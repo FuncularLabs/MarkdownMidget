@@ -146,9 +146,21 @@ const MDM = {
           ...prev,
           attributes: { class: 'mdm-prosemirror', spellcheck: 'true' },
         }));
-        ctx.get(listenerCtx).markdownUpdated(() => {
+        const l = ctx.get(listenerCtx);
+        l.markdownUpdated(() => {
           if (suppressChange) return;
           postToHost({ type: 'change' });
+        });
+        // Report the block type at the cursor so the host can reflect it in the
+        // Style dropdown/menu.
+        l.selectionUpdated((_ctx, selection) => {
+          const node = selection?.$head?.parent;
+          let style = 'paragraph';
+          if (node) {
+            if (node.type.name === 'heading') style = 'h' + (node.attrs.level || 1);
+            else style = node.type.name; // paragraph, blockquote, code_block, …
+          }
+          postToHost({ type: 'selection', style });
         });
       })
       .config(nord)

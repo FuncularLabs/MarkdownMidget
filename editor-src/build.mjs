@@ -1,7 +1,8 @@
 // Bundles the Milkdown editor surface into the WPF app's wwwroot.
 // esbuild collects the CSS imported from JS into a sibling .css bundle.
 import esbuild from 'esbuild';
-import { cpSync, mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -22,8 +23,16 @@ const options = {
   minify: true,
 };
 
+// Copy index.html, stamping the bundle references with a content hash so the
+// WebView2 never serves a stale cached bundle after a rebuild.
 function copyStatic() {
-  cpSync(resolve(here, 'index.html'), resolve(outdir, 'index.html'));
+  const js = readFileSync(resolve(outdir, 'editor.bundle.js'));
+  const css = readFileSync(resolve(outdir, 'editor.bundle.css'));
+  const v = createHash('sha256').update(js).update(css).digest('hex').slice(0, 12);
+  const html = readFileSync(resolve(here, 'index.html'), 'utf8')
+    .replace('editor.bundle.css', `editor.bundle.css?v=${v}`)
+    .replace('editor.bundle.js', `editor.bundle.js?v=${v}`);
+  writeFileSync(resolve(outdir, 'index.html'), html);
 }
 
 const watch = process.argv.includes('--watch');

@@ -7,12 +7,16 @@
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <!-- Old-school flat icon buttons (Notepad++-style), Segoe Fluent glyphs. -->
+        <!-- Toolbar buttons never take focus, so clicking them can't move the
+             document caret or drop the current text selection. -->
         <Style x:Key="ToolGlyph" TargetType="{x:Type ButtonBase}">
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             <Setter Property="FontSize" Value="16" />
             <Setter Property="MinWidth" Value="30" />
             <Setter Property="Height" Value="26" />
             <Setter Property="Padding" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
         </Style>
         <!-- Buttons whose mark has no clean glyph; use a text symbol instead. -->
         <Style x:Key="ToolChar" TargetType="{x:Type ButtonBase}">
@@ -20,6 +24,8 @@
             <Setter Property="MinWidth" Value="30" />
             <Setter Property="Height" Value="26" />
             <Setter Property="Padding" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
         </Style>
     </Window.Resources>
     <DockPanel>
@@ -109,7 +115,8 @@
                         <Separator />
                         <!-- Paragraph style: replaces WordPad's font-size box ("Styles, not size"). -->
                         <TextBlock Text="Style:" VerticalAlignment="Center" Margin="4,0,4,0" />
-                        <ComboBox x:Name="StyleCombo" Width="150" ToolTip="Paragraph style (Ctrl+Shift+H)"
+                        <ComboBox x:Name="StyleCombo" Width="150" IsTabStop="False"
+                                  ToolTip="Paragraph style (Ctrl+Shift+H)"
                                   SelectionChanged="StyleCombo_Changed">
                             <ComboBoxItem Content="Paragraph" Tag="paragraph" IsSelected="True" />
                             <ComboBoxItem Content="H1 &#8212; Heading 1" Tag="h1" />
@@ -126,7 +133,10 @@
                         <Button Style="{StaticResource ToolChar}" ToolTip="Inline code" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
                         <Separator />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Bulleted list" Click="Bullet_Click" Content="&#xE8FD;" />
-                        <Button Style="{StaticResource ToolChar}" ToolTip="Numbered list" Click="Ordered_Click" Content="1." />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Numbered list" Click="Ordered_Click">
+                            <Image Source="/Assets/numbered-list-64.png" Width="16" Height="16"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Button>
                         <Button Style="{StaticResource ToolChar}" ToolTip="Block quote" Click="Quote_Click" FontSize="18" Content="&#x275D;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Horizontal rule" Click="Hr_Click" Content="&#xE738;" />
                         <Separator />

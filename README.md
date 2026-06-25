@@ -73,19 +73,19 @@ npm run build    # writes src/MarkdownMidget/wwwroot/editor.bundle.{js,css}
 
 `npm run watch` rebuilds on change during development.
 
-## Distribution (self-contained build)
+## Distribution (single-file builds)
 
-`Release` is configured to publish a **single self-contained `.exe`** for alpha
-testers — the .NET runtime is bundled, so no SDK/runtime install is needed
-(testers do need the Edge **WebView2 runtime**, which ships with Windows 11):
+Two `Release` publish profiles, both producing a single `.exe` (the editor bundle
+is embedded). Testers need the Edge **WebView2 runtime** either way (ships with
+Windows 11).
 
-```sh
-dotnet publish src/MarkdownMidget -p:PublishProfile=win-x64
-# -> src/MarkdownMidget/bin/Release/net10.0-windows/win-x64/publish/MarkdownMidget.exe
-```
+| Profile | Command | Size | Needs on target |
+| --- | --- | --- | --- |
+| Self-contained | `dotnet publish src/MarkdownMidget -p:PublishProfile=win-x64` | ~63 MB | nothing (runtime bundled) |
+| Framework-dependent | `dotnet publish src/MarkdownMidget -p:PublishProfile=win-x64-fxdependent` | ~2.7 MB | .NET 10 Desktop runtime |
 
-Debug/`dotnet run` stay framework-dependent and fast; only this profile produces
-the bundled binary.
+Output: `src/MarkdownMidget/bin/Release/net10.0-windows/win-x64/publish/MarkdownMidget.exe`.
+Debug/`dotnet run` stay framework-dependent and fast.
 
 ## Icon / mascot
 

@@ -62,7 +62,9 @@ public partial class MainWindow : Window
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = false;
 
-        core.Navigate($"https://{VirtualHost}/index.html");
+        // Per-launch nonce defeats WebView2's disk cache so a rebuilt editor bundle
+        // is always loaded fresh (the bundle refs inside index.html are also hashed).
+        core.Navigate($"https://{VirtualHost}/index.html?n={Guid.NewGuid():N}");
     }
 
     /// <summary>
@@ -119,6 +121,15 @@ public partial class MainWindow : Window
                 if (!_sourceMode)
                     MarkDirty();
                 break;
+            case "selection":
+                // Reflect the block type at the cursor in the Style dropdown.
+                if (!_sourceMode)
+                {
+                    using var d = JsonDocument.Parse(e.WebMessageAsJson);
+                    if (d.RootElement.TryGetProperty("style", out var s))
+                        SyncStyleCombo(s.GetString() ?? "paragraph");
+                }
+                break;
         }
     }
 
@@ -144,6 +155,7 @@ public partial class MainWindow : Window
         if (!_editorReady) return;
         _ = RunEditorAsync($"window.MDM.cmd({JsLiteral(name)})");
         MarkDirty();
+        RefocusEditor();
     }
 
     /// <summary>Inserts a markdown fragment (link/image) into the active surface.</summary>
@@ -160,6 +172,7 @@ public partial class MainWindow : Window
             _ = RunEditorAsync($"window.MDM.insertMarkdown({JsLiteral(md)})");
         }
         MarkDirty();
+        RefocusEditor();
     }
 
     private void InsertCodeBlock(string language)
@@ -173,6 +186,17 @@ public partial class MainWindow : Window
         if (!_editorReady) return;
         _ = RunEditorAsync($"window.MDM.cmd({JsLiteral("codeblock")}, {JsLiteral(language)})");
         MarkDirty();
+        RefocusEditor();
+    }
+
+    /// <summary>
+    /// Returns focus to the active editing surface after a toolbar/menu action so the
+    /// caret and selection stay put and the user can keep typing immediately.
+    /// </summary>
+    private void RefocusEditor()
+    {
+        if (_sourceMode) SourceBox.Focus();
+        else Web.Focus(); // MDM.cmd/insertMarkdown already restores the DOM caret in JS
     }
 
     private static string JsLiteral(string value) => JsonSerializer.Serialize(value);
@@ -229,6 +253,8 @@ public partial class MainWindow : Window
         SourceToggle.ToolTip = on
             ? "Switch to formatted view (Ctrl+E)"
             : "Edit markdown source (Ctrl+E)";
+
+        RefocusEditor();
     }
 
     // ===== File operations =====
