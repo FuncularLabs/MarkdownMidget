@@ -26,6 +26,12 @@ export const formattingMarks = $prose(() => new Plugin({
         if (node.type.name === 'hardbreak') {
           decos.push(Decoration.widget(pos, mark('↵', 'break'),
             { side: -1, ignoreSelection: true }));
+        } else if (node.isText && node.text && node.text.includes('\t')) {
+          // A tab arrow (→) for each tab character.
+          for (let i = node.text.indexOf('\t'); i !== -1; i = node.text.indexOf('\t', i + 1)) {
+            decos.push(Decoration.widget(pos + i, mark('→', 'tab'),
+              { side: -1, ignoreSelection: true }));
+          }
         } else if (node.isTextblock &&
                    (node.type.name === 'paragraph' || node.type.name === 'heading')) {
           const end = pos + node.nodeSize - 1; // just inside the block's close

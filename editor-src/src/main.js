@@ -113,6 +113,63 @@ const exitBlockKeymap = $useKeymap('mdmExitBlockKeymap', {
   },
 });
 
+// ArrowUp at the top line of a code block that is the FIRST block inserts a
+// paragraph above it — the only keyboard way out when there's nothing to click.
+const escapeUpCommand = $command('EscapeCodeBlockUp', () => () => (state, dispatch) => {
+  const { $head, empty } = state.selection;
+  if (!empty) return false;
+  const node = $head.parent;
+  if (node.type.name !== 'code_block') return false;
+  if ($head.before($head.depth) !== 0) return false;        // not the first block
+  if (node.textBetween(0, $head.parentOffset).includes('\n')) return false; // not first line
+  const paragraph = state.schema.nodes.paragraph;
+  if (!paragraph) return false;
+  if (dispatch) {
+    const tr = state.tr.insert(0, paragraph.createAndFill());
+    tr.setSelection(TextSelection.create(tr.doc, 1)).scrollIntoView();
+    dispatch(tr);
+  }
+  return true;
+});
+
+const escapeUpKeymap = $useKeymap('mdmEscapeUpKeymap', {
+  EscapeCodeBlockUp: {
+    shortcuts: 'ArrowUp',
+    command: (ctx) => { const c = ctx.get(commandsCtx); return () => c.call(escapeUpCommand.key); },
+  },
+});
+
+// Tab inserts a tab character (Shift+Tab removes a preceding one), except inside
+// list items where Tab keeps its indent/outdent behavior.
+const inList = ($pos) => {
+  for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type.name === 'list_item') return true;
+  return false;
+};
+const insertTabCommand = $command('InsertTab', () => () => (state, dispatch) => {
+  if (inList(state.selection.$head)) return false;
+  if (dispatch) dispatch(state.tr.insertText('\t').scrollIntoView());
+  return true;
+});
+const removeTabCommand = $command('RemoveTab', () => () => (state, dispatch) => {
+  const { $head, empty } = state.selection;
+  if (!empty || inList($head)) return false;
+  const pos = $head.pos;
+  if (pos < 1 || state.doc.textBetween(pos - 1, pos) !== '\t') return false;
+  if (dispatch) dispatch(state.tr.delete(pos - 1, pos).scrollIntoView());
+  return true;
+});
+
+const tabKeymap = $useKeymap('mdmTabKeymap', {
+  InsertTab: {
+    shortcuts: 'Tab',
+    command: (ctx) => { const c = ctx.get(commandsCtx); return () => c.call(insertTabCommand.key); },
+  },
+  RemoveTab: {
+    shortcuts: 'Shift-Tab',
+    command: (ctx) => { const c = ctx.get(commandsCtx); return () => c.call(removeTabCommand.key); },
+  },
+});
+
 // Headings + paragraph keymap: Ctrl+1..Ctrl+5 => H1..H5, Ctrl+0 => paragraph.
 const headingKeymap = $useKeymap('mdmHeadingKeymap', {
   Paragraph: {
@@ -206,6 +263,11 @@ const MDM = {
       .use(headingEnterKeymap)
       .use(exitBlockCommand)
       .use(exitBlockKeymap)
+      .use(escapeUpCommand)
+      .use(escapeUpKeymap)
+      .use(insertTabCommand)
+      .use(removeTabCommand)
+      .use(tabKeymap)
       .use(headingKeymap)
       .create();
 
