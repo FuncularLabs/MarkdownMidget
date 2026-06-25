@@ -1,0 +1,367 @@
+using System.IO;
+using System.Reflection;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Win32;
+
+namespace MarkdownMidget;
+
+/// <summary>
+/// Main window. Hosts the Milkdown WYSIWYG surface in a WebView2 and provides a
+/// WordPad-style menu/toolbar plus a toggleable raw-markdown source view.
+/// </summary>
+public partial class MainWindow : Window
+{
+    private const string VirtualHost = "markdownmidget.invalid";
+
+    // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
+    private static readonly string GlyphSource = char.ConvertFromUtf32(0xE943); // braces {} = markdown source
+    private static readonly string GlyphRich = char.ConvertFromUtf32(0xE8A5);   // document = formatted view
+
+    private string? _currentPath;
+    private bool _dirty;
+    private bool _editorReady;
+    private bool _sourceMode;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        RegisterShortcuts();
+        SourceToggle.Content = GlyphSource; // start in WYSIWYG; button offers source view
+        Loaded += async (_, _) => await InitializeEditorAsync();
+        Closing += MainWindow_Closing;
+        UpdateTitle();
+    }
+
+    // ===== WebView2 / editor bootstrap =====
+
+    private async Task InitializeEditorAsync()
+    {
+        var wwwroot = ExtractEmbeddedEditor();
+
+        // Keep the user-data folder out of Program Files / the app directory.
+        var userData = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MarkdownMidget", "WebView2");
+        Directory.CreateDirectory(userData);
+
+        var env = await CoreWebView2Environment.CreateAsync(null, userData);
+        await Web.EnsureCoreWebView2Async(env);
+
+        var core = Web.CoreWebView2;
+        core.SetVirtualHostNameToFolderMapping(
+            VirtualHost, wwwroot, CoreWebView2HostResourceAccessKind.Allow);
+        core.WebMessageReceived += OnWebMessage;
+
+        // Lock down the host shell: it is a local app, not a browser.
+        core.Settings.AreDefaultContextMenusEnabled = false;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.AreBrowserAcceleratorKeysEnabled = false;
+
+        core.Navigate($"https://{VirtualHost}/index.html");
+    }
+
+    /// <summary>
+    /// Writes the embedded editor bundle to a local folder and returns its path.
+    /// Embedding (rather than shipping a loose wwwroot) lets a self-contained
+    /// publish stay a single file; WebView2 still needs the assets on disk to map.
+    /// </summary>
+    private static string ExtractEmbeddedEditor()
+    {
+        const string prefix = "wwwroot/";
+        var asm = Assembly.GetExecutingAssembly();
+        var target = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MarkdownMidget", "editor");
+        Directory.CreateDirectory(target);
+
+        foreach (var name in asm.GetManifestResourceNames())
+        {
+            if (!name.StartsWith(prefix, StringComparison.Ordinal)) continue;
+            using var stream = asm.GetManifestResourceStream(name);
+            if (stream is null) continue;
+            var dest = Path.Combine(target, name[prefix.Length..]);
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            using var file = File.Create(dest);
+            stream.CopyTo(file);
+        }
+
+        return target;
+    }
+
+    private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        string type;
+        try
+        {
+            using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+            type = doc.RootElement.GetProperty("type").GetString() ?? "";
+        }
+        catch
+        {
+            return;
+        }
+
+        switch (type)
+        {
+            case "loaded":
+                // Bridge is wired; hand the editor its initial (empty) document.
+                _ = RunEditorAsync($"window.MDM.create({JsLiteral(string.Empty)})");
+                break;
+            case "ready":
+                _editorReady = true;
+                break;
+            case "change":
+                if (!_sourceMode)
+                    MarkDirty();
+                break;
+        }
+    }
+
+    /// <summary>Runs JS in the editor and returns its (JSON-decoded string) result.</summary>
+    private async Task<string?> RunEditorAsync(string script)
+    {
+        if (Web.CoreWebView2 is null) return null;
+        var raw = await Web.CoreWebView2.ExecuteScriptAsync(script);
+        if (string.IsNullOrEmpty(raw) || raw == "null") return null;
+        try { return JsonSerializer.Deserialize<string>(raw); }
+        catch { return raw; }
+    }
+
+    private void EditorCommand(string name)
+    {
+        if (_sourceMode || !_editorReady) return;
+        _ = RunEditorAsync($"window.MDM.cmd({JsLiteral(name)})");
+        MarkDirty();
+    }
+
+    private static string JsLiteral(string value) => JsonSerializer.Serialize(value);
+
+    private async Task<string> GetDocumentMarkdownAsync()
+    {
+        if (_sourceMode) return SourceBox.Text;
+        if (!_editorReady) return string.Empty;
+        return await RunEditorAsync("window.MDM.getMarkdown()") ?? string.Empty;
+    }
+
+    private async Task SetDocumentMarkdownAsync(string markdown)
+    {
+        SourceBox.Text = markdown;
+        if (_editorReady)
+            await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
+    }
+
+    // ===== Source / WYSIWYG toggle =====
+
+    private async void ToggleSource_Click(object sender, RoutedEventArgs e)
+    {
+        await SetSourceModeAsync(!_sourceMode);
+    }
+
+    private async Task SetSourceModeAsync(bool on)
+    {
+        if (on == _sourceMode) return;
+
+        if (on)
+        {
+            // Entering source: pull the latest markdown out of the editor.
+            SourceBox.Text = await GetDocumentMarkdownAsync();
+            Web.Visibility = Visibility.Collapsed;
+            SourceBox.Visibility = Visibility.Visible;
+            SourceBox.Focus();
+        }
+        else
+        {
+            // Leaving source: push edits back into the WYSIWYG editor.
+            await SetDocumentMarkdownAsync(SourceBox.Text);
+            SourceBox.Visibility = Visibility.Collapsed;
+            Web.Visibility = Visibility.Visible;
+        }
+
+        _sourceMode = on;
+        SourceToggle.IsChecked = on;
+        MenuViewSource.IsChecked = on;
+        StatusMode.Text = on ? "Markdown source" : "WYSIWYG";
+
+        // The button shows the view it switches TO: braces = markdown source,
+        // document = formatted (WYSIWYG).
+        SourceToggle.Content = on ? GlyphSource : GlyphRich;
+        SourceToggle.ToolTip = on
+            ? "Switch to formatted view (Ctrl+E)"
+            : "Edit markdown source (Ctrl+E)";
+    }
+
+    // ===== File operations =====
+
+    private async Task<bool> ConfirmDiscardAsync()
+    {
+        if (!_dirty) return true;
+        var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
+        var result = MessageBox.Show(
+            $"Save changes to {name}?", "Markdown Midget",
+            MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        return result switch
+        {
+            MessageBoxResult.Yes => await SaveAsync(false),
+            MessageBoxResult.No => true,
+            _ => false,
+        };
+    }
+
+    private async void New_Click(object sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmDiscardAsync()) return;
+        await SetDocumentMarkdownAsync(string.Empty);
+        _currentPath = null;
+        _dirty = false;
+        UpdateTitle();
+    }
+
+    private async void Open_Click(object sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmDiscardAsync()) return;
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Markdown (*.md;*.markdown)|*.md;*.markdown|Text (*.txt)|*.txt|All files (*.*)|*.*",
+            DefaultExt = ".md",
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        var text = await File.ReadAllTextAsync(dlg.FileName);
+        await SetDocumentMarkdownAsync(text);
+        _currentPath = dlg.FileName;
+        _dirty = false;
+        UpdateTitle();
+    }
+
+    private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync(false);
+
+    private async void SaveAs_Click(object sender, RoutedEventArgs e) => await SaveAsync(true);
+
+    private async Task<bool> SaveAsync(bool forcePrompt)
+    {
+        var path = _currentPath;
+        if (forcePrompt || path is null)
+        {
+            var dlg = new SaveFileDialog
+            {
+                Filter = "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = ".md",
+                FileName = _currentPath is null ? "Untitled.md" : Path.GetFileName(_currentPath),
+            };
+            if (dlg.ShowDialog(this) != true) return false;
+            path = dlg.FileName;
+        }
+
+        var markdown = await GetDocumentMarkdownAsync();
+        await File.WriteAllTextAsync(path, markdown);
+        _currentPath = path;
+        _dirty = false;
+        UpdateTitle();
+        return true;
+    }
+
+    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+
+    private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_dirty)
+        {
+            e.Cancel = true; // Defer; re-close after the async prompt resolves.
+            if (await ConfirmDiscardAsync())
+            {
+                _dirty = false;
+                Close();
+            }
+        }
+    }
+
+    // ===== Edit menu (native shortcuts also work in each surface) =====
+
+    private void Undo_Click(object sender, RoutedEventArgs e) => EditOrEditor("undo", "document.execCommand('undo')");
+    private void Redo_Click(object sender, RoutedEventArgs e) => EditOrEditor("redo", "document.execCommand('redo')");
+    private void Cut_Click(object sender, RoutedEventArgs e) => EditOrEditor("cut", "document.execCommand('cut')");
+    private void Copy_Click(object sender, RoutedEventArgs e) => EditOrEditor("copy", "document.execCommand('copy')");
+    private void Paste_Click(object sender, RoutedEventArgs e) => EditOrEditor("paste", null);
+    private void SelectAll_Click(object sender, RoutedEventArgs e) => EditOrEditor("selectall", "document.execCommand('selectAll')");
+
+    /// <summary>In source mode operate on the TextBox; in WYSIWYG defer to the editor.</summary>
+    private void EditOrEditor(string textBoxAction, string? editorScript)
+    {
+        if (_sourceMode)
+        {
+            switch (textBoxAction)
+            {
+                case "undo": SourceBox.Undo(); break;
+                case "redo": SourceBox.Redo(); break;
+                case "cut": SourceBox.Cut(); break;
+                case "copy": SourceBox.Copy(); break;
+                case "paste": SourceBox.Paste(); break;
+                case "selectall": SourceBox.SelectAll(); break;
+            }
+            return;
+        }
+        if (editorScript is not null && _editorReady)
+            _ = RunEditorAsync(editorScript);
+    }
+
+    // ===== Format commands =====
+
+    private void Bold_Click(object sender, RoutedEventArgs e) => EditorCommand("bold");
+    private void Italic_Click(object sender, RoutedEventArgs e) => EditorCommand("italic");
+    private void Underline_Click(object sender, RoutedEventArgs e) => EditorCommand("underline");
+    private void Strike_Click(object sender, RoutedEventArgs e) => EditorCommand("strike");
+    private void Code_Click(object sender, RoutedEventArgs e) => EditorCommand("code");
+    private void Bullet_Click(object sender, RoutedEventArgs e) => EditorCommand("bullet");
+    private void Ordered_Click(object sender, RoutedEventArgs e) => EditorCommand("ordered");
+    private void Quote_Click(object sender, RoutedEventArgs e) => EditorCommand("quote");
+    private void Hr_Click(object sender, RoutedEventArgs e) => EditorCommand("hr");
+
+    private void StyleCombo_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (StyleCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            EditorCommand(tag);
+    }
+
+    // ===== Misc UI =====
+
+    private void About_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(
+            "Markdown Midget\nA WYSIWYG markdown editor.\n\nMarkdown is the native format.",
+            "About Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void MarkDirty()
+    {
+        if (_dirty) return;
+        _dirty = true;
+        UpdateTitle();
+    }
+
+    private void UpdateTitle()
+    {
+        var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
+        Title = $"{(_dirty ? "*" : "")}{name} — Markdown Midget";
+        StatusFile.Text = name;
+    }
+
+    private void RegisterShortcuts()
+    {
+        void Bind(Key key, ModifierKeys mods, ExecutedRoutedEventHandler handler)
+        {
+            var cmd = new RoutedCommand();
+            cmd.InputGestures.Add(new KeyGesture(key, mods));
+            CommandBindings.Add(new CommandBinding(cmd, handler));
+        }
+
+        Bind(Key.N, ModifierKeys.Control, (_, _) => New_Click(this, new RoutedEventArgs()));
+        Bind(Key.O, ModifierKeys.Control, (_, _) => Open_Click(this, new RoutedEventArgs()));
+        Bind(Key.S, ModifierKeys.Control, (_, _) => Save_Click(this, new RoutedEventArgs()));
+        Bind(Key.S, ModifierKeys.Control | ModifierKeys.Shift, (_, _) => SaveAs_Click(this, new RoutedEventArgs()));
+        Bind(Key.E, ModifierKeys.Control, (_, _) => ToggleSource_Click(this, new RoutedEventArgs()));
+    }
+}

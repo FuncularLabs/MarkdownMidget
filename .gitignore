@@ -1,0 +1,14 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+*.user
+
+# Node / editor bundle deps
+node_modules/
+
+# Generated editor bundle (rebuilt from editor-src via `npm run build`)
+src/MarkdownMidget/wwwroot/*.map
+
+# IDE
+.vs/
+*.suo

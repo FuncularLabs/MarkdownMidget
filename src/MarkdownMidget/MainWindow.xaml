@@ -1,0 +1,134 @@
+<Window x:Class="MarkdownMidget.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Markdown Midget" Height="720" Width="980"
+        Icon="/Assets/midget-256.png"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <!-- Old-school flat icon buttons (Notepad++-style), Segoe Fluent glyphs. -->
+        <Style x:Key="ToolGlyph" TargetType="{x:Type ButtonBase}">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <!-- Buttons whose mark has no clean glyph; use a text symbol instead. -->
+        <Style x:Key="ToolChar" TargetType="{x:Type ButtonBase}">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+    </Window.Resources>
+    <DockPanel>
+        <!-- ===== Menu bar (WordPad-style, MVP subset) ===== -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGestureText="Ctrl+N" Click="New_Click" />
+                <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click" />
+                <Separator />
+                <MenuItem Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click" />
+                <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="Exit_Click" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Click="Undo_Click" />
+                <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Click="Redo_Click" />
+                <Separator />
+                <MenuItem Header="Cu_t" InputGestureText="Ctrl+X" Click="Cut_Click" />
+                <MenuItem Header="_Copy" InputGestureText="Ctrl+C" Click="Copy_Click" />
+                <MenuItem Header="_Paste" InputGestureText="Ctrl+V" Click="Paste_Click" />
+                <Separator />
+                <MenuItem Header="Select _All" InputGestureText="Ctrl+A" Click="SelectAll_Click" />
+            </MenuItem>
+            <MenuItem Header="F_ormat">
+                <MenuItem Header="_Bold" InputGestureText="Ctrl+B" Click="Bold_Click" />
+                <MenuItem Header="_Italic" InputGestureText="Ctrl+I" Click="Italic_Click" />
+                <MenuItem Header="_Underline" InputGestureText="Ctrl+U" Click="Underline_Click" />
+                <MenuItem Header="_Strikethrough" Click="Strike_Click" />
+                <MenuItem Header="Inline _Code" Click="Code_Click" />
+                <Separator />
+                <MenuItem Header="Bulleted _List" Click="Bullet_Click" />
+                <MenuItem Header="_Numbered List" Click="Ordered_Click" />
+                <MenuItem Header="Block _Quote" Click="Quote_Click" />
+                <MenuItem Header="_Horizontal Rule" Click="Hr_Click" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem x:Name="MenuViewSource" Header="Edit Markdown _Source"
+                          IsCheckable="True" InputGestureText="Ctrl+E" Click="ToggleSource_Click" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About Markdown Midget" Click="About_Click" />
+            </MenuItem>
+        </Menu>
+
+        <!-- ===== Toolbar (mascot pinned to the right) ===== -->
+        <DockPanel DockPanel.Dock="Top" Background="{x:Static SystemColors.ControlBrush}">
+            <Image DockPanel.Dock="Right" Source="/Assets/midget-64.png"
+                   Width="26" Height="26" Margin="8,2,10,2"
+                   ToolTip="Markdown Midget" RenderOptions.BitmapScalingMode="HighQuality" />
+            <ToolBarTray IsLocked="True">
+            <ToolBar Band="0" BandIndex="0">
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="New (Ctrl+N)" Click="New_Click" Content="&#xE7C3;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Open (Ctrl+O)" Click="Open_Click" Content="&#xED25;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Save (Ctrl+S)" Click="Save_Click" Content="&#xE74E;" />
+                <Separator />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click" Content="&#xE7A7;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Redo (Ctrl+Y)" Click="Redo_Click" Content="&#xE7A6;" />
+                <Separator />
+                <!-- Paragraph style: replaces WordPad's font-size box ("Styles, not size"). -->
+                <TextBlock Text="Style:" VerticalAlignment="Center" Margin="4,0,4,0" />
+                <ComboBox x:Name="StyleCombo" Width="116" SelectionChanged="StyleCombo_Changed">
+                    <ComboBoxItem Content="Paragraph" Tag="paragraph" IsSelected="True" />
+                    <ComboBoxItem Content="Heading 1" Tag="h1" />
+                    <ComboBoxItem Content="Heading 2" Tag="h2" />
+                    <ComboBoxItem Content="Heading 3" Tag="h3" />
+                </ComboBox>
+                <Separator />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Bold (Ctrl+B)" Click="Bold_Click" Content="&#xE8DD;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Italic (Ctrl+I)" Click="Italic_Click" Content="&#xE8DB;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Underline (Ctrl+U)" Click="Underline_Click" Content="&#xE8DC;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Strikethrough" Click="Strike_Click" Content="&#xEDE0;" />
+                <Button Style="{StaticResource ToolChar}" ToolTip="Inline code" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
+                <Separator />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Bulleted list" Click="Bullet_Click" Content="&#xE8FD;" />
+                <Button Style="{StaticResource ToolChar}" ToolTip="Numbered list" Click="Ordered_Click" Content="1." />
+                <Button Style="{StaticResource ToolChar}" ToolTip="Block quote" Click="Quote_Click" FontSize="18" Content="&#x275D;" />
+                <Button Style="{StaticResource ToolGlyph}" ToolTip="Horizontal rule" Click="Hr_Click" Content="&#xE738;" />
+                <Separator />
+                <ToggleButton x:Name="SourceToggle" Style="{StaticResource ToolGlyph}"
+                              ToolTip="Edit markdown source (Ctrl+E)"
+                              Click="ToggleSource_Click" />
+            </ToolBar>
+            </ToolBarTray>
+        </DockPanel>
+
+        <!-- ===== Status bar ===== -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusMode" Text="WYSIWYG" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock x:Name="StatusFile" Text="Untitled" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- ===== Editing surface: WebView (WYSIWYG) over a raw-markdown box ===== -->
+        <Grid>
+            <wv2:WebView2 x:Name="Web" />
+            <TextBox x:Name="SourceBox"
+                     Visibility="Collapsed"
+                     AcceptsReturn="True" AcceptsTab="True"
+                     TextWrapping="NoWrap"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Auto"
+                     FontFamily="Consolas" FontSize="14"
+                     Padding="12"
+                     Background="#FFFBFBFB" />
+        </Grid>
+    </DockPanel>
+</Window>

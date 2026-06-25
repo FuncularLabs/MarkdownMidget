@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\midget.ico</ApplicationIcon>
+    <AssemblyName>MarkdownMidget</AssemblyName>
+    <RootNamespace>MarkdownMidget</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
+    <PackageReference Include="Markdig" Version="0.41.3" />
+  </ItemGroup>
+
+  <!-- App icon + mascot images shown in the title bar, taskbar and toolbar. -->
+  <ItemGroup>
+    <Resource Include="Assets\midget-64.png" />
+    <Resource Include="Assets\midget-256.png" />
+  </ItemGroup>
+
+  <!-- The Milkdown editor bundle (built by editor-src) is embedded in the assembly
+       and extracted at runtime. This keeps a self-contained single-file publish to
+       one actual file instead of an exe plus a loose wwwroot folder. -->
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\index.html;wwwroot\editor.bundle.js;wwwroot\editor.bundle.css">
+      <LogicalName>wwwroot/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

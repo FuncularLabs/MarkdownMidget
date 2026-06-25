@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Markdown Midget — self test</title>
+    <link rel="stylesheet" href="./editor.bundle.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="./editor.bundle.js"></script>
+    <script>
+      // Stand in for the WPF host: initialize the editor with a demo document.
+      window.addEventListener('load', async () => {
+        const demo = [
+          '# Markdown Midget',
+          '',
+          'A **WYSIWYG** markdown editor with _live_ formatting, <u>underline</u>, and `inline code`.',
+          '',
+          '## Features',
+          '',
+          '- Bullet lists',
+          '- ~~Strikethrough~~ (GFM)',
+          '',
+          '1. Numbered lists',
+          '2. Block quotes:',
+          '',
+          '> Markdown is the native format.',
+          '',
+          '---',
+        ].join('\n');
+        await window.MDM.create(demo);
+        // Echo round-tripped markdown so the harness can assert on it.
+        window.__roundTrip = window.MDM.getMarkdown();
+      });
+    </script>
+  </body>
+</html>
