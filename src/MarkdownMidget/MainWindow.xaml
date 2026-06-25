@@ -44,7 +44,7 @@
                         <MenuItem Header="_New" InputGestureText="Ctrl+N" Click="New_Click" />
                         <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click" />
                         <Separator />
-                        <MenuItem Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click" />
+                        <MenuItem x:Name="SaveMenu" Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click" />
                         <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click" />
                         <Separator />
                         <MenuItem Header="E_xit" Click="Exit_Click" />
@@ -117,7 +117,7 @@
                                   IsCheckable="True" IsChecked="True" Click="SpellCheck_Click" />
                     </MenuItem>
                     <MenuItem Header="_Help">
-                        <MenuItem Header="_View Help" Click="Help_Click" />
+                        <MenuItem x:Name="MenuViewHelp" Header="_View Help" Click="Help_Click" />
                         <Separator />
                         <MenuItem Header="_About Markdown Midget" Click="About_Click" />
                     </MenuItem>
@@ -129,7 +129,7 @@
                     <ToolBar Band="0" BandIndex="0">
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="New (Ctrl+N)" Click="New_Click" Content="&#xE7C3;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Open (Ctrl+O)" Click="Open_Click" Content="&#xED25;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Save (Ctrl+S)" Click="Save_Click" Content="&#xE74E;" />
+                        <Button x:Name="SaveBtn" Style="{StaticResource ToolGlyph}" ToolTip="Save (Ctrl+S)" Click="Save_Click" Content="&#xE74E;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Save As… (Ctrl+Shift+S)" Click="SaveAs_Click" Content="&#xEA35;" />
                         <Separator />
                         <Button x:Name="UndoBtn" Style="{StaticResource ToolGlyph}" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click" Content="&#xE7A7;" />

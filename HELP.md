@@ -72,9 +72,10 @@ and heading ends, **↵** at manual line breaks, and **→** for tabs.
 
 **Edit ▸ Read Only** locks the document against changes (this Help window uses it).
 All document-modifying controls — the formatting toolbar, the Format/Style/Insert
-menus, and Undo/Redo — gray out, while **Open / New / Save / Save As** and the
-view toggles stay available. The title bar shows **`[Read Only]`**. You can also
-start read-only from the command line with `--readonly`.
+menus, Undo/Redo, and plain **Save** — gray out, while **Open / New / Save As** and
+the view toggles stay available (use **Save As** to keep a copy elsewhere). The
+title bar shows **`[Read Only]`**. You can also start read-only from the command
+line with `--readonly`.
 
 ## Modified state, undo, and saving
 

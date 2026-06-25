@@ -18,6 +18,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
+    private const string AppVersion = "v0.1-alpha1";
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
     private static readonly string GlyphSource = char.ConvertFromUtf32(0xE943); // braces {} = markdown source
@@ -37,6 +38,7 @@ public partial class MainWindow : Window
     private bool _suppressDirty;
     private string? _pendingOpenPath;
     private bool _startReadOnly;
+    private bool _isHelpWindow;
     private bool _readOnly;
     private readonly DispatcherTimer _dirtyTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
@@ -51,8 +53,11 @@ public partial class MainWindow : Window
         foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
         {
             if (arg is "--readonly" or "-r" or "/readonly") _startReadOnly = true;
+            else if (arg is "--help-window") { _isHelpWindow = true; _startReadOnly = true; }
             else if (File.Exists(arg)) _pendingOpenPath ??= arg;
         }
+
+        if (_isHelpWindow) MenuViewHelp.IsEnabled = false; // no help-of-help
 
         Loaded += async (_, _) => await InitializeEditorAsync();
         Closing += MainWindow_Closing;
@@ -365,6 +370,10 @@ public partial class MainWindow : Window
 
     private async Task<bool> SaveAsync(bool forcePrompt)
     {
+        // Plain Save is disabled in read-only mode (it would overwrite the same file);
+        // Save As (forcePrompt) still works so the content can be kept elsewhere.
+        if (_readOnly && !forcePrompt) return false;
+
         var path = _currentPath;
         if (forcePrompt || path is null)
         {
@@ -379,7 +388,16 @@ public partial class MainWindow : Window
         }
 
         var markdown = await GetDocumentMarkdownAsync();
-        await File.WriteAllTextAsync(path, markdown);
+        try
+        {
+            await File.WriteAllTextAsync(path, markdown);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Couldn't save the file:\n{ex.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
         _currentPath = path;
         _cleanMarkdown = markdown; // new clean baseline; undo history is left intact
         _dirty = false;
@@ -615,12 +633,12 @@ public partial class MainWindow : Window
         Activate();
     }
 
-    private static void OpenInNewInstance(string path, bool readOnly = false)
+    private static void OpenInNewInstance(string path, bool readOnly = false, bool helpWindow = false)
     {
         var exe = Environment.ProcessPath;
         if (exe is null) return;
-        var args = readOnly ? $"\"{path}\" --readonly" : $"\"{path}\"";
-        try { Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false }); }
+        var flags = helpWindow ? " --help-window" : (readOnly ? " --readonly" : "");
+        try { Process.Start(new ProcessStartInfo(exe, $"\"{path}\"{flags}") { UseShellExecute = false }); }
         catch (Exception ex)
         {
             MessageBox.Show($"Couldn't open a new window:\n{ex.Message}", "Markdown Midget",
@@ -640,9 +658,11 @@ public partial class MainWindow : Window
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setEditable({(on ? "false" : "true")})");
 
-        // Gray out everything that modifies the document; Save/Save As/Open/New and
-        // the view toggles stay usable.
+        // Gray out everything that modifies the open file; Save As / Open / New and
+        // the view toggles stay usable (Save would overwrite the same file, so it is
+        // disabled — Save As to a new file is the read-only escape hatch).
         FormatToolBar.IsEnabled = FormatMenu.IsEnabled = StyleMenu.IsEnabled = InsertMenu.IsEnabled = !on;
+        SaveBtn.IsEnabled = SaveMenu.IsEnabled = !on;
         SetUndoRedoEnabled(_canUndo, _canRedo); // re-gate undo/redo for read-only
 
         StatusMode.Text = on ? (_sourceMode ? "Markdown source (read-only)" : "WYSIWYG (read-only)")
@@ -659,11 +679,17 @@ public partial class MainWindow : Window
             var path = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "MarkdownMidget", "HELP.md");
+
+            // Always restore the canonical help text from the embedded copy, then mark
+            // the file read-only so it's harder to overwrite by accident.
+            if (File.Exists(path)) File.SetAttributes(path, FileAttributes.Normal);
             var asm = Assembly.GetExecutingAssembly();
             using (var stream = asm.GetManifestResourceStream("HELP.md"))
             using (var file = File.Create(path))
                 stream!.CopyTo(file);
-            OpenInNewInstance(path, readOnly: true);
+            File.SetAttributes(path, FileAttributes.ReadOnly);
+
+            OpenInNewInstance(path, helpWindow: true);
         }
         catch (Exception ex)
         {
@@ -727,7 +753,7 @@ public partial class MainWindow : Window
     {
         var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
         var readOnly = _readOnly ? "          [Read Only]" : "";
-        Title = $"{(_dirty ? "*" : "")}{name}{readOnly} — Markdown Midget";
+        Title = $"{(_dirty ? "*" : "")}{name}{readOnly} — Markdown Midget {AppVersion}";
         StatusFile.Text = name;
     }
 
