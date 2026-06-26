@@ -30,7 +30,7 @@
         </Style>
 
         <!-- Native editor context menus (shown on right-click / Menu key in WYSIWYG). -->
-        <ContextMenu x:Key="TableContextMenu">
+        <ContextMenu x:Key="TableContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="_Insert">
                 <MenuItem Header="Column _Left" Tag="colLeft" Click="TableCmd_Click" />
                 <MenuItem Header="Column _Right" Tag="colRight" Click="TableCmd_Click" />
@@ -48,10 +48,10 @@
                 <MenuItem Header="Ta_ble" Tag="selTable" Click="TableCmd_Click" />
             </MenuItem>
         </ContextMenu>
-        <ContextMenu x:Key="ImageContextMenu">
+        <ContextMenu x:Key="ImageContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="_Resize…" Click="ImageResize_Click" />
         </ContextMenu>
-        <ContextMenu x:Key="TextContextMenu">
+        <ContextMenu x:Key="TextContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="Cu_t" Click="Cut_Click" />
             <MenuItem Header="_Copy" Click="Copy_Click" />
             <MenuItem Header="_Paste" Click="Paste_Click" />
@@ -73,7 +73,7 @@
                     <MenuItem Header="_File">
                         <MenuItem Header="_New" InputGestureText="Ctrl+N" Click="New_Click" />
                         <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click" />
-                        <MenuItem x:Name="RecentMenu" Header="Open _Recent" SubmenuOpened="RecentMenu_Opened" />
+                        <MenuItem x:Name="RecentMenu" Header="Open _Recent" />
                         <Separator />
                         <MenuItem x:Name="SaveMenu" Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click" />
                         <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click" />

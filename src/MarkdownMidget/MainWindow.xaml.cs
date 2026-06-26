@@ -55,6 +55,7 @@ public partial class MainWindow : Window
         _dirtyTimer.Tick += async (_, _) => { _dirtyTimer.Stop(); await UpdateDirtyAsync(); };
 
         LoadRecent();
+        BuildRecentMenu();
 
         foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
         {
@@ -225,6 +226,28 @@ public partial class MainWindow : Window
         cm.HorizontalOffset = x;
         cm.VerticalOffset = y;
         cm.IsOpen = true;
+    }
+
+    /// <summary>
+    /// The WebView2 (an HwndHost) keeps Win32 keyboard focus, so a menu opened over it
+    /// isn't keyboard-navigable until we pull focus into it and highlight an item.
+    /// </summary>
+    private void ContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu cm) return;
+        cm.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            cm.Focus();
+            if (cm.ItemContainerGenerator.ContainerFromIndex(0) is MenuItem first)
+            {
+                first.Focus();
+                Keyboard.Focus(first);
+            }
+            else
+            {
+                cm.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+            }
+        }));
     }
 
     private void TableCmd_Click(object sender, RoutedEventArgs e)
@@ -502,9 +525,12 @@ public partial class MainWindow : Window
         _recentFiles.Insert(0, full);
         while (_recentFiles.Count > MaxRecent) _recentFiles.RemoveAt(_recentFiles.Count - 1);
         SaveRecent();
+        BuildRecentMenu();
     }
 
-    private void RecentMenu_Opened(object sender, RoutedEventArgs e)
+    // Built eagerly (not just on submenu-open) so an empty submenu still shows and
+    // the list updates the moment a file is opened or saved.
+    private void BuildRecentMenu()
     {
         RecentMenu.Items.Clear();
         if (_recentFiles.Count == 0)
@@ -535,6 +561,7 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             _recentFiles.Remove(path);
             SaveRecent();
+            BuildRecentMenu();
             return;
         }
         if (!await ConfirmDiscardAsync()) return;
@@ -545,6 +572,7 @@ public partial class MainWindow : Window
     {
         _recentFiles.Clear();
         SaveRecent();
+        BuildRecentMenu();
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
