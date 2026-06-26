@@ -1,31 +1,32 @@
 <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
   <!-- Markdown Midget mascot: a big dark Markdown badge with googly eyes poking up,
-       the M▼ mark, orange feet and little arms, on a teal tile for contrast. -->
+       the M▼ mark, orange feet and little arms, on a teal tile for contrast.
+       The character is enlarged toward the edges, anchored at the feet. -->
 
   <!-- Teal background tile (the contrast). -->
   <rect x="4" y="4" width="248" height="248" rx="44" fill="#88c8d2"/>
 
-  <!-- Feet and arms sit behind the body so they peek out. -->
+  <!-- Feet and arms sit behind the body so they peek out. Feet stay anchored. -->
   <rect x="80" y="222" width="38" height="26" rx="13" fill="#e0905a"/>
   <rect x="138" y="222" width="38" height="26" rx="13" fill="#e0905a"/>
-  <rect x="24" y="146" width="22" height="30" rx="11" fill="#3a3d42" stroke="#23262b" stroke-width="5"/>
-  <rect x="210" y="146" width="22" height="30" rx="11" fill="#3a3d42" stroke="#23262b" stroke-width="5"/>
+  <rect x="12" y="150" width="24" height="32" rx="12" fill="#3a3d42" stroke="#23262b" stroke-width="6"/>
+  <rect x="220" y="150" width="24" height="32" rx="12" fill="#3a3d42" stroke="#23262b" stroke-width="6"/>
 
-  <!-- Body. -->
-  <rect x="38" y="80" width="180" height="150" rx="26" fill="#3a3d42" stroke="#23262b" stroke-width="7"/>
+  <!-- Body (larger, grown up and out). -->
+  <rect x="28" y="62" width="200" height="168" rx="28" fill="#3a3d42" stroke="#23262b" stroke-width="7"/>
 
   <!-- The canonical Markdown mark (M + down arrow), white, lower-centre of the body. -->
-  <g transform="translate(53,130) scale(0.72)" fill="#ffffff">
+  <g transform="translate(45,116) scale(0.8)" fill="#ffffff">
     <path d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39zm125 0l-30-33h20V30h20v35h20z"/>
   </g>
 
   <!-- Big googly eyes overlapping the top edge. -->
   <g>
-    <circle cx="90" cy="64" r="38" fill="#ffffff" stroke="#23262b" stroke-width="7"/>
-    <circle cx="168" cy="64" r="38" fill="#ffffff" stroke="#23262b" stroke-width="7"/>
-    <circle cx="99" cy="74" r="16" fill="#23262b"/>
-    <circle cx="159" cy="74" r="16" fill="#23262b"/>
-    <circle cx="105" cy="68" r="5.5" fill="#ffffff"/>
-    <circle cx="165" cy="68" r="5.5" fill="#ffffff"/>
+    <circle cx="86" cy="50" r="40" fill="#ffffff" stroke="#23262b" stroke-width="7"/>
+    <circle cx="170" cy="50" r="40" fill="#ffffff" stroke="#23262b" stroke-width="7"/>
+    <circle cx="95" cy="60" r="17" fill="#23262b"/>
+    <circle cx="161" cy="60" r="17" fill="#23262b"/>
+    <circle cx="102" cy="54" r="6" fill="#ffffff"/>
+    <circle cx="168" cy="54" r="6" fill="#ffffff"/>
   </g>
 </svg>
