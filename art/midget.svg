@@ -1,22 +1,31 @@
 <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-  <!-- Markdown Midget mascot, sized to fill the whole tile: the dark Markdown
-       badge IS the icon, with googly eyes up top and the M▼ mark below. -->
+  <!-- Markdown Midget mascot: a big dark Markdown badge with googly eyes poking up,
+       the M▼ mark, orange feet and little arms, on a teal tile for contrast. -->
 
-  <!-- Body fills the square (rounded), becoming the app tile. -->
-  <rect x="6" y="6" width="244" height="244" rx="52" fill="#3B4252" stroke="#2E3440" stroke-width="6"/>
+  <!-- Teal background tile (the contrast). -->
+  <rect x="4" y="4" width="248" height="248" rx="44" fill="#88c8d2"/>
 
-  <!-- Googly eyes in the upper third. -->
-  <g>
-    <circle cx="92" cy="84" r="36" fill="#ECEFF4" stroke="#2E3440" stroke-width="5"/>
-    <circle cx="164" cy="84" r="36" fill="#ECEFF4" stroke="#2E3440" stroke-width="5"/>
-    <circle cx="96" cy="96" r="15" fill="#2E3440"/>
-    <circle cx="160" cy="96" r="15" fill="#2E3440"/>
-    <circle cx="101" cy="90" r="5" fill="#ECEFF4"/>
-    <circle cx="165" cy="90" r="5" fill="#ECEFF4"/>
+  <!-- Feet and arms sit behind the body so they peek out. -->
+  <rect x="80" y="222" width="38" height="26" rx="13" fill="#e0905a"/>
+  <rect x="138" y="222" width="38" height="26" rx="13" fill="#e0905a"/>
+  <rect x="24" y="146" width="22" height="30" rx="11" fill="#3a3d42" stroke="#23262b" stroke-width="5"/>
+  <rect x="210" y="146" width="22" height="30" rx="11" fill="#3a3d42" stroke="#23262b" stroke-width="5"/>
+
+  <!-- Body. -->
+  <rect x="38" y="80" width="180" height="150" rx="26" fill="#3a3d42" stroke="#23262b" stroke-width="7"/>
+
+  <!-- The canonical Markdown mark (M + down arrow), white, lower-centre of the body. -->
+  <g transform="translate(53,130) scale(0.72)" fill="#ffffff">
+    <path d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39zm125 0l-30-33h20V30h20v35h20z"/>
   </g>
 
-  <!-- The canonical Markdown mark (M + down arrow), white, in the lower half. -->
-  <g transform="translate(38,128) scale(0.87)" fill="#ECEFF4">
-    <path d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39zm125 0l-30-33h20V30h20v35h20z"/>
+  <!-- Big googly eyes overlapping the top edge. -->
+  <g>
+    <circle cx="90" cy="64" r="38" fill="#ffffff" stroke="#23262b" stroke-width="7"/>
+    <circle cx="168" cy="64" r="38" fill="#ffffff" stroke="#23262b" stroke-width="7"/>
+    <circle cx="99" cy="74" r="16" fill="#23262b"/>
+    <circle cx="159" cy="74" r="16" fill="#23262b"/>
+    <circle cx="105" cy="68" r="5.5" fill="#ffffff"/>
+    <circle cx="165" cy="68" r="5.5" fill="#ffffff"/>
   </g>
 </svg>

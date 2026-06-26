@@ -109,6 +109,8 @@ line with `--readonly`.
 ## Files & windows
 
 - Native format is Markdown (`.md`). Plain text is also fine.
+- **File ▸ Open Recent** lists the last 5 files you opened or saved, with a
+  **Clear Recent** option.
 - **Drag a file onto the window:** it opens in place if the current document is
   untitled and unmodified; otherwise it opens in a **new window**. You can also
   pass a file path (and optional `--readonly`) on the command line.

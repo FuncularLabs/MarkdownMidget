@@ -37,6 +37,9 @@ public partial class MainWindow : Window
     private string _cleanMarkdown = string.Empty;
     private bool _suppressDirty;
     private string? _pendingOpenPath;
+
+    private const int MaxRecent = 5;
+    private readonly List<string> _recentFiles = new();
     private bool _startReadOnly;
     private bool _isHelpWindow;
     private bool _readOnly;
@@ -49,6 +52,8 @@ public partial class MainWindow : Window
         SourceToggle.Content = GlyphSource; // start in WYSIWYG; button offers source view
         SourceBox.SpellCheck.IsEnabled = true; // match the editor's default
         _dirtyTimer.Tick += async (_, _) => { _dirtyTimer.Stop(); await UpdateDirtyAsync(); };
+
+        LoadRecent();
 
         foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
         {
@@ -364,6 +369,7 @@ public partial class MainWindow : Window
         {
             var text = await File.ReadAllTextAsync(path);
             await LoadDocumentAsync(text, path);
+            AddRecent(path);
         }
         catch (Exception ex)
         {
@@ -420,7 +426,87 @@ public partial class MainWindow : Window
         _cleanMarkdown = markdown; // new clean baseline; undo history is left intact
         _dirty = false;
         UpdateTitle();
+        AddRecent(path);
         return true;
+    }
+
+    // ===== Recent files (MRU, persisted) =====
+
+    private static string RecentStorePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MarkdownMidget", "recent.json");
+
+    private void LoadRecent()
+    {
+        try
+        {
+            if (!File.Exists(RecentStorePath)) return;
+            var list = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(RecentStorePath));
+            if (list is not null) _recentFiles.AddRange(list.Take(MaxRecent));
+        }
+        catch { /* ignore a corrupt/absent MRU */ }
+    }
+
+    private void SaveRecent()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(RecentStorePath)!);
+            File.WriteAllText(RecentStorePath, JsonSerializer.Serialize(_recentFiles));
+        }
+        catch { /* MRU is best-effort */ }
+    }
+
+    private void AddRecent(string path)
+    {
+        var full = Path.GetFullPath(path);
+        _recentFiles.RemoveAll(p => string.Equals(p, full, StringComparison.OrdinalIgnoreCase));
+        _recentFiles.Insert(0, full);
+        while (_recentFiles.Count > MaxRecent) _recentFiles.RemoveAt(_recentFiles.Count - 1);
+        SaveRecent();
+    }
+
+    private void RecentMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        RecentMenu.Items.Clear();
+        if (_recentFiles.Count == 0)
+        {
+            RecentMenu.Items.Add(new MenuItem { Header = "(none)", IsEnabled = false });
+            return;
+        }
+        var i = 1;
+        foreach (var path in _recentFiles)
+        {
+            var item = new MenuItem { Header = $"_{i} {Path.GetFileName(path)}", Tag = path, ToolTip = path };
+            item.Click += RecentItem_Click;
+            RecentMenu.Items.Add(item);
+            i++;
+        }
+        RecentMenu.Items.Add(new Separator());
+        var clear = new MenuItem { Header = "_Clear Recent" };
+        clear.Click += ClearRecent_Click;
+        RecentMenu.Items.Add(clear);
+    }
+
+    private async void RecentItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string path }) return;
+        if (!File.Exists(path))
+        {
+            MessageBox.Show($"File not found:\n{path}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            _recentFiles.Remove(path);
+            SaveRecent();
+            return;
+        }
+        if (!await ConfirmDiscardAsync()) return;
+        await OpenPathAsync(path);
+    }
+
+    private void ClearRecent_Click(object sender, RoutedEventArgs e)
+    {
+        _recentFiles.Clear();
+        SaveRecent();
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
@@ -781,7 +867,8 @@ public partial class MainWindow : Window
     {
         var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
         var readOnly = _readOnly ? "  [Read Only]" : "";
-        Title = $"{(_dirty ? "*" : "")}{name}{readOnly}          —   Markdown Midget {AppVersion}";
+        const string gap = "                            "; // wide gap before the product name
+        Title = $"{(_dirty ? "*" : "")}{name}{readOnly}{gap}Markdown Midget {AppVersion}";
         StatusFile.Text = name;
     }
 
