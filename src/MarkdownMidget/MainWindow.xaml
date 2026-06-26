@@ -98,6 +98,7 @@
                     <MenuItem x:Name="InsertMenu" Header="_Insert">
                         <MenuItem Header="_Link…" InputGestureText="Ctrl+K" Click="Link_Click" />
                         <MenuItem Header="_Picture…" Click="Picture_Click" />
+                        <MenuItem Header="_Table…" Click="InsertTable_Click" />
                         <Separator />
                         <MenuItem Header="_Code Block">
                             <MenuItem Header="Plain" Tag="" Click="CodeBlock_Click" />
@@ -189,6 +190,7 @@
                         <Separator />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert link (Ctrl+K)" Click="Link_Click" Content="&#xE71B;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert picture" Click="Picture_Click" Content="&#xEB9F;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert table" Click="InsertTable_Click" Content="&#xE80A;" />
                     </ToolBar>
 
                     <!-- View toggles: usable in read-only. -->

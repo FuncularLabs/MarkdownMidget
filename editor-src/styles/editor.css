@@ -59,7 +59,7 @@ body {
   margin-bottom: 16px;
 }
 
-/* Headings: more space before than after, tight leading, semibold. */
+/* Headings: dark blue (steelblue), more space before than after, tight leading. */
 .mdm-prosemirror h1,
 .mdm-prosemirror h2,
 .mdm-prosemirror h3,
@@ -70,6 +70,7 @@ body {
   margin-bottom: 16px;
   font-weight: 600;
   line-height: 1.25;
+  color: #4682b4; /* steelblue */
 }
 
 /* The very first block shouldn't push the page down. */
@@ -83,10 +84,10 @@ body {
 .mdm-prosemirror h2 {
   font-size: 1.5em;
 }
-.mdm-prosemirror h3 { font-size: 1.25em; }
-.mdm-prosemirror h4 { font-size: 1em; }
-.mdm-prosemirror h5 { font-size: 0.875em; }
-.mdm-prosemirror h6 { font-size: 0.85em; color: #6a737d; }
+.mdm-prosemirror h3 { font-size: 1.3em; }
+.mdm-prosemirror h4 { font-size: 1.15em; color: #555; }
+.mdm-prosemirror h5 { font-size: 1.05em; color: #606060; }
+.mdm-prosemirror h6 { font-size: 1em; color: #707070; }
 
 .mdm-prosemirror u {
   text-decoration: underline;
@@ -95,20 +96,26 @@ body {
 /* Links look and behave like browser links (the link-tooltip plugin adds the
    hover preview card with the URL and edit/copy/remove actions). */
 .mdm-prosemirror a {
-  color: #5e81ac;
+  color: #4582b4; /* steelblue, matches headings */
+  font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
 }
 .mdm-prosemirror a:hover {
-  color: #81a1c1;
+  color: #2f5f87;
 }
 
+/* Blue blockquote (Markdown Monster "PDF Output" theme). */
 .mdm-prosemirror blockquote {
-  border-left: 3px solid #d0d7de;
+  background: #f2f7fb;
+  border-left: 6px solid #569ad4;
+  border-radius: 4px 0 0 4px;
   margin-left: 0;
-  padding: 0 16px;
-  color: #57606a;
+  padding: 8px 18px;
+  color: #3a4a58;
 }
+.mdm-prosemirror blockquote > :first-child { margin-top: 0; }
+.mdm-prosemirror blockquote > :last-child { margin-bottom: 0; }
 
 .mdm-prosemirror code {
   background: #f2f2f2;
@@ -138,6 +145,80 @@ body {
   border: none;
   border-top: 1px solid #d0d0d0;
   margin: 24px 0;
+}
+
+/* Tables: dark header row, alternating row stripes (Markdown Monster theme). */
+.mdm-prosemirror table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #c8ccd4;
+  table-layout: fixed;
+}
+.mdm-prosemirror th,
+.mdm-prosemirror td {
+  border: 1px solid #d0d7de;
+  padding: 6px 11px;
+  text-align: left;
+  vertical-align: top;
+}
+/* Override the Nord theme's per-column cell striping: we want a dark header row
+   and row (not column) stripes, so !important is needed to win the cascade. */
+.mdm-prosemirror td {
+  background: #ffffff !important;
+}
+.mdm-prosemirror th {
+  background: #2e3c52 !important; /* dark blue header */
+  color: #ffffff !important;
+  font-weight: 600;
+}
+.mdm-prosemirror tbody tr:nth-child(even) td {
+  background: #eef1f5 !important; /* alternating row stripe */
+}
+.mdm-prosemirror th > *,
+.mdm-prosemirror td > * {
+  margin: 0;
+}
+/* prosemirror-tables: selected cells + column-resize handle. */
+.mdm-prosemirror .selectedCell {
+  background: rgba(86, 154, 212, 0.25) !important;
+}
+.mdm-prosemirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #569ad4;
+  pointer-events: none;
+}
+
+/* Right-click table context menu. */
+.mdm-table-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 168px;
+  padding: 4px 0;
+  background: #ffffff;
+  border: 1px solid #c8ccd4;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: #2e3440;
+}
+.mdm-menu-item {
+  padding: 5px 18px;
+  cursor: default;
+  white-space: nowrap;
+}
+.mdm-menu-item:hover {
+  background: #569ad4;
+  color: #ffffff;
+}
+.mdm-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: #e2e4e8;
 }
 
 /* Tight list items: a list item's paragraph shouldn't carry the 16px block gap. */

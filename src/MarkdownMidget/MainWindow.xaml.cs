@@ -579,6 +579,16 @@ public partial class MainWindow : Window
             InsertCodeBlock(item.Tag as string ?? string.Empty);
     }
 
+    private void InsertTable_Click(object sender, RoutedEventArgs e)
+    {
+        if (_readOnly || _sourceMode || !_editorReady) return;
+        var dlg = new TableDialog { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        _ = RunEditorAsync(
+            $"window.MDM.insertTable({dlg.Rows}, {dlg.Columns}, {(dlg.HeaderRow ? "true" : "false")})");
+        RefocusEditor();
+    }
+
     /// <summary>Opens the code-block language menu beneath the hybrid code button.</summary>
     private void CodeBlockMenu_Click(object sender, RoutedEventArgs e)
     {

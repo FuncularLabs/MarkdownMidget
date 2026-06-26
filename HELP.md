@@ -25,7 +25,7 @@ From left to right:
 - **Inline code `</>`** with a chevron dropdown for inserting a fenced **code
   block** in a chosen language (Plain, C#, JavaScript, TypeScript, HTML, CSS).
 - **Bulleted list / Numbered list / Block quote / Horizontal rule**.
-- **Insert link / Insert picture**.
+- **Insert link / Insert picture / Insert table**.
 - **Source toggle** and the **¶** formatting-marks toggle.
 
 Toolbar buttons never take keyboard focus, so clicking them won't move your cursor
@@ -58,6 +58,24 @@ or drop your selection.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
   in the editor and travel with the file.
 - **Underline** has no markdown equivalent, so it is stored as inline `<u>…</u>`.
+
+## Tables
+
+Insert a table from **Insert ▸ Table…** (or the grid toolbar button): choose
+columns (default 3), rows (default 4), and whether to include a header row (GFM
+tables always keep a header row, so this controls whether your row count is in
+addition to it).
+
+**Right-click inside a table** for the only structure edits available in the
+WYSIWYG view:
+
+- **Insert** column left/right, row above/below
+- **Delete** column / row / table
+- **Select** column / row / table
+
+With cells selected, **Backspace/Delete clears their contents** and **typing
+replaces them**. Anything more elaborate (alignment, merging, etc.) is done by
+editing the markdown source directly.
 
 ## Formatting marks (¶)
 

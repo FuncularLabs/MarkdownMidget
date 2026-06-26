@@ -136,8 +136,12 @@ is deferred from this first iteration. Notable deferrals / divergences:
   into the markdown (`![alt](data:image/…;base64,…)`) so it renders inside the
   sandboxed WebView and travels with the document. This deliberately bloats the
   markdown; linking external/relative paths is a possible future option.
-- **Links** render styled (Nord blue, underlined) with the URL shown as a native
+- **Links** render styled (steelblue, underlined) with the URL shown as a native
   hover tooltip (a `title`-attribute decoration), like a browser.
+- **Tables** (GFM): insert via Insert ▸ Table…; right-click for the minimal
+  structure edits (insert/delete/select column, row, table). Cell selection +
+  Backspace/Delete clears content; typing replaces it. Styled like the Markdown
+  Monster "PDF Output" theme — dark header row, alternating row stripes.
 - **Modified state is content-based:** the document is "unchanged" whenever it
   matches the last opened/saved markdown, so undoing back to that state clears the
   modified flag. Opening/new flushes undo history (you can't undo past the open

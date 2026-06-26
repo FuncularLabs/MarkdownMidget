@@ -1,0 +1,32 @@
+<Window x:Class="MarkdownMidget.TableDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Insert Table" SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <StackPanel Margin="18" Width="240">
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Columns" VerticalAlignment="Center" />
+            <TextBox x:Name="ColsBox" Grid.Column="1" Width="64" Text="3" Padding="3"
+                     PreviewTextInput="DigitsOnly" />
+        </Grid>
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Rows" VerticalAlignment="Center" />
+            <TextBox x:Name="RowsBox" Grid.Column="1" Width="64" Text="4" Padding="3"
+                     PreviewTextInput="DigitsOnly" />
+        </Grid>
+        <CheckBox x:Name="HeaderBox" Content="Header row" IsChecked="True" Margin="0,0,0,16" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Insert" IsDefault="True" Width="80" Margin="0,0,8,0" Click="Ok_Click" />
+            <Button Content="Cancel" IsCancel="True" Width="80" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -17,6 +17,7 @@ import { $prose } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
+import { tableCellEditing, installTableContextMenu, insertTableAction } from './tables.js';
 
 import {
   toggleStrongCommand,
@@ -275,6 +276,7 @@ const MDM = {
       .use(linkTitle)
       .use(trailing)
       .use(formattingMarks)
+      .use(tableCellEditing)
       .use(splitHeadingCommand)
       .use(headingEnterKeymap)
       .use(exitBlockCommand)
@@ -288,9 +290,16 @@ const MDM = {
       .create();
 
     editorView = editor.ctx.get(editorViewCtx);
+    installTableContextMenu(editorView);
     postHistory();
     postToHost({ type: 'ready' });
     return true;
+  },
+
+  insertTable(rows, cols, header) {
+    if (!editor) return;
+    insertTableAction(editor, rows || 4, cols || 3, header !== false);
+    this.focus();
   },
 
   getMarkdown() {
