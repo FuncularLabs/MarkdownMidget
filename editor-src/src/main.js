@@ -284,6 +284,27 @@ function installContextMenus(view) {
   });
 }
 
+// Make the editor area a file drop target. The OS doesn't expose dropped-file
+// paths to web content, so we read the text and hand the host the name + content.
+function installFileDrop() {
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  window.addEventListener('dragover', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, true);
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => postToHost({ type: 'fileDrop', name: file.name, content: String(reader.result) });
+    reader.readAsText(file);
+  }, true);
+}
+
 const MDM = {
   async create(initialMarkdown) {
     const root = document.getElementById('app');
@@ -345,6 +366,7 @@ const MDM = {
 
     editorView = editor.ctx.get(editorViewCtx);
     installContextMenus(editorView);
+    installFileDrop();
     postHistory();
     postToHost({ type: 'ready' });
     return true;

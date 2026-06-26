@@ -112,9 +112,12 @@ line with `--readonly`.
 - Native format is Markdown (`.md`). Plain text is also fine.
 - **File ▸ Open Recent** lists the last 5 files you opened or saved, with a
   **Clear Recent** option.
-- **Drag a file onto the window:** it opens in place if the current document is
-  untitled and unmodified; otherwise it opens in a **new window**. You can also
-  pass a file path (and optional `--readonly`) on the command line.
+- **Drag a file onto the window** to open it. Dropping on the **toolbar or menu
+  bar** opens it in place (if the current document is untitled and unmodified) or
+  in a **new window**. Dropping on the **editing area** opens the file's text as a
+  new untitled document — the OS doesn't reveal a dropped file's path to the
+  editor, so **Save** will prompt for a location. You can also pass a file path
+  (and optional `--readonly`) on the command line.
 
 ## Distribution
 

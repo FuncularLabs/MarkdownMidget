@@ -70,7 +70,7 @@
             <StackPanel Grid.Column="0">
                 <!-- ===== Menu bar (WordPad-style, MVP subset) ===== -->
                 <Menu>
-                    <MenuItem Header="_File">
+                    <MenuItem Header="_File" SubmenuOpened="FileMenu_Opened">
                         <MenuItem Header="_New" InputGestureText="Ctrl+N" Click="New_Click" />
                         <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click" />
                         <MenuItem x:Name="RecentMenu" Header="Open _Recent" />

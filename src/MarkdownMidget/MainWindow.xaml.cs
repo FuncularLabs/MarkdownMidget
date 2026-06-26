@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
@@ -25,6 +27,7 @@ public partial class MainWindow : Window
     private static readonly string GlyphRich = char.ConvertFromUtf32(0xE8A5);   // document = formatted view
 
     private string? _currentPath;
+    private string? _displayName; // title for dropped content that has no path
     private bool _dirty;
     private bool _editorReady;
     private bool _sourceMode;
@@ -96,8 +99,10 @@ public partial class MainWindow : Window
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = false;
 
-        // Let dropped files bubble to the window's drop handler instead of the WebView.
-        Web.AllowExternalDrop = false;
+        // The WebView covers the window centre, so let it accept drops; the editor
+        // intercepts file drops and posts them to the host (see the 'fileDrop'
+        // message). Drops on the toolbar/menu are still handled by Window_Drop.
+        Web.AllowExternalDrop = true;
 
         // Per-launch nonce defeats WebView2's disk cache so a rebuilt editor bundle
         // is always loaded fresh (the bundle refs inside index.html are also hashed).
@@ -201,6 +206,14 @@ public partial class MainWindow : Window
                     Dispatcher.BeginInvoke(() => ShowEditorContextMenu(menu, x, y));
                 }
                 break;
+            case "fileDrop":
+                {
+                    using var d = JsonDocument.Parse(e.WebMessageAsJson);
+                    var name = d.RootElement.TryGetProperty("name", out var nv) ? nv.GetString() ?? "Dropped.md" : "Dropped.md";
+                    var content = d.RootElement.TryGetProperty("content", out var cv) ? cv.GetString() ?? "" : "";
+                    Dispatcher.BeginInvoke(() => HandleDroppedContent(name, content));
+                }
+                break;
         }
     }
 
@@ -214,6 +227,9 @@ public partial class MainWindow : Window
 
     // ===== Native editor context menus =====
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetFocus(IntPtr hWnd);
+
     private void ShowEditorContextMenu(string menu, double x, double y)
     {
         // Structure menus aren't available in read-only — fall back to the text menu.
@@ -221,6 +237,12 @@ public partial class MainWindow : Window
                 : (!_readOnly && menu == "image") ? "ImageContextMenu"
                 : "TextContextMenu";
         if (FindResource(key) is not ContextMenu cm) return;
+
+        // The WebView2 child HWND holds OS keyboard focus; pull it up to this window
+        // first so the menu popup becomes keyboard-navigable.
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero) SetFocus(hwnd);
+
         cm.PlacementTarget = Web;
         cm.Placement = System.Windows.Controls.Primitives.PlacementMode.RelativePoint;
         cm.HorizontalOffset = x;
@@ -445,6 +467,7 @@ public partial class MainWindow : Window
         _suppressDirty = true;
         await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
         _currentPath = path;
+        _displayName = null;
         _suppressDirty = false;
         await SetCleanBaselineAsync();
     }
@@ -527,6 +550,8 @@ public partial class MainWindow : Window
         SaveRecent();
         BuildRecentMenu();
     }
+
+    private void FileMenu_Opened(object sender, RoutedEventArgs e) => BuildRecentMenu();
 
     // Built eagerly (not just on submenu-open) so an empty submenu still shows and
     // the list updates the moment a file is opened or saved.
@@ -813,6 +838,22 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    /// <summary>
+    /// Opens a file dropped onto the editor area. Web content can't see the file
+    /// path, so this loads the dropped text as an untitled document named after the
+    /// file (Save will prompt for a location).
+    /// </summary>
+    private async void HandleDroppedContent(string name, string content)
+    {
+        if (!await ConfirmDiscardAsync()) return;
+        _suppressDirty = true;
+        await SetDocumentMarkdownAsync(content);
+        _currentPath = null;
+        _displayName = name;
+        _suppressDirty = false;
+        await SetCleanBaselineAsync();
+    }
+
     private static void OpenInNewInstance(string path, bool readOnly = false, bool helpWindow = false)
     {
         var exe = Environment.ProcessPath;
@@ -931,7 +972,8 @@ public partial class MainWindow : Window
 
     private void UpdateTitle()
     {
-        var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
+        var name = _currentPath is not null ? Path.GetFileName(_currentPath)
+                 : _displayName ?? "Untitled";
         var readOnly = _readOnly ? "  [Read Only]" : "";
         const string gap = "                            "; // wide gap before the product name
         Title = $"{(_dirty ? "*" : "")}{name}{readOnly}{gap}Markdown Midget {AppVersion}";
