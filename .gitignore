@@ -13,3 +13,6 @@ src/MarkdownMidget/wwwroot/*.map
 .vs/
 *.suo
 .claude/
+
+# Release staging
+dist/
