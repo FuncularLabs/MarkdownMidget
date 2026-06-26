@@ -18,6 +18,8 @@ import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
 import { tableCellEditing, installTableContextMenu, insertTableAction } from './tables.js';
+import { resizableImage, remarkImageSize } from './resizable-image.js';
+import { NodeSelection } from '@milkdown/kit/prose/state';
 
 import {
   toggleStrongCommand,
@@ -232,6 +234,49 @@ function postHistory() {
   });
 }
 
+// Right-click an image to resize it. Selects the image node and asks the host to
+// show the size dialog (the host then calls MDM.setImageSize).
+function installImageContextMenu(view) {
+  const menu = document.createElement('div');
+  menu.className = 'mdm-table-menu';
+  menu.style.display = 'none';
+  const item = document.createElement('div');
+  item.className = 'mdm-menu-item';
+  item.textContent = 'Resize…';
+  menu.appendChild(item);
+  document.body.appendChild(menu);
+  const hide = () => { menu.style.display = 'none'; };
+  let img = null;
+
+  item.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    hide();
+    if (!img) return;
+    const natW = img.naturalWidth || img.width || 0;
+    const natH = img.naturalHeight || img.height || 0;
+    const curW = parseInt(img.getAttribute('width'), 10) || img.width || natW;
+    const curH = parseInt(img.getAttribute('height'), 10) || img.height || natH;
+    postToHost({ type: 'imageResize', curW, curH, natW, natH });
+    view.focus();
+  });
+
+  view.dom.addEventListener('contextmenu', (e) => {
+    if (!e.target || e.target.tagName !== 'IMG') { hide(); return; }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    img = e.target;
+    try {
+      const pos = view.posAtDOM(img, 0);
+      view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos)));
+    } catch (_) { /* selection may fail at edges */ }
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    menu.style.display = 'block';
+  });
+  document.addEventListener('mousedown', (e) => { if (!menu.contains(e.target)) hide(); });
+  document.addEventListener('scroll', hide, true);
+}
+
 const MDM = {
   async create(initialMarkdown) {
     const root = document.getElementById('app');
@@ -269,6 +314,8 @@ const MDM = {
       })
       .use(commonmark)
       .use(gfm)
+      .use(remarkImageSize)
+      .use(resizableImage)
       .use(history)
       .use(listener)
       .use(underline)
@@ -290,6 +337,7 @@ const MDM = {
       .create();
 
     editorView = editor.ctx.get(editorViewCtx);
+    installImageContextMenu(editorView);
     installTableContextMenu(editorView);
     postHistory();
     postToHost({ type: 'ready' });
@@ -332,6 +380,17 @@ const MDM = {
   // Read-only: ProseMirror stops accepting edits and the caret/handles disappear.
   setEditable(on) {
     if (editorView) editorView.setProps({ editable: () => !!on });
+  },
+
+  // Apply width/height (px) to the currently selected image node.
+  setImageSize(width, height) {
+    if (!editorView) return;
+    const { selection } = editorView.state;
+    const node = selection.node;
+    if (!node || node.type.name !== 'image') return;
+    const attrs = { ...node.attrs, width: String(width), height: String(height) };
+    editorView.dispatch(editorView.state.tr.setNodeMarkup(selection.from, undefined, attrs));
+    this.focus();
   },
 
   cmd(name, ...args) {

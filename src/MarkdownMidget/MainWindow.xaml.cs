@@ -18,7 +18,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.1-alpha1";
+    private const string AppVersion = "v0.1.1";
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
     private static readonly string GlyphSource = char.ConvertFromUtf32(0xE943); // braces {} = markdown source
@@ -179,7 +179,25 @@ public partial class MainWindow : Window
                         d.RootElement.TryGetProperty("canRedo", out var cr) && cr.GetBoolean());
                 }
                 break;
+            case "imageResize":
+                if (!_readOnly && !_sourceMode)
+                {
+                    using var d = JsonDocument.Parse(e.WebMessageAsJson);
+                    int Get(string k) => d.RootElement.TryGetProperty(k, out var v) ? v.GetInt32() : 0;
+                    var (cw, ch, nw, nh) = (Get("curW"), Get("curH"), Get("natW"), Get("natH"));
+                    // Defer so the dialog doesn't block the WebView2 message pump.
+                    Dispatcher.BeginInvoke(() => ShowImageResizeDialog(cw, ch, nw, nh));
+                }
+                break;
         }
+    }
+
+    private void ShowImageResizeDialog(int curW, int curH, int natW, int natH)
+    {
+        var dlg = new ImageSizeDialog(curW, curH, natW, natH) { Owner = this };
+        if (dlg.ShowDialog() == true)
+            _ = RunEditorAsync($"window.MDM.setImageSize({dlg.NewWidth}, {dlg.NewHeight})");
+        RefocusEditor();
     }
 
     /// <summary>Runs JS in the editor and returns its (JSON-decoded string) result.</summary>
@@ -762,8 +780,8 @@ public partial class MainWindow : Window
     private void UpdateTitle()
     {
         var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
-        var readOnly = _readOnly ? "          [Read Only]" : "";
-        Title = $"{(_dirty ? "*" : "")}{name}{readOnly} — Markdown Midget {AppVersion}";
+        var readOnly = _readOnly ? "  [Read Only]" : "";
+        Title = $"{(_dirty ? "*" : "")}{name}{readOnly}          —   Markdown Midget {AppVersion}";
         StatusFile.Text = name;
     }
 

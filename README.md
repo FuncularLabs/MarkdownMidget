@@ -134,8 +134,8 @@ is deferred from this first iteration. Notable deferrals / divergences:
   (`{}`, → markdown source) and a document glyph (→ formatted view).
 - **Pictures embed as data URIs.** Inserting a picture base64-encodes the file
   into the markdown (`![alt](data:image/…;base64,…)`) so it renders inside the
-  sandboxed WebView and travels with the document. This deliberately bloats the
-  markdown; linking external/relative paths is a possible future option.
+  sandboxed WebView and travels with the document. Right-click ▸ **Resize…**
+  (aspect-locked) stores the size as inline HTML `<img width height>`.
 - **Links** render styled (steelblue, underlined) with the URL shown as a native
   hover tooltip (a `title`-attribute decoration), like a browser.
 - **Tables** (GFM): insert via Insert ▸ Table…; right-click for the minimal
