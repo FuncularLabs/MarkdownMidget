@@ -225,6 +225,94 @@ body {
   display: none;
 }
 
+/* =====================================================================
+ *  Print styles (paper-friendly): white page, light code blocks with light-
+ *  theme syntax colors, no chrome, page-break hints, source-mode override.
+ * ===================================================================== */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    height: auto;
+  }
+  /* The screen page card becomes the print page. */
+  .milkdown {
+    margin: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    min-height: 0 !important;
+  }
+  .mdm-prosemirror {
+    padding: 0 !important;
+    color: #000;
+  }
+  /* Hide screen-only ornaments. */
+  .mdm-mark { display: none !important; }
+  .mdm-prosemirror blockquote {
+    background: transparent !important;
+    color: #333 !important;
+    border-left: 3px solid #999 !important;
+    border-radius: 0 !important;
+  }
+  /* Page-break hygiene. */
+  .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3,
+  .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+  .mdm-prosemirror table, .mdm-prosemirror pre, .mdm-prosemirror blockquote {
+    page-break-inside: avoid;
+  }
+  /* Light-theme code blocks for paper. */
+  .mdm-prosemirror pre {
+    background: #f6f8fa !important;
+    color: #24292e !important;
+    border: 1px solid #d0d7de !important;
+  }
+  .mdm-prosemirror pre code { color: #24292e !important; background: transparent !important; }
+  .mdm-prosemirror code {
+    background: #f6f8fa !important;
+    color: #24292e !important;
+  }
+  /* Light-theme syntax tokens (GitHub-ish). */
+  .mdm-prosemirror .token.comment { color: #6a737d !important; font-style: italic; }
+  .mdm-prosemirror .token.punctuation,
+  .mdm-prosemirror .token.operator { color: #24292e !important; }
+  .mdm-prosemirror .token.keyword,
+  .mdm-prosemirror .token.atrule,
+  .mdm-prosemirror .token.attr-value,
+  .mdm-prosemirror .token.tag { color: #d73a49 !important; }
+  .mdm-prosemirror .token.string,
+  .mdm-prosemirror .token.char,
+  .mdm-prosemirror .token.attr-name,
+  .mdm-prosemirror .token.builtin { color: #032f62 !important; }
+  .mdm-prosemirror .token.number,
+  .mdm-prosemirror .token.boolean,
+  .mdm-prosemirror .token.constant { color: #005cc5 !important; }
+  .mdm-prosemirror .token.function,
+  .mdm-prosemirror .token.class-name { color: #6f42c1 !important; }
+  .mdm-prosemirror .token.property { color: #22863a !important; }
+  /* Mono code mode: strip every token color, italics off. */
+  body.mdm-print-mono-code .mdm-prosemirror .token {
+    color: #24292e !important; font-style: normal !important;
+  }
+  /* Source-mode print: hide the rendered editor, show the raw text. */
+  body.mdm-print-source #app { display: none !important; }
+  .mdm-print-source-pre {
+    display: none;
+    margin: 0; padding: 0;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 10pt;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    color: #000;
+  }
+  body.mdm-print-source .mdm-print-source-pre { display: block; }
+  /* Headers/footers come from browser/PDF settings; @page just sets paper margins. */
+  @page { margin: 0.6in; }
+}
+
 /* Prism / refractor syntax tokens (Nord palette). */
 .mdm-prosemirror .token.comment,
 .mdm-prosemirror .token.prolog,

@@ -734,6 +734,106 @@ public partial class MainWindow : Window
         }
     }
 
+    // ===== Print + PDF export (per-page-width prefs, persisted) =====
+
+    private void PrintSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        var p = GetPrintPrefs();
+        PrintHeaderFooterMenu.IsChecked = p.ShowHeaderFooter;
+        PrintColorCodeMenu.IsChecked = p.ColorCodeBlocks;
+    }
+
+    private void PrintHeaderFooter_Click(object sender, RoutedEventArgs e)
+    {
+        var p = GetPrintPrefs();
+        p.ShowHeaderFooter = PrintHeaderFooterMenu.IsChecked;
+        SaveSettings();
+    }
+
+    private void PrintColorCode_Click(object sender, RoutedEventArgs e)
+    {
+        var p = GetPrintPrefs();
+        p.ColorCodeBlocks = PrintColorCodeMenu.IsChecked;
+        SaveSettings();
+    }
+
+    /// <summary>
+    /// Stashes the current print prefs in the editor. The editor applies them on
+    /// the standard browser `beforeprint` event and clears them on `afterprint`,
+    /// so the screen view is never disturbed and timing is correct for both
+    /// ShowPrintUI and PrintToPdfAsync.
+    /// </summary>
+    private async Task PreparePrintModeAsync()
+    {
+        if (!_editorReady) return;
+        var p = GetPrintPrefs();
+        var sourceText = _sourceMode ? SourceBox.Text : string.Empty;
+        var opts = $"{{sourceMode:{(_sourceMode ? "true" : "false")},colorCode:{(p.ColorCodeBlocks ? "true" : "false")},sourceText:{JsLiteral(sourceText)}}}";
+        await RunEditorAsync($"window.MDM.setPrintMode({opts})");
+    }
+
+    private async void Print_Click(object sender, RoutedEventArgs e)
+    {
+        if (_closed || Web.CoreWebView2 is null) return;
+        try
+        {
+            await PreparePrintModeAsync();
+            // The browser preview is modal-by-WebView; we cannot read what the user
+            // toggles in it (printer, copies, header/footer), but our app-level
+            // prefs (mono/colour code blocks, source vs WYSIWYG view) are applied
+            // during print rendering via beforeprint/afterprint.
+            Web.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.Browser);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Print failed:\n{ex.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void ExportPdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (_closed || Web.CoreWebView2 is null) return;
+
+        var defaultName = _currentPath is not null
+            ? Path.GetFileNameWithoutExtension(_currentPath) + ".pdf"
+            : (Path.GetFileNameWithoutExtension(_displayName) ?? "Untitled") + ".pdf";
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "Export to PDF",
+            Filter = "PDF (*.pdf)|*.pdf|All files (*.*)|*.*",
+            DefaultExt = ".pdf",
+            FileName = defaultName,
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        try
+        {
+            await PreparePrintModeAsync();
+            var prefs = GetPrintPrefs();
+            var settings = Web.CoreWebView2.Environment.CreatePrintSettings();
+            settings.ShouldPrintHeaderAndFooter = prefs.ShowHeaderFooter;
+            settings.HeaderTitle = _currentPath is not null
+                ? Path.GetFileName(_currentPath)
+                : (_displayName ?? "Untitled");
+            settings.FooterUri = string.Empty; // suppress markdownmidget.invalid URL
+            settings.Orientation = _pageWidth == "landscape"
+                ? CoreWebView2PrintOrientation.Landscape
+                : CoreWebView2PrintOrientation.Portrait;
+
+            var ok = await Web.CoreWebView2.PrintToPdfAsync(dlg.FileName, settings);
+            if (!ok)
+                MessageBox.Show("PDF export did not complete.", "Markdown Midget",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"PDF export failed:\n{ex.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     // ===== Recent files (MRU, persisted) =====
 
     private static string RecentStorePath => Path.Combine(
@@ -825,6 +925,25 @@ public partial class MainWindow : Window
     private sealed class AppSettings
     {
         public string PageWidth { get; set; } = "portrait";
+        public Dictionary<string, PrintPrefs> PrintPrefs { get; set; } = new();
+    }
+
+    private sealed class PrintPrefs
+    {
+        public bool ShowHeaderFooter { get; set; } = true;
+        public bool ColorCodeBlocks { get; set; } = true;
+    }
+
+    private readonly Dictionary<string, PrintPrefs> _printPrefs = new();
+
+    private PrintPrefs GetPrintPrefs()
+    {
+        if (!_printPrefs.TryGetValue(_pageWidth, out var p))
+        {
+            p = new PrintPrefs();
+            _printPrefs[_pageWidth] = p;
+        }
+        return p;
     }
 
     private static string SettingsStorePath => Path.Combine(
@@ -837,8 +956,13 @@ public partial class MainWindow : Window
         {
             if (!File.Exists(SettingsStorePath)) return;
             var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsStorePath));
-            if (s is not null && s.PageWidth is "portrait" or "landscape" or "full")
+            if (s is null) return;
+            if (s.PageWidth is "portrait" or "landscape" or "full")
                 _pageWidth = s.PageWidth;
+            if (s.PrintPrefs is not null)
+                foreach (var kv in s.PrintPrefs)
+                    if (kv.Key is "portrait" or "landscape" or "full" && kv.Value is not null)
+                        _printPrefs[kv.Key] = kv.Value;
         }
         catch { /* defaults are fine */ }
     }
@@ -848,7 +972,11 @@ public partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsStorePath)!);
-            File.WriteAllText(SettingsStorePath, JsonSerializer.Serialize(new AppSettings { PageWidth = _pageWidth }));
+            File.WriteAllText(SettingsStorePath, JsonSerializer.Serialize(new AppSettings
+            {
+                PageWidth = _pageWidth,
+                PrintPrefs = _printPrefs,
+            }));
         }
         catch { /* best-effort */ }
     }
@@ -1306,6 +1434,7 @@ public partial class MainWindow : Window
         Bind(Key.S, ModifierKeys.Control | ModifierKeys.Shift, (_, _) => SaveAs_Click(this, new RoutedEventArgs()));
         Bind(Key.E, ModifierKeys.Control, (_, _) => ToggleSource_Click(this, new RoutedEventArgs()));
         Bind(Key.W, ModifierKeys.Control, (_, _) => Close_Click(this, new RoutedEventArgs()));
+        Bind(Key.P, ModifierKeys.Control, (_, _) => Print_Click(this, new RoutedEventArgs()));
         Bind(Key.K, ModifierKeys.Control, (_, _) => Link_Click(this, new RoutedEventArgs()));
         Bind(Key.H, ModifierKeys.Control | ModifierKeys.Shift, (_, _) => FocusStyle_Click(this, new RoutedEventArgs()));
 

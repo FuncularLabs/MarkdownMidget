@@ -222,6 +222,18 @@ function postToHost(message) {
   }
 }
 
+// Apply / remove print-only body classes precisely during print rendering.
+// Fires for both ShowPrintUI and PrintToPdfAsync.
+window.addEventListener('beforeprint', () => {
+  const p = window.__mdmPrintPrefs || {};
+  document.body.classList.toggle('mdm-print-source', !!p.sourceMode);
+  document.body.classList.toggle('mdm-print-mono-code', p.colorCode === false);
+});
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('mdm-print-source');
+  document.body.classList.remove('mdm-print-mono-code');
+});
+
 // Tell the host whether undo/redo are available so it can enable/disable buttons.
 // Dry-running the same commands (no dispatch) reports applicability and avoids the
 // undoDepth/redoDepth key mismatch between duplicate prosemirror-history copies.
@@ -412,6 +424,26 @@ const MDM = {
   // Read-only: ProseMirror stops accepting edits and the caret/handles disappear.
   setEditable(on) {
     if (editorView) editorView.setProps({ editable: () => !!on });
+  },
+
+  // Stores the print prefs; they're applied to <body> on the standard browser
+  // `beforeprint` event (and stripped on `afterprint`), so screen view stays
+  // untouched and the timing is correct for both ShowPrintUI and PrintToPdf.
+  setPrintMode(opts) {
+    window.__mdmPrintPrefs = Object.assign(
+      { sourceMode: false, colorCode: true, sourceText: '' }, opts || {});
+    let pre = document.getElementById('mdm-print-source-pre');
+    if (window.__mdmPrintPrefs.sourceMode) {
+      if (!pre) {
+        pre = document.createElement('pre');
+        pre.id = 'mdm-print-source-pre';
+        pre.className = 'mdm-print-source-pre';
+        document.body.appendChild(pre);
+      }
+      pre.textContent = String(window.__mdmPrintPrefs.sourceText || '');
+    } else if (pre) {
+      pre.remove();
+    }
   },
 
   // Document width: portrait (~A4), landscape (11/8 wider), or full window width.

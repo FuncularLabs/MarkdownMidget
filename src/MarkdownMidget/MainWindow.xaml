@@ -78,6 +78,18 @@
                         <MenuItem x:Name="SaveMenu" Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click" />
                         <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click" />
                         <Separator />
+                        <MenuItem x:Name="PrintMenuRoot" Header="_Print" SubmenuOpened="PrintSubmenu_Opened">
+                            <MenuItem Header="_Print…" InputGestureText="Ctrl+P" Click="Print_Click" />
+                            <MenuItem Header="Export to P_DF…" Click="ExportPdf_Click" />
+                            <Separator />
+                            <MenuItem x:Name="PrintHeaderFooterMenu" Header="Include _header and footer (PDF export)"
+                                      IsCheckable="True" Click="PrintHeaderFooter_Click"
+                                      ToolTip="Stored per Document Width view." />
+                            <MenuItem x:Name="PrintColorCodeMenu" Header="_Color code blocks"
+                                      IsCheckable="True" Click="PrintColorCode_Click"
+                                      ToolTip="Stored per Document Width view. Off prints code in monochrome." />
+                        </MenuItem>
+                        <Separator />
                         <MenuItem Header="C_lose" InputGestureText="Ctrl+W" Click="Close_Click" />
                         <Separator />
                         <MenuItem Header="E_xit" Click="Exit_Click" />

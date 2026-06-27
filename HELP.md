@@ -85,6 +85,27 @@ editing the markdown source directly.
 The **¶** toolbar toggle shows Word-style marks in light gray: **¶** at paragraph
 and heading ends, **↵** at manual line breaks, and **→** for tabs.
 
+## Printing & PDF export
+
+**File ▸ Print ▸ Print…** (or **Ctrl+P**) opens the browser-style print preview.
+**File ▸ Print ▸ Export to PDF…** writes a PDF directly.
+
+Two print prefs sit in the **File ▸ Print** menu and are **remembered separately
+for each Document Width view** (Portrait / Landscape / Full):
+
+- **Include header and footer (PDF export)** — toggles a header (file name) and
+  footer (page number) in PDF exports. (For Print, you control header/footer in
+  the browser preview itself; it isn't readable by the app.)
+- **Color code blocks** — on by default. Off prints code in monochrome.
+
+The print stylesheet automatically:
+
+- Uses a **white background and light code blocks** (paper-friendly).
+- Hides the page card shadow, formatting marks, and blockquote tint.
+- Avoids page breaks inside tables, code blocks, and headings.
+- Prints **whatever view is current** — Markdown source prints as monospaced
+  text; WYSIWYG prints the rendered document.
+
 ## Document width & zoom
 
 **View ▸ Document Width** sets how wide the page is: **Portrait** (narrow, the
