@@ -184,6 +184,23 @@ is deferred from this first iteration. Notable deferrals / divergences:
   [HELP.md](HELP.md) read-only in a new instance.
 - Deferred: print, page setup, find/replace, color, theming.
 
+## Recent changes
+
+A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
+full version history.
+
+- **v0.1.5-alpha1** — File ▸ Close (Ctrl+W) with a gray drop-target placeholder;
+  external change detection with a timestamped backup + reload/save-as/keep
+  dialog; **Print (Ctrl+P) and Export to PDF** with per-Document-Width prefs;
+  tighter table preview CSS.
+- **v0.1.4-alpha1** — Spell-check toggle joins the View toolbar group (no
+  leading separator).
+- **v0.1.3** — Spell-check toggle button on the View toolbar (custom *abc + red
+  squiggle* icon), two-way bound to View ▸ Spell Check.
+- **v0.1.2** — Initial public release: WYSIWYG markdown editing, GFM tables,
+  pictures (data URIs + Resize), code blocks with syntax highlighting, Document
+  Width modes, Recent files, drag-and-drop, read-only mode, bundled help.
+
 ## License
 
 [MIT](LICENSE) © Funcular Labs.
