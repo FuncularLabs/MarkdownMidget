@@ -12,8 +12,8 @@
     <RootNamespace>MarkdownMidget</RootNamespace>
     <Product>Markdown Midget</Product>
     <Authors>Funcular Labs</Authors>
-    <Version>0.1.2</Version>
-    <InformationalVersion>0.1.2</InformationalVersion>
+    <Version>0.1.3</Version>
+    <InformationalVersion>0.1.3</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +26,7 @@
     <Resource Include="Assets\midget-64.png" />
     <Resource Include="Assets\midget-256.png" />
     <Resource Include="Assets\numbered-list-64.png" />
+    <Resource Include="Assets\spellcheck-64.png" />
   </ItemGroup>
 
   <!-- The Milkdown editor bundle (built by editor-src) is embedded in the assembly

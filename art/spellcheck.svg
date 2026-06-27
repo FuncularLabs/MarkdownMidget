@@ -1,0 +1,7 @@
+<svg viewBox="0 0 72 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- Spell-check toolbar icon: "abc" with a red wavy underline. -->
+  <text x="4" y="32" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700"
+        fill="#1a1a1a" letter-spacing="1">abc</text>
+  <path d="M4 42 q4 -6 8 0 t8 0 t8 0 t8 0 t8 0 t8 0 t8 0"
+        fill="none" stroke="#d23b3b" stroke-width="3" stroke-linecap="round" />
+</svg>

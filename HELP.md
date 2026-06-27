@@ -96,7 +96,8 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 
 ## Spell check
 
-**View ▸ Spell Check** toggles the red squiggles in both views. On by default.
+**View ▸ Spell Check** (or the **abc** toggle at the right of the View toolbar)
+toggles the red squiggles in both views. On by default.
 
 ## Read-only mode
 

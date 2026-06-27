@@ -244,6 +244,14 @@
                                       Click="ToggleMarks_Click" FontSize="15" Content="&#xB6;" />
                         <Button Style="{StaticResource ToolChar}" ToolTip="Document width"
                                 Click="PageWidthMenu_Click" FontSize="15" Content="&#x2194;" />
+                        <Separator />
+                        <ToggleButton Style="{StaticResource ToolGlyph}"
+                                      ToolTip="Spell check"
+                                      IsChecked="{Binding ElementName=MenuSpellCheck, Path=IsChecked, Mode=TwoWay}"
+                                      Click="SpellCheck_Click">
+                            <Image Source="/Assets/spellcheck-64.png" Width="20" Height="14"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </ToggleButton>
                     </ToolBar>
                 </ToolBarTray>
             </StackPanel>
