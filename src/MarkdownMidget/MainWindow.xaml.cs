@@ -20,7 +20,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.1.6-alpha1";
+    private const string AppVersion = "v0.1.7-alpha1";
     private const string ProductDesc = "Markdown Midget " + AppVersion;
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
@@ -51,6 +51,10 @@ public partial class MainWindow : Window
     private bool _closed;            // closed/no-document state — shows ClosedSplash
     private (int curW, int curH, int natW, int natH) _imgResize;
     private readonly DispatcherTimer _dirtyTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+
+    private FindDialog? _findDialog;
+    private int _sourceFindCursor = -1; // index into _sourceFindMatches
+    private System.Text.RegularExpressions.MatchCollection? _sourceFindMatches;
 
     // External-change tracking for the currently-open file.
     private FileSystemWatcher? _watcher;
@@ -467,6 +471,7 @@ public partial class MainWindow : Window
 
     private async Task OpenPathAsync(string path)
     {
+        ShowBusy($"Opening {Path.GetFileName(path)}…");
         try
         {
             var text = await File.ReadAllTextAsync(path);
@@ -478,6 +483,7 @@ public partial class MainWindow : Window
             MessageBox.Show($"Couldn't open the file:\n{ex.Message}", "Markdown Midget",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally { HideBusy(); }
     }
 
     /// <summary>Loads markdown into the editor and resets the clean baseline + history.</summary>
@@ -738,6 +744,137 @@ public partial class MainWindow : Window
         {
             await LoadDocumentAsync(newDiskContent, _currentPath);
         }
+    }
+
+    // ===== Busy overlay (file open / large-doc load) =====
+
+    private void ShowBusy(string text)
+    {
+        BusyText.Text = text;
+        BusyOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void HideBusy() => BusyOverlay.Visibility = Visibility.Collapsed;
+
+    // ===== Find (modeless dialog, F3 / Shift+F3 navigation) =====
+
+    private void Find_Click(object sender, RoutedEventArgs e)
+    {
+        if (_findDialog is null)
+        {
+            _findDialog = new FindDialog { Owner = this };
+            _findDialog.FindRequested += OnFindRequested;
+            _findDialog.Closed2 += (_, _) =>
+            {
+                _findDialog = null;
+                _ = ClearWysiwygFindAsync();
+                _sourceFindMatches = null;
+                _sourceFindCursor = -1;
+            };
+            _findDialog.Show();
+        }
+        _findDialog.FocusQuery();
+    }
+
+    private void FindNextRequested(bool forward)
+    {
+        if (_findDialog is null) Find_Click(this, new RoutedEventArgs());
+        else
+            OnFindRequested(this, new FindRequest(
+                _findDialog!.Query, _findDialog.CurrentMode,
+                _findDialog.MatchCaseOn, _findDialog.WholeWordOn, _findDialog.WrapOn, forward));
+    }
+
+    private async void OnFindRequested(object? sender, FindRequest req)
+    {
+        var regex = FindEngine.Build(req.Query, req.Mode, req.MatchCase, req.WholeWord);
+        if (regex is null)
+        {
+            _findDialog?.SetStatus(string.IsNullOrEmpty(req.Query)
+                ? "Type to search."
+                : "Invalid pattern.");
+            return;
+        }
+
+        if (_sourceMode)
+            DoSourceFind(regex, req);
+        else
+            await DoWysiwygFindAsync(regex, req);
+    }
+
+    private void DoSourceFind(System.Text.RegularExpressions.Regex regex, FindRequest req)
+    {
+        var text = SourceBox.Text;
+        _sourceFindMatches = regex.Matches(text);
+        var total = _sourceFindMatches.Count;
+        if (total == 0)
+        {
+            _sourceFindCursor = -1;
+            _findDialog?.SetStatus(req.LiveTyping ? "No matches." : "No matches found.");
+            return;
+        }
+
+        if (req.LiveTyping)
+        {
+            // Land on the first match at or after the current caret position.
+            var caret = SourceBox.SelectionStart;
+            _sourceFindCursor = 0;
+            for (var i = 0; i < total; i++)
+                if (_sourceFindMatches[i].Index >= caret) { _sourceFindCursor = i; break; }
+        }
+        else
+        {
+            _sourceFindCursor = req.Forward
+                ? (_sourceFindCursor + 1)
+                : (_sourceFindCursor - 1);
+            if (_sourceFindCursor >= total) _sourceFindCursor = req.Wrap ? 0 : total - 1;
+            if (_sourceFindCursor < 0) _sourceFindCursor = req.Wrap ? total - 1 : 0;
+        }
+
+        var m = _sourceFindMatches[_sourceFindCursor];
+        SourceBox.Select(m.Index, m.Length);
+        SourceBox.ScrollToLine(SourceBox.GetLineIndexFromCharacterIndex(m.Index));
+        _findDialog?.SetStatus($"Match {_sourceFindCursor + 1} of {total}");
+    }
+
+    private async Task DoWysiwygFindAsync(System.Text.RegularExpressions.Regex regex, FindRequest req)
+    {
+        if (!_editorReady) return;
+        // Pass the regex source + flags to JS (which builds a JS RegExp from it).
+        var flags = "g";
+        if ((regex.Options & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0) flags += "i";
+        if ((regex.Options & System.Text.RegularExpressions.RegexOptions.Multiline) != 0) flags += "m";
+
+        // Convert .NET-isms that JS doesn't support back to nearest equivalents.
+        // For our four modes the generated patterns stick to the common subset, so
+        // a direct pass-through works.
+        var src = regex.ToString();
+        await RunEditorAsync($"window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)})");
+        var dir = req.Forward ? "Next" : "Prev";
+        var result = await RunEditorAsync($"JSON.stringify(window.MDM.find{dir}({(req.Wrap ? "true" : "false")}))");
+        ReportFindResult(result, req);
+    }
+
+    private void ReportFindResult(string? json, FindRequest req)
+    {
+        if (string.IsNullOrEmpty(json)) { _findDialog?.SetStatus("No matches."); return; }
+        try
+        {
+            using var d = JsonDocument.Parse(json);
+            var total = d.RootElement.TryGetProperty("total", out var t) ? t.GetInt32() : 0;
+            var current = d.RootElement.TryGetProperty("current", out var c) ? c.GetInt32() : 0;
+            if (total == 0)
+                _findDialog?.SetStatus(req.LiveTyping ? "No matches." : "No matches found.");
+            else
+                _findDialog?.SetStatus($"Match {current} of {total}");
+        }
+        catch { _findDialog?.SetStatus("No matches."); }
+    }
+
+    private async Task ClearWysiwygFindAsync()
+    {
+        if (_editorReady)
+            await RunEditorAsync("window.MDM.findClear()");
     }
 
     // ===== Print + PDF export (per-page-width prefs, persisted) =====
@@ -1290,14 +1427,19 @@ public partial class MainWindow : Window
     private async void HandleDroppedContent(string name, string content)
     {
         if (!await ConfirmDiscardAsync()) return;
-        StopWatching();
-        _suppressDirty = true;
-        await SetDocumentMarkdownAsync(content);
-        _currentPath = null;
-        _displayName = name;
-        _suppressDirty = false;
-        await SetCleanBaselineAsync();
-        SetClosed(false);
+        ShowBusy($"Opening {name}…");
+        try
+        {
+            StopWatching();
+            _suppressDirty = true;
+            await SetDocumentMarkdownAsync(content);
+            _currentPath = null;
+            _displayName = name;
+            _suppressDirty = false;
+            await SetCleanBaselineAsync();
+            SetClosed(false);
+        }
+        finally { HideBusy(); }
     }
 
     private static void OpenInNewInstance(string path, bool readOnly = false, bool helpWindow = false)
@@ -1442,6 +1584,9 @@ public partial class MainWindow : Window
         Bind(Key.W, ModifierKeys.Control, (_, _) => Close_Click(this, new RoutedEventArgs()));
         Bind(Key.P, ModifierKeys.Control, (_, _) => Print_Click(this, new RoutedEventArgs()));
         Bind(Key.K, ModifierKeys.Control, (_, _) => Link_Click(this, new RoutedEventArgs()));
+        Bind(Key.F, ModifierKeys.Control, (_, _) => Find_Click(this, new RoutedEventArgs()));
+        Bind(Key.F3, ModifierKeys.None, (_, _) => FindNextRequested(forward: true));
+        Bind(Key.F3, ModifierKeys.Shift, (_, _) => FindNextRequested(forward: false));
         Bind(Key.H, ModifierKeys.Control | ModifierKeys.Shift, (_, _) => FocusStyle_Click(this, new RoutedEventArgs()));
 
         // Ctrl+0..Ctrl+5 apply paragraph styles (also work via the editor keymap in WYSIWYG).

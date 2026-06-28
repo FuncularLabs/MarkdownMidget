@@ -88,6 +88,54 @@ editing the markdown source directly.
 The **¶** toolbar toggle shows Word-style marks in light gray: **¶** at paragraph
 and heading ends, **↵** at manual line breaks, and **→** for tabs.
 
+## Find
+
+**Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find dialog. **F3** jumps to
+the next match, **Shift+F3** to the previous. The status line shows
+**`Match m of n`**. Find works in either the WYSIWYG or the Markdown source view.
+
+The dialog has four **Search modes**:
+
+### Normal
+
+Plain literal substring. Case-insensitive by default; toggle **Match case** to
+require exact case. **Match whole word only** restricts hits to word boundaries.
+
+### Extended (literal with C-style escapes)
+
+Like Normal, but these backslash escapes are recognised:
+
+| Escape       | Meaning                                                |
+| ------------ | ------------------------------------------------------ |
+| `\n`         | newline (LF, 0x0A)                                     |
+| `\r`         | carriage return (CR, 0x0D)                             |
+| `\t`         | tab (0x09)                                             |
+| `\0`         | null (0x00)                                            |
+| `\\`         | a literal backslash                                    |
+| `\xNN`       | character by **two-digit hex** code (e.g. `\x20` = ' ') |
+| `\uNNNN`     | character by **four-digit Unicode hex** (e.g. `—` = em-dash `—`) |
+
+Any other character after a `\` is treated as that character literally — so
+`\.` matches a real `.`. This mirrors Notepad++'s Extended mode.
+
+### Wildcards
+
+Like Normal, but with two wildcards:
+
+| Token | Meaning                                               |
+| ----- | ----------------------------------------------------- |
+| `*`   | any run of characters, including none                 |
+| `?`   | exactly one character                                 |
+| `\*`  | a literal `*`                                         |
+| `\?`  | a literal `?`                                         |
+| `\\`  | a literal `\`                                         |
+
+### Regular expression
+
+.NET regex syntax — full power. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`,
+`(foo|bar)`. **Wrap around** lets the search loop from the end back to the
+start when **Find Next** runs off the bottom.
+
 ## Printing & PDF export
 
 **File ▸ Print ▸ Print…** (or **Ctrl+P**) opens the browser-style print preview.

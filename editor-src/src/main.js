@@ -19,6 +19,7 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { mermaidBlock } from './mermaid.js';
+import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 
@@ -453,6 +454,13 @@ const MDM = {
     const map = { portrait: '850px', landscape: '1169px', full: 'none' };
     document.documentElement.style.setProperty('--mdm-page-width', map[mode] || '850px');
   },
+
+  // Find (WYSIWYG view). The host hands us a regex (source + flags) it built from
+  // its FindEngine, so the four search modes stay consistent between views.
+  findReset(source, flags) { return fReset(source, flags); },
+  findNext(wrap) { return fNext(!!wrap); },
+  findPrev(wrap) { return fPrev(!!wrap); },
+  findClear() { fClear(); },
 
   // Apply width/height (px) to the currently selected image node.
   setImageSize(width, height) {

@@ -104,6 +104,8 @@
                         <Separator />
                         <MenuItem Header="Select _All" InputGestureText="Ctrl+A" Click="SelectAll_Click" />
                         <Separator />
+                        <MenuItem Header="_Find…" InputGestureText="Ctrl+F" Click="Find_Click" />
+                        <Separator />
                         <MenuItem x:Name="MenuReadOnly" Header="_Read Only"
                                   IsCheckable="True" Click="ReadOnly_Click" />
                     </MenuItem>
@@ -308,6 +310,17 @@
                      FontFamily="Consolas" FontSize="14"
                      Padding="12"
                      Background="#FFFBFBFB" />
+            <Grid x:Name="BusyOverlay" Visibility="Collapsed" Background="#A0FFFFFF" Panel.ZIndex="100">
+                <Border Background="#FF2E3440" CornerRadius="6" Padding="20,16"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock x:Name="BusyText" Text="Opening…" Foreground="#FFECEFF4"
+                                   FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                        <ProgressBar IsIndeterminate="True" Width="220" Height="6"
+                                     Background="#FF3B4252" Foreground="#FF88C0D0" BorderThickness="0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
             <Grid x:Name="ClosedSplash" Visibility="Collapsed" Background="#FF707479" AllowDrop="True">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Image Source="/Assets/midget-256.png" Width="96" Height="96"

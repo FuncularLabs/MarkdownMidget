@@ -1,0 +1,63 @@
+<Window x:Class="MarkdownMidget.FindDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Find" SizeToContent="Height" Width="440"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Content="_Find what:" Target="{Binding ElementName=QueryBox}"
+                   Padding="0" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <TextBox x:Name="QueryBox" Grid.Column="1" Padding="3" TextChanged="Query_Changed" />
+        </Grid>
+
+        <GroupBox Grid.Row="1" Header="Search mode" Margin="0,0,0,10">
+            <StackPanel Margin="6">
+                <RadioButton x:Name="ModeNormal" Content="_Normal" IsChecked="True"
+                             GroupName="Mode" Checked="Mode_Changed" />
+                <RadioButton x:Name="ModeExtended" Content="_Extended (\n \r \t \0 \\ \xNN \uNNNN)"
+                             GroupName="Mode" Checked="Mode_Changed" />
+                <RadioButton x:Name="ModeWildcards" Content="_Wildcards (* ?)"
+                             GroupName="Mode" Checked="Mode_Changed" />
+                <RadioButton x:Name="ModeRegex" Content="Regular e_xpression"
+                             GroupName="Mode" Checked="Mode_Changed" />
+            </StackPanel>
+        </GroupBox>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <CheckBox x:Name="MatchCase" Content="Match _case" Margin="0,0,18,0"
+                      Click="Option_Changed" />
+            <CheckBox x:Name="WholeWord" Content="Match _whole word only" Margin="0,0,18,0"
+                      Click="Option_Changed" />
+            <CheckBox x:Name="WrapAround" Content="_Wrap around" IsChecked="True"
+                      Click="Option_Changed" />
+        </StackPanel>
+
+        <DockPanel Grid.Row="3" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="Cl_ose" Width="80" IsCancel="True"
+                    Click="Close_Click" />
+            <Button DockPanel.Dock="Right" Content="Find _Previous" Width="110" Margin="0,0,6,0"
+                    Click="FindPrev_Click" ToolTip="Shift+F3" />
+            <Button DockPanel.Dock="Right" Content="Find _Next" Width="100" Margin="0,0,6,0"
+                    IsDefault="True" Click="FindNext_Click" ToolTip="F3" />
+            <TextBlock />
+        </DockPanel>
+
+        <Border Grid.Row="4" Background="#FFF0F2F5" BorderBrush="#FFC8CCD4" BorderThickness="1"
+                Padding="8,4" CornerRadius="3">
+            <TextBlock x:Name="StatusText" Text="Type to search." FontSize="11" />
+        </Border>
+    </Grid>
+</Window>

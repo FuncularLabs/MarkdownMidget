@@ -9,6 +9,22 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.1.7-alpha1] – 2026-06-27
+
+### Added
+- **Find** (Edit ▸ Find… / **Ctrl+F**) — modeless dialog with four search modes
+  (Normal, Extended, Wildcards, Regular expression), **Match case** / **Match
+  whole word only** / **Wrap around** toggles, and a `Match m of n` status line.
+  **F3** jumps to the next match, **Shift+F3** to the previous. Find works in
+  both the WYSIWYG view (text-node scan with browser-selection highlight) and
+  the Markdown source view (TextBox selection). Tooltips on the Extended /
+  Wildcards / Regex radios describe the syntax. HELP.md has the full escape
+  tables. Replace is not yet in; this iteration is read-only Find.
+- **Spinner overlay** when opening a file — a small busy card shows over the
+  editing area during the read + editor load, useful for large documents with
+  embedded base64 images. Fires on File ▸ Open, Open Recent, and editor-area
+  file drops.
+
 ## [0.1.6-alpha1] – 2026-06-27
 
 ### Added
@@ -105,7 +121,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.6-alpha1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.7-alpha1...HEAD
+[0.1.7-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha1
 [0.1.6-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.6-alpha1
 [0.1.5-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.5-alpha2
 [0.1.5-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.5-alpha1

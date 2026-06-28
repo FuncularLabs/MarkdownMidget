@@ -189,6 +189,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.1.7-alpha1** — **Find** (Ctrl+F, F3/Shift+F3) with Normal / Extended /
+  Wildcards / Regex modes, case + whole-word + wrap toggles, "Match m of n"
+  status; **busy overlay** when opening files.
 - **v0.1.6-alpha1** — **Mermaid diagrams** render live in WYSIWYG view for
   fenced ` ```mermaid ` blocks; source is hidden by default and revealed for
   inline editing when the cursor enters the block. Diagrams print and export
