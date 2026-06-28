@@ -18,6 +18,7 @@ import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
+import { mermaidBlock } from './mermaid.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 
@@ -364,6 +365,7 @@ const MDM = {
       .use(trailing)
       .use(formattingMarks)
       .use(tableCellEditing)
+      .use(mermaidBlock)
       .use(splitHeadingCommand)
       .use(headingEnterKeymap)
       .use(exitBlockCommand)

@@ -199,6 +199,46 @@ body {
   pointer-events: none;
 }
 
+/* Mermaid: hide the source code block by default; reveal only when the cursor
+   is inside it (a node decoration adds `mdm-mermaid-active`). The rendered SVG
+   sits in a sibling .mdm-mermaid container injected via a widget decoration. */
+.mdm-prosemirror pre[data-language="mermaid"] {
+  display: none;
+}
+.mdm-prosemirror pre[data-language="mermaid"].mdm-mermaid-active {
+  display: block;
+  margin-bottom: 4px;
+}
+.mdm-mermaid {
+  display: block;
+  margin: 6px 0 14px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e4e8;
+  border-radius: 6px;
+  overflow-x: auto;
+  text-align: center;
+  page-break-inside: avoid;
+}
+.mdm-mermaid svg { max-width: 100%; height: auto; }
+.mdm-mermaid-error {
+  background: #fdf2f2;
+  border-color: #f0b8b6;
+  text-align: left;
+}
+.mdm-mermaid-error-msg {
+  margin: 0;
+  color: #b83232;
+  font-family: Consolas, "Cascadia Code", monospace;
+  font-size: 0.9em;
+}
+.mdm-mermaid-empty { color: #888; font-style: italic; font-size: 0.9em; }
+@media print {
+  /* Always hide the source on paper; the rendered diagram alone is what's wanted. */
+  .mdm-prosemirror pre[data-language="mermaid"] { display: none !important; }
+  .mdm-mermaid { background: transparent; border: none; padding: 0; }
+}
+
 /* Tight list items: a list item's paragraph shouldn't carry the 16px block gap. */
 .mdm-prosemirror li > p {
   margin: 0;

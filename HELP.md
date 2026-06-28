@@ -24,6 +24,9 @@ From left to right:
 - **Bold / Italic / Underline / Strikethrough**.
 - **Inline code `</>`** with a chevron dropdown for inserting a fenced **code
   block** in a chosen language (Plain, C#, JavaScript, TypeScript, HTML, CSS).
+- **Mermaid diagrams** — a code block whose language is `mermaid` renders as a
+  live diagram in the WYSIWYG view. The source is hidden until you move the
+  cursor into the block (then it shows for editing).
 - **Bulleted list / Numbered list / Block quote / Horizontal rule**.
 - **Insert link / Insert picture / Insert table**.
 - **Source toggle** and the **¶** formatting-marks toggle.

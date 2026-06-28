@@ -9,6 +9,25 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.1.6-alpha1] – 2026-06-27
+
+### Added
+- **Mermaid diagrams.** Fenced code blocks tagged `mermaid` now render as live
+  diagrams in the WYSIWYG view (flowcharts, sequence diagrams, class diagrams,
+  etc.). The diagram appears below the block, the source itself is hidden while
+  the cursor is outside the block, and revealed for inline editing when the
+  cursor moves into it. Markdown round-trips unchanged (the on-disk file remains
+  a normal ``` ```mermaid ``` ``` fence). Print and PDF export render the
+  diagram (not the source), with page-break-inside avoided.
+
+### Known limitations
+- Mermaid pulls a large dependency tree (D3, dagre, cytoscape) — the editor
+  bundle grows from ~560 KB to ~3.9 MB. The extracted bundle is one-time-per-run
+  and cached by WebView2 thereafter; the app's startup time is still well under
+  a second on a typical machine, but the on-disk `.exe` size grows by about
+  0.5 MB after compression. Bundle splitting / lazy-load is a possible later
+  optimization if this becomes a concern.
+
 ## [0.1.5-alpha2] – 2026-06-27
 
 ### Changed
@@ -86,7 +105,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.5-alpha2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.6-alpha1...HEAD
+[0.1.6-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.6-alpha1
 [0.1.5-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.5-alpha2
 [0.1.5-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.5-alpha1
 [0.1.4-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.4-alpha1

@@ -189,6 +189,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.1.6-alpha1** — **Mermaid diagrams** render live in WYSIWYG view for
+  fenced ` ```mermaid ` blocks; source is hidden by default and revealed for
+  inline editing when the cursor enters the block. Diagrams print and export
+  to PDF cleanly.
 - **v0.1.5-alpha2** — Default landing is the "No document open" splash with
   clickable **Open** / **New** prompts; **Landscape** is the new default
   Document Width for fresh installs.

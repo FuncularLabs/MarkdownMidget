@@ -20,7 +20,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.1.5-alpha2";
+    private const string AppVersion = "v0.1.6-alpha1";
     private const string ProductDesc = "Markdown Midget " + AppVersion;
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.

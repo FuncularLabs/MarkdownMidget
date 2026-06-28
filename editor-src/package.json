@@ -11,7 +11,8 @@
   "dependencies": {
     "@milkdown/kit": "^7.21.2",
     "@milkdown/plugin-prism": "^7.21.2",
-    "@milkdown/theme-nord": "^7.21.2"
+    "@milkdown/theme-nord": "^7.21.2",
+    "mermaid": "^11.16.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.1"
