@@ -20,10 +20,21 @@ function buildIndex() {
   if (!root) return { text: '', nodes: [] };
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(n) {
-      // Skip text inside our injected widgets / marks / decorations that aren't
-      // part of the editable content (best-effort).
-      if (n.parentElement && n.parentElement.closest('.mdm-mark, .mdm-mermaid, .mdm-print-source-pre'))
+      const parent = n.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      // Injected widgets / marks / our print-source pre — never search.
+      if (parent.closest('.mdm-mark, .mdm-mermaid, .mdm-print-source-pre'))
         return NodeFilter.FILTER_REJECT;
+      // Mermaid source <pre> is hidden by default but its text nodes are still in
+      // the DOM. Reject anything inside an element with display:none (also covers
+      // collapsed details, hidden draft regions, etc.).
+      let el = parent;
+      while (el && el !== root) {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden')
+          return NodeFilter.FILTER_REJECT;
+        el = el.parentElement;
+      }
       return NodeFilter.FILTER_ACCEPT;
     },
   });

@@ -189,6 +189,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.1.7-alpha2** — Fix Find Next/Prev cursor (was resetting to match 1 every
+  press) and skip hidden mermaid source in the index; add **Win+arrow**
+  window-management shortcuts (Up/Down/Shift+Up plus Left/Right snap).
 - **v0.1.7-alpha1** — **Find** (Ctrl+F, F3/Shift+F3) with Normal / Extended /
   Wildcards / Regex modes, case + whole-word + wrap toggles, "Match m of n"
   status; **busy overlay** when opening files.

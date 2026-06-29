@@ -20,7 +20,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.1.7-alpha1";
+    private const string AppVersion = "v0.1.7-alpha2";
     private const string ProductDesc = "Markdown Midget " + AppVersion;
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
@@ -55,6 +55,8 @@ public partial class MainWindow : Window
     private FindDialog? _findDialog;
     private int _sourceFindCursor = -1; // index into _sourceFindMatches
     private System.Text.RegularExpressions.MatchCollection? _sourceFindMatches;
+    private string _lastFindSource = "";
+    private string _lastFindFlags = "";
 
     // External-change tracking for the currently-open file.
     private FileSystemWatcher? _watcher;
@@ -194,6 +196,9 @@ public partial class MainWindow : Window
             case "change":
                 if (!_sourceMode)
                     ScheduleDirtyCheck();
+                // Edits invalidate the WYSIWYG find index — force a re-scan on next find.
+                _lastFindSource = "";
+                _lastFindFlags = "";
                 break;
             case "selection":
                 // Reflect the block type at the cursor in the Style dropdown.
@@ -746,6 +751,57 @@ public partial class MainWindow : Window
         }
     }
 
+    // ===== Standard Windows window-management shortcuts =====
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        // Only act when the Windows key is held.
+        if ((Keyboard.Modifiers & ModifierKeys.Windows) == 0) return;
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+
+        switch (e.Key)
+        {
+            case Key.Up:
+                if (shift) FillVertical();                    // Win+Shift+Up: stretch full height
+                else if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+                else WindowState = WindowState.Maximized;     // Win+Up: maximize
+                e.Handled = true;
+                break;
+            case Key.Down:
+                if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+                else WindowState = WindowState.Minimized;     // Win+Down: minimize / restore from max
+                e.Handled = true;
+                break;
+            case Key.Left:
+                SnapWindowHalf(left: true);                   // Win+Left: snap left half
+                e.Handled = true;
+                break;
+            case Key.Right:
+                SnapWindowHalf(left: false);                  // Win+Right: snap right half
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void FillVertical()
+    {
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+        var area = SystemParameters.WorkArea;
+        Top = area.Top;
+        Height = area.Height;
+    }
+
+    private void SnapWindowHalf(bool left)
+    {
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+        var area = SystemParameters.WorkArea;
+        var halfW = area.Width / 2;
+        Top = area.Top;
+        Height = area.Height;
+        Width = halfW;
+        Left = left ? area.Left : area.Left + halfW;
+    }
+
     // ===== Busy overlay (file open / large-doc load) =====
 
     private void ShowBusy(string text)
@@ -844,12 +900,17 @@ public partial class MainWindow : Window
         var flags = "g";
         if ((regex.Options & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0) flags += "i";
         if ((regex.Options & System.Text.RegularExpressions.RegexOptions.Multiline) != 0) flags += "m";
-
-        // Convert .NET-isms that JS doesn't support back to nearest equivalents.
-        // For our four modes the generated patterns stick to the common subset, so
-        // a direct pass-through works.
         var src = regex.ToString();
-        await RunEditorAsync($"window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)})");
+
+        // Re-scan only when the pattern OR options change, so explicit Find Next /
+        // Find Previous advance the match cursor rather than rebuilding from match 1.
+        if (src != _lastFindSource || flags != _lastFindFlags)
+        {
+            await RunEditorAsync($"window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)})");
+            _lastFindSource = src;
+            _lastFindFlags = flags;
+        }
+
         var dir = req.Forward ? "Next" : "Prev";
         var result = await RunEditorAsync($"JSON.stringify(window.MDM.find{dir}({(req.Wrap ? "true" : "false")}))");
         ReportFindResult(result, req);
@@ -1587,6 +1648,11 @@ public partial class MainWindow : Window
         Bind(Key.F, ModifierKeys.Control, (_, _) => Find_Click(this, new RoutedEventArgs()));
         Bind(Key.F3, ModifierKeys.None, (_, _) => FindNextRequested(forward: true));
         Bind(Key.F3, ModifierKeys.Shift, (_, _) => FindNextRequested(forward: false));
+
+        // Standard Windows window-management shortcuts (Win+arrow). WebView2 has its
+        // own child HWND that grabs focus, so we hook PreviewKeyDown at the Window
+        // level to make sure these reach us regardless of the focused control.
+        PreviewKeyDown += Window_PreviewKeyDown;
         Bind(Key.H, ModifierKeys.Control | ModifierKeys.Shift, (_, _) => FocusStyle_Click(this, new RoutedEventArgs()));
 
         // Ctrl+0..Ctrl+5 apply paragraph styles (also work via the editor keymap in WYSIWYG).

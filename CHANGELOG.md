@@ -9,6 +9,27 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.1.7-alpha2] – 2026-06-27
+
+### Fixed
+- **Find Next / Find Previous now actually advance the cursor.** The WYSIWYG
+  dispatcher was calling `findReset()` on every navigation, which reset the match
+  pointer to -1 — so F3 always landed back at the first match. The reset is now
+  only performed when the pattern or its options change (and is invalidated on
+  any subsequent document edit).
+- **Find no longer "lands nowhere"** when a match falls inside a hidden mermaid
+  source block. The text-node walker now rejects any node whose ancestor has
+  `display: none` or `visibility: hidden` (which covers the hidden mermaid
+  `<pre>`, collapsed details, draft regions, etc.).
+
+### Added
+- **Standard Windows window-management shortcuts**, intercepted at the WPF
+  Window so they work even when the WebView2 child has keyboard focus:
+  - **Win+Up** — maximize (restore-from-minimized if minimized)
+  - **Win+Down** — minimize (restore-from-maximized if maximized)
+  - **Win+Shift+Up** — fill the working-area height at the current width
+  - **Win+Left** / **Win+Right** — snap to the left / right half of the work area
+
 ## [0.1.7-alpha1] – 2026-06-27
 
 ### Added
@@ -121,7 +142,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.7-alpha1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.7-alpha2...HEAD
+[0.1.7-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha2
 [0.1.7-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha1
 [0.1.6-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.6-alpha1
 [0.1.5-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.5-alpha2
