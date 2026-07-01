@@ -88,6 +88,53 @@ jobs:
           "asset=$dest" >> $env:GITHUB_OUTPUT
           "sizeMB=$([Math]::Round($size / 1MB, 2))" >> $env:GITHUB_OUTPUT
 
+      # ===== Authenticode signing via Azure Artifact Signing =====
+      # Uses the SP whose credentials are in AZURE_CLIENT_ID/TENANT/SECRET secrets.
+      # azuretrustedsigntool wraps signtool.exe + the CodeSigning dlib; it picks
+      # up creds via DefaultAzureCredential (which reads the AZURE_* env vars).
+
+      - name: Install azuretrustedsigntool
+        run: dotnet tool install --global azuretrustedsigntool
+
+      - name: Locate signtool.exe (Windows SDK, preinstalled on windows-latest)
+        id: signtool
+        shell: pwsh
+        run: |
+          $tool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" `
+                    -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+                  Where-Object { $_.FullName -like "*\x64\*" } |
+                  Sort-Object FullName -Descending |
+                  Select-Object -First 1
+          if (-not $tool) { throw "signtool.exe not found on runner" }
+          Write-Host "signtool: $($tool.FullName)"
+          "path=$($tool.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Sign the exe (Azure Artifact Signing)
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        shell: pwsh
+        run: |
+          azuretrustedsigntool sign `
+            -g "${{ steps.stage.outputs.asset }}" `
+            -a func-az-artifact-signing `
+            -p funcular-labs-public-trust `
+            -t https://cus.codesigning.azure.net/ `
+            -e "${{ steps.signtool.outputs.path }}" `
+            -d "Markdown Midget" `
+            -v
+
+      - name: Verify Authenticode signature
+        shell: pwsh
+        run: |
+          & "${{ steps.signtool.outputs.path }}" verify /pa /v "${{ steps.stage.outputs.asset }}"
+          if ($LASTEXITCODE -ne 0) { throw "Authenticode verify failed (exit $LASTEXITCODE)" }
+          $sig = Get-AuthenticodeSignature "${{ steps.stage.outputs.asset }}"
+          Write-Host "Status:  $($sig.Status)"
+          Write-Host "Subject: $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "Signature status is $($sig.Status), expected Valid" }
+
       - name: Build release notes from CHANGELOG
         id: notes
         shell: pwsh
@@ -130,8 +177,7 @@ jobs:
             ''
             '## Notes'
             ''
-            '- This is an early **alpha** — expect rough edges, and please file issues.'
-            '- The download is **unsigned**, so Windows SmartScreen may warn on first run: click **More info → Run anyway**.'
+            '- The download is **signed** by Funcular Labs via Azure Artifact Signing (Authenticode). If Windows SmartScreen warns on a very new release, the reputation graph builds up quickly for signed installers.'
             '- Settings/recent files live under `%LocalAppData%\MarkdownMidget`.'
           ) -join "`n"
 

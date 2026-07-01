@@ -20,8 +20,13 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.2.0-beta1";
-    private const string ProductDesc = "Markdown Midget " + AppVersion;
+    // Read at runtime from AssemblyInformationalVersionAttribute so CI's tag-derived
+    // -p:InformationalVersion=... flows through automatically — no manual const sync.
+    private static readonly string AppVersion = "v" + (
+        typeof(MainWindow).Assembly
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion ?? "0.0.0");
+    private static readonly string ProductDesc = "Markdown Midget " + AppVersion;
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
     private static readonly string GlyphSource = char.ConvertFromUtf32(0xE943); // braces {} = markdown source

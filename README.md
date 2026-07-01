@@ -207,6 +207,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.2.0-beta2** — Releases are now **Authenticode-signed** by Funcular Labs
+  via Azure Artifact Signing; exe metadata (Company, Copyright, description)
+  fully populated; `AppVersion` derived from assembly attribute so the title
+  bar auto-syncs to the tag.
 - **v0.2.0-beta1** — First beta. All 0.1.x-alpha work baked in;
   release-engineering (CI, tag-driven publishing, unit tests, embedded HELP.md,
   Windows integration) proven. Refreshed screenshot; README images now use

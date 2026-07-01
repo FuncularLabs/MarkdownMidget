@@ -9,6 +9,26 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.2.0-beta2] – 2026-07-01
+
+### Added
+- **Authenticode-signed releases via Azure Artifact Signing.** The release
+  workflow now signs the published exe using a service principal + the
+  `funcular-labs-public-trust` certificate profile, then verifies the
+  signature before uploading to the release. Windows SmartScreen will build
+  reputation quickly for signed installers rather than warning on every run.
+
+### Changed
+- **Exe metadata is populated.** Details tab now shows Company (Funcular Labs),
+  Copyright (`© Funcular Labs 2026, MIT`), Product / FileDescription
+  (`Markdown Midget` with the space), and the `+git-sha` suffix that MSBuild
+  was appending to ProductVersion is suppressed.
+- **`AppVersion` is now derived from the assembly's
+  `AssemblyInformationalVersionAttribute`** at runtime. CI passes
+  `-p:InformationalVersion=<tag-version>` at publish, so the title-bar version
+  automatically reflects whatever tag drove the release — no more manual const
+  bumps between the code, the csproj, and the tag.
+
 ## [0.2.0-beta1] – 2026-07-01
 
 Beta milestone. Everything from the 0.1.x alpha series is baked in and the
@@ -229,7 +249,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.2.0-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.2.0-beta2...HEAD
+[0.2.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta2
 [0.2.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta1
 [0.1.8-alpha3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha3
 [0.1.8-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha2
