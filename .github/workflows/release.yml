@@ -116,14 +116,18 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         shell: pwsh
         run: |
+          # NB: --signtoolexe long form: the tool has a bug where `-e` is
+          # registered twice (both --signtoolexe and --excludefilelist), so any
+          # short-form `-e` triggers "Sequence contains more than one matching
+          # element" in the CommandLine parser. Long form is unambiguous.
           azuretrustedsigntool sign `
-            -g "${{ steps.stage.outputs.asset }}" `
-            -a func-az-artifact-signing `
-            -p funcular-labs-public-trust `
-            -t https://cus.codesigning.azure.net/ `
-            -e "${{ steps.signtool.outputs.path }}" `
-            -d "Markdown Midget" `
-            -v
+            --file "${{ steps.stage.outputs.asset }}" `
+            --accountname func-az-artifact-signing `
+            --profilename funcular-labs-public-trust `
+            --trustedendpoint https://cus.codesigning.azure.net/ `
+            --signtoolexe "${{ steps.signtool.outputs.path }}" `
+            --description "Markdown Midget" `
+            --verbose
 
       - name: Verify Authenticode signature
         shell: pwsh
