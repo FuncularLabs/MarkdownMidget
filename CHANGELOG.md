@@ -9,6 +9,30 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.1.8-alpha1] – 2026-06-27
+
+### Added
+- **File ▸ Windows Integration ▸ Register as .md editor…** — a per-user, no-admin
+  workflow to add Markdown Midget to the Windows "Open with" menu for `.md`
+  files. Uses a stable ProgID (`MarkdownMidget.Document`), so re-registering the
+  current version overwrites the same registry key and can't accidentally create
+  duplicates. On register we also **dedupe stale references** to Markdown Midget
+  (previous "Choose another app" pickings under `FileExts\.md\OpenWithList`,
+  old `Applications\` entries under different exe filenames like `mkm.exe`).
+- **Optional AppData install + Start-menu entry.** Checkbox in the register
+  dialog copies the current build to
+  `%LocalAppData%\Programs\MarkdownMidget\MarkdownMidget.exe` and creates a
+  Start-menu shortcut — a portable-app style install with no MSI. Recommended
+  because it keeps the Open With entry stable across future releases (just
+  re-register after each upgrade).
+- **Optional "Set as default"** — Windows 10/11 protect the UserChoice hash so
+  apps can't set defaults programmatically; the checkbox opens the Default Apps
+  Settings page filtered to `.md` for the user to confirm with one click.
+- **File ▸ Windows Integration ▸ Unregister as .md editor** — removes the
+  ProgID + Applications entry + `.md\OpenWithProgids` link and does the same
+  dedupe pass. If an AppData install exists (and isn't the currently-running
+  copy), asks whether to also remove that folder and the Start-menu shortcut.
+
 ## [0.1.7-alpha2] – 2026-06-27
 
 ### Fixed
@@ -142,7 +166,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.7-alpha2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.8-alpha1...HEAD
+[0.1.8-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha1
 [0.1.7-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha2
 [0.1.7-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha1
 [0.1.6-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.6-alpha1

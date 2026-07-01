@@ -171,6 +171,29 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 **View ▸ Spell Check** (or the **abc** toggle at the right of the View toolbar)
 toggles the red squiggles in both views. On by default.
 
+## Windows integration
+
+**File ▸ Windows Integration ▸ Register as .md editor…** adds Markdown Midget to
+the Windows **"Open with"** list for `.md` files, per-user, with no installer or
+admin prompt. A stable ProgID (`MarkdownMidget.Document`) is used so re-running
+the wizard just points the existing entry at the current version — you'll never
+see duplicate "Markdown Midget" entries in the Open With menu.
+
+The dialog offers two opt-ins:
+
+- **Copy this build to AppData and add a Start-menu entry** — recommended. Puts
+  a stable copy at `%LocalAppData%\Programs\MarkdownMidget\MarkdownMidget.exe`
+  and creates a `Markdown Midget.lnk` shortcut in your Start-menu Programs
+  folder, so the Open With entry keeps working even if you move or delete the
+  originally-downloaded file.
+- **Make it my default for .md files** — Windows requires the user to confirm
+  defaults in Settings, so this option opens the Default Apps page filtered to
+  `.md` where you can click "Markdown Midget" to make it default.
+
+**File ▸ Windows Integration ▸ Unregister as .md editor** does the reverse:
+removes the registry entries and, if there's an AppData copy, offers to remove
+that folder and the Start-menu shortcut too.
+
 ## Read-only mode
 
 **Edit ▸ Read Only** locks the document against changes (this Help window uses it).

@@ -92,6 +92,11 @@
                         <Separator />
                         <MenuItem Header="C_lose" InputGestureText="Ctrl+W" Click="Close_Click" />
                         <Separator />
+                        <MenuItem Header="_Windows Integration">
+                            <MenuItem Header="_Register as .md editor…" Click="RegisterMdEditor_Click" />
+                            <MenuItem x:Name="UnregisterMenu" Header="_Unregister as .md editor" Click="UnregisterMdEditor_Click" />
+                        </MenuItem>
+                        <Separator />
                         <MenuItem Header="E_xit" Click="Exit_Click" />
                     </MenuItem>
                     <MenuItem Header="_Edit">

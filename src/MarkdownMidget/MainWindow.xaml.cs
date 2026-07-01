@@ -20,7 +20,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.1.7-alpha2";
+    private const string AppVersion = "v0.1.8-alpha1";
     private const string ProductDesc = "Markdown Midget " + AppVersion;
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
@@ -748,6 +748,76 @@ public partial class MainWindow : Window
         else
         {
             await LoadDocumentAsync(newDiskContent, _currentPath);
+        }
+    }
+
+    // ===== Windows integration (register / unregister as .md editor) =====
+
+    private void RegisterMdEditor_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new RegisterDialog { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            var exeToRegister = dlg.InstallToAppData
+                ? RegistrationService.InstallToAppData()
+                : RegistrationService.CurrentExePath;
+
+            RegistrationService.Register(exeToRegister);
+
+            if (dlg.InstallToAppData)
+                RegistrationService.CreateStartMenuShortcut(exeToRegister);
+
+            var summary = $"Registered Markdown Midget as an editor for .md files.\n\nExe: {exeToRegister}"
+                + (dlg.InstallToAppData ? "\nStart menu: added" : "");
+            MessageBox.Show(this, summary, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            if (dlg.SetAsDefault)
+                RegistrationService.OpenDefaultAppsSettings();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Couldn't complete registration:\n\n" + ex.Message,
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void UnregisterMdEditor_Click(object sender, RoutedEventArgs e)
+    {
+        var installed = RegistrationService.IsInstalledToAppData();
+        var runningFromInstalled = RegistrationService.IsRunningFromAppDataInstall();
+
+        var message = "Remove Markdown Midget from the Windows \"Open with\" list for .md files?";
+        if (installed && !runningFromInstalled)
+            message += "\n\nAlso remove the AppData copy and Start-menu entry?  (Yes to remove both, No for registry only.)";
+        else if (installed && runningFromInstalled)
+            message += "\n\nNote: an installed copy exists at %LocalAppData%\\Programs\\MarkdownMidget, but it's the one currently running — close it first to remove the folder.";
+
+        var buttons = installed && !runningFromInstalled
+            ? MessageBoxButton.YesNoCancel
+            : MessageBoxButton.OKCancel;
+
+        var result = MessageBox.Show(this, message, "Markdown Midget", buttons, MessageBoxImage.Question);
+
+        var proceed = result is MessageBoxResult.Yes or MessageBoxResult.No or MessageBoxResult.OK;
+        if (!proceed) return;
+
+        try
+        {
+            RegistrationService.Unregister();
+            if (result == MessageBoxResult.Yes)
+                RegistrationService.UninstallFromAppData();
+            else if (installed && !runningFromInstalled && result == MessageBoxResult.OK)
+                RegistrationService.RemoveStartMenuShortcut();
+
+            MessageBox.Show(this, "Markdown Midget has been unregistered.",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Couldn't complete unregistration:\n\n" + ex.Message,
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

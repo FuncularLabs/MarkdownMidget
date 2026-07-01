@@ -189,6 +189,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.1.8-alpha1** — **Windows integration** submenu (File): register /
+  unregister as a .md editor without an installer, dedupe stale references,
+  optional AppData install + Start-menu shortcut, optional "set as default"
+  via Windows Settings.
 - **v0.1.7-alpha2** — Fix Find Next/Prev cursor (was resetting to match 1 every
   press) and skip hidden mermaid source in the index; add **Win+arrow**
   window-management shortcuts (Up/Down/Shift+Up plus Left/Right snap).

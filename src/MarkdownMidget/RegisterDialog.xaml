@@ -1,0 +1,46 @@
+<Window x:Class="MarkdownMidget.RegisterDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Register as .md editor" SizeToContent="Height" Width="500"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <StackPanel Margin="18">
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+            Add Markdown Midget to the Windows <Bold>"Open with"</Bold> list for
+            <Bold>.md</Bold> files. Any earlier Markdown Midget references in that list
+            will be cleaned up so only the currently running version remains.
+        </TextBlock>
+
+        <TextBlock x:Name="ExePathText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
+                   Foreground="#555" Margin="0,0,0,12" />
+
+        <CheckBox x:Name="InstallToAppDataCheck" IsChecked="True" Margin="0,0,0,4">
+            <TextBlock TextWrapping="Wrap">
+                Also <Bold>copy this build to AppData</Bold> and add a
+                <Bold>Start-menu entry</Bold>.
+            </TextBlock>
+        </CheckBox>
+        <TextBlock TextWrapping="Wrap" Margin="24,0,0,12" FontSize="11" Foreground="#555">
+            Recommended. Puts a stable copy at
+            <Run FontFamily="Consolas">%LocalAppData%\Programs\MarkdownMidget\</Run>
+            so the Open With entry survives moving or deleting the downloaded file.
+        </TextBlock>
+
+        <CheckBox x:Name="SetDefaultCheck" IsChecked="False" Margin="0,0,0,4">
+            <TextBlock TextWrapping="Wrap">
+                Also <Bold>make it my default for .md</Bold> files.
+            </TextBlock>
+        </CheckBox>
+        <TextBlock TextWrapping="Wrap" Margin="24,0,0,16" FontSize="11" Foreground="#555">
+            Windows requires you to confirm defaults in Settings, so we'll open the
+            Default Apps page for .md after registering — click "Markdown Midget" there
+            to finish.
+        </TextBlock>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="OkBtn" Content="_Register" Width="100" IsDefault="True"
+                    Click="Ok_Click" Margin="0,0,8,0" />
+            <Button Content="Cancel" Width="80" IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>
