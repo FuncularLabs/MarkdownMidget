@@ -2,6 +2,9 @@
 
 <img src="art/midget-256.png" alt="Markdown Midget mascot" width="120" align="right" />
 
+[![Latest release](https://img.shields.io/github/v/release/FuncularLabs/MarkdownMidget?include_prereleases&sort=semver&color=blue&label=latest)](https://github.com/FuncularLabs/MarkdownMidget/releases)
+[![Release date](https://img.shields.io/github/release-date-pre/FuncularLabs/MarkdownMidget?color=informational)](https://github.com/FuncularLabs/MarkdownMidget/releases)
+[![Downloads](https://img.shields.io/github/downloads/FuncularLabs/MarkdownMidget/total?color=success)](https://github.com/FuncularLabs/MarkdownMidget/releases)
 [![CI](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/ci.yml/badge.svg)](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/ci.yml)
 [![Release](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/release.yml/badge.svg)](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/release.yml)
 
@@ -15,6 +18,18 @@ Built on **.NET / WPF** hosting a **WebView2** control. The editing surface is
 so markdown is the literal document model rather than a lossy import/export.
 
 ![Markdown Midget editing a document](art/screenshot.png)
+
+## Download
+
+The latest build is always on the
+[**Releases page**](https://github.com/FuncularLabs/MarkdownMidget/releases) —
+grab `MarkdownMidget-vX.Y.Z-…-net10.exe` from the top entry. Releases are
+currently marked as prereleases (`-alpha`, `-beta`) until we cut a stable 1.0;
+GitHub's sidebar "Releases" widget only highlights non-prereleases, so the
+badge above is the reliable "latest version" indicator.
+
+Every tagged push builds on GitHub Actions and attaches the exe automatically
+(see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
 
 ## Features
 
