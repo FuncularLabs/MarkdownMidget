@@ -1,9 +1,6 @@
 # Markdown Midget
 
-<img src="art/midget-256.png" alt="Markdown Midget mascot" width="120" align="right" />
-
-[![CI](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/ci.yml/badge.svg)](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/ci.yml)
-[![Release](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/release.yml/badge.svg)](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/release.yml)
+<img src="art/midget-256.png" alt="Markdown Midget mascot" width="120" />
 
 A WYSIWYG markdown editor for Windows, modeled on WordPad's behaviors, menus,
 toolbar, and keyboard shortcuts — but with **markdown as the native (and only)
@@ -18,29 +15,39 @@ so markdown is the literal document model rather than a lossy import/export.
 
 ## Features
 
-- **WYSIWYG editing** with a one-key toggle to the raw **markdown source** (Ctrl+E).
-- Headings, **bold / italic / underline / strikethrough**, inline code, bulleted &
+* **WYSIWYG editing** with a one-key toggle to the raw **markdown source** (Ctrl+E).
+
+* Headings, **bold / italic / underline / strikethrough**, inline code, bulleted &
   numbered lists, block quotes, and horizontal rules.
-- **Tables** (GFM) — insert dialog plus a native right-click menu for
+
+* **Tables** (GFM) — insert dialog plus a native right-click menu for
   insert/delete/select column, row, or table; styled with a dark header and
   alternating rows.
-- **Pictures** embedded as data URIs (travel with the file), with an aspect-locked
+
+* **Pictures** embedded as data URIs (travel with the file), with an aspect-locked
   **Resize** dialog.
-- **Links** rendered like a browser, with the URL as a hover tooltip.
-- **Fenced code blocks** with syntax highlighting (C#, JavaScript, TypeScript,
+
+* **Links** rendered like a browser, with the URL as a hover tooltip.
+
+* **Fenced code blocks** with syntax highlighting (C#, JavaScript, TypeScript,
   HTML, CSS).
-- **Formatting marks** toggle (¶ / ↵ / →) and **spell check**.
-- **Document width** (Portrait / Landscape / Full, remembered between sessions) and
+
+* **Formatting marks** toggle (¶ / ↵ / →) and **spell check**.
+
+* **Document width** (Portrait / Landscape / Full, remembered between sessions) and
   a **zoom** indicator (Ctrl + mouse wheel).
-- **Recent files**, drag-and-drop to open, **read-only** mode, and a bundled Help
+
+* **Recent files**, drag-and-drop to open, **read-only** mode, and a bundled Help
   document.
-- Ships as a **single `.exe`**.
+
+* Ships as a **single** **`.exe`**.
 
 ## Requirements
 
-- **Windows 10/11** and the Microsoft Edge **WebView2 runtime** (already present on
+* **Windows 10/11** and the Microsoft Edge **WebView2 runtime** (already present on
   Windows 11; otherwise a free download from Microsoft).
-- The framework-dependent build also needs the **.NET Desktop runtime**; the
+
+* The framework-dependent build also needs the **.NET Desktop runtime**; the
   self-contained build bundles it. See [Distribution](#distribution-single-file-builds).
 
 ## Status
@@ -62,12 +69,15 @@ editor-src/                 npm/esbuild project that bundles Milkdown -> wwwroot
 
 ### Host ↔ editor bridge (`window.MDM`)
 
-- `create(initialMarkdown)` — mount the editor with a document
-- `getMarkdown()` / `setMarkdown(md)` — used for file I/O and the source toggle
-- `cmd(name, …args)` — run a formatting command (`bold`, `italic`, `underline`,
+* `create(initialMarkdown)` — mount the editor with a document
+
+* `getMarkdown()` / `setMarkdown(md)` — used for file I/O and the source toggle
+
+* `cmd(name, …args)` — run a formatting command (`bold`, `italic`, `underline`,
   `strike`, `code`, `h1`..`h6`, `paragraph`, `bullet`, `ordered`, `quote`, `hr`,
   `codeblock` (language))
-- `insertMarkdown(md)` — insert a fragment (used by the link/picture helpers)
+
+* `insertMarkdown(md)` — insert a fragment (used by the link/picture helpers)
 
 The editor posts `loaded` / `ready` / `change` messages back to the WPF host.
 Headings `Ctrl+1`..`Ctrl+5` / `Ctrl+0` (paragraph) are bound in the editor keymap
@@ -107,7 +117,7 @@ npm run build    # writes src/MarkdownMidget/wwwroot/editor.bundle.{js,css}
 
 ## Distribution (single-file builds)
 
-The **framework-dependent** profile is the standard distributable — a single ~3 MB
+The **framework-dependent** profile is the standard distributable — a single \~3 MB
 `.exe` for machines that have the **.NET 10 Desktop runtime** (and the Edge
 **WebView2 runtime**, which ships with Windows 11):
 
@@ -116,7 +126,7 @@ dotnet publish src/MarkdownMidget -p:PublishProfile=win-x64-fxdependent
 # -> src/MarkdownMidget/bin/Release/publish/framework-dependent/MarkdownMidget.exe
 ```
 
-A fully **self-contained** profile (`win-x64`, ~63 MB, bundles the .NET runtime so
+A fully **self-contained** profile (`win-x64`, \~63 MB, bundles the .NET runtime so
 nothing needs to be installed) also exists for one-off use; it can't be shrunk
 because WPF doesn't support trimming. The editor bundle and HELP.md are embedded
 in either build. Debug/`dotnet run` stay framework-dependent and fast.
@@ -137,88 +147,106 @@ magick -background none -density 512 midget.svg -define icon:auto-resize=256,128
 
 ## Keyboard shortcuts (WordPad-aligned)
 
-| Action            | Shortcut       |
-| ----------------- | -------------- |
-| New               | Ctrl+N         |
-| Open              | Ctrl+O         |
-| Save              | Ctrl+S         |
-| Save As           | Ctrl+Shift+S   |
-| Bold / Italic / Underline | Ctrl+B / Ctrl+I / Ctrl+U (in the editor) |
-| Paragraph / Heading 1–5 | Ctrl+0 / Ctrl+1 … Ctrl+5 |
-| Focus style box   | Ctrl+Shift+H   |
-| Insert link       | Ctrl+K         |
-| Exit block (escape a code block) | Ctrl+Enter |
-| Toggle source     | Ctrl+E         |
+| Action                           | Shortcut                                 |
+| -------------------------------- | ---------------------------------------- |
+| New                              | Ctrl+N                                   |
+| Open                             | Ctrl+O                                   |
+| Save                             | Ctrl+S                                   |
+| Save As                          | Ctrl+Shift+S                             |
+| Bold / Italic / Underline        | Ctrl+B / Ctrl+I / Ctrl+U (in the editor) |
+| Paragraph / Heading 1–5          | Ctrl+0 / Ctrl+1 … Ctrl+5                 |
+| Focus style box                  | Ctrl+Shift+H                             |
+| Insert link                      | Ctrl+K                                   |
+| Exit block (escape a code block) | Ctrl+Enter                               |
+| Toggle source                    | Ctrl+E                                   |
 
 ## MVP scope notes
 
 Per the project rule, anything from WordPad that isn't strictly easy to implement
 is deferred from this first iteration. Notable deferrals / divergences:
 
-- **Ribbon → menu + toolbar.** WPF has no trivial Office ribbon, so the MVP uses
+* **Ribbon → menu + toolbar.** WPF has no trivial Office ribbon, so the MVP uses
   a classic menu bar + toolbar with the same commands and shortcuts.
-- **Font size box → paragraph Style dropdown.** Markdown styles blocks
+
+* **Font size box → paragraph Style dropdown.** Markdown styles blocks
   (Paragraph / Heading 1–5 / code block), not point sizes — the "Styles, not size"
   divergence.
-- **Underline → inline HTML.** Markdown has no underline; it round-trips as
+
+* **Underline → inline HTML.** Markdown has no underline; it round-trips as
   `<u>…</u>` (see above).
-- **Toolbar glyphs.** Old-school flat icon buttons (Segoe Fluent Icons). The
+
+* **Toolbar glyphs.** Old-school flat icon buttons (Segoe Fluent Icons). The
   `</>` mark is reserved for inline code; the source/WYSIWYG toggle uses braces
   (`{}`, → markdown source) and a document glyph (→ formatted view).
-- **Pictures embed as data URIs.** Inserting a picture base64-encodes the file
+
+* **Pictures embed as data URIs.** Inserting a picture base64-encodes the file
   into the markdown (`![alt](data:image/…;base64,…)`) so it renders inside the
   sandboxed WebView and travels with the document. Right-click ▸ **Resize…**
   (aspect-locked) stores the size as inline HTML `<img width height>`.
-- **Links** render styled (steelblue, underlined) with the URL shown as a native
+
+* **Links** render styled (steelblue, underlined) with the URL shown as a native
   hover tooltip (a `title`-attribute decoration), like a browser.
-- **Tables** (GFM): insert via Insert ▸ Table…; right-click for the minimal
+
+* **Tables** (GFM): insert via Insert ▸ Table…; right-click for the minimal
   structure edits (insert/delete/select column, row, table). Cell selection +
   Backspace/Delete clears content; typing replaces it. Styled like the Markdown
   Monster "PDF Output" theme — dark header row, alternating row stripes.
-- **Modified state is content-based:** the document is "unchanged" whenever it
+
+* **Modified state is content-based:** the document is "unchanged" whenever it
   matches the last opened/saved markdown, so undoing back to that state clears the
   modified flag. Opening/new flushes undo history (you can't undo past the open
   state); saving leaves history intact (you can undo past a save).
-- **Drag & drop:** dropping a file opens it in place when the window holds an
+
+* **Drag & drop:** dropping a file opens it in place when the window holds an
   untitled, unmodified document; otherwise it opens in a new instance. Files can
   also be passed on the command line.
-- **Read-only mode:** Edit ▸ Read Only locks the document; also available via the
+
+* **Read-only mode:** Edit ▸ Read Only locks the document; also available via the
   `--readonly` command-line switch. Help ▸ View Help opens the bundled
   [HELP.md](HELP.md) read-only in a new instance.
-- Deferred: print, page setup, find/replace, color, theming.
+
+* Deferred: print, page setup, find/replace, color, theming.
 
 ## Recent changes
 
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
-- **v0.1.8-alpha2** — Fix registration dedupe (also cleans the per-user
+* **v0.1.8-alpha2** — Fix registration dedupe (also cleans the per-user
   Explorer ProgID MRU and stale UserChoice); clearer "Set as default"
   walkthrough; **F1 opens Help**.
-- **v0.1.8-alpha1** — **Windows integration** submenu (File): register /
+
+* **v0.1.8-alpha1** — **Windows integration** submenu (File): register /
   unregister as a .md editor without an installer, dedupe stale references,
   optional AppData install + Start-menu shortcut, optional "set as default"
   via Windows Settings.
-- **v0.1.7-alpha2** — Fix Find Next/Prev cursor (was resetting to match 1 every
+
+* **v0.1.7-alpha2** — Fix Find Next/Prev cursor (was resetting to match 1 every
   press) and skip hidden mermaid source in the index; add **Win+arrow**
   window-management shortcuts (Up/Down/Shift+Up plus Left/Right snap).
-- **v0.1.7-alpha1** — **Find** (Ctrl+F, F3/Shift+F3) with Normal / Extended /
+
+* **v0.1.7-alpha1** — **Find** (Ctrl+F, F3/Shift+F3) with Normal / Extended /
   Wildcards / Regex modes, case + whole-word + wrap toggles, "Match m of n"
   status; **busy overlay** when opening files.
-- **v0.1.6-alpha1** — **Mermaid diagrams** render live in WYSIWYG view for
+
+* **v0.1.6-alpha1** — **Mermaid diagrams** render live in WYSIWYG view for
   fenced ` ```mermaid ` blocks; source is hidden by default and revealed for
   inline editing when the cursor enters the block. Diagrams print and export
   to PDF cleanly.
-- **v0.1.5-alpha2** — Default landing is the "No document open" splash with
+
+* **v0.1.5-alpha2** — Default landing is the "No document open" splash with
   clickable **Open** / **New** prompts; **Landscape** is the new default
   Document Width for fresh installs.
-- **v0.1.5-alpha1** — File ▸ Close (Ctrl+W) with a gray drop-target placeholder;
+
+* **v0.1.5-alpha1** — File ▸ Close (Ctrl+W) with a gray drop-target placeholder;
   external change detection with a timestamped backup + reload/save-as/keep
   dialog; **Print (Ctrl+P) and Export to PDF** with per-Document-Width prefs;
   tighter table preview CSS.
-- **v0.1.4-alpha1** — Spell-check toggle joins the View toolbar group (no
+
+* **v0.1.4-alpha1** — Spell-check toggle joins the View toolbar group (no
   leading separator).
-- **v0.1.3** — Spell-check toggle button on the View toolbar (custom *abc + red
+
+* **v0.1.3** — Spell-check toggle button on the View toolbar (custom *abc + red
   squiggle* icon), two-way bound to View ▸ Spell Check.
 
 ## License

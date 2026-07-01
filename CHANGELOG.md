@@ -9,6 +9,24 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Unit tests.** New `tests/MarkdownMidget.Tests/` xUnit project covering
+  `FindEngine` (four search modes, escapes, wildcards, whole word, case, regex
+  edge cases) — 32 tests, ~40 ms locally.
+- **GitHub Actions CI**: `.github/workflows/ci.yml` runs on pushes to `master`
+  and every PR — builds the editor bundle (npm) + solution + runs tests on
+  `windows-latest` with .NET 10.
+- **GitHub Actions release publishing**: `.github/workflows/release.yml` fires
+  on `v*` tag pushes. Reproduces the manual release flow: builds the editor
+  bundle, runs tests, publishes the framework-dependent exe with tag-derived
+  `Version` / `InformationalVersion`, extracts the matching CHANGELOG section
+  for release notes, appends the standard Download / Requirements /
+  Notes boilerplate, and creates the GitHub release (prerelease flag inferred
+  from the presence of `-alpha`/`-beta`/`-rc` in the tag).
+- **HELP.md** now leads with a base64-embedded mascot image; convention
+  established that HELP images are always inlined (so the help view keeps
+  working when the exe is copied solo).
+
 ## [0.1.8-alpha2] – 2026-06-27
 
 ### Fixed

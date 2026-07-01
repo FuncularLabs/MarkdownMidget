@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/MarkdownMidget/MarkdownMidget.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MarkdownMidget.Tests/MarkdownMidget.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (must already exist)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Determine tag
+        id: tag
+        shell: pwsh
+        run: |
+          $tag = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ inputs.tag }}'
+          } else {
+            $env:GITHUB_REF_NAME
+          }
+          if (-not $tag) { throw "No tag provided." }
+          $version = $tag -replace '^v',''
+          # Base numeric version (strip anything after the first hyphen).
+          $base = ($version -split '-')[0]
+          $isPre = $version -match '-'
+          "tag=$tag"          >> $env:GITHUB_OUTPUT
+          "version=$version"  >> $env:GITHUB_OUTPUT
+          "base=$base"        >> $env:GITHUB_OUTPUT
+          "prerelease=$($isPre.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "Building $tag (base=$base, prerelease=$isPre)"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'editor-src/package-lock.json'
+
+      - name: Build editor bundle
+        working-directory: editor-src
+        run: |
+          npm ci
+          npm run build
+
+      - name: Restore
+        run: dotnet restore MarkdownMidget.slnx
+
+      - name: Test
+        run: dotnet test tests/MarkdownMidget.Tests/MarkdownMidget.Tests.csproj -c Release --verbosity minimal
+
+      - name: Publish framework-dependent
+        shell: pwsh
+        run: |
+          dotnet publish src/MarkdownMidget/MarkdownMidget.csproj `
+            -p:PublishProfile=win-x64-fxdependent `
+            -p:Version=${{ steps.tag.outputs.base }} `
+            -p:InformationalVersion=${{ steps.tag.outputs.version }} `
+            --nologo
+
+      - name: Stage asset
+        id: stage
+        shell: pwsh
+        run: |
+          $src = "src/MarkdownMidget/bin/Release/publish/framework-dependent/MarkdownMidget.exe"
+          if (-not (Test-Path $src)) { throw "Published exe not found at $src" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $dest = "dist/MarkdownMidget-${{ steps.tag.outputs.tag }}-win-x64-net10.exe"
+          Copy-Item $src $dest -Force
+          $size = (Get-Item $dest).Length
+          "asset=$dest" >> $env:GITHUB_OUTPUT
+          "sizeMB=$([Math]::Round($size / 1MB, 2))" >> $env:GITHUB_OUTPUT
+
+      - name: Build release notes from CHANGELOG
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.tag.outputs.version }}"
+          $tag = "${{ steps.tag.outputs.tag }}"
+          $sizeMB = "${{ steps.stage.outputs.sizeMB }}"
+
+          $lines = Get-Content CHANGELOG.md
+          $start = -1
+          $end = $lines.Count
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($start -lt 0 -and $lines[$i] -match "^##\s+\[$([regex]::Escape($version))\]") {
+              $start = $i + 1
+              continue
+            }
+            if ($start -ge 0 -and $lines[$i] -match '^##\s+\[') {
+              $end = $i; break
+            }
+          }
+          if ($start -lt 0) {
+            Write-Warning "No CHANGELOG entry for [$version]; using generic notes."
+            $body = "Alpha update. See [CHANGELOG.md](https://github.com/FuncularLabs/MarkdownMidget/blob/master/CHANGELOG.md) for full history."
+          } else {
+            $body = ($lines[$start..($end-1)] -join "`n").TrimEnd()
+            $body += "`n`nSee [CHANGELOG.md](https://github.com/FuncularLabs/MarkdownMidget/blob/master/CHANGELOG.md) for full history."
+          }
+
+          $boilerplate = @"
+
+## Download
+
+**`MarkdownMidget-$tag-win-x64-net10.exe`** — single-file, framework-dependent build (~$sizeMB MB).
+
+## Requirements
+
+- **Windows 10/11 (x64)**
+- **.NET 10 Desktop Runtime** — https://dotnet.microsoft.com/download/dotnet/10.0
+- **Microsoft Edge WebView2 Runtime** — preinstalled on Windows 11; otherwise a free download from Microsoft.
+
+## Notes
+
+- This is an early **alpha** — expect rough edges, and please file issues.
+- The download is **unsigned**, so Windows SmartScreen may warn on first run: click **More info → Run anyway**.
+- Settings/recent files live under ``%LocalAppData%\MarkdownMidget``.
+"@
+
+          $full = $body + "`n" + $boilerplate
+          Set-Content -Path release-notes.md -Value $full -Encoding utf8
+          "Extracted notes (first 500 chars):"
+          $full.Substring(0, [Math]::Min(500, $full.Length))
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Markdown Midget ${{ steps.tag.outputs.tag }}
+          body_path: release-notes.md
+          prerelease: ${{ steps.tag.outputs.prerelease == 'true' }}
+          files: ${{ steps.stage.outputs.asset }}
+          fail_on_unmatched_files: true
