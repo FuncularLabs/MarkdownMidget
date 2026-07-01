@@ -116,24 +116,24 @@ jobs:
             $body += "`n`nSee [CHANGELOG.md](https://github.com/FuncularLabs/MarkdownMidget/blob/master/CHANGELOG.md) for full history."
           }
 
-          $boilerplate = @"
-
-## Download
-
-**`MarkdownMidget-$tag-win-x64-net10.exe`** — single-file, framework-dependent build (~$sizeMB MB).
-
-## Requirements
-
-- **Windows 10/11 (x64)**
-- **.NET 10 Desktop Runtime** — https://dotnet.microsoft.com/download/dotnet/10.0
-- **Microsoft Edge WebView2 Runtime** — preinstalled on Windows 11; otherwise a free download from Microsoft.
-
-## Notes
-
-- This is an early **alpha** — expect rough edges, and please file issues.
-- The download is **unsigned**, so Windows SmartScreen may warn on first run: click **More info → Run anyway**.
-- Settings/recent files live under ``%LocalAppData%\MarkdownMidget``.
-"@
+          $boilerplate = @(
+            ''
+            '## Download'
+            ''
+            "**``MarkdownMidget-$tag-win-x64-net10.exe``** — single-file, framework-dependent build (~$sizeMB MB)."
+            ''
+            '## Requirements'
+            ''
+            '- **Windows 10/11 (x64)**'
+            '- **.NET 10 Desktop Runtime** — https://dotnet.microsoft.com/download/dotnet/10.0'
+            '- **Microsoft Edge WebView2 Runtime** — preinstalled on Windows 11; otherwise a free download from Microsoft.'
+            ''
+            '## Notes'
+            ''
+            '- This is an early **alpha** — expect rough edges, and please file issues.'
+            '- The download is **unsigned**, so Windows SmartScreen may warn on first run: click **More info → Run anyway**.'
+            '- Settings/recent files live under `%LocalAppData%\MarkdownMidget`.'
+          ) -join "`n"
 
           $full = $body + "`n" + $boilerplate
           Set-Content -Path release-notes.md -Value $full -Encoding utf8
