@@ -12,8 +12,8 @@
     <RootNamespace>MarkdownMidget</RootNamespace>
     <Product>Markdown Midget</Product>
     <Authors>Funcular Labs</Authors>
-    <Version>0.1.8</Version>
-    <InformationalVersion>0.1.8-alpha3</InformationalVersion>
+    <Version>0.2.0</Version>
+    <InformationalVersion>0.2.0-beta1</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

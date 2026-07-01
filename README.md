@@ -1,6 +1,6 @@
 # Markdown Midget
 
-<img src="art/midget-256.png" alt="Markdown Midget mascot" width="120" align="right" />
+<img src="https://raw.githubusercontent.com/FuncularLabs/MarkdownMidget/master/art/midget-256.png" alt="Markdown Midget mascot" width="120" align="right" />
 
 [![Latest release](https://img.shields.io/github/v/release/FuncularLabs/MarkdownMidget?include_prereleases&sort=semver&color=blue&label=latest)](https://github.com/FuncularLabs/MarkdownMidget/releases)
 [![Release date](https://img.shields.io/github/release-date-pre/FuncularLabs/MarkdownMidget?color=informational)](https://github.com/FuncularLabs/MarkdownMidget/releases)
@@ -17,7 +17,7 @@ Built on **.NET / WPF** hosting a **WebView2** control. The editing surface is
 [Milkdown](https://milkdown.dev/) (a ProseMirror-based WYSIWYG markdown editor),
 so markdown is the literal document model rather than a lossy import/export.
 
-![Markdown Midget editing a document](art/screenshot.png)
+![Markdown Midget editing a document](https://raw.githubusercontent.com/FuncularLabs/MarkdownMidget/master/art/screenshot.png)
 
 ## Download
 
@@ -207,6 +207,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.2.0-beta1** — First beta. All 0.1.x-alpha work baked in;
+  release-engineering (CI, tag-driven publishing, unit tests, embedded HELP.md,
+  Windows integration) proven. Refreshed screenshot; README images now use
+  `raw.githubusercontent.com` absolute URLs.
 - **v0.1.8-alpha2** — Fix registration dedupe (also cleans the per-user
   Explorer ProgID MRU and stale UserChoice); clearer "Set as default"
   walkthrough; **F1 opens Help**.

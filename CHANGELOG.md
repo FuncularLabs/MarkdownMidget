@@ -9,6 +9,24 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.2.0-beta1] – 2026-07-01
+
+Beta milestone. Everything from the 0.1.x alpha series is baked in and the
+release engineering (CI, tag-driven publishing, unit tests, embedded HELP.md,
+Windows integration) is proven. This is the first `-beta` — targeted at
+hands-on testing before dropping the prerelease flag for 0.2.0 stable.
+
+### Changed
+- **README image references** now point at
+  `raw.githubusercontent.com/…/master/art/…` instead of relative paths, so the
+  file renders identically on GitHub and stays functional when the README is
+  copied anywhere (the absolute URL always resolves, without falling into the
+  GitHub-strips-data-URIs trap).
+- **Refreshed screenshot** — updated to reflect the current 0.2 feature set
+  (formatting marks toggled on, live table editing, syntax-highlighted code
+  block, ¶ tab-arrow marks, custom spell-check icon on the View toolbar,
+  in-document mascot).
+
 ## [0.1.8-alpha3] – 2026-07-01
 
 ### Added
@@ -211,7 +229,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.8-alpha3...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.2.0-beta1...HEAD
+[0.2.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta1
 [0.1.8-alpha3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha3
 [0.1.8-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha2
 [0.1.8-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha1
