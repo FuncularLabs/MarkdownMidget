@@ -9,6 +9,8 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.1.8-alpha3] – 2026-07-01
+
 ### Added
 - **Unit tests.** New `tests/MarkdownMidget.Tests/` xUnit project covering
   `FindEngine` (four search modes, escapes, wildcards, whole word, case, regex
@@ -17,15 +19,16 @@ changes between alpha tags.
   and every PR — builds the editor bundle (npm) + solution + runs tests on
   `windows-latest` with .NET 10.
 - **GitHub Actions release publishing**: `.github/workflows/release.yml` fires
-  on `v*` tag pushes. Reproduces the manual release flow: builds the editor
-  bundle, runs tests, publishes the framework-dependent exe with tag-derived
-  `Version` / `InformationalVersion`, extracts the matching CHANGELOG section
-  for release notes, appends the standard Download / Requirements /
-  Notes boilerplate, and creates the GitHub release (prerelease flag inferred
-  from the presence of `-alpha`/`-beta`/`-rc` in the tag).
-- **HELP.md** now leads with a base64-embedded mascot image; convention
-  established that HELP images are always inlined (so the help view keeps
-  working when the exe is copied solo).
+  on `v*` tag pushes. Builds the editor bundle, runs tests, publishes the
+  framework-dependent exe with tag-derived `Version` / `InformationalVersion`,
+  extracts the matching CHANGELOG section for release notes, appends the
+  standard Download / Requirements / Notes boilerplate, and creates the
+  GitHub release (prerelease flag inferred from `-alpha`/`-beta`/`-rc` in
+  the tag). **This release is the first published by CI.**
+- **README and HELP.md** now embed all images as base64 data URIs so the
+  files stay self-contained if copied outside the repo tree. HELP.md's
+  mascot header set the pattern in alpha3-prep; the README screenshot and
+  mascot follow the same convention.
 
 ## [0.1.8-alpha2] – 2026-06-27
 
@@ -206,7 +209,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.8-alpha2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.8-alpha3...HEAD
+[0.1.8-alpha3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha3
 [0.1.8-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha2
 [0.1.8-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha1
 [0.1.7-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha2
