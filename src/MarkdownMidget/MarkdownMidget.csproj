@@ -10,10 +10,17 @@
     <ApplicationIcon>Assets\midget.ico</ApplicationIcon>
     <AssemblyName>MarkdownMidget</AssemblyName>
     <RootNamespace>MarkdownMidget</RootNamespace>
+    <AssemblyTitle>Markdown Midget</AssemblyTitle>
     <Product>Markdown Midget</Product>
+    <Company>Funcular Labs</Company>
     <Authors>Funcular Labs</Authors>
+    <Copyright>Copyright © Funcular Labs 2026. Licensed under the MIT License.</Copyright>
+    <Description>A WYSIWYG markdown editor for Windows, modeled on WordPad's behaviors but with markdown as the native format.</Description>
     <Version>0.2.0</Version>
     <InformationalVersion>0.2.0-beta1</InformationalVersion>
+    <!-- Don't append the +git-sha suffix to InformationalVersion — it clutters the
+         file-properties dialog and doesn't help users. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
