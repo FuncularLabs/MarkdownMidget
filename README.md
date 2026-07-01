@@ -189,6 +189,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history.
 
+- **v0.1.8-alpha2** — Fix registration dedupe (also cleans the per-user
+  Explorer ProgID MRU and stale UserChoice); clearer "Set as default"
+  walkthrough; **F1 opens Help**.
 - **v0.1.8-alpha1** — **Windows integration** submenu (File): register /
   unregister as a .md editor without an installer, dedupe stale references,
   optional AppData install + Start-menu shortcut, optional "set as default"

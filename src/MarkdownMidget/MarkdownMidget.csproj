@@ -13,7 +13,7 @@
     <Product>Markdown Midget</Product>
     <Authors>Funcular Labs</Authors>
     <Version>0.1.8</Version>
-    <InformationalVersion>0.1.8-alpha1</InformationalVersion>
+    <InformationalVersion>0.1.8-alpha2</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

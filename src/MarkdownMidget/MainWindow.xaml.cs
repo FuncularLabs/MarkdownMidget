@@ -20,7 +20,7 @@ namespace MarkdownMidget;
 public partial class MainWindow : Window
 {
     private const string VirtualHost = "markdownmidget.invalid";
-    private const string AppVersion = "v0.1.8-alpha1";
+    private const string AppVersion = "v0.1.8-alpha2";
     private const string ProductDesc = "Markdown Midget " + AppVersion;
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
@@ -770,7 +770,14 @@ public partial class MainWindow : Window
                 RegistrationService.CreateStartMenuShortcut(exeToRegister);
 
             var summary = $"Registered Markdown Midget as an editor for .md files.\n\nExe: {exeToRegister}"
-                + (dlg.InstallToAppData ? "\nStart menu: added" : "");
+                + (dlg.InstallToAppData ? "\nStart menu: added" : "")
+                + "\n\nIf File Explorer's \"Open with\" menu still shows an old entry, sign out and back in — Explorer aggressively caches this menu until then.";
+
+            if (dlg.SetAsDefault)
+            {
+                summary += "\n\nSettings will open next. In the panel, click the current default (probably a different app), then pick \"Markdown Midget\" from the list. Windows requires this final click; the app can't set the default programmatically.";
+            }
+
             MessageBox.Show(this, summary, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
 
             if (dlg.SetAsDefault)
@@ -1718,6 +1725,7 @@ public partial class MainWindow : Window
         Bind(Key.F, ModifierKeys.Control, (_, _) => Find_Click(this, new RoutedEventArgs()));
         Bind(Key.F3, ModifierKeys.None, (_, _) => FindNextRequested(forward: true));
         Bind(Key.F3, ModifierKeys.Shift, (_, _) => FindNextRequested(forward: false));
+        Bind(Key.F1, ModifierKeys.None, (_, _) => Help_Click(this, new RoutedEventArgs()));
 
         // Standard Windows window-management shortcuts (Win+arrow). WebView2 has its
         // own child HWND that grabs focus, so we hook PreviewKeyDown at the Window

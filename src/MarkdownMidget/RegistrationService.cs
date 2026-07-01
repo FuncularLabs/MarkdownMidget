@@ -61,7 +61,7 @@ internal static class RegistrationService
     /// </summary>
     public static void Register(string exePath)
     {
-        DedupeStrays();
+        DedupeStrays(keepOurProgId: true);
 
         // Our ProgID (the modern, canonical entry).
         using (var progKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\" + ProgId)!)
@@ -119,67 +119,125 @@ internal static class RegistrationService
         }
         catch { }
 
-        DedupeStrays();
+        DedupeStrays(keepOurProgId: false);
         NotifyShellAssocChanged();
     }
 
     /// <summary>
     /// Clean up any left-over "MarkdownMidget" references from previous manual
-    /// "Open with → Choose another app" pickings by the user, so the extension
-    /// menu ends up with only our controlled entry.
+    /// "Open with → Choose another app" pickings so the extension menu ends up
+    /// with only our controlled entry. Called on both Register and Unregister.
     /// </summary>
-    private static void DedupeStrays()
+    /// <param name="keepOurProgId">
+    /// When true (during Register), don't strip our fresh <see cref="ProgId"/>
+    /// from Explorer's per-user OpenWithProgids MRU. When false (Unregister),
+    /// strip it too.
+    /// </param>
+    private static void DedupeStrays(bool keepOurProgId = false)
     {
-        // The Explorer-controlled MRU list under FileExts.
-        var mruPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\OpenWithList";
+        // 1) Explorer-controlled per-user MRU of app EXE FILENAMES.
+        var mruListPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\OpenWithList";
         try
         {
-            using var mru = Registry.CurrentUser.OpenSubKey(mruPath, writable: true);
-            if (mru is null) return;
-
-            var order = (mru.GetValue("MRUList") as string) ?? string.Empty;
-            var toRemove = new List<char>();
-
-            foreach (var name in mru.GetValueNames())
+            using var mru = Registry.CurrentUser.OpenSubKey(mruListPath, writable: true);
+            if (mru is not null)
             {
-                if (name == "MRUList") continue;
-                if (name.Length != 1) continue;
-                var val = mru.GetValue(name) as string ?? string.Empty;
-                if (LooksLikeUs(val))
+                var order = (mru.GetValue("MRUList") as string) ?? string.Empty;
+                var toRemove = new List<char>();
+                foreach (var name in mru.GetValueNames())
                 {
-                    toRemove.Add(name[0]);
-                    try { mru.DeleteValue(name); } catch { }
+                    if (name == "MRUList" || name.Length != 1) continue;
+                    var val = mru.GetValue(name) as string ?? string.Empty;
+                    if (LooksLikeUs(val))
+                    {
+                        toRemove.Add(name[0]);
+                        try { mru.DeleteValue(name); } catch { }
+                    }
                 }
-            }
-
-            if (toRemove.Count > 0)
-            {
-                foreach (var ch in toRemove) order = order.Replace(ch.ToString(), string.Empty);
-                mru.SetValue("MRUList", order);
+                if (toRemove.Count > 0)
+                {
+                    foreach (var ch in toRemove) order = order.Replace(ch.ToString(), string.Empty);
+                    mru.SetValue("MRUList", order);
+                }
             }
         }
         catch { /* best-effort */ }
 
-        // Also clean any other exe-filename registrations that were pointing at
-        // our tool via a shortcut with a different filename (e.g. mkm.exe).
-        var appsRoot = Registry.CurrentUser.OpenSubKey(@"Software\Classes\Applications", writable: true);
-        if (appsRoot is null) return;
+        // 2) Explorer-controlled per-user PROGID MRU. Windows tracks the user's
+        // manually-selected ProgIDs here separately from the Classes hive — this
+        // was the missing dedupe target that let stale "Markdown Midget" entries
+        // survive on re-registration.
+        var mruPidsPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\OpenWithProgids";
         try
         {
-            foreach (var name in appsRoot.GetSubKeyNames())
+            using var mruPids = Registry.CurrentUser.OpenSubKey(mruPidsPath, writable: true);
+            if (mruPids is not null)
             {
-                if (string.Equals(name, ExeCanonicalName, StringComparison.OrdinalIgnoreCase)) continue;
-                using var sub = appsRoot.OpenSubKey(name);
-                var friendly = sub?.GetValue("FriendlyAppName") as string;
-                var cmd = sub?.OpenSubKey(@"shell\open\command")?.GetValue(string.Empty) as string;
-                if ((friendly is not null && friendly.Contains("Markdown Midget", StringComparison.OrdinalIgnoreCase))
-                    || (cmd is not null && cmd.Contains("MarkdownMidget", StringComparison.OrdinalIgnoreCase)))
+                foreach (var name in mruPids.GetValueNames())
                 {
-                    try { appsRoot.DeleteSubKeyTree(name, throwOnMissingSubKey: false); } catch { }
+                    // If it's our ProgID and we're registering, leave it alone (we'll add
+                    // it back below). If we're unregistering, drop it.
+                    if (string.Equals(name, ProgId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!keepOurProgId) try { mruPids.DeleteValue(name); } catch { }
+                        continue;
+                    }
+                    if (LooksLikeUs(name)
+                        || name.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
+                        || name.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { mruPids.DeleteValue(name); } catch { }
+                    }
                 }
             }
         }
-        finally { appsRoot.Dispose(); }
+        catch { /* best-effort */ }
+
+        // 3) UserChoice — if it was pointing at a stale/old ProgID of ours, remove
+        // it so Windows falls back to prompting. (This is the only key we can
+        // safely delete but not write; write is hash-protected.)
+        try
+        {
+            using var uc = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice", writable: true);
+            if (uc is not null)
+            {
+                var pid = uc.GetValue("ProgId") as string ?? string.Empty;
+                if (pid.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
+                    || pid.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase)
+                    || (LooksLikeUs(pid) && !string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    Registry.CurrentUser.DeleteSubKey(
+                        @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice",
+                        throwOnMissingSubKey: false);
+                }
+            }
+        }
+        catch { /* best-effort */ }
+
+        // 4) Applications\ subkeys with different exe filenames pointing at our
+        // tool via shortcuts (e.g. mkm.exe entries left over from earlier tests).
+        try
+        {
+            using var appsRoot = Registry.CurrentUser.OpenSubKey(
+                @"Software\Classes\Applications", writable: true);
+            if (appsRoot is not null)
+            {
+                foreach (var name in appsRoot.GetSubKeyNames())
+                {
+                    if (string.Equals(name, ExeCanonicalName, StringComparison.OrdinalIgnoreCase)) continue;
+                    using var sub = appsRoot.OpenSubKey(name);
+                    var friendly = sub?.GetValue("FriendlyAppName") as string;
+                    var cmd = sub?.OpenSubKey(@"shell\open\command")?.GetValue(string.Empty) as string;
+                    if ((friendly is not null && friendly.Contains("Markdown Midget", StringComparison.OrdinalIgnoreCase))
+                        || (cmd is not null && cmd.Contains("MarkdownMidget", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        try { appsRoot.DeleteSubKeyTree(name, throwOnMissingSubKey: false); } catch { }
+                    }
+                }
+            }
+        }
+        catch { /* best-effort */ }
     }
 
     private static bool LooksLikeUs(string s) =>

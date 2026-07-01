@@ -179,7 +179,7 @@
                                   IsCheckable="True" IsChecked="True" Click="SpellCheck_Click" />
                     </MenuItem>
                     <MenuItem Header="_Help">
-                        <MenuItem x:Name="MenuViewHelp" Header="_View Help" Click="Help_Click" />
+                        <MenuItem x:Name="MenuViewHelp" Header="_View Help" InputGestureText="F1" Click="Help_Click" />
                         <Separator />
                         <MenuItem Header="_About Markdown Midget" Click="About_Click" />
                     </MenuItem>

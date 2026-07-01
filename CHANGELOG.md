@@ -9,6 +9,28 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.1.8-alpha2] – 2026-06-27
+
+### Fixed
+- **Registration dedupe now covers the per-user Explorer ProgID MRU.** The
+  0.1.8-alpha1 dedupe cleaned `HKCU\Classes\.md\OpenWithProgids` and the
+  `OpenWithList` MRU but missed the parallel per-user
+  `Explorer\FileExts\.md\OpenWithProgids` layer — that's what was letting a
+  stale "Markdown Midget" reference to an older version survive re-registration.
+  Also handles legacy `Applications\MarkdownMidget…` / `Applications\mkm…`
+  ProgID references in the same MRU and clears an outdated `UserChoice` if it
+  points at one of ours.
+- **The "Set as default" prompt now walks the user through Settings.** Windows
+  10/11 protect the default-app UserChoice hash so apps can't set defaults
+  programmatically; the registration confirmation now spells out exactly what
+  to click in the Settings pane that gets opened.
+- **Registration success message** notes that Explorer's Open With submenu
+  aggressively caches and may still show an old entry until sign-out.
+
+### Added
+- **F1 opens the Help window** (in addition to Help ▸ View Help). The menu item
+  displays the shortcut.
+
 ## [0.1.8-alpha1] – 2026-06-27
 
 ### Added
@@ -166,7 +188,8 @@ changes between alpha tags.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.8-alpha1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.1.8-alpha2...HEAD
+[0.1.8-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha2
 [0.1.8-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha1
 [0.1.7-alpha2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha2
 [0.1.7-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.7-alpha1
