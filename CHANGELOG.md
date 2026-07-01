@@ -25,10 +25,12 @@ changes between alpha tags.
   standard Download / Requirements / Notes boilerplate, and creates the
   GitHub release (prerelease flag inferred from `-alpha`/`-beta`/`-rc` in
   the tag). **This release is the first published by CI.**
-- **README and HELP.md** now embed all images as base64 data URIs so the
-  files stay self-contained if copied outside the repo tree. HELP.md's
-  mascot header set the pattern in alpha3-prep; the README screenshot and
-  mascot follow the same convention.
+- **HELP.md** now embeds its mascot header as a base64 data URI. The help
+  file ships inside the exe (extracted to `%LocalAppData%\MarkdownMidget\
+  HELP.md` at runtime), so linked images would orphan if the exe moved;
+  inlining keeps the help view portable. README stays on relative-path
+  images because GitHub strips data URIs from `<img>` tags but happily
+  renders relative paths from the repo.
 
 ## [0.1.8-alpha2] – 2026-06-27
 

@@ -16,3 +16,7 @@ src/MarkdownMidget/wwwroot/*.map
 
 # Release staging
 dist/
+
+# External-change backups (created by MM's watcher; content lives inside .exe workspace)
+*.bak
+*.md.bak
