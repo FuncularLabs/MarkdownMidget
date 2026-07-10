@@ -10,13 +10,15 @@ changes between alpha tags.
 ## [Unreleased]
 
 ### Added
-- **Self-heal for a corrupted WebView2 profile.** If the editor surface fails to
-  load (e.g. `ERR_ACCESS_DENIED` from a corrupted WebView2 data folder after a
-  hard crash), the app now offers a one-click reset that clears the profile and
-  restarts — instead of stranding the user on a cryptic Edge error page.
-  Documents and settings are untouched.
-
-### Added
+- **Crash-resilient WebView2 profile.** Each run now uses its own per-process
+  WebView2 data folder instead of one shared folder. A hard crash or force-kill
+  used to orphan WebView2 child processes that kept the shared folder locked,
+  breaking the *next* launch with `ERR_ACCESS_DENIED`; per-process folders can't
+  collide, so the following launch is always clean (stale folders from prior runs
+  are swept on startup, skipping any still in use). If the editor surface still
+  fails to load, the app offers a one-click restart into a fresh profile rather
+  than stranding the user on a cryptic Edge error page. Documents and settings are
+  untouched.
 - **Raw HTML now renders** (sanitized). Embedded HTML — a centered logo
   (`<p align="center"><img …>`), `<br>`, `<sub>`/`<sup>`, small tables, etc. —
   renders instead of showing as escaped text. The HTML is sanitized with

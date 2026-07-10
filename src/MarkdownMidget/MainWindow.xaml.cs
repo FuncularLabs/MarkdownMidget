@@ -109,23 +109,21 @@ public partial class MainWindow : Window
 
     // ===== WebView2 / editor bootstrap =====
 
-    private static string WebViewDataDir => Path.Combine(
+    private static string WebViewBaseDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MarkdownMidget", "WebView2");
-
-    private static string WebViewResetMarker => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "MarkdownMidget", "reset-webview.flag");
 
     private async Task InitializeEditorAsync()
     {
         var wwwroot = ExtractEmbeddedEditor();
 
-        // If a previous run flagged the WebView2 profile as corrupt, delete it now —
-        // before CreateAsync, while nothing holds the folder open.
-        await HonorPendingWebViewResetAsync();
-
-        var userData = WebViewDataDir; // out of Program Files / the app directory
+        // Give each instance its OWN WebView2 profile folder (keyed by process id).
+        // A shared folder gets locked/corrupted by a crashed or force-killed instance
+        // whose WebView2 child processes orphan and hold the lock, breaking the next
+        // launch with ERR_ACCESS_DENIED. Per-process folders can't conflict; a bad
+        // one only affects that run, and the next launch is always clean.
+        var userData = Path.Combine(WebViewBaseDir, Environment.ProcessId.ToString());
+        CleanupOldWebViewProfiles(); // remove folders from prior runs (in-use ones skipped)
         Directory.CreateDirectory(userData);
 
         var env = await CoreWebView2Environment.CreateAsync(null, userData);
@@ -162,9 +160,9 @@ public partial class MainWindow : Window
 
     private bool _editorNavPending;
 
-    // If the editor page itself fails to load (usually a corrupted WebView2 data
-    // folder → ERR_ACCESS_DENIED), offer a one-click reset instead of leaving the
-    // user on a cryptic Edge error page.
+    // Backstop: if the editor shell still fails to load, offer a restart. With the
+    // per-process profile folder a restart alone yields a clean profile, so no
+    // marker/manual delete is needed.
     private void OnEditorNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
         if (!_editorNavPending) return;   // only the initial editor-shell navigation
@@ -173,12 +171,11 @@ public partial class MainWindow : Window
 
         var reset = MessageBox.Show(this,
             $"The editor surface couldn't load (error: {e.WebErrorStatus}).\n\n" +
-            "This is almost always a corrupted WebView2 data folder. Reset it and restart Markdown Midget?\n\n" +
+            "Restart Markdown Midget with a fresh editor profile?\n\n" +
             "Your documents and settings are not affected.",
             "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (reset != MessageBoxResult.Yes) return;
 
-        try { File.WriteAllText(WebViewResetMarker, "1"); } catch { /* best-effort */ }
         try
         {
             var exe = Environment.ProcessPath;
@@ -188,25 +185,22 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
-    private static async Task HonorPendingWebViewResetAsync()
+    // Remove WebView2 profile folders left by previous runs. Folders still in use
+    // (another running instance, or an orphaned WebView2 child) are locked and
+    // skipped — they'll be cleaned up by a later launch once released.
+    private static void CleanupOldWebViewProfiles()
     {
-        if (!File.Exists(WebViewResetMarker)) return; // common case: nothing to do
-
-        // The instance that requested the reset may still be exiting and briefly
-        // holding the folder — retry for a couple of seconds. Keep the marker until
-        // the delete actually succeeds so a locked race doesn't silently no-op.
-        for (var attempt = 0; attempt < 20; attempt++)
+        try
         {
-            try
+            if (!Directory.Exists(WebViewBaseDir)) return;
+            var mine = Environment.ProcessId.ToString();
+            foreach (var dir in Directory.GetDirectories(WebViewBaseDir))
             {
-                if (Directory.Exists(WebViewDataDir)) Directory.Delete(WebViewDataDir, recursive: true);
-                try { File.Delete(WebViewResetMarker); } catch { /* ignore */ }
-                return;
+                if (string.Equals(Path.GetFileName(dir), mine, StringComparison.Ordinal)) continue;
+                try { Directory.Delete(dir, recursive: true); } catch { /* in use — skip */ }
             }
-            catch { await Task.Delay(100); }
         }
-        // Gave up (folder stubbornly locked) — drop the marker to avoid a reset loop.
-        try { File.Delete(WebViewResetMarker); } catch { /* ignore */ }
+        catch { /* best-effort */ }
     }
 
     /// <summary>
