@@ -113,21 +113,39 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MarkdownMidget", "WebView2");
 
+    // Unique per launch. A crashed/force-killed instance can orphan WebView2 child
+    // processes that keep its profile folder locked; a bare process id could later be
+    // recycled onto that still-locked folder and hit ERR_ACCESS_DENIED again. A GUID
+    // never collides, so this run's folder is always brand-new and unlocked.
+    private static readonly string ProfileFolderName = Guid.NewGuid().ToString("N");
+
     private async Task InitializeEditorAsync()
     {
         var wwwroot = ExtractEmbeddedEditor();
 
-        // Give each instance its OWN WebView2 profile folder (keyed by process id).
-        // A shared folder gets locked/corrupted by a crashed or force-killed instance
-        // whose WebView2 child processes orphan and hold the lock, breaking the next
-        // launch with ERR_ACCESS_DENIED. Per-process folders can't conflict; a bad
-        // one only affects that run, and the next launch is always clean.
-        var userData = Path.Combine(WebViewBaseDir, Environment.ProcessId.ToString());
+        // Give each instance its OWN WebView2 profile folder. A shared folder gets
+        // locked/corrupted by a crashed or force-killed instance whose WebView2 child
+        // processes orphan and hold the lock, breaking the next launch with
+        // ERR_ACCESS_DENIED. A fresh per-launch folder can't conflict; a bad one only
+        // affects that run, and the next launch is always clean.
+        var userData = Path.Combine(WebViewBaseDir, ProfileFolderName);
         CleanupOldWebViewProfiles(); // remove folders from prior runs (in-use ones skipped)
-        Directory.CreateDirectory(userData);
 
-        var env = await CoreWebView2Environment.CreateAsync(null, userData);
-        await Web.EnsureCoreWebView2Async(env);
+        try
+        {
+            Directory.CreateDirectory(userData);
+            var env = await CoreWebView2Environment.CreateAsync(null, userData);
+            await Web.EnsureCoreWebView2Async(env);
+        }
+        catch (Exception ex)
+        {
+            // Creating the profile folder or the WebView2 environment failed
+            // (denied/locked profile, missing runtime, disk full…). The nav backstop
+            // can't fire because we never navigate — offer the same restart, which
+            // comes up on a fresh folder.
+            OfferEditorRestart(ex.Message);
+            return;
+        }
 
         var core = Web.CoreWebView2;
         core.SetVirtualHostNameToFolderMapping(
@@ -168,9 +186,16 @@ public partial class MainWindow : Window
         if (!_editorNavPending) return;   // only the initial editor-shell navigation
         _editorNavPending = false;
         if (e.IsSuccess) return;
+        OfferEditorRestart($"error: {e.WebErrorStatus}");
+    }
 
+    // Offer a one-click restart when the editor surface can't come up (nav failure or
+    // a failed environment creation). A restarted process gets a fresh per-launch
+    // profile folder, so nothing else needs cleaning.
+    private void OfferEditorRestart(string reason)
+    {
         var reset = MessageBox.Show(this,
-            $"The editor surface couldn't load (error: {e.WebErrorStatus}).\n\n" +
+            $"The editor surface couldn't load ({reason}).\n\n" +
             "Restart Markdown Midget with a fresh editor profile?\n\n" +
             "Your documents and settings are not affected.",
             "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning);
@@ -193,10 +218,9 @@ public partial class MainWindow : Window
         try
         {
             if (!Directory.Exists(WebViewBaseDir)) return;
-            var mine = Environment.ProcessId.ToString();
             foreach (var dir in Directory.GetDirectories(WebViewBaseDir))
             {
-                if (string.Equals(Path.GetFileName(dir), mine, StringComparison.Ordinal)) continue;
+                if (string.Equals(Path.GetFileName(dir), ProfileFolderName, StringComparison.Ordinal)) continue;
                 try { Directory.Delete(dir, recursive: true); } catch { /* in use — skip */ }
             }
         }
