@@ -109,14 +109,23 @@ public partial class MainWindow : Window
 
     // ===== WebView2 / editor bootstrap =====
 
+    private static string WebViewDataDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MarkdownMidget", "WebView2");
+
+    private static string WebViewResetMarker => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MarkdownMidget", "reset-webview.flag");
+
     private async Task InitializeEditorAsync()
     {
         var wwwroot = ExtractEmbeddedEditor();
 
-        // Keep the user-data folder out of Program Files / the app directory.
-        var userData = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MarkdownMidget", "WebView2");
+        // If a previous run flagged the WebView2 profile as corrupt, delete it now —
+        // before CreateAsync, while nothing holds the folder open.
+        HonorPendingWebViewReset();
+
+        var userData = WebViewDataDir; // out of Program Files / the app directory
         Directory.CreateDirectory(userData);
 
         var env = await CoreWebView2Environment.CreateAsync(null, userData);
@@ -126,6 +135,7 @@ public partial class MainWindow : Window
         core.SetVirtualHostNameToFolderMapping(
             VirtualHost, wwwroot, CoreWebView2HostResourceAccessKind.Allow);
         core.WebMessageReceived += OnWebMessage;
+        core.NavigationCompleted += OnEditorNavigationCompleted;
 
         // Lock down the host shell: it is a local app, not a browser.
         core.Settings.AreDefaultContextMenusEnabled = false;
@@ -142,7 +152,47 @@ public partial class MainWindow : Window
 
         // Per-launch nonce defeats WebView2's disk cache so a rebuilt editor bundle
         // is always loaded fresh (the bundle refs inside index.html are also hashed).
+        _editorNavPending = true;
         core.Navigate($"https://{VirtualHost}/index.html?n={Guid.NewGuid():N}");
+    }
+
+    private bool _editorNavPending;
+
+    // If the editor page itself fails to load (usually a corrupted WebView2 data
+    // folder → ERR_ACCESS_DENIED), offer a one-click reset instead of leaving the
+    // user on a cryptic Edge error page.
+    private void OnEditorNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        if (!_editorNavPending) return;   // only the initial editor-shell navigation
+        _editorNavPending = false;
+        if (e.IsSuccess) return;
+
+        var reset = MessageBox.Show(this,
+            $"The editor surface couldn't load (error: {e.WebErrorStatus}).\n\n" +
+            "This is almost always a corrupted WebView2 data folder. Reset it and restart Markdown Midget?\n\n" +
+            "Your documents and settings are not affected.",
+            "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (reset != MessageBoxResult.Yes) return;
+
+        try { File.WriteAllText(WebViewResetMarker, "1"); } catch { /* best-effort */ }
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (exe is not null) Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
+        }
+        catch { /* if relaunch fails the user can start it manually */ }
+        Application.Current.Shutdown();
+    }
+
+    private static void HonorPendingWebViewReset()
+    {
+        try
+        {
+            if (!File.Exists(WebViewResetMarker)) return;
+            File.Delete(WebViewResetMarker);
+            if (Directory.Exists(WebViewDataDir)) Directory.Delete(WebViewDataDir, recursive: true);
+        }
+        catch { /* best-effort; if it can't be cleared the app still tries to load */ }
     }
 
     /// <summary>

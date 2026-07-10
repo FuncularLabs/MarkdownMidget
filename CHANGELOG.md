@@ -9,6 +9,13 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Self-heal for a corrupted WebView2 profile.** If the editor surface fails to
+  load (e.g. `ERR_ACCESS_DENIED` from a corrupted WebView2 data folder after a
+  hard crash), the app now offers a one-click reset that clears the profile and
+  restarts — instead of stranding the user on a cryptic Edge error page.
+  Documents and settings are untouched.
+
 ### Fixed
 - **Relative image paths in opened files now render.** Images referenced
   relative to the document (e.g. `docs/logo.png`) resolve against the file's
