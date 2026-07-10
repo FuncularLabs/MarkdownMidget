@@ -9,6 +9,11 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.3.0-beta1] – 2026-07-09
+
+First 0.3.0 release (the alpha1 work was dogfooded internally, never published,
+and is rolled up here).
+
 ### Added
 - **Richer Register / Unregister dialogs** for Windows integration, each with
   **minimalist diagrams** so non-technical users can see what every option does.
@@ -19,12 +24,8 @@ changes between alpha tags.
     copy to where it was downloaded**, remove the Start-menu entry, remove the
     Desktop shortcut, and remove the installed app-folder copy.
   - **Move** installs to the app folder then relaunches from there and deletes
-    the original download (handled via a `--finish-move` handoff, guarded by the
+    the original download (via a `--finish-move` handoff, guarded by the
     unsaved-changes prompt so a restart can't drop edits).
-
-## [0.3.0-alpha1] – 2026-07-06
-
-### Added
 - **Skip Spell Check in Code** (View menu, WYSIWYG) — leaves code blocks and
   inline code un-checked while still spell-checking prose, so identifiers,
   keywords and snippets don't get flagged. On by default; remembered between
@@ -289,8 +290,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.3.0-alpha1...HEAD
-[0.3.0-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.3.0-alpha1
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.3.0-beta1...HEAD
+[0.3.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.3.0-beta1
 [0.2.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta2
 [0.2.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta1
 [0.1.8-alpha3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha3

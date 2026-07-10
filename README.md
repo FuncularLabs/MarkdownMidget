@@ -207,10 +207,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
 full version history, and [ROADMAP.md](ROADMAP.md) for what's on deck.
 
-- **v0.3.0-alpha1** — **Skip Spell Check in Code** (WYSIWYG) so identifiers and
-  snippets aren't flagged; spell-check state now persists; **denser table
-  styling** (square, gray header, tighter); **Win+arrow** now uses native
-  Windows Snap (removed our inferior custom handler).
+- **v0.3.0-beta1** — Richer **Register / Unregister** dialogs (move vs. copy,
+  Start-menu + Desktop shortcuts, restore-to-original) with plain-language
+  diagrams; **Skip Spell Check in Code** (WYSIWYG); spell-check state persists;
+  **denser table styling**; **Win+arrow** native Windows Snap.
 - **v0.2.0-beta2** — Releases are now **Authenticode-signed** by Funcular Labs
   via Azure Artifact Signing; exe metadata (Company, Copyright, description)
   fully populated; `AppVersion` derived from assembly attribute so the title
