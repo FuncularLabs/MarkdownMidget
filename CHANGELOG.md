@@ -16,6 +16,15 @@ changes between alpha tags.
   restarts — instead of stranding the user on a cryptic Edge error page.
   Documents and settings are untouched.
 
+### Added
+- **Raw HTML now renders** (sanitized). Embedded HTML — a centered logo
+  (`<p align="center"><img …>`), `<br>`, `<sub>`/`<sup>`, small tables, etc. —
+  renders instead of showing as escaped text. The HTML is sanitized with
+  **DOMPurify** (scripts, event handlers like `onerror`, `iframe`/`object`, and
+  `javascript:` URLs are stripped) before display, and the original markup is
+  kept in the model so **saving round-trips it unchanged**. Relative image paths
+  inside the HTML resolve against the document folder like everything else.
+
 ### Fixed
 - **Relative image paths in opened files now render.** Images referenced
   relative to the document (e.g. `docs/logo.png`) resolve against the file's
@@ -25,8 +34,8 @@ changes between alpha tags.
   to the editor host, and image bytes weren't delivered). Only URL resolution
   changes; the markdown keeps the original relative paths, so **saving is
   unaffected**. Serving is restricted to the document's own folder subtree;
-  untitled / dropped content clears the base. (Raw-HTML `<img>` tags — e.g. a
-  centered logo — still show as text; HTML rendering is tracked separately.)
+  untitled / dropped content clears the base. (Images inside raw HTML — e.g. a
+  centered logo — render too; see "Raw HTML now renders" above.)
 
 ## [0.3.0-beta1] – 2026-07-09
 

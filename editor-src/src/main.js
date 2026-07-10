@@ -20,6 +20,7 @@ import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { mermaidBlock } from './mermaid.js';
 import { codeSpellcheck, setCodeSpellcheck as setCodeSpell } from './code-spellcheck.js';
+import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
@@ -359,6 +360,7 @@ const MDM = {
       .use(gfm)
       .use(remarkImageSize)
       .use(resizableImage)
+      .use(htmlRender)
       .use(history)
       .use(listener)
       .use(underline)

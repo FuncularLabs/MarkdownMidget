@@ -255,6 +255,12 @@ body {
   .mdm-mermaid { background: transparent; border: none; padding: 0; }
 }
 
+/* Rendered raw-HTML nodes (e.g. a centered logo). Sanitized in html-render.js. */
+.mdm-html { display: inline; }
+.mdm-html img { max-width: 100%; height: auto; }
+.mdm-html p { margin: 8px 0; }
+.mdm-html table { border-collapse: collapse; }
+
 /* Tight list items: a list item's paragraph shouldn't carry the 16px block gap. */
 .mdm-prosemirror li > p {
   margin: 0;
