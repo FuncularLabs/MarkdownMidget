@@ -10,6 +10,11 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 
 export const CODE_SPELLCHECK_KEY = new PluginKey('mdmCodeSpellcheck');
 
+// Held at module scope so the setting survives EditorState rebuilds (setMarkdown
+// flushes and re-creates the plugin state; without this the toggle would reset to
+// its default every time a document is loaded).
+let currentSkip = true;
+
 function build(doc, skip) {
   if (!skip) return DecorationSet.empty;
   const decos = [];
@@ -29,7 +34,7 @@ function build(doc, skip) {
 export const codeSpellcheck = $prose(() => new Plugin({
   key: CODE_SPELLCHECK_KEY,
   state: {
-    init(_, state) { return { skip: true, deco: build(state.doc, true) }; },
+    init(_, state) { return { skip: currentSkip, deco: build(state.doc, currentSkip) }; },
     apply(tr, value, _old, newState) {
       const meta = tr.getMeta(CODE_SPELLCHECK_KEY);
       const skip = meta && typeof meta.skip === 'boolean' ? meta.skip : value.skip;
@@ -45,5 +50,6 @@ export const codeSpellcheck = $prose(() => new Plugin({
 }));
 
 export function setCodeSpellcheck(view, skip) {
-  if (view) view.dispatch(view.state.tr.setMeta(CODE_SPELLCHECK_KEY, { skip: !!skip }));
+  currentSkip = !!skip;
+  if (view) view.dispatch(view.state.tr.setMeta(CODE_SPELLCHECK_KEY, { skip: currentSkip }));
 }
