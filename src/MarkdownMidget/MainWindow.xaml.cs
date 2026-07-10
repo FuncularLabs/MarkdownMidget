@@ -123,7 +123,7 @@ public partial class MainWindow : Window
 
         // If a previous run flagged the WebView2 profile as corrupt, delete it now —
         // before CreateAsync, while nothing holds the folder open.
-        HonorPendingWebViewReset();
+        await HonorPendingWebViewResetAsync();
 
         var userData = WebViewDataDir; // out of Program Files / the app directory
         Directory.CreateDirectory(userData);
@@ -184,15 +184,25 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
-    private static void HonorPendingWebViewReset()
+    private static async Task HonorPendingWebViewResetAsync()
     {
-        try
+        if (!File.Exists(WebViewResetMarker)) return; // common case: nothing to do
+
+        // The instance that requested the reset may still be exiting and briefly
+        // holding the folder — retry for a couple of seconds. Keep the marker until
+        // the delete actually succeeds so a locked race doesn't silently no-op.
+        for (var attempt = 0; attempt < 20; attempt++)
         {
-            if (!File.Exists(WebViewResetMarker)) return;
-            File.Delete(WebViewResetMarker);
-            if (Directory.Exists(WebViewDataDir)) Directory.Delete(WebViewDataDir, recursive: true);
+            try
+            {
+                if (Directory.Exists(WebViewDataDir)) Directory.Delete(WebViewDataDir, recursive: true);
+                try { File.Delete(WebViewResetMarker); } catch { /* ignore */ }
+                return;
+            }
+            catch { await Task.Delay(100); }
         }
-        catch { /* best-effort; if it can't be cleared the app still tries to load */ }
+        // Gave up (folder stubbornly locked) — drop the marker to avoid a reset loop.
+        try { File.Delete(WebViewResetMarker); } catch { /* ignore */ }
     }
 
     /// <summary>
