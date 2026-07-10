@@ -9,6 +9,16 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Regression tests for the 0.4.0 image/HTML path.** C# unit tests for the
+  document asset-serving boundary — path-traversal containment (including
+  percent-encoded `..` and sibling folders sharing a name prefix), rejection of
+  absolute/rooted references, and MIME mapping — plus JS tests for the raw-HTML
+  sanitize policy (script / event-handler / `javascript:` / `iframe` / `base`
+  stripped; presentational tags like a centered `<img>` logo preserved) running on
+  Node's test runner against real DOMPurify in jsdom. Both suites run in CI and in
+  the release workflow.
+
 ## [0.4.0-beta1] – 2026-07-10
 
 Minor bump to **0.4.0**. Two user-visible wins — documents that reference images

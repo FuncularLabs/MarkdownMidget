@@ -636,38 +636,19 @@ public partial class MainWindow : Window
     // Restricted to the document's own folder subtree.
     private void OnDocResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
     {
-        var root = _docFolder;
-        if (root is null) return;
+        if (_docFolder is null) return;
         try
         {
-            var rel = Uri.UnescapeDataString(new Uri(e.Request.Uri).AbsolutePath.TrimStart('/'))
-                .Replace('/', Path.DirectorySeparatorChar);
-            var full = Path.GetFullPath(Path.Combine(root, rel));
-            if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
-                return; // outside the document folder — don't serve
-            if (!File.Exists(full)) return;
+            var full = DocAsset.ResolveWithinRoot(_docFolder, e.Request.Uri);
+            if (full is null || !File.Exists(full)) return;
 
             var ms = new MemoryStream(File.ReadAllBytes(full));
-            var headers = $"Content-Type: {ContentTypeFor(Path.GetExtension(full))}\r\n" +
+            var headers = $"Content-Type: {DocAsset.ContentTypeFor(Path.GetExtension(full))}\r\n" +
                           "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache";
             e.Response = Web.CoreWebView2.Environment.CreateWebResourceResponse(ms, 200, "OK", headers);
         }
         catch { /* fall through to a normal failure */ }
     }
-
-    private static string ContentTypeFor(string ext) => ext.ToLowerInvariant() switch
-    {
-        ".png" => "image/png",
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".gif" => "image/gif",
-        ".svg" => "image/svg+xml",
-        ".webp" => "image/webp",
-        ".bmp" => "image/bmp",
-        ".ico" => "image/x-icon",
-        ".avif" => "image/avif",
-        _ => "application/octet-stream",
-    };
 
     private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync(false);
 

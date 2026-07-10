@@ -53,6 +53,12 @@ to switch (a reflex several testers have). Currently one document per window.
 - **.NET 8 build + portable self-contained build.** The multi-target plan (net8 /
   net10 / portable ~63 MB) is scoped and the code already compiles for net8; just
   needs the csproj multi-target + extra publish profiles + release-workflow matrix.
+- **Editor round-trip test harness.** The HTML sanitize policy and the C#
+  image-serving boundary now have unit tests, but the markdown **load → edit →
+  serialize round-trip** (Milkdown/ProseMirror) is still only covered by manual
+  dogfooding. A proper test needs the full editor mounted in jsdom (ProseMirror +
+  all Milkdown plugins) — more an integration harness than a smoke test. Worth
+  building before relying on it for regression safety on parser/serializer changes.
 - **Editor bundle lazy-load.** Mermaid pulled the bundle from ~560 KB to ~3.9 MB
   (exe 2.9 → 6.4 MB). Code-split Mermaid so it loads only when a `mermaid` block
   is present — switches esbuild to ESM chunks + adapts the HTML/extraction.

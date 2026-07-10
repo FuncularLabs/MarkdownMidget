@@ -6,13 +6,7 @@
 
 import { $nodeSchema } from '@milkdown/kit/utils';
 import DOMPurify from 'dompurify';
-
-const SANITIZE_OPTS = {
-  // Keep a few presentational attributes DOMPurify drops by default.
-  ADD_ATTR: ['align', 'target', 'width', 'height', 'valign', 'colspan', 'rowspan'],
-  FORBID_TAGS: ['script', 'style', 'iframe', 'form', 'object', 'embed', 'link', 'meta', 'base'],
-  FORBID_ATTR: ['srcset'],
-};
+import { SANITIZE_OPTS } from './sanitize.js';
 
 export const htmlRender = $nodeSchema('html', () => ({
   atom: true,

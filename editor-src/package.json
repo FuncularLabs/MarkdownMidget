@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "watch": "node build.mjs --watch"
+    "watch": "node build.mjs --watch",
+    "test": "node --test"
   },
   "dependencies": {
     "@milkdown/kit": "^7.21.2",
@@ -16,6 +17,7 @@
     "mermaid": "^11.16.0"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "jsdom": "^25.0.1"
   }
 }

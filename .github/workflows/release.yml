@@ -60,6 +60,10 @@ jobs:
           npm ci
           npm run build
 
+      - name: Test editor (JS)
+        working-directory: editor-src
+        run: npm test
+
       - name: Restore
         run: dotnet restore MarkdownMidget.slnx
 

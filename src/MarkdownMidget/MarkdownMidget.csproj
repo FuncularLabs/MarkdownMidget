@@ -28,6 +28,10 @@
     <PackageReference Include="Markdig" Version="0.41.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MarkdownMidget.Tests" />
+  </ItemGroup>
+
   <!-- App icon + mascot images shown in the title bar, taskbar and toolbar. -->
   <ItemGroup>
     <Resource Include="Assets\midget-64.png" />
