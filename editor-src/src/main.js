@@ -426,6 +426,20 @@ const MDM = {
     if (editorView) editorView.dom.setAttribute('spellcheck', on ? 'true' : 'false');
   },
 
+  // Resolve relative image/link paths against the open document's folder (mapped
+  // by the host to a virtual host). This only changes how the browser resolves
+  // relative URLs — the markdown model keeps the original relative paths, so
+  // saving is unaffected. Pass null to clear (untitled / no folder context).
+  setDocBase(url) {
+    let base = document.querySelector('head > base');
+    if (url) {
+      if (!base) { base = document.createElement('base'); document.head.appendChild(base); }
+      base.setAttribute('href', url);
+    } else if (base) {
+      base.remove();
+    }
+  },
+
   // skip=true → code_block + inlineCode get spellcheck="false" (prose still checked).
   setCodeSpellcheck(skip) {
     if (editorView) setCodeSpell(editorView, skip);

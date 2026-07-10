@@ -514,6 +514,7 @@ public partial class MainWindow : Window
     private async Task LoadDocumentAsync(string markdown, string? path)
     {
         _suppressDirty = true;
+        await ApplyDocBaseAsync(path);            // resolve relative images before render
         await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
         _currentPath = path;
         _displayName = null;
@@ -521,6 +522,44 @@ public partial class MainWindow : Window
         await SetCleanBaselineAsync();
         SetClosed(false);
         StartWatching(path);
+    }
+
+    // Map the open document's folder to a virtual host so relative image/link
+    // paths (e.g. docs/logo.png) resolve against the file's directory — the way
+    // Markdown Monster and GitHub do. The markdown model keeps the original
+    // relative paths; only browser URL resolution changes, so saving is safe.
+    private const string DocHost = "mdm-document.invalid";
+
+    private async Task ApplyDocBaseAsync(string? path)
+    {
+        var core = Web.CoreWebView2;
+        if (core is null) return;
+
+        try { core.ClearVirtualHostNameToFolderMapping(DocHost); } catch { /* not mapped yet */ }
+
+        string? dir = null;
+        if (!string.IsNullOrEmpty(path))
+        {
+            try { dir = Path.GetDirectoryName(Path.GetFullPath(path)); } catch { dir = null; }
+        }
+
+        var mapped = false;
+        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+        {
+            // A bad/unsupported path (e.g. some UNC cases) must not fail the open —
+            // just skip the base so the doc still loads (images simply won't resolve).
+            try
+            {
+                core.SetVirtualHostNameToFolderMapping(DocHost, dir, CoreWebView2HostResourceAccessKind.Allow);
+                mapped = true;
+            }
+            catch { mapped = false; }
+        }
+
+        if (_editorReady)
+            await RunEditorAsync(mapped
+                ? $"window.MDM.setDocBase({JsLiteral($"https://{DocHost}/")})"
+                : "window.MDM.setDocBase(null)");
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync(false);
@@ -1578,6 +1617,7 @@ public partial class MainWindow : Window
         {
             StopWatching();
             _suppressDirty = true;
+            await ApplyDocBaseAsync(null); // dropped content has no folder context
             await SetDocumentMarkdownAsync(content);
             _currentPath = null;
             _displayName = name;

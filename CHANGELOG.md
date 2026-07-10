@@ -9,6 +9,14 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Fixed
+- **Relative image paths in opened files now render.** Images referenced
+  relative to the document (e.g. `docs/logo.png`) resolve against the file's
+  folder — the way Markdown Monster and GitHub do — by mapping that folder to a
+  virtual host and pointing a `<base href>` at it. Only URL resolution changes;
+  the markdown keeps the original relative paths, so **saving is unaffected**.
+  Untitled / dropped content (no folder) clears the base.
+
 ## [0.3.0-beta1] – 2026-07-09
 
 First 0.3.0 release (the alpha1 work was dogfooded internally, never published,
