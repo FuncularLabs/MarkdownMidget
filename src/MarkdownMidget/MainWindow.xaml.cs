@@ -137,6 +137,10 @@ public partial class MainWindow : Window
         core.WebMessageReceived += OnWebMessage;
         core.NavigationCompleted += OnEditorNavigationCompleted;
 
+        // Serve the open document's images ourselves (see ApplyDocBaseAsync).
+        core.AddWebResourceRequestedFilter($"https://{DocHost}/*", CoreWebView2WebResourceContext.All);
+        core.WebResourceRequested += OnDocResourceRequested;
+
         // Lock down the host shell: it is a local app, not a browser.
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
@@ -584,43 +588,68 @@ public partial class MainWindow : Window
         StartWatching(path);
     }
 
-    // Map the open document's folder to a virtual host so relative image/link
-    // paths (e.g. docs/logo.png) resolve against the file's directory — the way
-    // Markdown Monster and GitHub do. The markdown model keeps the original
-    // relative paths; only browser URL resolution changes, so saving is safe.
-    private const string DocHost = "mdm-document.invalid";
+    // Resolve relative image paths (e.g. docs/logo.png) against the open document's
+    // folder — the way Markdown Monster and GitHub do — by pointing a <base href> at
+    // a dedicated host we serve ourselves via WebResourceRequested (a second virtual-
+    // host mapping won't serve cross-origin to the editor host). The markdown model
+    // keeps the original relative paths; only browser URL resolution changes, so
+    // saving is unaffected.
+    private const string DocHost = "mdm-doc.invalid";
+    private string? _docFolder;
 
     private async Task ApplyDocBaseAsync(string? path)
     {
-        var core = Web.CoreWebView2;
-        if (core is null) return;
-
-        try { core.ClearVirtualHostNameToFolderMapping(DocHost); } catch { /* not mapped yet */ }
+        if (Web.CoreWebView2 is null) return;
 
         string? dir = null;
         if (!string.IsNullOrEmpty(path))
         {
             try { dir = Path.GetDirectoryName(Path.GetFullPath(path)); } catch { dir = null; }
         }
-
-        var mapped = false;
-        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-        {
-            // A bad/unsupported path (e.g. some UNC cases) must not fail the open —
-            // just skip the base so the doc still loads (images simply won't resolve).
-            try
-            {
-                core.SetVirtualHostNameToFolderMapping(DocHost, dir, CoreWebView2HostResourceAccessKind.Allow);
-                mapped = true;
-            }
-            catch { mapped = false; }
-        }
+        _docFolder = (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) ? Path.GetFullPath(dir) : null;
 
         if (_editorReady)
-            await RunEditorAsync(mapped
+            await RunEditorAsync(_docFolder is not null
                 ? $"window.MDM.setDocBase({JsLiteral($"https://{DocHost}/")})"
                 : "window.MDM.setDocBase(null)");
     }
+
+    // Serve files from the current document's folder for requests to the doc host.
+    // Restricted to the document's own folder subtree.
+    private void OnDocResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+    {
+        var root = _docFolder;
+        if (root is null) return;
+        try
+        {
+            var rel = Uri.UnescapeDataString(new Uri(e.Request.Uri).AbsolutePath.TrimStart('/'))
+                .Replace('/', Path.DirectorySeparatorChar);
+            var full = Path.GetFullPath(Path.Combine(root, rel));
+            if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
+                return; // outside the document folder — don't serve
+            if (!File.Exists(full)) return;
+
+            var ms = new MemoryStream(File.ReadAllBytes(full));
+            var headers = $"Content-Type: {ContentTypeFor(Path.GetExtension(full))}\r\n" +
+                          "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache";
+            e.Response = Web.CoreWebView2.Environment.CreateWebResourceResponse(ms, 200, "OK", headers);
+        }
+        catch { /* fall through to a normal failure */ }
+    }
+
+    private static string ContentTypeFor(string ext) => ext.ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".svg" => "image/svg+xml",
+        ".webp" => "image/webp",
+        ".bmp" => "image/bmp",
+        ".ico" => "image/x-icon",
+        ".avif" => "image/avif",
+        _ => "application/octet-stream",
+    };
 
     private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync(false);
 

@@ -19,10 +19,14 @@ changes between alpha tags.
 ### Fixed
 - **Relative image paths in opened files now render.** Images referenced
   relative to the document (e.g. `docs/logo.png`) resolve against the file's
-  folder — the way Markdown Monster and GitHub do — by mapping that folder to a
-  virtual host and pointing a `<base href>` at it. Only URL resolution changes;
-  the markdown keeps the original relative paths, so **saving is unaffected**.
-  Untitled / dropped content (no folder) clears the base.
+  folder — the way Markdown Monster and GitHub do. A `<base href>` points at a
+  dedicated host whose files the app serves from the document's folder via
+  `WebResourceRequested` (a second virtual-host mapping won't serve cross-origin
+  to the editor host, and image bytes weren't delivered). Only URL resolution
+  changes; the markdown keeps the original relative paths, so **saving is
+  unaffected**. Serving is restricted to the document's own folder subtree;
+  untitled / dropped content clears the base. (Raw-HTML `<img>` tags — e.g. a
+  centered logo — still show as text; HTML rendering is tracked separately.)
 
 ## [0.3.0-beta1] – 2026-07-09
 
