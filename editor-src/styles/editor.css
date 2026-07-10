@@ -147,39 +147,55 @@ body {
   margin: 24px 0;
 }
 
-/* Tables: dark header row, alternating row stripes (Markdown Monster theme). */
+/* Tables: dense, square, gray header (darker than stripes) + subtle alternating
+   rows. Nord's own table rules are overridden with matching specificity below. */
 .mdm-prosemirror table {
   width: 100%;
   border-collapse: collapse;
-  border: 1px solid #c8ccd4;
+  border: 1px solid #d7dbe0;
   table-layout: fixed;
-  margin: 10px 0 12px;
+  margin: 8px 0 10px;
+}
+/* Beat Nord's `.milkdown-theme-nord.prose table` rules (0,2,1): square the corners
+   and drop the font a touch below Nord's --text-sm (14px) for a denser table. */
+.mdm-prosemirror.milkdown-theme-nord.prose table {
+  border-radius: 0 !important;
+  font-size: 12px !important;
+}
+/* Nord sets `padding-block`/`padding-inline` !important on `.milkdown-theme-nord.prose
+   td` (specificity 0,2,1). To win we need a higher-specificity selector AND the same
+   logical properties — a physical `padding` shorthand loses to logical longhands here. */
+.mdm-prosemirror.milkdown-theme-nord.prose th,
+.mdm-prosemirror.milkdown-theme-nord.prose td {
+  padding-block: 1px !important;
+  padding-inline: 6px !important;
 }
 .mdm-prosemirror th,
 .mdm-prosemirror td {
-  border: 1px solid #d0d7de;
-  padding: 3px 8px;
+  border: 1px solid #dde1e6 !important;
   text-align: left;
   vertical-align: top;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 .mdm-prosemirror th > p,
 .mdm-prosemirror td > p {
   margin: 0;
   padding: 0;
 }
-/* Override the Nord theme's per-column cell striping: we want a dark header row
-   and row (not column) stripes, so !important is needed to win the cascade. */
+/* Override the Nord theme's per-column cell striping: we want a header row +
+   row (not column) stripes, so !important is needed to win the cascade. */
 .mdm-prosemirror td {
-  background: #ffffff !important;
+  background: #ffffff !important;   /* odd rows */
 }
 .mdm-prosemirror th {
-  background: #2e3c52 !important; /* dark blue header */
-  color: #ffffff !important;
+  background: #c4c9d1 !important;   /* gray header, darker than the stripes */
+  color: #1f2328 !important;
   font-weight: 600;
 }
-.mdm-prosemirror tbody tr:nth-child(even) td {
-  background: #eef1f5 !important; /* alternating row stripe */
+/* Header is tr:nth-child(1), so data rows start at child 2. Stripe the ODD data
+   rows (children 3, 5, 7…) so row 1 stays light/white and row 2 is the first tint. */
+.mdm-prosemirror tbody tr:nth-child(odd) td {
+  background: #f4f6f8 !important;   /* subtle alternating stripe */
 }
 .mdm-prosemirror th > *,
 .mdm-prosemirror td > * {

@@ -74,12 +74,16 @@ public partial class MainWindow : Window
         InitializeComponent();
         RegisterShortcuts();
         SourceToggle.Content = GlyphSource; // start in WYSIWYG; button offers source view
-        SourceBox.SpellCheck.IsEnabled = true; // match the editor's default
         _dirtyTimer.Tick += async (_, _) => { _dirtyTimer.Stop(); await UpdateDirtyAsync(); };
 
         LoadRecent();
         BuildRecentMenu();
         LoadSettings();
+
+        // Apply the persisted spell-check state (the editor is told on ready).
+        MenuSpellCheck.IsChecked = _spellCheck;
+        MenuSkipCodeSpell.IsChecked = _skipCodeSpell;
+        SourceBox.SpellCheck.IsEnabled = _spellCheck;
 
         foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
         {
@@ -183,6 +187,8 @@ public partial class MainWindow : Window
             case "ready":
                 _editorReady = true;
                 _ = RunEditorAsync($"window.MDM.setPageWidth({JsLiteral(_pageWidth)})");
+                if (!_spellCheck) _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
+                _ = RunEditorAsync($"window.MDM.setCodeSpellcheck({(_skipCodeSpell ? "true" : "false")})");
                 UpdatePageWidthChecks();
                 if (_pendingOpenPath is { } p)
                 {
@@ -833,56 +839,10 @@ public partial class MainWindow : Window
         }
     }
 
-    // ===== Standard Windows window-management shortcuts =====
-
-    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        // Only act when the Windows key is held.
-        if ((Keyboard.Modifiers & ModifierKeys.Windows) == 0) return;
-        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
-
-        switch (e.Key)
-        {
-            case Key.Up:
-                if (shift) FillVertical();                    // Win+Shift+Up: stretch full height
-                else if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-                else WindowState = WindowState.Maximized;     // Win+Up: maximize
-                e.Handled = true;
-                break;
-            case Key.Down:
-                if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
-                else WindowState = WindowState.Minimized;     // Win+Down: minimize / restore from max
-                e.Handled = true;
-                break;
-            case Key.Left:
-                SnapWindowHalf(left: true);                   // Win+Left: snap left half
-                e.Handled = true;
-                break;
-            case Key.Right:
-                SnapWindowHalf(left: false);                  // Win+Right: snap right half
-                e.Handled = true;
-                break;
-        }
-    }
-
-    private void FillVertical()
-    {
-        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
-        var area = SystemParameters.WorkArea;
-        Top = area.Top;
-        Height = area.Height;
-    }
-
-    private void SnapWindowHalf(bool left)
-    {
-        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
-        var area = SystemParameters.WorkArea;
-        var halfW = area.Width / 2;
-        Top = area.Top;
-        Height = area.Height;
-        Width = halfW;
-        Left = left ? area.Left : area.Left + halfW;
-    }
+    // Win+arrow window management is handled natively by the Windows shell — the
+    // window is a standard resizable window, so Snap works like Notepad/Explorer.
+    // We deliberately do NOT intercept those keys; a custom handler only degrades
+    // the OS behavior (no snap-assist, worse multi-monitor/DPI handling).
 
     // ===== Busy overlay (file open / large-doc load) =====
 
@@ -1212,7 +1172,12 @@ public partial class MainWindow : Window
     {
         public string PageWidth { get; set; } = "portrait";
         public Dictionary<string, PrintPrefs> PrintPrefs { get; set; } = new();
+        public bool SpellCheck { get; set; } = true;
+        public bool SkipCodeSpellCheck { get; set; } = true;
     }
+
+    private bool _spellCheck = true;         // persisted; applied on editor-ready
+    private bool _skipCodeSpell = true;      // persisted; exempt code from spell check
 
     private sealed class PrintPrefs
     {
@@ -1249,6 +1214,8 @@ public partial class MainWindow : Window
                 foreach (var kv in s.PrintPrefs)
                     if (kv.Key is "portrait" or "landscape" or "full" && kv.Value is not null)
                         _printPrefs[kv.Key] = kv.Value;
+            _spellCheck = s.SpellCheck;
+            _skipCodeSpell = s.SkipCodeSpellCheck;
         }
         catch { /* defaults are fine */ }
     }
@@ -1262,6 +1229,8 @@ public partial class MainWindow : Window
             {
                 PageWidth = _pageWidth,
                 PrintPrefs = _printPrefs,
+                SpellCheck = _spellCheck,
+                SkipCodeSpellCheck = _skipCodeSpell,
             }));
         }
         catch { /* best-effort */ }
@@ -1532,9 +1501,20 @@ public partial class MainWindow : Window
     private void SpellCheck_Click(object sender, RoutedEventArgs e)
     {
         var on = MenuSpellCheck.IsChecked;
+        _spellCheck = on;
+        SaveSettings();               // remember the choice across sessions
         SourceBox.SpellCheck.IsEnabled = on;
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setSpellcheck({(on ? "true" : "false")})");
+        RefocusEditor();
+    }
+
+    private void SkipCodeSpell_Click(object sender, RoutedEventArgs e)
+    {
+        _skipCodeSpell = MenuSkipCodeSpell.IsChecked;
+        SaveSettings();
+        if (_editorReady)
+            _ = RunEditorAsync($"window.MDM.setCodeSpellcheck({(_skipCodeSpell ? "true" : "false")})");
         RefocusEditor();
     }
 
@@ -1731,11 +1711,6 @@ public partial class MainWindow : Window
         Bind(Key.F3, ModifierKeys.None, (_, _) => FindNextRequested(forward: true));
         Bind(Key.F3, ModifierKeys.Shift, (_, _) => FindNextRequested(forward: false));
         Bind(Key.F1, ModifierKeys.None, (_, _) => Help_Click(this, new RoutedEventArgs()));
-
-        // Standard Windows window-management shortcuts (Win+arrow). WebView2 has its
-        // own child HWND that grabs focus, so we hook PreviewKeyDown at the Window
-        // level to make sure these reach us regardless of the focused control.
-        PreviewKeyDown += Window_PreviewKeyDown;
         Bind(Key.H, ModifierKeys.Control | ModifierKeys.Shift, (_, _) => FocusStyle_Click(this, new RoutedEventArgs()));
 
         // Ctrl+0..Ctrl+5 apply paragraph styles (also work via the editor keymap in WYSIWYG).

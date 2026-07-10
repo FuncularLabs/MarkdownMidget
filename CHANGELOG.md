@@ -9,6 +9,33 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.3.0-alpha1] – 2026-07-06
+
+### Added
+- **Skip Spell Check in Code** (View menu, WYSIWYG) — leaves code blocks and
+  inline code un-checked while still spell-checking prose, so identifiers,
+  keywords and snippets don't get flagged. On by default; remembered between
+  sessions. (Source view remains all-or-nothing — a WPF `TextBox` limitation.)
+- **Spell-check on/off is now remembered** between sessions.
+- **[ROADMAP.md](ROADMAP.md)** — a living wishlist/roadmap. First entry: the
+  de-risk spike for owning the spell-check stack (custom dictionaries +
+  "Add to dictionary" via the Windows Spell Checking API), since WebView2
+  exposes no dictionary API.
+
+### Changed
+- **Denser table styling.** Square corners, a gray header row (darker than the
+  stripes), tighter cell padding (`1px 6px`), 12px text, and the first data row
+  is light (stripes start on row 2). Also fixed a latent bug where Nord's
+  `!important` logical-padding rules were silently overriding our cell padding —
+  tables now render at the intended density.
+
+### Fixed
+- **Win+arrow window management now behaves like Notepad / File Explorer.** We
+  were intercepting Win+arrow and hand-rolling snap math, which was worse than
+  the OS (no snap-assist, poor multi-monitor/DPI handling). Removed the handler
+  entirely; the window is a standard resizable window, so native Windows Snap
+  just works.
+
 ## [0.2.0-beta2] – 2026-07-01
 
 ### Added
@@ -249,7 +276,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.2.0-beta2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.3.0-alpha1...HEAD
+[0.3.0-alpha1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.3.0-alpha1
 [0.2.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta2
 [0.2.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta1
 [0.1.8-alpha3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.1.8-alpha3

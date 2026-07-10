@@ -177,6 +177,9 @@
                         <Separator />
                         <MenuItem x:Name="MenuSpellCheck" Header="_Spell Check"
                                   IsCheckable="True" IsChecked="True" Click="SpellCheck_Click" />
+                        <MenuItem x:Name="MenuSkipCodeSpell" Header="Skip Spell Check in _Code"
+                                  IsCheckable="True" IsChecked="True" Click="SkipCodeSpell_Click"
+                                  ToolTip="Don't spell-check code blocks or inline code (WYSIWYG view)." />
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem x:Name="MenuViewHelp" Header="_View Help" InputGestureText="F1" Click="Help_Click" />

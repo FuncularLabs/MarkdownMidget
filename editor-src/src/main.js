@@ -19,6 +19,7 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { mermaidBlock } from './mermaid.js';
+import { codeSpellcheck, setCodeSpellcheck as setCodeSpell } from './code-spellcheck.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
@@ -367,6 +368,7 @@ const MDM = {
       .use(formattingMarks)
       .use(tableCellEditing)
       .use(mermaidBlock)
+      .use(codeSpellcheck)
       .use(splitHeadingCommand)
       .use(headingEnterKeymap)
       .use(exitBlockCommand)
@@ -422,6 +424,11 @@ const MDM = {
 
   setSpellcheck(on) {
     if (editorView) editorView.dom.setAttribute('spellcheck', on ? 'true' : 'false');
+  },
+
+  // skip=true → code_block + inlineCode get spellcheck="false" (prose still checked).
+  setCodeSpellcheck(skip) {
+    if (editorView) setCodeSpell(editorView, skip);
   },
 
   // Read-only: ProseMirror stops accepting edits and the caret/handles disappear.

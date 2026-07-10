@@ -171,7 +171,13 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 ## Spell check
 
 **View ▸ Spell Check** (or the **abc** toggle at the right of the View toolbar)
-toggles the red squiggles in both views. On by default.
+toggles the red squiggles in both views. Your choice is remembered between
+sessions.
+
+**View ▸ Skip Spell Check in Code** leaves code blocks and inline code
+un-checked while still spell-checking your prose — handy so identifiers, keywords
+and snippets don't get flagged. On by default; applies to the WYSIWYG view (the
+raw source view spell-checks all-or-nothing). Also remembered between sessions.
 
 ## Windows integration
 
