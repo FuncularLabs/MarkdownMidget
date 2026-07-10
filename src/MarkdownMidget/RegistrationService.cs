@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Microsoft.Win32;
 
 namespace MarkdownMidget;
@@ -20,7 +21,8 @@ internal static class RegistrationService
     private const string DisplayName = "Markdown Midget";
     private const string DocTypeName = "Markdown Document";
     private const string ExeCanonicalName = "MarkdownMidget.exe";
-    private const string StartMenuLinkName = "Markdown Midget.lnk";
+    private const string ShortcutLinkName = "Markdown Midget.lnk";
+    private const string InstallInfoName = "install-info.json";
 
     public static string CurrentExePath =>
         Environment.ProcessPath ?? throw new InvalidOperationException("Cannot determine current exe path.");
@@ -32,9 +34,19 @@ internal static class RegistrationService
     public static string AppDataInstallExe => Path.Combine(AppDataInstallDir, ExeCanonicalName);
 
     public static string StartMenuLinkPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.Programs), StartMenuLinkName);
+        Environment.GetFolderPath(Environment.SpecialFolder.Programs), ShortcutLinkName);
+
+    public static string DesktopLinkPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ShortcutLinkName);
+
+    private static string InstallInfoPath => Path.Combine(AppDataInstallDir, InstallInfoName);
 
     public static bool IsInstalledToAppData() => File.Exists(AppDataInstallExe);
+    public static bool HasStartMenuShortcut() => File.Exists(StartMenuLinkPath);
+    public static bool HasDesktopShortcut() => File.Exists(DesktopLinkPath);
+
+    /// <summary>Where the exe originally came from, and whether we moved (deleted) it.</summary>
+    public sealed record InstallInfo(string? OriginalPath, bool Moved);
 
     public static bool IsRunningFromAppDataInstall()
     {
@@ -264,7 +276,6 @@ internal static class RegistrationService
 
     public static void UninstallFromAppData()
     {
-        RemoveStartMenuShortcut();
         try
         {
             if (Directory.Exists(AppDataInstallDir))
@@ -273,26 +284,94 @@ internal static class RegistrationService
         catch { /* usually file-in-use; user needs to close first */ }
     }
 
-    public static void CreateStartMenuShortcut(string targetExe)
+    private static void CreateShortcut(string linkPath, string targetExe)
     {
         try
         {
             var t = Type.GetTypeFromProgID("WScript.Shell");
             if (t is null) return;
             dynamic shell = Activator.CreateInstance(t)!;
-            dynamic link = shell.CreateShortcut(StartMenuLinkPath);
+            dynamic link = shell.CreateShortcut(linkPath);
             link.TargetPath = targetExe;
             link.WorkingDirectory = Path.GetDirectoryName(targetExe) ?? string.Empty;
             link.IconLocation = targetExe + ",0";
             link.Description = "Markdown Midget — a WordPad-style, markdown-native WYSIWYG editor.";
             link.Save();
         }
-        catch { /* best-effort — Start menu is bonus, not critical */ }
+        catch { /* best-effort — shortcuts are a bonus, not critical */ }
     }
+
+    public static void CreateStartMenuShortcut(string targetExe) => CreateShortcut(StartMenuLinkPath, targetExe);
+    public static void CreateDesktopShortcut(string targetExe) => CreateShortcut(DesktopLinkPath, targetExe);
 
     public static void RemoveStartMenuShortcut()
     {
         try { if (File.Exists(StartMenuLinkPath)) File.Delete(StartMenuLinkPath); } catch { }
+    }
+
+    public static void RemoveDesktopShortcut()
+    {
+        try { if (File.Exists(DesktopLinkPath)) File.Delete(DesktopLinkPath); } catch { }
+    }
+
+    // ===== Original-location memorialization + move / restore =====
+
+    /// <summary>Record where the exe came from (so unregister can offer to restore it).</summary>
+    public static void SaveInstallInfo(string? originalPath, bool moved)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppDataInstallDir);
+            File.WriteAllText(InstallInfoPath,
+                JsonSerializer.Serialize(new InstallInfo(originalPath, moved)));
+        }
+        catch { /* best-effort */ }
+    }
+
+    public static InstallInfo? ReadInstallInfo()
+    {
+        try
+        {
+            if (!File.Exists(InstallInfoPath)) return null;
+            return JsonSerializer.Deserialize<InstallInfo>(File.ReadAllText(InstallInfoPath));
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Copy the installed exe back to <paramref name="destPath"/>.</summary>
+    public static bool RestoreToOriginal(string destPath)
+    {
+        try
+        {
+            if (!File.Exists(AppDataInstallExe)) return false;
+            var dir = Path.GetDirectoryName(destPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            File.Copy(AppDataInstallExe, destPath, overwrite: true);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Delete the original downloaded exe after a "move" install. Called by the
+    /// freshly-launched AppData copy (passed <c>--finish-move &lt;path&gt;</c>);
+    /// the original process needs a moment to exit and release the file lock.
+    /// </summary>
+    public static void FinishMove(string originalPath)
+    {
+        _ = Task.Run(async () =>
+        {
+            for (var attempt = 0; attempt < 40; attempt++) // ~10s total
+            {
+                try
+                {
+                    if (!File.Exists(originalPath)) return;
+                    File.Delete(originalPath);
+                    return;
+                }
+                catch { await Task.Delay(250); }
+            }
+        });
     }
 
     // ===== Windows default-apps deep link =====

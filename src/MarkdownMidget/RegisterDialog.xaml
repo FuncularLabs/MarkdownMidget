@@ -1,45 +1,110 @@
 <Window x:Class="MarkdownMidget.RegisterDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Register as .md editor" SizeToContent="Height" Width="500"
+        Title="Register as .md editor" SizeToContent="Height" Width="560"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <Window.Resources>
+        <!-- A small rounded "chip" used to build the minimalist diagrams. -->
+        <Style x:Key="Chip" TargetType="Border">
+            <Setter Property="Background" Value="#FFF3F4F6" />
+            <Setter Property="BorderBrush" Value="#FFCFD4DB" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MinWidth" Value="88" />
+        </Style>
+        <Style x:Key="ChipLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#FF3A3F46" />
+        </Style>
+        <Style x:Key="Arrow" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#x2192;" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="#FF8A9099" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,0" />
+        </Style>
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#FF5B6168" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="26,2,0,0" />
+        </Style>
+    </Window.Resources>
+
     <StackPanel Margin="18">
-        <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,4">
             Add Markdown Midget to the Windows <Bold>"Open with"</Bold> list for
-            <Bold>.md</Bold> files. Any earlier Markdown Midget references in that list
-            will be cleaned up so only the currently running version remains.
+            <Bold>.md</Bold> files, and choose how it's installed. Earlier Markdown
+            Midget references are cleaned up so only this version remains.
         </TextBlock>
-
         <TextBlock x:Name="ExePathText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
-                   Foreground="#555" Margin="0,0,0,12" />
+                   Foreground="#FF666666" Margin="0,0,0,14" />
 
-        <CheckBox x:Name="InstallToAppDataCheck" IsChecked="True" Margin="0,0,0,4">
-            <TextBlock TextWrapping="Wrap">
-                Also <Bold>copy this build to AppData</Bold> and add a
-                <Bold>Start-menu entry</Bold>.
-            </TextBlock>
-        </CheckBox>
-        <TextBlock TextWrapping="Wrap" Margin="24,0,0,12" FontSize="11" Foreground="#555">
-            Recommended. Puts a stable copy at
-            <Run FontFamily="Consolas">%LocalAppData%\Programs\MarkdownMidget\</Run>
-            so the Open With entry survives moving or deleting the downloaded file.
-        </TextBlock>
+        <!-- Move vs copy -->
+        <StackPanel x:Name="MovePanel" Margin="0,0,0,14">
+            <CheckBox x:Name="MoveCheck" IsChecked="True" Content="_Move the downloaded file into the app folder" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}" Opacity="0.45">
+                    <StackPanel>
+                        <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="Downloads" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="(removed)" Foreground="#FFB23A3A" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource Arrow}" />
+                <Border Style="{StaticResource Chip}">
+                    <StackPanel>
+                        <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="App folder" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            <TextBlock Style="{StaticResource Caption}"
+                       Text="Keeps a stable copy in your app folder and removes the download. Uncheck to leave the downloaded file in place (a copy is installed either way)." />
+        </StackPanel>
 
-        <CheckBox x:Name="SetDefaultCheck" IsChecked="False" Margin="0,0,0,4">
-            <TextBlock TextWrapping="Wrap">
-                Also <Bold>make it my default for .md</Bold> files.
-            </TextBlock>
-        </CheckBox>
-        <TextBlock TextWrapping="Wrap" Margin="24,0,0,16" FontSize="11" Foreground="#555">
-            Windows requires you to confirm defaults in Settings, so we'll open the
-            Default Apps page for .md after registering — click "Markdown Midget" there
-            to finish.
-        </TextBlock>
+        <!-- Start menu -->
+        <StackPanel Margin="0,0,0,14">
+            <CheckBox x:Name="StartMenuCheck" IsChecked="True" Content="Add to the _Start menu" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}">
+                    <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                </Border>
+                <TextBlock Style="{StaticResource Arrow}" />
+                <Border Style="{StaticResource Chip}" MinWidth="120">
+                    <TextBlock Style="{StaticResource ChipLabel}" Text="⊞  Start menu" FontSize="12" />
+                </Border>
+            </StackPanel>
+            <TextBlock Style="{StaticResource Caption}" Text="Markdown Midget shows up in your Start menu so you can launch it anytime." />
+        </StackPanel>
+
+        <!-- Desktop -->
+        <StackPanel Margin="0,0,0,14">
+            <CheckBox x:Name="DesktopCheck" IsChecked="True" Content="Add a _Desktop shortcut" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}">
+                    <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                </Border>
+                <TextBlock Style="{StaticResource Arrow}" />
+                <Border Style="{StaticResource Chip}" MinWidth="120">
+                    <TextBlock Style="{StaticResource ChipLabel}" Text="🖥  Desktop" FontSize="12" />
+                </Border>
+            </StackPanel>
+            <TextBlock Style="{StaticResource Caption}" Text="Puts a shortcut on your desktop for one-click access." />
+        </StackPanel>
+
+        <!-- Set as default -->
+        <StackPanel Margin="0,0,0,16">
+            <CheckBox x:Name="SetDefaultCheck" IsChecked="False" Content="Make it my de_fault for .md files" FontWeight="SemiBold" />
+            <TextBlock Style="{StaticResource Caption}"
+                       Text="Windows requires you to confirm defaults, so Settings will open on the .md page — click Markdown Midget there to finish." />
+        </StackPanel>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="OkBtn" Content="_Register" Width="100" IsDefault="True"
-                    Click="Ok_Click" Margin="0,0,8,0" />
+            <Button x:Name="OkBtn" Content="_Register" Width="100" IsDefault="True" Click="Ok_Click" Margin="0,0,8,0" />
             <Button Content="Cancel" Width="80" IsCancel="True" />
         </StackPanel>
     </StackPanel>

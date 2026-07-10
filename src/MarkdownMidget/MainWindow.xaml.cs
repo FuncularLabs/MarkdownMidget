@@ -85,10 +85,18 @@ public partial class MainWindow : Window
         MenuSkipCodeSpell.IsChecked = _skipCodeSpell;
         SourceBox.SpellCheck.IsEnabled = _spellCheck;
 
-        foreach (var arg in Environment.GetCommandLineArgs().Skip(1))
+        var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        for (var i = 0; i < args.Length; i++)
         {
+            var arg = args[i];
             if (arg is "--readonly" or "-r" or "/readonly") _startReadOnly = true;
             else if (arg is "--help-window") { _isHelpWindow = true; _startReadOnly = true; }
+            else if (arg == "--finish-move" && i + 1 < args.Length)
+            {
+                // We were launched by a "move" install to delete the original download
+                // once its process has exited. Consume the path so it isn't opened.
+                RegistrationService.FinishMove(args[++i]);
+            }
             else if (File.Exists(arg)) _pendingOpenPath ??= arg;
         }
 
@@ -764,35 +772,60 @@ public partial class MainWindow : Window
 
     // ===== Windows integration (register / unregister as .md editor) =====
 
-    private void RegisterMdEditor_Click(object sender, RoutedEventArgs e)
+    private async void RegisterMdEditor_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new RegisterDialog { Owner = this };
         if (dlg.ShowDialog() != true) return;
 
+        var alreadyInstalled = RegistrationService.IsRunningFromAppDataInstall();
+        var willMove = dlg.MoveInsteadOfCopy && !alreadyInstalled;
+
+        // A move restarts the app from the installed copy, so make sure unsaved
+        // work is dealt with first — otherwise the restart would drop it.
+        if (willMove && !await ConfirmDiscardAsync()) return;
+
         try
         {
-            var exeToRegister = dlg.InstallToAppData
-                ? RegistrationService.InstallToAppData()
-                : RegistrationService.CurrentExePath;
+            // Register always installs a stable copy to the app folder (unless we're
+            // already running it). "Move" additionally removes the original download.
+            var download = RegistrationService.CurrentExePath;
+            var exeToRegister = alreadyInstalled
+                ? RegistrationService.CurrentExePath
+                : RegistrationService.InstallToAppData();
+
+            if (!alreadyInstalled)
+                RegistrationService.SaveInstallInfo(download, moved: willMove);
 
             RegistrationService.Register(exeToRegister);
+            if (dlg.AddStartMenu) RegistrationService.CreateStartMenuShortcut(exeToRegister);
+            else RegistrationService.RemoveStartMenuShortcut();
+            if (dlg.AddDesktop) RegistrationService.CreateDesktopShortcut(exeToRegister);
+            else RegistrationService.RemoveDesktopShortcut();
 
-            if (dlg.InstallToAppData)
-                RegistrationService.CreateStartMenuShortcut(exeToRegister);
-
-            var summary = $"Registered Markdown Midget as an editor for .md files.\n\nExe: {exeToRegister}"
-                + (dlg.InstallToAppData ? "\nStart menu: added" : "")
-                + "\n\nIf File Explorer's \"Open with\" menu still shows an old entry, sign out and back in — Explorer aggressively caches this menu until then.";
-
-            if (dlg.SetAsDefault)
+            // A "move" means deleting the download — but it's the running exe, so we
+            // hand off to the freshly-installed copy which deletes it after we exit.
+            if (willMove)
             {
-                summary += "\n\nSettings will open next. In the panel, click the current default (probably a different app), then pick \"Markdown Midget\" from the list. Windows requires this final click; the app can't set the default programmatically.";
+                var psi = new ProcessStartInfo(exeToRegister) { UseShellExecute = true };
+                psi.ArgumentList.Add("--finish-move");
+                psi.ArgumentList.Add(download);
+                if (_currentPath is not null) psi.ArgumentList.Add(_currentPath);
+                Process.Start(psi);
+                _dirty = false; // handled above; don't let Closing re-prompt
+                Application.Current.Shutdown();
+                return;
             }
 
-            MessageBox.Show(this, summary, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
-
+            var lines = new List<string> { "Registered Markdown Midget as an editor for .md files.", "", "Exe: " + exeToRegister };
+            if (dlg.AddStartMenu) lines.Add("Start menu: added");
+            if (dlg.AddDesktop) lines.Add("Desktop shortcut: added");
+            lines.Add("");
+            lines.Add("If Explorer's \"Open with\" menu still shows an old entry, sign out and back in — it caches aggressively.");
             if (dlg.SetAsDefault)
-                RegistrationService.OpenDefaultAppsSettings();
+                lines.Add("\nSettings will open on the .md page — click \"Markdown Midget\" there to finish making it the default (Windows requires this last click).");
+
+            MessageBox.Show(this, string.Join("\n", lines), "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (dlg.SetAsDefault) RegistrationService.OpenDefaultAppsSettings();
         }
         catch (Exception ex)
         {
@@ -803,34 +836,24 @@ public partial class MainWindow : Window
 
     private void UnregisterMdEditor_Click(object sender, RoutedEventArgs e)
     {
-        var installed = RegistrationService.IsInstalledToAppData();
-        var runningFromInstalled = RegistrationService.IsRunningFromAppDataInstall();
-
-        var message = "Remove Markdown Midget from the Windows \"Open with\" list for .md files?";
-        if (installed && !runningFromInstalled)
-            message += "\n\nAlso remove the AppData copy and Start-menu entry?  (Yes to remove both, No for registry only.)";
-        else if (installed && runningFromInstalled)
-            message += "\n\nNote: an installed copy exists at %LocalAppData%\\Programs\\MarkdownMidget, but it's the one currently running — close it first to remove the folder.";
-
-        var buttons = installed && !runningFromInstalled
-            ? MessageBoxButton.YesNoCancel
-            : MessageBoxButton.OKCancel;
-
-        var result = MessageBox.Show(this, message, "Markdown Midget", buttons, MessageBoxImage.Question);
-
-        var proceed = result is MessageBoxResult.Yes or MessageBoxResult.No or MessageBoxResult.OK;
-        if (!proceed) return;
+        var dlg = new UnregisterDialog { Owner = this };
+        if (dlg.ShowDialog() != true) return;
 
         try
         {
-            RegistrationService.Unregister();
-            if (result == MessageBoxResult.Yes)
-                RegistrationService.UninstallFromAppData();
-            else if (installed && !runningFromInstalled && result == MessageBoxResult.OK)
-                RegistrationService.RemoveStartMenuShortcut();
+            var done = new List<string>();
+            if (dlg.RemoveRegistration) { RegistrationService.Unregister(); done.Add("• Removed from the Open with list"); }
+            if (dlg.RestoreToOriginal && dlg.OriginalPath is { } orig)
+            {
+                var ok = RegistrationService.RestoreToOriginal(orig);
+                done.Add(ok ? "• Restored a copy to " + orig : "• Couldn't restore to " + orig);
+            }
+            if (dlg.RemoveStartMenu) { RegistrationService.RemoveStartMenuShortcut(); done.Add("• Removed the Start-menu entry"); }
+            if (dlg.RemoveDesktop) { RegistrationService.RemoveDesktopShortcut(); done.Add("• Removed the Desktop shortcut"); }
+            if (dlg.RemoveAppDataCopy) { RegistrationService.UninstallFromAppData(); done.Add("• Removed the installed copy from the app folder"); }
 
-            MessageBox.Show(this, "Markdown Midget has been unregistered.",
-                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+            var summary = done.Count > 0 ? string.Join("\n", done) : "Nothing was selected.";
+            MessageBox.Show(this, summary, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {

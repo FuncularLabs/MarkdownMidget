@@ -187,20 +187,30 @@ admin prompt. A stable ProgID (`MarkdownMidget.Document`) is used so re-running
 the wizard just points the existing entry at the current version — you'll never
 see duplicate "Markdown Midget" entries in the Open With menu.
 
-The dialog offers two opt-ins:
+Registering always installs a stable copy to
+`%LocalAppData%\Programs\MarkdownMidget\` (so the Open With entry keeps working
+even if you move or delete the download). Each dialog has small **diagrams** so
+it's clear what each option does. Register offers (all on by default):
 
-- **Copy this build to AppData and add a Start-menu entry** — recommended. Puts
-  a stable copy at `%LocalAppData%\Programs\MarkdownMidget\MarkdownMidget.exe`
-  and creates a `Markdown Midget.lnk` shortcut in your Start-menu Programs
-  folder, so the Open With entry keeps working even if you move or delete the
-  originally-downloaded file.
-- **Make it my default for .md files** — Windows requires the user to confirm
-  defaults in Settings, so this option opens the Default Apps page filtered to
-  `.md` where you can click "Markdown Midget" to make it default.
+- **Move the downloaded file into the app folder** — installs the stable copy and
+  then removes the download. Uncheck to leave the download in place (a copy is
+  installed either way). The original location is remembered so you can restore
+  it later.
+- **Add to the Start menu** — a `Markdown Midget.lnk` in your Start-menu Programs.
+- **Add a Desktop shortcut** — a shortcut on your desktop.
+- **Make it my default for .md files** (off by default) — opens the Default Apps
+  page filtered to `.md`; click "Markdown Midget" there to finish (Windows
+  requires this last click).
 
-**File ▸ Windows Integration ▸ Unregister as .md editor** does the reverse:
-removes the registry entries and, if there's an AppData copy, offers to remove
-that folder and the Start-menu shortcut too.
+**File ▸ Windows Integration ▸ Unregister as .md editor** offers to undo each of
+those (with diagrams), all optional:
+
+- **Remove from the Open with list** (the core unregister + stale-reference cleanup)
+- **Restore a copy to where it was downloaded** (defaulted on if the download was
+  moved away)
+- **Remove the Start-menu entry** / **Remove the Desktop shortcut**
+- **Remove the installed copy from the app folder** (unless it's the copy you're
+  currently running — close it first)
 
 ## Read-only mode
 

@@ -1,0 +1,126 @@
+<Window x:Class="MarkdownMidget.UnregisterDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Unregister as .md editor" SizeToContent="Height" Width="560"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <Window.Resources>
+        <Style x:Key="Chip" TargetType="Border">
+            <Setter Property="Background" Value="#FFF3F4F6" />
+            <Setter Property="BorderBrush" Value="#FFCFD4DB" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MinWidth" Value="88" />
+        </Style>
+        <Style x:Key="ChipLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#FF3A3F46" />
+        </Style>
+        <Style x:Key="Gone" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#x2715;" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="#FFB23A3A" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,0" />
+        </Style>
+        <Style x:Key="Arrow" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#x2192;" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="#FF8A9099" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,0" />
+        </Style>
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#FF5B6168" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="26,2,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="18">
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,14">
+            Choose what to undo. Each is optional — check only what you want removed.
+        </TextBlock>
+
+        <!-- Remove registration -->
+        <StackPanel Margin="0,0,0,14">
+            <CheckBox x:Name="RemoveRegCheck" IsChecked="True" Content="Remove from the _Open with list" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}" MinWidth="110">
+                    <TextBlock Style="{StaticResource ChipLabel}" Text=".md  ▸  Open with" FontSize="12" />
+                </Border>
+                <TextBlock Style="{StaticResource Gone}" />
+                <Border Style="{StaticResource Chip}">
+                    <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                </Border>
+            </StackPanel>
+            <TextBlock Style="{StaticResource Caption}" Text="Markdown Midget stops appearing when you right-click a .md file. Also cleans stale references." />
+        </StackPanel>
+
+        <!-- Restore to original -->
+        <StackPanel x:Name="RestorePanel" Margin="0,0,0,14">
+            <CheckBox x:Name="RestoreCheck" Content="_Restore a copy to where it was downloaded" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}">
+                    <StackPanel>
+                        <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="App folder" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource Arrow}" />
+                <Border Style="{StaticResource Chip}">
+                    <StackPanel>
+                        <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="Original spot" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            <TextBlock x:Name="RestoreCaption" Style="{StaticResource Caption}" />
+        </StackPanel>
+
+        <!-- Remove Start menu -->
+        <StackPanel x:Name="StartMenuPanel" Margin="0,0,0,14">
+            <CheckBox x:Name="RemoveStartMenuCheck" IsChecked="True" Content="Remove the _Start menu entry" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}" MinWidth="120">
+                    <TextBlock Style="{StaticResource ChipLabel}" Text="⊞  Start menu" FontSize="12" />
+                </Border>
+                <TextBlock Style="{StaticResource Gone}" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Remove Desktop -->
+        <StackPanel x:Name="DesktopPanel" Margin="0,0,0,14">
+            <CheckBox x:Name="RemoveDesktopCheck" IsChecked="True" Content="Remove the _Desktop shortcut" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}" MinWidth="120">
+                    <TextBlock Style="{StaticResource ChipLabel}" Text="🖥  Desktop" FontSize="12" />
+                </Border>
+                <TextBlock Style="{StaticResource Gone}" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Remove AppData copy -->
+        <StackPanel x:Name="RemoveCopyPanel" Margin="0,0,0,16">
+            <CheckBox x:Name="RemoveCopyCheck" IsChecked="True" Content="Remove the installed copy from the app _folder" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Margin="26,8,0,0">
+                <Border Style="{StaticResource Chip}">
+                    <StackPanel>
+                        <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="App folder" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource Gone}" />
+            </StackPanel>
+            <TextBlock x:Name="RemoveCopyCaption" Style="{StaticResource Caption}" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="OkBtn" Content="_Apply" Width="100" IsDefault="True" Click="Ok_Click" Margin="0,0,8,0" />
+            <Button Content="Cancel" Width="80" IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -9,6 +9,19 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Richer Register / Unregister dialogs** for Windows integration, each with
+  **minimalist diagrams** so non-technical users can see what every option does.
+  - Register (all on by default): **Move** the download into the app folder
+    (vs. copy), **Add to Start menu**, **Add a Desktop shortcut**, plus the
+    existing **Set as default**. The original download location is remembered.
+  - Unregister (all optional): remove the Open With registration, **restore a
+    copy to where it was downloaded**, remove the Start-menu entry, remove the
+    Desktop shortcut, and remove the installed app-folder copy.
+  - **Move** installs to the app folder then relaunches from there and deletes
+    the original download (handled via a `--finish-move` handoff, guarded by the
+    unsaved-changes prompt so a restart can't drop edits).
+
 ## [0.3.0-alpha1] – 2026-07-06
 
 ### Added
