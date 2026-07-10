@@ -9,6 +9,14 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.4.0-beta1] – 2026-07-10
+
+Minor bump to **0.4.0**. Two user-visible wins — documents that reference images
+now render them fully, and the recurring "editor surface couldn't load"
+(`ERR_ACCESS_DENIED`) crash after a hard exit is fixed — plus safe rendering of
+embedded raw HTML. Shipped as a beta for a weekend of dogfooding before the
+prerelease flag is dropped for 0.4.0 stable.
+
 ### Added
 - **Crash-resilient WebView2 profile.** Each run now uses its own per-process
   WebView2 data folder instead of one shared folder. A hard crash or force-kill
@@ -320,7 +328,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.3.0-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.4.0-beta1...HEAD
+[0.4.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.0-beta1
 [0.3.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.3.0-beta1
 [0.2.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta2
 [0.2.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta1
