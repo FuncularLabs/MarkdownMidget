@@ -10,14 +10,23 @@ changes between alpha tags.
 ## [Unreleased]
 
 ### Added
+- **Word wrap in the markdown source view** (View ▸ Word Wrap). Long lines wrap to
+  the pane width instead of scrolling off to the right; off by default and
+  remembered between sessions. The WYSIWYG view always reflows, so this only
+  affects the raw-source (Ctrl+E) view.
 - **Regression tests for the 0.4.0 image/HTML path.** C# unit tests for the
   document asset-serving boundary — path-traversal containment (including
-  percent-encoded `..` and sibling folders sharing a name prefix), rejection of
-  absolute/rooted references, and MIME mapping — plus JS tests for the raw-HTML
+  percent-encoded separators and sibling folders sharing a name prefix), rejection
+  of absolute/rooted references, and MIME mapping — plus JS tests for the raw-HTML
   sanitize policy (script / event-handler / `javascript:` / `iframe` / `base`
   stripped; presentational tags like a centered `<img>` logo preserved) running on
   Node's test runner against real DOMPurify in jsdom. Both suites run in CI and in
   the release workflow.
+
+### Changed
+- **Clearer source → formatted toggle icon.** The toolbar button that returns from
+  the markdown-source view to the WYSIWYG view now shows a rendered-content glyph
+  instead of a plain document page, so it reads as "formatted view" at a glance.
 
 ## [0.4.0-beta1] – 2026-07-10
 

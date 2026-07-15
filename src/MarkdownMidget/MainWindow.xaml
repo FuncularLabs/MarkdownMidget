@@ -165,6 +165,9 @@
                     <MenuItem Header="_View">
                         <MenuItem x:Name="MenuViewSource" Header="Edit Markdown _Source"
                                   IsCheckable="True" InputGestureText="Ctrl+E" Click="ToggleSource_Click" />
+                        <MenuItem x:Name="MenuWordWrap" Header="Word Wr_ap (source view)"
+                                  IsCheckable="True" Click="WordWrap_Click"
+                                  ToolTip="Wrap long lines in the markdown source view instead of scrolling horizontally." />
                         <Separator />
                         <MenuItem Header="Document _Width">
                             <MenuItem x:Name="PageWidthPortrait" Header="_Portrait" IsCheckable="True"

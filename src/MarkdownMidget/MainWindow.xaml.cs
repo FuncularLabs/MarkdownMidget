@@ -30,7 +30,7 @@ public partial class MainWindow : Window
 
     // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
     private static readonly string GlyphSource = char.ConvertFromUtf32(0xE943); // braces {} = markdown source
-    private static readonly string GlyphRich = char.ConvertFromUtf32(0xE8A5);   // document = formatted view
+    private static readonly string GlyphRich = char.ConvertFromUtf32(0xE8A1);   // rendered content card = formatted (WYSIWYG) view
 
     private string? _currentPath;
     private string? _displayName; // title for dropped content that has no path
@@ -84,6 +84,10 @@ public partial class MainWindow : Window
         MenuSpellCheck.IsChecked = _spellCheck;
         MenuSkipCodeSpell.IsChecked = _skipCodeSpell;
         SourceBox.SpellCheck.IsEnabled = _spellCheck;
+
+        // Apply the persisted source-view word-wrap state.
+        MenuWordWrap.IsChecked = _wordWrap;
+        ApplyWordWrap();
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         for (var i = 0; i < args.Length; i++)
@@ -1324,10 +1328,12 @@ public partial class MainWindow : Window
         public Dictionary<string, PrintPrefs> PrintPrefs { get; set; } = new();
         public bool SpellCheck { get; set; } = true;
         public bool SkipCodeSpellCheck { get; set; } = true;
+        public bool WordWrap { get; set; } // source-view line wrapping; off = horizontal scroll
     }
 
     private bool _spellCheck = true;         // persisted; applied on editor-ready
     private bool _skipCodeSpell = true;      // persisted; exempt code from spell check
+    private bool _wordWrap;                  // persisted; wrap long lines in the source view
 
     private sealed class PrintPrefs
     {
@@ -1366,6 +1372,7 @@ public partial class MainWindow : Window
                         _printPrefs[kv.Key] = kv.Value;
             _spellCheck = s.SpellCheck;
             _skipCodeSpell = s.SkipCodeSpellCheck;
+            _wordWrap = s.WordWrap;
         }
         catch { /* defaults are fine */ }
     }
@@ -1381,6 +1388,7 @@ public partial class MainWindow : Window
                 PrintPrefs = _printPrefs,
                 SpellCheck = _spellCheck,
                 SkipCodeSpellCheck = _skipCodeSpell,
+                WordWrap = _wordWrap,
             }));
         }
         catch { /* best-effort */ }
@@ -1666,6 +1674,23 @@ public partial class MainWindow : Window
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setCodeSpellcheck({(_skipCodeSpell ? "true" : "false")})");
         RefocusEditor();
+    }
+
+    private void WordWrap_Click(object sender, RoutedEventArgs e)
+    {
+        _wordWrap = MenuWordWrap.IsChecked;
+        ApplyWordWrap();
+        SaveSettings();               // remember the choice across sessions
+        if (_sourceMode) SourceBox.Focus();
+    }
+
+    // Wrap long lines in the raw-markdown source view, or scroll horizontally.
+    // Applies only to the source TextBox; the WYSIWYG view always reflows.
+    private void ApplyWordWrap()
+    {
+        SourceBox.TextWrapping = _wordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        SourceBox.HorizontalScrollBarVisibility =
+            _wordWrap ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
     }
 
     // ===== Drag & drop: open in this instance if idle, else launch a new one =====
