@@ -9,6 +9,13 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.4.1] – 2026-07-15
+
+Small feature release on top of 0.4.0, and the first to drop the prerelease flag
+on the 0.4 line. Adds source-view word wrap and a clearer source ↔ formatted
+toggle icon, and hardens the 0.4.0 image/HTML work with a regression-test net.
+Dogfooded before release.
+
 ### Added
 - **Word wrap in the markdown source view** (View ▸ Word Wrap). Long lines wrap to
   the pane width instead of scrolling off to the right; off by default and
@@ -347,7 +354,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.4.0-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.1
 [0.4.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.0-beta1
 [0.3.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.3.0-beta1
 [0.2.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.2.0-beta2
