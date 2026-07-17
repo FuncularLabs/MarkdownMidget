@@ -489,6 +489,17 @@ public partial class MainWindow : Window
 
     private static string JsLiteral(string value) => JsonSerializer.Serialize(value);
 
+    /// <summary>
+    /// The document's markdown, or null when the editor can't be asked. Callers making
+    /// destructive decisions must not treat "couldn't ask" as "the document is empty".
+    /// </summary>
+    private async Task<string?> TryGetDocumentMarkdownAsync()
+    {
+        if (_sourceMode) return SourceBox.Text;
+        if (!_editorReady) return null;
+        return await RunEditorAsync("window.MDM.getMarkdown()");
+    }
+
     private async Task<string> GetDocumentMarkdownAsync()
     {
         if (_sourceMode) return SourceBox.Text;
@@ -785,9 +796,15 @@ public partial class MainWindow : Window
         _watcher = null;
     }
 
+    private bool _missedWhileBusy;   // a watcher event we dropped while a pass was running
+
     private void OnWatcherEvent(object sender, FileSystemEventArgs e)
     {
-        if (_suppressWatcher || _externalChangeBusy) return;
+        if (_suppressWatcher) return;
+        // Don't silently drop events that arrive mid-pass: the writer's LAST write can
+        // land here, and losing it would strand us on a stale (or truncated) document
+        // that we'd believe is clean. Remember it and re-check when the pass ends.
+        if (_externalChangeBusy) { _missedWhileBusy = true; return; }
         var now = DateTime.UtcNow;
         if ((now - _lastWatcherFireUtc).TotalMilliseconds < 400) return; // debounce duplicate events
         _lastWatcherFireUtc = now;
@@ -797,27 +814,44 @@ public partial class MainWindow : Window
     private async Task OnExternalChangeAsync(string fullPath)
     {
         if (_externalChangeBusy || _currentPath is null) return;
-        if (!string.Equals(Path.GetFullPath(fullPath), Path.GetFullPath(_currentPath), StringComparison.OrdinalIgnoreCase))
+        // Pin the document this pass is about. _currentPath can change under our awaits
+        // (the user opens something else), and everything below must refuse to act on a
+        // document it wasn't started for.
+        var path = _currentPath;
+        if (!string.Equals(Path.GetFullPath(fullPath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
             return;
 
         _externalChangeBusy = true;
         try
         {
-            await HandleExternalChangeAsync();
+            await HandleExternalChangeAsync(path);
         }
         finally { _externalChangeBusy = false; }
+
+        if (_missedWhileBusy)
+        {
+            _missedWhileBusy = false;
+            _lastWatcherFireUtc = DateTime.MinValue;   // don't let the debounce eat the retry
+            Dispatcher.BeginInvoke(new Action(async () => await OnExternalChangeAsync(fullPath)));
+        }
     }
 
-    private async Task HandleExternalChangeAsync()
-    {
-        if (_currentPath is null) return;
+    /// <summary>True while <paramref name="path"/> is still the open document.</summary>
+    private bool StillEditing(string path) =>
+        _currentPath is not null &&
+        string.Equals(Path.GetFullPath(_currentPath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase);
 
+    private async Task HandleExternalChangeAsync(string path)
+    {
         // Don't read until the writer has stopped changing the file: a program that
         // truncates then streams lets a plain read succeed on half a document, and
         // the reload would then make that half document the new baseline.
-        var newContent = await ReadWhenStableAsync(_currentPath);
+        var newContent = await ReadWhenStableAsync(path);
         if (newContent is null) return;
-        if (_currentPath is null) return;                   // closed while we waited
+        // Re-assert identity after EVERY await, not just null: if the user opened another
+        // document while we waited, acting now would pour this file's content into that
+        // one — and the freshness check below would cheerfully call it "nothing to lose".
+        if (!StillEditing(path)) return;
 
         if (string.Equals(newContent, _cleanMarkdown, StringComparison.Ordinal)) return;
 
@@ -826,20 +860,22 @@ public partial class MainWindow : Window
         // keystroke, so during continuous typing it never fires and `_dirty` stays
         // false for the whole burst. Believing it here would silently discard live
         // edits — with no backup, since this path deliberately writes none.
-        var inMemory = await GetDocumentMarkdownAsync();
+        var inMemory = await TryGetDocumentMarkdownAsync();
+        if (inMemory is null) return;                       // couldn't ask; don't guess
+        if (!StillEditing(path)) return;
         var hasUnsavedWork = !string.Equals(inMemory, _cleanMarkdown, StringComparison.Ordinal);
 
         // Nothing unsaved: the in-memory copy IS the old disk version, so there's
         // nothing to lose, nothing worth backing up, and nothing to ask about.
         if (_autoReload && !hasUnsavedWork)
         {
-            await ReloadPreservingPositionAsync(newContent);
+            await ReloadPreservingPositionAsync(path, newContent);
             return;
         }
 
         // Save the current (possibly unsaved) in-memory version as a timestamped backup.
         string backupPath;
-        try { backupPath = WriteTimestampedBackup(_currentPath, inMemory); }
+        try { backupPath = WriteTimestampedBackup(path, inMemory); }
         catch (Exception ex)
         {
             MessageBox.Show($"Couldn't write a backup of your current version:\n{ex.Message}\n\nThe disk version was NOT reloaded.",
@@ -847,12 +883,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dlg = new ExternalChangeDialog(Path.GetFileName(_currentPath), backupPath) { Owner = this };
+        var dlg = new ExternalChangeDialog(Path.GetFileName(path), backupPath) { Owner = this };
         dlg.ShowDialog();
+        if (!StillEditing(path)) return;   // the modal pumps messages; don't act on a swapped document
         switch (dlg.Choice)
         {
             case ExternalChangeChoice.Reload:
-                await LoadDocumentAsync(newContent, _currentPath);
+                await LoadDocumentAsync(newContent, path);
                 break;
             case ExternalChangeChoice.SaveAs:
                 await HandleSaveAsAfterExternalChangeAsync(inMemory, newContent, backupPath);
@@ -895,7 +932,9 @@ public partial class MainWindow : Window
             catch { return null; }
             await Task.Delay(80);
         }
-        try { return await File.ReadAllTextAsync(path); } catch { return null; }
+        // Still changing after ~1s: refuse rather than read a possibly half-written
+        // document. A later watcher event (see _missedWhileBusy) brings us back.
+        return null;
     }
 
     /// <summary>Character index where a 0-based source line starts, or -1.</summary>
@@ -920,12 +959,13 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Swap in the new content without the reader losing their place. Only ever called
-    /// when nothing is unsaved (see OnExternalChangeAsync).
+    /// when nothing is unsaved (see HandleExternalChangeAsync).
     /// </summary>
-    private async Task ReloadPreservingPositionAsync(string newContent)
+    private async Task ReloadPreservingPositionAsync(string path, string newContent)
     {
         var anchor = await CaptureAnchorAsync();
-        await LoadDocumentAsync(newContent, _currentPath);
+        if (!StillEditing(path)) return;   // capturing the anchor awaits the editor too
+        await LoadDocumentAsync(newContent, path);
         await RestoreAnchorAsync(anchor);
         FlashStatus("Reloaded — file changed on disk");
     }
@@ -944,7 +984,9 @@ public partial class MainWindow : Window
             if (charIndex < 0 || charIndex > text.Length) return null;
             var sourceLine = 0;
             for (var i = 0; i < charIndex; i++) if (text[i] == '\n') sourceLine++;
-            var ratio = text.Length == 0 ? 0 : (double)charIndex / text.Length;
+            var totalLines = 1;
+            for (var i = 0; i < text.Length; i++) if (text[i] == '\n') totalLines++;
+            var ratio = (double)sourceLine / totalLines;   // ResolveLine consumes this as a LINE ratio
             return ScrollAnchor.Capture(text, sourceLine, ratio);
         }
         if (!_editorReady) return null;
