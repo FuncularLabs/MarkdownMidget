@@ -905,7 +905,7 @@ public partial class MainWindow : Window
                 RecheckExternalChange(path);
                 return;
             }
-            await ReloadPreservingPositionAsync(path, newContent);
+            await ReloadPreservingPositionAsync(path, newContent, PassValid);
             return;
         }
 
@@ -970,7 +970,7 @@ public partial class MainWindow : Window
             await Task.Delay(80);
         }
         // Still changing after ~1s: refuse rather than read a possibly half-written
-        // document. A later watcher event (see _missedWhileBusy) brings us back.
+        // document. A later watcher event (via the pending-path intake) brings us back.
         return null;
     }
 
@@ -996,12 +996,15 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Swap in the new content without the reader losing their place. Only ever called
-    /// when nothing is unsaved (see HandleExternalChangeAsync).
+    /// when nothing is unsaved (see HandleExternalChangeAsync). The caller's full
+    /// validity predicate (identity + baseline pin) is re-checked after the anchor
+    /// capture's editor round-trip — StillEditing alone would miss a Save landing in
+    /// that window.
     /// </summary>
-    private async Task ReloadPreservingPositionAsync(string path, string newContent)
+    private async Task ReloadPreservingPositionAsync(string path, string newContent, Func<bool> stillValid)
     {
         var anchor = await CaptureAnchorAsync();
-        if (!StillEditing(path)) return;   // capturing the anchor awaits the editor too
+        if (!stillValid()) { RecheckExternalChange(path); return; }
         await LoadDocumentAsync(newContent, path);
         await RestoreAnchorAsync(anchor);
         FlashStatus("Reloaded — file changed on disk");
