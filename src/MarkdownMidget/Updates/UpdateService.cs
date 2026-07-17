@@ -61,7 +61,8 @@ internal static class UpdateService
         {
             var dir = Path.Combine(Path.GetTempPath(), "MarkdownMidget-update");
             Directory.CreateDirectory(dir);
-            var dest = Path.Combine(dir, release.AssetName);
+            // AssetName comes from the release JSON — never let it steer the path.
+            var dest = Path.Combine(dir, Path.GetFileName(release.AssetName));
             if (File.Exists(dest)) File.Delete(dest);
 
             using var response = await Http.GetAsync(release.AssetUrl, HttpCompletionOption.ResponseHeadersRead);
@@ -80,21 +81,78 @@ internal static class UpdateService
         catch { return null; }
     }
 
+    // The identity gate. Azure Trusted Signing issues short-lived LEAF certs that
+    // rotate every release, so the leaf thumbprint can't be pinned. Two things are
+    // stable and together constitute a real identity check (not a spoofable subject
+    // string): the leaf's Organization, and the chain root — Microsoft only issues a
+    // cert under this root with O="Funcular Labs, Inc." after verifying that identity.
+    private const string ExpectedOrg = "Funcular Labs, Inc.";
+    private const string TrustedRootThumbprint = "F40042E2E5F7E8EF8189FED15519AECE42C3BFA2"; // MS Identity Verification Root CA 2020
+
     /// <summary>
-    /// True only when the file carries a VALID Authenticode signature (full
-    /// WinVerifyTrust chain + hash check) whose signer subject is Funcular Labs.
+    /// True only when the file carries a valid embedded Authenticode signature
+    /// (WinVerifyTrust: hash + trust chain), the signer's Organization is exactly
+    /// Funcular Labs, Inc., the chain roots at Microsoft's identity-verification
+    /// root, and no chain cert is known-revoked.
     /// </summary>
     public static bool VerifySignature(string filePath, out string signer)
     {
         signer = "";
         try
         {
-            if (WinVerifyTrustFile(filePath) != 0) return false;
-            var cert = new X509Certificate2(X509Certificate.CreateFromSignedFile(filePath));
-            signer = cert.GetNameInfo(X509NameType.SimpleName, forIssuer: false) ?? "";
-            return signer.Contains("Funcular Labs", StringComparison.OrdinalIgnoreCase);
+            if (WinVerifyTrustFile(filePath) != 0) return false;   // invalid/untrusted/tampered
+
+            // Extract the embedded SIGNER cert. CreateFromSignedFile is flagged
+            // SYSLIB0057, but its steer (X509CertificateLoader) only loads certificate
+            // *files* — there is no non-obsolete managed API to pull a signer out of a
+            // signed PE. So use it, then re-load the raw bytes via the non-obsolete
+            // loader to hold an X509Certificate2 without the obsolete file ctor.
+#pragma warning disable SYSLIB0057
+            var signed = X509Certificate.CreateFromSignedFile(filePath);
+#pragma warning restore SYSLIB0057
+            using var leaf = X509CertificateLoader.LoadCertificate(signed.GetRawCertData());
+            signer = leaf.Subject;
+
+            // Organization must be EXACTLY ours (not a Contains — "Funcular Labs Fan
+            // Club" and the like must not pass).
+            if (!OrganizationIs(leaf, ExpectedOrg)) return false;
+
+            using var chain = new X509Chain();
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+            chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+            // WinVerifyTrust already established trust; here we only need the chain to
+            // read the root and to surface a definitive revocation. Transient CRL/OCSP
+            // unavailability must NOT block a legitimate update, so those are ignored;
+            // a genuine "Revoked" is not.
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreCertificateAuthorityRevocationUnknown
+                | X509VerificationFlags.IgnoreEndRevocationUnknown
+                | X509VerificationFlags.IgnoreRootRevocationUnknown;
+            chain.Build(leaf);
+
+            var rootPinned = false;
+            foreach (var el in chain.ChainElements)
+            {
+                foreach (var st in el.ChainElementStatus)
+                    if (st.Status.HasFlag(X509ChainStatusFlags.Revoked)) return false;
+                if (string.Equals(el.Certificate.Thumbprint, TrustedRootThumbprint, StringComparison.OrdinalIgnoreCase))
+                    rootPinned = true;
+            }
+            return rootPinned;
         }
         catch { return false; }
+    }
+
+    private static bool OrganizationIs(X509Certificate2 cert, string org)
+    {
+        foreach (var rdn in cert.SubjectName.EnumerateRelativeDistinguishedNames())
+        {
+            if (rdn.GetSingleElementType().FriendlyName is "O" or "Organization" ||
+                rdn.GetSingleElementType().Value == "2.5.4.10") // OID for O
+            {
+                return string.Equals(rdn.GetSingleElementValue(), org, StringComparison.Ordinal);
+            }
+        }
+        return false;
     }
 
     /// <summary>Where the current process's exe lives (single-file publish safe).</summary>
@@ -116,17 +174,25 @@ internal static class UpdateService
     public static void ApplyInstalledAndRestart(string verifiedNewExe)
     {
         var target = CurrentExePath;
+        var dir = Path.GetDirectoryName(target)!;
+        var staged = Path.Combine(dir, ".mdm-update-staged.exe");
         var old = target + ".old";
+
+        // Do the slow cross-volume copy from %TEMP% BEFORE touching the running exe,
+        // so the only window where `target` is absent spans two fast same-volume
+        // renames rather than a full copy.
+        File.Copy(verifiedNewExe, staged, overwrite: true);
         try { if (File.Exists(old)) File.Delete(old); } catch { /* replaced below */ }
 
         File.Move(target, old);            // legal while running; the process keeps its image
         try
         {
-            File.Copy(verifiedNewExe, target);
+            File.Move(staged, target);     // same volume — effectively atomic
         }
         catch
         {
             File.Move(old, target);        // roll back — leave the install untouched
+            try { File.Delete(staged); } catch { /* best effort */ }
             throw;
         }
 
@@ -150,9 +216,10 @@ internal static class UpdateService
     public static string ApplyPortableAndRestart(string verifiedNewExe, string assetName)
     {
         var dir = Path.GetDirectoryName(CurrentExePath)!;
-        var dest = Path.Combine(dir, assetName);
+        var safeName = Path.GetFileName(assetName);   // never let the release name escape `dir`
+        var dest = Path.Combine(dir, safeName);
         if (string.Equals(dest, CurrentExePath, StringComparison.OrdinalIgnoreCase))
-            dest = Path.Combine(dir, Path.GetFileNameWithoutExtension(assetName) + ".new.exe");
+            dest = Path.Combine(dir, Path.GetFileNameWithoutExtension(safeName) + ".new.exe");
         File.Copy(verifiedNewExe, dest, overwrite: true);
         Process.Start(new ProcessStartInfo(dest) { UseShellExecute = true });
         return dest;
@@ -185,9 +252,9 @@ internal static class UpdateService
         {
             cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>(),
             dwUIChoice = 2,           // WTD_UI_NONE
-            fdwRevocationChecks = 0,  // WTD_REVOKE_NONE (offline-tolerant; chain still validated)
+            fdwRevocationChecks = 0,  // WTD_REVOKE_NONE here; VerifySignature does explicit revocation
             dwUnionChoice = 1,        // WTD_CHOICE_FILE
-            dwStateAction = 0,
+            dwStateAction = 1,        // WTD_STATEACTION_VERIFY
         };
         var fileInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_FILE_INFO>());
         try
@@ -195,7 +262,11 @@ internal static class UpdateService
             Marshal.StructureToPtr(fileInfo, fileInfoPtr, false);
             data.pFile = fileInfoPtr;
             var action = ActionGenericVerifyV2;
-            return WinVerifyTrust(IntPtr.Zero, ref action, ref data);
+            var result = WinVerifyTrust(IntPtr.Zero, ref action, ref data);
+            // Always release the provider state the VERIFY action allocated.
+            data.dwStateAction = 2;   // WTD_STATEACTION_CLOSE
+            WinVerifyTrust(IntPtr.Zero, ref action, ref data);
+            return result;
         }
         finally { Marshal.FreeHGlobal(fileInfoPtr); }
     }
