@@ -9,6 +9,14 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.5.1] – 2026-07-17
+
+Stable promotion of **0.5.0-beta1** after dogfooding — same content, prerelease
+flag dropped. See the 0.5.0-beta1 notes below for everything new on the 0.5
+line: the app-owned spell-check stack (private dictionary, both views, code
+exempted, right-click suggestions) and auto-reload of externally-changed files
+with topic-anchored position restore.
+
 ## [0.5.0-beta1] – 2026-07-17
 
 Markdown Midget now owns its spell-check stack. The minor bump marks the
@@ -412,7 +420,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.5.0-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.1
 [0.5.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.0-beta1
 [0.4.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.1
 [0.4.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.0-beta1

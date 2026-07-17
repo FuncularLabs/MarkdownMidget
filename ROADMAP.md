@@ -12,6 +12,17 @@ deliberately parked).
 
 ## Someday / Big
 
+### Real installer / uninstaller
+
+A proper signed installer (MSI or MSIX) and an Add/Remove-Programs-visible
+uninstaller, replacing the current portable-exe + "Register as .md editor"
+AppData-install flow. Candidates: WiX (MSI, full control), MSIX (store-style
+servicing, but packaging constraints on WebView2/file-association UX). The
+in-app updater (Help ▸ About, 0.6.0) covers keeping users current until this
+lands; the installer should absorb the updater's swap/registration logic rather
+than duplicate it. Not started — parked deliberately until the update flow has
+proven itself in the wild.
+
 ### Multi-document tabs
 
 Tabbed editing with `Ctrl+Tab` / `Ctrl+Shift+Tab` and `Ctrl+PgUp` / `Ctrl+PgDn`
