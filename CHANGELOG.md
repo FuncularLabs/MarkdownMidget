@@ -9,7 +9,36 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.5.0-beta1] – 2026-07-17
+
+Markdown Midget now owns its spell-check stack. The minor bump marks the
+replacement of both views' native spell checking with the app's own engine and
+private dictionary — plus the auto-reload feature for externally-rewritten files.
+
 ### Added
+- **The app's own spell checker, in both views.** Checking is done by the
+  Windows spelling engine (`ISpellChecker`) driven by the app, so both the
+  WYSIWYG view and the raw source view get the same squiggles, the same
+  suggestions, and the same dictionary — the source view previously had
+  all-or-nothing native checking with no way to exempt code.
+  - **Right-click a squiggled word** for suggestions, **Add to Dictionary**, and
+    **Ignore All** — in both views. The WYSIWYG view previously had *no* spelling
+    suggestions at all (its context menu was app-drawn).
+  - **The dictionary is private to Markdown Midget**
+    (`%LocalAppData%\MarkdownMidget\dictionary.txt`). Adding a word never writes
+    to the Windows or Office custom dictionaries — integrating with the OS
+    dictionary was deliberately rejected as too invasive.
+  - **Skip Spell Check in Code now works in the source view too**, exempting
+    fenced blocks (including unclosed ones being typed) and inline code via real
+    parsing — and in the WYSIWYG view it's exact by construction, driven by the
+    document's node structure.
+  - Engineering notes: squiggle positions round-trip through a plain-text ↔
+    ProseMirror segment map (verified across headings, lists, tables, links, and
+    mark-split words); late check results are rebased through an edit `Mapping`
+    so a slow check can't squiggle the wrong text; and only the viewport's worth
+    of decorations is live at a time (a whole-document decoration pass on a 50k
+    doc costs ~14ms per keystroke; a viewport's worth costs ~1ms).
+- **`--source` startup switch** — open a document showing the raw markdown.
 - **Auto-reload changed files** (View ▸ Auto-reload changed files, on by default).
   When another program rewrites the open document — an AI tool regenerating it, a
   build step, a `git pull` — Markdown Midget now reloads it silently and **keeps
@@ -383,7 +412,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.5.0-beta1...HEAD
+[0.5.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.0-beta1
 [0.4.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.1
 [0.4.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.0-beta1
 [0.3.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.3.0-beta1

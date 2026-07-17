@@ -19,9 +19,9 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { mermaidBlock } from './mermaid.js';
-import { codeSpellcheck, setCodeSpellcheck as setCodeSpell } from './code-spellcheck.js';
 import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
-import { spellDecorate, setSpellRanges, beginSpellCheck } from './spell-decorate.js';
+import { spellDecorate, setSpellRanges, beginSpellCheck, misspellingAt } from './spell-decorate.js';
+import { extractSpellText } from './spell-extract.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
@@ -278,7 +278,17 @@ function requestContextMenu(view, clientX, clientY, img) {
     postToHost({ type: 'contextmenu', menu: 'table', x: clientX, y: clientY });
     return;
   }
-  postToHost({ type: 'contextmenu', menu: 'text', x: clientX, y: clientY });
+  // If the click landed on a misspelled word, tell the host so it can prepend
+  // suggestions; also select nothing — the host replaces via replaceRange.
+  let spell = null;
+  try {
+    const hit = view.posAtCoords({ left: clientX, top: clientY });
+    if (hit) {
+      const r = misspellingAt(view.state, hit.pos);
+      if (r) spell = { from: r.from, to: r.to, word: view.state.doc.textBetween(r.from, r.to) };
+    }
+  } catch (_) { /* no spell info is fine */ }
+  postToHost({ type: 'contextmenu', menu: 'text', x: clientX, y: clientY, spell });
 }
 
 function installContextMenus(view) {
@@ -332,7 +342,7 @@ const MDM = {
         ctx.set(defaultValueCtx, initialMarkdown || '');
         ctx.update(editorViewOptionsCtx, (prev) => ({
           ...prev,
-          attributes: { class: 'mdm-prosemirror', spellcheck: 'true' },
+          attributes: { class: 'mdm-prosemirror', spellcheck: 'false' }, // native off — the app runs its own engine
         }));
         const l = ctx.get(listenerCtx);
         l.markdownUpdated(() => {
@@ -372,7 +382,6 @@ const MDM = {
       .use(formattingMarks)
       .use(tableCellEditing)
       .use(mermaidBlock)
-      .use(codeSpellcheck)
       .use(spellDecorate)
       .use(splitHeadingCommand)
       .use(headingEnterKeymap)
@@ -449,18 +458,42 @@ const MDM = {
   getScrollAnchor() { return getScrollAnchor(); },
   restoreScrollAnchor(a) { return restoreScrollAnchor(a); },
 
-  // skip=true → code_block + inlineCode get spellcheck="false" (prose still checked).
-  setCodeSpellcheck(skip) {
-    if (editorView) setCodeSpell(editorView, skip);
+
+  // ---- Spell check (host-driven; see spell-extract.js / spell-decorate.js) ----
+
+  // Call before extracting text for a check: starts recording edits so a slow
+  // host response can be rebased instead of landing on stale positions.
+  spellBegin() { beginSpellCheck(); },
+
+  // The checkable text + segment map (JSON string), or null when not ready.
+  // Starts the staleness recording itself, so no edit can slip between "begin"
+  // and the snapshot the host actually checks.
+  getSpellText(includeCode) {
+    if (!editorView) return null;
+    beginSpellCheck();
+    return JSON.stringify(extractSpellText(editorView.state.doc, !!includeCode));
   },
 
-  // TEMP (spell-check spike): expose the live EditorView so the position-mapping
-  // experiment can run against a real document. Revert before shipping.
-  __view() { return editorView; },
+  // Fresh check results as [{from,to}] ProseMirror ranges.
+  setSpellRanges(ranges) {
+    if (editorView) setSpellRanges(editorView, ranges || []);
+  },
 
-  // TEMP (spike): host-supplied misspelling ranges (ProseMirror positions).
-  __setSpellRanges(ranges) { if (editorView) setSpellRanges(editorView, ranges); },
-  __beginSpellCheck() { beginSpellCheck(); },
+  // Replace one range (a misspelled word) with new text — used by the host's
+  // suggestion menu. The document may have changed between right-click and the
+  // click on a suggestion (typing, auto-reload, a new file), so the replacement
+  // only proceeds if the range still holds the exact word the menu was built
+  // for; otherwise it's a silent no-op and the next re-check refreshes things.
+  replaceRange(from, to, text, expected) {
+    if (!editorView) return false;
+    const size = editorView.state.doc.content.size;
+    if (!(from >= 0 && to > from && to <= size)) return false;
+    if (typeof expected === 'string' &&
+        editorView.state.doc.textBetween(from, to) !== expected) return false;
+    editorView.dispatch(editorView.state.tr.insertText(text, from, to).scrollIntoView());
+    editorView.focus();
+    return true;
+  },
 
   // Read-only: ProseMirror stops accepting edits and the caret/handles disappear.
   setEditable(on) {

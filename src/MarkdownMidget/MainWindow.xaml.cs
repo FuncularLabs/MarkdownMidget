@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private readonly List<string> _recentFiles = new();
     private string _pageWidth = "landscape"; // portrait | landscape | full (persisted)
     private bool _startReadOnly;
+    private bool _startInSource;  // --source: open showing the raw markdown
     private bool _isHelpWindow;
     private bool _readOnly;
     private bool _closed;            // closed/no-document state — shows ClosedSplash
@@ -79,10 +80,11 @@ public partial class MainWindow : Window
         BuildRecentMenu();
         LoadSettings();
 
-        // Apply the persisted spell-check state (the editor is told on ready).
+        // Apply the persisted spell-check state. Checking is done by the app's own
+        // engine (see MainWindow.Spell.cs); native spell check stays off everywhere.
         MenuSpellCheck.IsChecked = _spellCheck;
         MenuSkipCodeSpell.IsChecked = _skipCodeSpell;
-        SourceBox.SpellCheck.IsEnabled = _spellCheck;
+        InitSpell();
 
         // Apply the persisted source-view word-wrap state (starts in WYSIWYG, so the
         // toolbar button starts disabled/off).
@@ -98,6 +100,7 @@ public partial class MainWindow : Window
         {
             var arg = args[i];
             if (arg is "--readonly" or "-r" or "/readonly") _startReadOnly = true;
+            else if (arg is "--source" or "/source") _startInSource = true;
             else if (arg is "--help-window") { _isHelpWindow = true; _startReadOnly = true; }
             else if (arg == "--finish-move" && i + 1 < args.Length)
             {
@@ -285,13 +288,15 @@ public partial class MainWindow : Window
             case "ready":
                 _editorReady = true;
                 _ = RunEditorAsync($"window.MDM.setPageWidth({JsLiteral(_pageWidth)})");
-                if (!_spellCheck) _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
-                _ = RunEditorAsync($"window.MDM.setCodeSpellcheck({(_skipCodeSpell ? "true" : "false")})");
+                // Native (browser) spell check stays OFF — the app runs its own engine
+                // with a private dictionary; squiggles come from host-computed ranges.
+                _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
+                RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
                 if (_pendingOpenPath is { } p)
                 {
                     _pendingOpenPath = null;
-                    _ = OpenPathAsync(p);
+                    _ = OpenThenApplyStartupViewAsync(p);
                 }
                 else
                 {
@@ -304,7 +309,10 @@ public partial class MainWindow : Window
                 break;
             case "change":
                 if (!_sourceMode)
+                {
                     ScheduleDirtyCheck();
+                    RequestSpellCheckSoon();
+                }
                 // Edits invalidate the WYSIWYG find index — force a re-scan on next find.
                 _lastFindSource = "";
                 _lastFindFlags = "";
@@ -338,8 +346,20 @@ public partial class MainWindow : Window
                         int Get(string k) => d.RootElement.TryGetProperty(k, out var v) ? v.GetInt32() : 0;
                         _imgResize = (Get("curW"), Get("curH"), Get("natW"), Get("natH"));
                     }
+                    // A right-click on a misspelled word carries its range + text.
+                    (int From, int To, string Word)? spell = null;
+                    if (menu == "text" && !_readOnly && _spellCheck &&
+                        d.RootElement.TryGetProperty("spell", out var sp) && sp.ValueKind == JsonValueKind.Object)
+                    {
+                        var w = sp.TryGetProperty("word", out var wv) ? wv.GetString() : null;
+                        if (!string.IsNullOrWhiteSpace(w))
+                            spell = (sp.GetProperty("from").GetInt32(), sp.GetProperty("to").GetInt32(), w!);
+                    }
                     // Defer so showing the menu doesn't block the WebView2 message pump.
-                    Dispatcher.BeginInvoke(() => ShowEditorContextMenu(menu, x, y));
+                    if (spell is { } si)
+                        Dispatcher.BeginInvoke(async () => await ShowSpellContextMenuAsync(x, y, si.From, si.To, si.Word));
+                    else
+                        Dispatcher.BeginInvoke(() => ShowEditorContextMenu(menu, x, y));
                 }
                 break;
             case "fileDrop":
@@ -373,12 +393,20 @@ public partial class MainWindow : Window
                 : (!_readOnly && menu == "image") ? "ImageContextMenu"
                 : "TextContextMenu";
         if (FindResource(key) is not ContextMenu cm) return;
+        ShowMenuOverEditor(cm, x, y);
+    }
 
+    /// <summary>Open a menu over the WebView2 surface with the focus dance the
+    /// HwndHost needs (used by both the resource menus and the dynamic spell menu).</summary>
+    private void ShowMenuOverEditor(ContextMenu cm, double x, double y)
+    {
         // The WebView2 child HWND holds OS keyboard focus; pull it up to this window
         // first so the menu popup becomes keyboard-navigable.
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd != IntPtr.Zero) SetFocus(hwnd);
 
+        cm.Opened -= ContextMenu_Opened;
+        cm.Opened += ContextMenu_Opened;
         cm.PlacementTarget = Web;
         cm.Placement = System.Windows.Controls.Primitives.PlacementMode.RelativePoint;
         cm.HorizontalOffset = x;
@@ -514,6 +542,16 @@ public partial class MainWindow : Window
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
     }
 
+    private async Task OpenThenApplyStartupViewAsync(string path)
+    {
+        await OpenPathAsync(path);
+        if (_startInSource && !_closed)
+        {
+            _startInSource = false;
+            await SetSourceModeAsync(true);
+        }
+    }
+
     // ===== Source / WYSIWYG toggle =====
 
     private async void ToggleSource_Click(object sender, RoutedEventArgs e)
@@ -557,9 +595,11 @@ public partial class MainWindow : Window
         // Word wrap applies to the source view only.
         UpdateWrapToggleUi();
 
+        if (on) _squiggles?.SetRanges(Array.Empty<(int, int)>()); // previous ranges are stale for this text
         if (on) SetUndoRedoEnabled(true, true); // the source TextBox manages its own undo
         RefocusEditor();
         _ = UpdateDirtyAsync();
+        RequestSpellCheckSoon();
     }
 
     // ===== File operations =====
@@ -618,6 +658,9 @@ public partial class MainWindow : Window
     private async Task LoadDocumentAsync(string markdown, string? path)
     {
         _suppressDirty = true;
+        // A new document invalidates any in-flight spell check — its results were
+        // computed against the OLD document and must never decorate this one.
+        _spellGeneration++;
         await ApplyDocBaseAsync(path);            // resolve relative images before render
         await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
         _currentPath = path;
@@ -626,6 +669,9 @@ public partial class MainWindow : Window
         await SetCleanBaselineAsync();
         SetClosed(false);
         StartWatching(path);
+        // setMarkdown doesn't surface as a 'change' message, so schedule explicitly —
+        // without this, a freshly opened document shows no squiggles until edited.
+        RequestSpellCheckSoon();
     }
 
     // Resolve relative image paths (e.g. docs/logo.png) against the open document's
@@ -1884,12 +1930,9 @@ public partial class MainWindow : Window
 
     private void SpellCheck_Click(object sender, RoutedEventArgs e)
     {
-        var on = MenuSpellCheck.IsChecked;
-        _spellCheck = on;
+        _spellCheck = MenuSpellCheck.IsChecked;
         SaveSettings();               // remember the choice across sessions
-        SourceBox.SpellCheck.IsEnabled = on;
-        if (_editorReady)
-            _ = RunEditorAsync($"window.MDM.setSpellcheck({(on ? "true" : "false")})");
+        RequestSpellCheckSoon();      // runs, or clears squiggles, per the new state
         RefocusEditor();
     }
 
@@ -1897,8 +1940,7 @@ public partial class MainWindow : Window
     {
         _skipCodeSpell = MenuSkipCodeSpell.IsChecked;
         SaveSettings();
-        if (_editorReady)
-            _ = RunEditorAsync($"window.MDM.setCodeSpellcheck({(_skipCodeSpell ? "true" : "false")})");
+        RequestSpellCheckSoon();
         RefocusEditor();
     }
 
@@ -2085,7 +2127,11 @@ public partial class MainWindow : Window
 
     private void Source_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_sourceMode) _ = UpdateDirtyAsync();
+        if (!_sourceMode) return;
+        _ = UpdateDirtyAsync();
+        foreach (var c in e.Changes)
+            _squiggles?.ShiftForEdit(c.Offset, c.AddedLength, c.RemovedLength);
+        RequestSpellCheckSoon();
     }
 
     private async Task UpdateDirtyAsync()

@@ -406,8 +406,13 @@ body {
 .mdm-prosemirror .token.important,
 .mdm-prosemirror .token.variable { color: #ebcb8b; }
 
-/* SPIKE: host-driven spell squiggles (Stage 1 proof) */
+/* Host-driven spell squiggles (the app's own engine; see spell-decorate.js). */
 .mdm-misspelled {
-  text-decoration: red wavy underline;
+  text-decoration: #e51d1d wavy underline;
   text-decoration-skip-ink: none;
+}
+
+/* Squiggles are an editing aid, never document content — keep them off paper. */
+@media print {
+  .mdm-misspelled { text-decoration: none; }
 }

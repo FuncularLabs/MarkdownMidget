@@ -170,14 +170,23 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 
 ## Spell check
 
+Markdown Midget runs its **own** spell checker (built on the Windows spelling
+engine) in both views, with a dictionary that is **private to the app** — adding
+a word never touches the Windows or Office custom dictionaries.
+
 **View ▸ Spell Check** (or the **abc** toggle at the right of the View toolbar)
 toggles the red squiggles in both views. Your choice is remembered between
 sessions.
 
-**View ▸ Skip Spell Check in Code** leaves code blocks and inline code
-un-checked while still spell-checking your prose — handy so identifiers, keywords
-and snippets don't get flagged. On by default; applies to the WYSIWYG view (the
-raw source view spell-checks all-or-nothing). Also remembered between sessions.
+**Right-click a squiggled word** for suggestions, **Add to Dictionary** (kept in
+the app's own word list at `%LocalAppData%\MarkdownMidget\dictionary.txt`), or
+**Ignore All** (this session only). Works the same in the WYSIWYG view and the
+raw source view.
+
+**View ▸ Skip Spell Check in Code** leaves fenced code blocks and inline code
+un-checked while still spell-checking your prose — so identifiers, keywords and
+snippets don't get flagged. On by default, applies to **both** views, and is
+remembered between sessions.
 
 ## Windows integration
 

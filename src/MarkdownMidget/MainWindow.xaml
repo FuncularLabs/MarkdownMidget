@@ -186,7 +186,7 @@
                                   IsCheckable="True" IsChecked="True" Click="SpellCheck_Click" />
                         <MenuItem x:Name="MenuSkipCodeSpell" Header="Skip Spell Check in _Code"
                                   IsCheckable="True" IsChecked="True" Click="SkipCodeSpell_Click"
-                                  ToolTip="Don't spell-check code blocks or inline code (WYSIWYG view)." />
+                                  ToolTip="Don't spell-check code blocks or inline code — in both the formatted and source views." />
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem x:Name="MenuViewHelp" Header="_View Help" InputGestureText="F1" Click="Help_Click" />
