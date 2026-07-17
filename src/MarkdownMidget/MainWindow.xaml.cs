@@ -66,7 +66,7 @@ public partial class MainWindow : Window
     // External-change tracking for the currently-open file.
     private FileSystemWatcher? _watcher;
     private bool _suppressWatcher;       // set true around our own writes
-    private bool _externalDialogOpen;    // re-entrancy guard
+    private bool _externalChangeBusy;    // re-entrancy guard: dialog OR auto-reload in flight
     private DateTime _lastWatcherFireUtc = DateTime.MinValue;
 
     public MainWindow()
@@ -787,7 +787,7 @@ public partial class MainWindow : Window
 
     private void OnWatcherEvent(object sender, FileSystemEventArgs e)
     {
-        if (_suppressWatcher || _externalDialogOpen) return;
+        if (_suppressWatcher || _externalChangeBusy) return;
         var now = DateTime.UtcNow;
         if ((now - _lastWatcherFireUtc).TotalMilliseconds < 400) return; // debounce duplicate events
         _lastWatcherFireUtc = now;
@@ -796,31 +796,48 @@ public partial class MainWindow : Window
 
     private async Task OnExternalChangeAsync(string fullPath)
     {
-        if (_externalDialogOpen || _currentPath is null) return;
+        if (_externalChangeBusy || _currentPath is null) return;
         if (!string.Equals(Path.GetFullPath(fullPath), Path.GetFullPath(_currentPath), StringComparison.OrdinalIgnoreCase))
             return;
 
-        // Wait briefly for the writer to finish flushing.
-        await Task.Delay(120);
+        _externalChangeBusy = true;
+        try
+        {
+            await HandleExternalChangeAsync();
+        }
+        finally { _externalChangeBusy = false; }
+    }
 
-        // Retry rather than trusting a later event to arrive: a writer holding the file
-        // for a moment used to mean the change was simply never picked up.
-        var newContent = await ReadWithRetryAsync(_currentPath);
+    private async Task HandleExternalChangeAsync()
+    {
+        if (_currentPath is null) return;
+
+        // Don't read until the writer has stopped changing the file: a program that
+        // truncates then streams lets a plain read succeed on half a document, and
+        // the reload would then make that half document the new baseline.
+        var newContent = await ReadWhenStableAsync(_currentPath);
         if (newContent is null) return;
+        if (_currentPath is null) return;                   // closed while we waited
 
         if (string.Equals(newContent, _cleanMarkdown, StringComparison.Ordinal)) return;
 
-        // Nothing is unsaved, so the in-memory copy IS the old disk version: there's
-        // nothing to lose, nothing worth backing up, and nothing to ask about. Reload
-        // in place and put the reader back on the topic they were reading.
-        if (_autoReload && !_dirty)
+        // Ask the editor what it actually holds rather than trusting `_dirty`, which
+        // is a debounced cache: ScheduleDirtyCheck() RESTARTS a 250ms timer on every
+        // keystroke, so during continuous typing it never fires and `_dirty` stays
+        // false for the whole burst. Believing it here would silently discard live
+        // edits — with no backup, since this path deliberately writes none.
+        var inMemory = await GetDocumentMarkdownAsync();
+        var hasUnsavedWork = !string.Equals(inMemory, _cleanMarkdown, StringComparison.Ordinal);
+
+        // Nothing unsaved: the in-memory copy IS the old disk version, so there's
+        // nothing to lose, nothing worth backing up, and nothing to ask about.
+        if (_autoReload && !hasUnsavedWork)
         {
             await ReloadPreservingPositionAsync(newContent);
             return;
         }
 
         // Save the current (possibly unsaved) in-memory version as a timestamped backup.
-        var inMemory = await GetDocumentMarkdownAsync();
         string backupPath;
         try { backupPath = WriteTimestampedBackup(_currentPath, inMemory); }
         catch (Exception ex)
@@ -830,41 +847,68 @@ public partial class MainWindow : Window
             return;
         }
 
-        _externalDialogOpen = true;
-        try
+        var dlg = new ExternalChangeDialog(Path.GetFileName(_currentPath), backupPath) { Owner = this };
+        dlg.ShowDialog();
+        switch (dlg.Choice)
         {
-            var dlg = new ExternalChangeDialog(Path.GetFileName(_currentPath), backupPath) { Owner = this };
-            dlg.ShowDialog();
-            switch (dlg.Choice)
-            {
-                case ExternalChangeChoice.Reload:
-                    await LoadDocumentAsync(newContent, _currentPath);
-                    break;
-                case ExternalChangeChoice.SaveAs:
-                    await HandleSaveAsAfterExternalChangeAsync(inMemory, newContent, backupPath);
-                    break;
-                case ExternalChangeChoice.Keep:
-                default:
-                    // Accept the disk content as the new baseline so dirty reflects "my
-                    // edits differ from disk"; the next Save will overwrite the disk.
-                    _cleanMarkdown = newContent;
-                    _ = UpdateDirtyAsync();
-                    break;
-            }
+            case ExternalChangeChoice.Reload:
+                await LoadDocumentAsync(newContent, _currentPath);
+                break;
+            case ExternalChangeChoice.SaveAs:
+                await HandleSaveAsAfterExternalChangeAsync(inMemory, newContent, backupPath);
+                break;
+            case ExternalChangeChoice.Keep:
+            default:
+                // Accept the disk content as the new baseline so dirty reflects "my
+                // edits differ from disk"; the next Save will overwrite the disk.
+                _cleanMarkdown = newContent;
+                _ = UpdateDirtyAsync();
+                break;
         }
-        finally { _externalDialogOpen = false; }
     }
 
-    /// <summary>Read a file a writer may still be holding, instead of giving up on it.</summary>
-    private static async Task<string?> ReadWithRetryAsync(string path)
+    /// <summary>
+    /// Read only once the file has stopped changing.
+    ///
+    /// Retrying on IOException isn't enough: a writer that truncates and then streams
+    /// leaves the file readable the whole time, so a plain read happily returns half a
+    /// document. Reloading that would make the truncated text the new baseline and the
+    /// next Save would write it over the good file. So sample size+timestamp until two
+    /// consecutive looks agree, and only then read.
+    /// </summary>
+    private static async Task<string?> ReadWhenStableAsync(string path)
     {
-        for (var attempt = 0; attempt < 6; attempt++)
+        long lastLen = -1;
+        var lastWrite = DateTime.MinValue;
+        for (var attempt = 0; attempt < 12; attempt++)
         {
-            try { return await File.ReadAllTextAsync(path); }
-            catch (IOException) { await Task.Delay(70); }   // locked mid-write — try again
-            catch { return null; }                          // gone or denied — nothing to do
+            try
+            {
+                var fi = new FileInfo(path);
+                if (!fi.Exists) return null;
+                if (fi.Length == lastLen && fi.LastWriteTimeUtc == lastWrite)
+                    return await File.ReadAllTextAsync(path);
+                lastLen = fi.Length;
+                lastWrite = fi.LastWriteTimeUtc;
+            }
+            catch (IOException) { /* locked mid-write — keep sampling */ }
+            catch { return null; }
+            await Task.Delay(80);
         }
-        return null;
+        try { return await File.ReadAllTextAsync(path); } catch { return null; }
+    }
+
+    /// <summary>Character index where a 0-based source line starts, or -1.</summary>
+    private static int CharIndexOfLine(string text, int line)
+    {
+        if (line <= 0) return 0;
+        var seen = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] != '\n') continue;
+            if (++seen == line) return Math.Min(i + 1, text.Length);
+        }
+        return -1;
     }
 
     // JS speaks camelCase; DocAnchor is PascalCase.
@@ -890,9 +934,18 @@ public partial class MainWindow : Window
     {
         if (_sourceMode)
         {
-            var first = SourceBox.GetFirstVisibleLineIndex();
-            var total = Math.Max(1, SourceBox.LineCount);
-            return ScrollAnchor.Capture(SourceBox.Text, first, (double)first / total);
+            // GetFirstVisibleLineIndex counts DISPLAY lines, which stop matching source
+            // lines as soon as word wrap is on — so convert through a character index
+            // rather than feeding a display index to ScrollAnchor's newline-based logic.
+            var firstDisplay = SourceBox.GetFirstVisibleLineIndex();
+            if (firstDisplay < 0) return null;   // no layout yet: no anchor beats a wrong one
+            var text = SourceBox.Text;
+            var charIndex = SourceBox.GetCharacterIndexFromLineIndex(firstDisplay);
+            if (charIndex < 0 || charIndex > text.Length) return null;
+            var sourceLine = 0;
+            for (var i = 0; i < charIndex; i++) if (text[i] == '\n') sourceLine++;
+            var ratio = text.Length == 0 ? 0 : (double)charIndex / text.Length;
+            return ScrollAnchor.Capture(text, sourceLine, ratio);
         }
         if (!_editorReady) return null;
         var json = await RunEditorAsync("JSON.stringify(window.MDM.getScrollAnchor())");
@@ -907,7 +960,17 @@ public partial class MainWindow : Window
         if (_sourceMode)
         {
             var line = ScrollAnchor.ResolveLine(SourceBox.Text, anchor);
-            if (line >= 0) SourceBox.ScrollToLine(Math.Clamp(line, 0, Math.Max(0, SourceBox.LineCount - 1)));
+            if (line < 0) return;
+            // ResolveLine returns a SOURCE line; ScrollToLine wants a DISPLAY line, and
+            // LineCount is -1 when layout info isn't available — in which case clamping
+            // would hand ScrollToLine a bad index and it throws (on an async void path,
+            // so it would take the process down). Skip instead.
+            var lineCount = SourceBox.LineCount;
+            if (lineCount <= 0) return;
+            var charIndex = CharIndexOfLine(SourceBox.Text, line);
+            var display = charIndex >= 0 ? SourceBox.GetLineIndexFromCharacterIndex(charIndex) : line;
+            if (display < 0) return;
+            SourceBox.ScrollToLine(Math.Clamp(display, 0, lineCount - 1));
             return;
         }
         if (!_editorReady) return;
