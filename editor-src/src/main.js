@@ -20,6 +20,7 @@ import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { mermaidBlock } from './mermaid.js';
 import { codeSpellcheck, setCodeSpellcheck as setCodeSpell } from './code-spellcheck.js';
+import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
@@ -441,6 +442,10 @@ const MDM = {
       base.remove();
     }
   },
+
+  // Reading position as a topic, for surviving an external rewrite of the file.
+  getScrollAnchor() { return getScrollAnchor(); },
+  restoreScrollAnchor(a) { return restoreScrollAnchor(a); },
 
   // skip=true → code_block + inlineCode get spellcheck="false" (prose still checked).
   setCodeSpellcheck(skip) {

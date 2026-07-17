@@ -90,6 +90,8 @@ public partial class MainWindow : Window
         MenuWordWrap.IsChecked = _wordWrap;
         ApplyWordWrap();
         UpdateWrapToggleUi();
+        MenuAutoReload.IsChecked = _autoReload;
+        _noteTimer.Tick += (_, _) => { _noteTimer.Stop(); StatusNote.Text = string.Empty; };
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         for (var i = 0; i < args.Length; i++)
@@ -801,11 +803,21 @@ public partial class MainWindow : Window
         // Wait briefly for the writer to finish flushing.
         await Task.Delay(120);
 
-        string newContent;
-        try { newContent = await File.ReadAllTextAsync(_currentPath); }
-        catch { return; /* file locked; another event will re-fire */ }
+        // Retry rather than trusting a later event to arrive: a writer holding the file
+        // for a moment used to mean the change was simply never picked up.
+        var newContent = await ReadWithRetryAsync(_currentPath);
+        if (newContent is null) return;
 
         if (string.Equals(newContent, _cleanMarkdown, StringComparison.Ordinal)) return;
+
+        // Nothing is unsaved, so the in-memory copy IS the old disk version: there's
+        // nothing to lose, nothing worth backing up, and nothing to ask about. Reload
+        // in place and put the reader back on the topic they were reading.
+        if (_autoReload && !_dirty)
+        {
+            await ReloadPreservingPositionAsync(newContent);
+            return;
+        }
 
         // Save the current (possibly unsaved) in-memory version as a timestamped backup.
         var inMemory = await GetDocumentMarkdownAsync();
@@ -841,6 +853,66 @@ public partial class MainWindow : Window
             }
         }
         finally { _externalDialogOpen = false; }
+    }
+
+    /// <summary>Read a file a writer may still be holding, instead of giving up on it.</summary>
+    private static async Task<string?> ReadWithRetryAsync(string path)
+    {
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            try { return await File.ReadAllTextAsync(path); }
+            catch (IOException) { await Task.Delay(70); }   // locked mid-write — try again
+            catch { return null; }                          // gone or denied — nothing to do
+        }
+        return null;
+    }
+
+    // JS speaks camelCase; DocAnchor is PascalCase.
+    private static readonly JsonSerializerOptions AnchorJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+    };
+
+    /// <summary>
+    /// Swap in the new content without the reader losing their place. Only ever called
+    /// when nothing is unsaved (see OnExternalChangeAsync).
+    /// </summary>
+    private async Task ReloadPreservingPositionAsync(string newContent)
+    {
+        var anchor = await CaptureAnchorAsync();
+        await LoadDocumentAsync(newContent, _currentPath);
+        await RestoreAnchorAsync(anchor);
+        FlashStatus("Reloaded — file changed on disk");
+    }
+
+    private async Task<DocAnchor?> CaptureAnchorAsync()
+    {
+        if (_sourceMode)
+        {
+            var first = SourceBox.GetFirstVisibleLineIndex();
+            var total = Math.Max(1, SourceBox.LineCount);
+            return ScrollAnchor.Capture(SourceBox.Text, first, (double)first / total);
+        }
+        if (!_editorReady) return null;
+        var json = await RunEditorAsync("JSON.stringify(window.MDM.getScrollAnchor())");
+        if (string.IsNullOrEmpty(json)) return null;
+        try { return JsonSerializer.Deserialize<DocAnchor>(json, AnchorJson); }
+        catch { return null; }
+    }
+
+    private async Task RestoreAnchorAsync(DocAnchor? anchor)
+    {
+        if (anchor is null) return;
+        if (_sourceMode)
+        {
+            var line = ScrollAnchor.ResolveLine(SourceBox.Text, anchor);
+            if (line >= 0) SourceBox.ScrollToLine(Math.Clamp(line, 0, Math.Max(0, SourceBox.LineCount - 1)));
+            return;
+        }
+        if (!_editorReady) return;
+        var json = JsonSerializer.Serialize(anchor, AnchorJson);
+        await RunEditorAsync($"window.MDM.restoreScrollAnchor({json})");
     }
 
     private static string WriteTimestampedBackup(string originalPath, string content)
@@ -1334,11 +1406,13 @@ public partial class MainWindow : Window
         public bool SpellCheck { get; set; } = true;
         public bool SkipCodeSpellCheck { get; set; } = true;
         public bool WordWrap { get; set; } // source-view line wrapping; off = horizontal scroll
+        public bool AutoReload { get; set; } = true; // silently reload externally-changed files when nothing is unsaved
     }
 
     private bool _spellCheck = true;         // persisted; applied on editor-ready
     private bool _skipCodeSpell = true;      // persisted; exempt code from spell check
     private bool _wordWrap;                  // persisted; wrap long lines in the source view
+    private bool _autoReload = true;         // persisted; see OnExternalChangeAsync
 
     private sealed class PrintPrefs
     {
@@ -1378,6 +1452,7 @@ public partial class MainWindow : Window
             _spellCheck = s.SpellCheck;
             _skipCodeSpell = s.SkipCodeSpellCheck;
             _wordWrap = s.WordWrap;
+            _autoReload = s.AutoReload;
         }
         catch { /* defaults are fine */ }
     }
@@ -1394,6 +1469,7 @@ public partial class MainWindow : Window
                 SpellCheck = _spellCheck,
                 SkipCodeSpellCheck = _skipCodeSpell,
                 WordWrap = _wordWrap,
+                AutoReload = _autoReload,
             }));
         }
         catch { /* best-effort */ }
@@ -1679,6 +1755,23 @@ public partial class MainWindow : Window
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setCodeSpellcheck({(_skipCodeSpell ? "true" : "false")})");
         RefocusEditor();
+    }
+
+    private void AutoReload_Click(object sender, RoutedEventArgs e)
+    {
+        _autoReload = MenuAutoReload.IsChecked;
+        SaveSettings();
+    }
+
+    // A transient status-bar note. Silently swapping the document under the reader
+    // would feel like a glitch; this says what happened without stealing focus.
+    private readonly DispatcherTimer _noteTimer = new() { Interval = TimeSpan.FromSeconds(4) };
+
+    private void FlashStatus(string message)
+    {
+        StatusNote.Text = message;
+        _noteTimer.Stop();
+        _noteTimer.Start();
     }
 
     private void WordWrap_Click(object sender, RoutedEventArgs e) =>

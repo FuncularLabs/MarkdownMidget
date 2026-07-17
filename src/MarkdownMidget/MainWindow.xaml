@@ -169,6 +169,10 @@
                                   IsCheckable="True" Click="WordWrap_Click"
                                   ToolTip="Wrap long lines in the markdown source view instead of scrolling horizontally." />
                         <Separator />
+                        <MenuItem x:Name="MenuAutoReload" Header="Auto-_reload changed files"
+                                  IsCheckable="True" IsChecked="True" Click="AutoReload_Click"
+                                  ToolTip="When another program rewrites the open file, reload it automatically and keep your place. Never applies while you have unsaved changes — those always prompt." />
+                        <Separator />
                         <MenuItem Header="Document _Width">
                             <MenuItem x:Name="PageWidthPortrait" Header="_Portrait" IsCheckable="True"
                                       Tag="portrait" Click="PageWidth_Click" />
@@ -303,6 +307,9 @@
             <Separator />
             <StatusBarItem>
                 <TextBlock x:Name="StatusFile" Text="Untitled" />
+            </StatusBarItem>
+            <StatusBarItem>
+                <TextBlock x:Name="StatusNote" Text="" Foreground="#FF3B6EA5" />
             </StatusBarItem>
             <StatusBarItem DockPanel.Dock="Right">
                 <TextBlock x:Name="StatusZoom" Text="100%" ToolTip="Zoom (Ctrl+scroll). Click to reset."

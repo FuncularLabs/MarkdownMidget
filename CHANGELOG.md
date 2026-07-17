@@ -9,6 +9,35 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Auto-reload changed files** (View ▸ Auto-reload changed files, on by default).
+  When another program rewrites the open document — an AI tool regenerating it, a
+  build step, a `git pull` — Markdown Midget now reloads it silently and **keeps
+  your place by topic**, instead of interrupting with a dialog. A brief status note
+  says what happened. Previously *every* external change wrote a timestamped `.bak`
+  and demanded a click, even when you had nothing unsaved and the backup was a
+  byte-for-byte copy of the file it was "protecting".
+  - **Your place is remembered as a topic, not a line number**, because a
+    regenerated document shifts every line. It re-finds the heading you were under
+    (disambiguating repeated headings), refines to the exact line when that line
+    survived, and falls back to a proportional position only when nothing
+    recognizable remains. Works in both the WYSIWYG and source views.
+  - **Unsaved changes are never silently replaced.** The auto-reload only ever
+    happens when nothing is unsaved; if you have edits, you still get the backup and
+    the prompt exactly as before. No setting can override that.
+  - Turn the setting off to get the old always-prompt behavior back.
+- **Word-wrap toolbar button** for the source view (View toolbar), disabled and
+  showing "off" in the WYSIWYG view where wrapping doesn't apply.
+
+### Changed
+- The source → formatted toggle tooltip now reads **"Switch to formatted / WYSIWYG
+  view"**, so the destination is unambiguous.
+
+### Fixed
+- **An externally changed file could be missed entirely** if the writing program
+  still held the file when we tried to read it: the read failed and we relied on
+  another filesystem event that might never arrive. It now retries.
+
 ## [0.4.1] – 2026-07-15
 
 Small feature release on top of 0.4.0, and the first to drop the prerelease flag
