@@ -67,7 +67,6 @@ public partial class MainWindow : Window
     private FileSystemWatcher? _watcher;
     private bool _suppressWatcher;       // set true around our own writes
     private bool _externalChangeBusy;    // re-entrancy guard: dialog OR auto-reload in flight
-    private DateTime _lastWatcherFireUtc = DateTime.MinValue;
 
     public MainWindow()
     {
@@ -92,6 +91,7 @@ public partial class MainWindow : Window
         UpdateWrapToggleUi();
         MenuAutoReload.IsChecked = _autoReload;
         _noteTimer.Tick += (_, _) => { _noteTimer.Stop(); StatusNote.Text = string.Empty; };
+        _externalChangeTimer.Tick += async (_, _) => await OnExternalChangeTimerAsync();
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         for (var i = 0; i < args.Length; i++)
@@ -796,45 +796,62 @@ public partial class MainWindow : Window
         _watcher = null;
     }
 
-    private bool _missedWhileBusy;   // a watcher event we dropped while a pass was running
+    // External-change intake. Everything below `OnWatcherEvent` runs on the UI thread
+    // only, so no flag can race between the FileSystemWatcher threadpool and the
+    // dispatcher. Events are never dropped: each one records the LATEST changed path,
+    // and a short quiet timer (which also coalesces save bursts) runs the pass. A pass
+    // that ends with another event pending reschedules itself with the CURRENT pending
+    // path — never the path it started with, which may be stale by then.
+    private string? _pendingExternalChange;                     // UI-thread only
+    private readonly DispatcherTimer _externalChangeTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
 
     private void OnWatcherEvent(object sender, FileSystemEventArgs e)
     {
         if (_suppressWatcher) return;
-        // Don't silently drop events that arrive mid-pass: the writer's LAST write can
-        // land here, and losing it would strand us on a stale (or truncated) document
-        // that we'd believe is clean. Remember it and re-check when the pass ends.
-        if (_externalChangeBusy) { _missedWhileBusy = true; return; }
-        var now = DateTime.UtcNow;
-        if ((now - _lastWatcherFireUtc).TotalMilliseconds < 400) return; // debounce duplicate events
-        _lastWatcherFireUtc = now;
-        Dispatcher.BeginInvoke(new Action(async () => await OnExternalChangeAsync(e.FullPath)));
+        _ = Dispatcher.BeginInvoke(new Action(() => NoteExternalChange(e.FullPath)));
     }
 
-    private async Task OnExternalChangeAsync(string fullPath)
+    private void NoteExternalChange(string fullPath)
     {
-        if (_externalChangeBusy || _currentPath is null) return;
+        _pendingExternalChange = fullPath;
+        if (_externalChangeBusy) return;   // the running pass reschedules us when it ends
+        _externalChangeTimer.Stop();
+        _externalChangeTimer.Start();      // wait for a quiet moment, coalescing bursts
+    }
+
+    private async Task OnExternalChangeTimerAsync()
+    {
+        _externalChangeTimer.Stop();
+        var fullPath = _pendingExternalChange;
+        _pendingExternalChange = null;
+        if (fullPath is null || _externalChangeBusy || _currentPath is null) return;
+
         // Pin the document this pass is about. _currentPath can change under our awaits
         // (the user opens something else), and everything below must refuse to act on a
         // document it wasn't started for.
         var path = _currentPath;
-        if (!string.Equals(Path.GetFullPath(fullPath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
-            return;
-
-        _externalChangeBusy = true;
-        try
+        if (string.Equals(Path.GetFullPath(fullPath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
         {
-            await HandleExternalChangeAsync(path);
+            _externalChangeBusy = true;
+            try
+            {
+                await HandleExternalChangeAsync(path);
+            }
+            finally { _externalChangeBusy = false; }
         }
-        finally { _externalChangeBusy = false; }
 
-        if (_missedWhileBusy)
+        // Anything that arrived while we were busy (or a path mismatch above) gets a
+        // fresh look — against whatever document is open THEN, not the one we pinned.
+        if (_pendingExternalChange is not null)
         {
-            _missedWhileBusy = false;
-            _lastWatcherFireUtc = DateTime.MinValue;   // don't let the debounce eat the retry
-            Dispatcher.BeginInvoke(new Action(async () => await OnExternalChangeAsync(fullPath)));
+            _externalChangeTimer.Stop();
+            _externalChangeTimer.Start();
         }
     }
+
+    /// <summary>Queue another look at the file through the normal intake, so an
+    /// aborted pass is retried against the CURRENT document state, not acted on stale.</summary>
+    private void RecheckExternalChange(string path) => NoteExternalChange(path);
 
     /// <summary>True while <paramref name="path"/> is still the open document.</summary>
     private bool StillEditing(string path) =>
@@ -843,15 +860,23 @@ public partial class MainWindow : Window
 
     private async Task HandleExternalChangeAsync(string path)
     {
+        // Pin the baseline as well as the path. A Save or Load mid-pass reassigns
+        // _cleanMarkdown (always to a fresh string instance, even for identical text),
+        // so a reference check detects ANY baseline movement — without it, a user Save
+        // that lands during our awaits reads as "nothing to lose" and the pass would
+        // quietly revert the just-saved document to the stale disk content it read.
+        var cleanAtStart = _cleanMarkdown;
+        bool PassValid() => StillEditing(path) && ReferenceEquals(_cleanMarkdown, cleanAtStart);
+
         // Don't read until the writer has stopped changing the file: a program that
         // truncates then streams lets a plain read succeed on half a document, and
         // the reload would then make that half document the new baseline.
         var newContent = await ReadWhenStableAsync(path);
         if (newContent is null) return;
-        // Re-assert identity after EVERY await, not just null: if the user opened another
-        // document while we waited, acting now would pour this file's content into that
-        // one — and the freshness check below would cheerfully call it "nothing to lose".
-        if (!StillEditing(path)) return;
+        // Re-assert identity + freshness after EVERY await: if the user opened another
+        // document or saved while we waited, acting now would clobber it — and the
+        // unsaved-work check below would cheerfully call it "nothing to lose".
+        if (!PassValid()) { RecheckExternalChange(path); return; }
 
         if (string.Equals(newContent, _cleanMarkdown, StringComparison.Ordinal)) return;
 
@@ -862,13 +887,24 @@ public partial class MainWindow : Window
         // edits — with no backup, since this path deliberately writes none.
         var inMemory = await TryGetDocumentMarkdownAsync();
         if (inMemory is null) return;                       // couldn't ask; don't guess
-        if (!StillEditing(path)) return;
+        if (!PassValid()) { RecheckExternalChange(path); return; }
         var hasUnsavedWork = !string.Equals(inMemory, _cleanMarkdown, StringComparison.Ordinal);
 
         // Nothing unsaved: the in-memory copy IS the old disk version, so there's
         // nothing to lose, nothing worth backing up, and nothing to ask about.
         if (_autoReload && !hasUnsavedWork)
         {
+            // Last look at the disk right before acting: if the file moved again after
+            // our stable read (or a mid-pass save rewrote it), newContent is stale —
+            // reload nothing, and let the recheck run against the current state.
+            string? confirm;
+            try { confirm = await File.ReadAllTextAsync(path); }
+            catch { RecheckExternalChange(path); return; }
+            if (!PassValid() || !string.Equals(confirm, newContent, StringComparison.Ordinal))
+            {
+                RecheckExternalChange(path);
+                return;
+            }
             await ReloadPreservingPositionAsync(path, newContent);
             return;
         }
@@ -886,6 +922,7 @@ public partial class MainWindow : Window
         var dlg = new ExternalChangeDialog(Path.GetFileName(path), backupPath) { Owner = this };
         dlg.ShowDialog();
         if (!StillEditing(path)) return;   // the modal pumps messages; don't act on a swapped document
+
         switch (dlg.Choice)
         {
             case ExternalChangeChoice.Reload:
