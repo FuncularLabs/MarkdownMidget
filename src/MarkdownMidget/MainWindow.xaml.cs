@@ -93,6 +93,9 @@ public partial class MainWindow : Window
         UpdateWrapToggleUi();
         MenuAutoReload.IsChecked = _autoReload;
         _noteTimer.Tick += (_, _) => { _noteTimer.Stop(); StatusNote.Text = string.Empty; };
+
+        Updates.UpdateService.CleanupOldBinaries();
+        _ = NotifyIfUpdateAvailableAsync();
         _externalChangeTimer.Tick += async (_, _) => await OnExternalChangeTimerAsync();
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
@@ -2112,9 +2115,26 @@ public partial class MainWindow : Window
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show(
-            "Markdown Midget\nA WYSIWYG markdown editor.\n\nMarkdown is the native format.",
-            "About Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+        new AboutDialog { Owner = this }.ShowDialog();
+    }
+
+    // Quiet startup check: a status note, never a dialog. Prereleases are only
+    // suggested to users already running a prerelease.
+    private async Task NotifyIfUpdateAvailableAsync()
+    {
+        try
+        {
+            var current = Updates.UpdateVersion.Parse(AppVersion);
+            if (current is null) return;
+            var check = await Updates.UpdateService.CheckAsync();
+            if (check is null) return;
+            var stableNewer = check.Stable is not null && check.Stable.Version.CompareTo(current) > 0;
+            var preNewer = current.IsPrerelease &&
+                check.PrereleaseRelease is not null && check.PrereleaseRelease.Version.CompareTo(current) > 0;
+            if (stableNewer || preNewer)
+                FlashStatus("Update available — Help ▸ About");
+        }
+        catch { /* purely advisory */ }
     }
 
     // ===== Dirty tracking (content vs. last opened/saved markdown) =====

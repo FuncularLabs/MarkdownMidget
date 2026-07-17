@@ -1,0 +1,57 @@
+<Window x:Class="MarkdownMidget.AboutDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About Markdown Midget"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="24,20,24,18" Width="380">
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Image Source="/Assets/midget-256.png" Width="56" Height="56"
+                   RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
+            <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="Markdown Midget" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock x:Name="CurrentVersionText" Text="Version —" Foreground="#FF5B6570" Margin="0,2,0,0" />
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Margin="0,0,0,2">
+            <Run Text="©" /> <Run x:Name="CopyrightYear" Text="2026" />
+            <Hyperlink x:Name="CompanyLink" RequestNavigate="Link_RequestNavigate"
+                       NavigateUri="https://github.com/FuncularLabs">Funcular Labs, Inc.</Hyperlink>
+        </TextBlock>
+        <TextBlock Margin="0,0,0,10">
+            <Run Text="Released under the" />
+            <Hyperlink RequestNavigate="Link_RequestNavigate"
+                       NavigateUri="https://github.com/FuncularLabs/MarkdownMidget/blob/master/LICENSE">MIT License</Hyperlink><Run Text="." />
+        </TextBlock>
+
+        <Separator Margin="0,2,0,10" />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="StableText" Grid.Row="0" Grid.Column="0" Margin="0,0,10,6"
+                       VerticalAlignment="Center" Text="Newest release: checking…" />
+            <Button x:Name="StableUpdateBtn" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6"
+                    Padding="12,3" Visibility="Collapsed" Click="StableUpdate_Click">Update</Button>
+            <TextBlock x:Name="PreText" Grid.Row="1" Grid.Column="0" Margin="0,0,10,0"
+                       VerticalAlignment="Center" Text="Newest prerelease: checking…" />
+            <Button x:Name="PreUpdateBtn" Grid.Row="1" Grid.Column="1"
+                    Padding="12,3" Visibility="Collapsed" Click="PreUpdate_Click">Update (prerelease)</Button>
+        </Grid>
+
+        <TextBlock x:Name="StatusText" Margin="0,10,0,0" Foreground="#FF3B6EA5"
+                   TextWrapping="Wrap" Visibility="Collapsed" />
+        <ProgressBar x:Name="Progress" Height="6" Margin="0,8,0,0"
+                     IsIndeterminate="True" Visibility="Collapsed" />
+
+        <Button Content="Close" HorizontalAlignment="Right" Margin="0,14,0,0"
+                Padding="16,3" IsCancel="True" />
+    </StackPanel>
+</Window>

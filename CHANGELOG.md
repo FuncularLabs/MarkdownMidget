@@ -9,6 +9,32 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.0-beta1] – 2026-07-17
+
+### Added
+- **In-app updates** (Help ▸ About Markdown Midget). The About box now shows the
+  running version plus the newest available **release** and **prerelease** —
+  listed separately so choosing an early build is always an informed choice —
+  with one-click **Update** buttons when something newer exists.
+  - **Installed** copies (the *Register as .md editor* AppData install) update in
+    place: the exe is swapped, shortcuts and the Open-with registration are
+    refreshed, and the app restarts.
+  - **Portable** copies stay portable: the new version downloads into the same
+    folder the current exe runs from and starts; nothing else on the machine is
+    touched, and the old exe remains as a file you can delete.
+  - **Every download is signature-checked** (full Authenticode verification, and
+    the signer must be Funcular Labs) before it is started or installed — a
+    corrupted or tampered download is refused outright.
+  - A quiet **"Update available"** status-bar note appears at startup when a
+    newer version exists (prereleases only suggested to prerelease users).
+- The About box also gains the identity it always should have had: **© Funcular
+  Labs, Inc.** (linking to the company GitHub), an **MIT License** link, and the
+  current version with its install shape (installed vs portable).
+
+### Notes
+- The ROADMAP gains a **real installer/uninstaller** entry (MSI/MSIX, Someday) —
+  the in-app updater is the bridge until that lands.
+
 ## [0.5.1] – 2026-07-17
 
 Stable promotion of **0.5.0-beta1** after dogfooding — same content, prerelease
@@ -420,7 +446,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.0-beta1...HEAD
+[0.6.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta1
 [0.5.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.1
 [0.5.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.0-beta1
 [0.4.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.4.1

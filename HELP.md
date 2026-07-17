@@ -259,6 +259,26 @@ line with `--readonly`.
   editor, so **Save** will prompt for a location. You can also pass a file path
   (and optional `--readonly`) on the command line.
 
+## Updates
+
+**Help ▸ About Markdown Midget** shows the version you're running and the newest
+available versions — the newest **release** and the newest **prerelease** are
+listed separately, so you can knowingly opt into early builds. When something
+newer than your version exists, an **Update** button appears:
+
+- **Installed** (you used *Register as .md editor* with the AppData install):
+  the installed copy is replaced in place, shortcuts and the Open-with
+  registration are refreshed, and the app restarts.
+- **Portable** (running the exe from anywhere else): the new version is
+  downloaded into the same folder and started; your current exe is left behind
+  as a file you can delete.
+
+Every downloaded update must carry a valid **Funcular Labs Authenticode
+signature** before it is started or installed — a corrupted or tampered download
+is refused. A quiet "Update available" note also appears in the status bar at
+startup when a newer version exists (prereleases are only suggested if you're
+already running one).
+
 ## Distribution
 
 Markdown Midget ships as a single `.exe`. A self-contained build needs nothing
