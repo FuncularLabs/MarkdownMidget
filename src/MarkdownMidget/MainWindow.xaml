@@ -266,6 +266,9 @@
                         <ToggleButton x:Name="SourceToggle" Style="{StaticResource ToolGlyph}"
                                       ToolTip="Edit markdown source (Ctrl+E)"
                                       Click="ToggleSource_Click" />
+                        <ToggleButton x:Name="WrapToggle" Style="{StaticResource ToolGlyph}"
+                                      ToolTip="Word wrap (source view only)"
+                                      Click="WordWrapButton_Click" Content="&#xE751;" />
                         <ToggleButton x:Name="MarksToggle" Style="{StaticResource ToolChar}"
                                       ToolTip="Show formatting marks (¶)"
                                       Click="ToggleMarks_Click" FontSize="15" Content="&#xB6;" />

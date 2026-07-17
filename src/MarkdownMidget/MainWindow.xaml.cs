@@ -85,9 +85,11 @@ public partial class MainWindow : Window
         MenuSkipCodeSpell.IsChecked = _skipCodeSpell;
         SourceBox.SpellCheck.IsEnabled = _spellCheck;
 
-        // Apply the persisted source-view word-wrap state.
+        // Apply the persisted source-view word-wrap state (starts in WYSIWYG, so the
+        // toolbar button starts disabled/off).
         MenuWordWrap.IsChecked = _wordWrap;
         ApplyWordWrap();
+        UpdateWrapToggleUi();
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         for (var i = 0; i < args.Length; i++)
@@ -533,11 +535,14 @@ public partial class MainWindow : Window
         StatusMode.Text = on ? "Markdown source" : "WYSIWYG";
 
         // The button shows the view it switches TO: in source mode show the
-        // document glyph (-> formatted); in WYSIWYG show braces (-> source).
+        // rendered-content glyph (-> formatted); in WYSIWYG show braces (-> source).
         SourceToggle.Content = on ? GlyphRich : GlyphSource;
         SourceToggle.ToolTip = on
-            ? "Switch to formatted view (Ctrl+E)"
+            ? "Switch to formatted / WYSIWYG view (Ctrl+E)"
             : "Edit markdown source (Ctrl+E)";
+
+        // Word wrap applies to the source view only.
+        UpdateWrapToggleUi();
 
         if (on) SetUndoRedoEnabled(true, true); // the source TextBox manages its own undo
         RefocusEditor();
@@ -1676,10 +1681,19 @@ public partial class MainWindow : Window
         RefocusEditor();
     }
 
-    private void WordWrap_Click(object sender, RoutedEventArgs e)
+    private void WordWrap_Click(object sender, RoutedEventArgs e) =>
+        SetWordWrap(MenuWordWrap.IsChecked);
+
+    private void WordWrapButton_Click(object sender, RoutedEventArgs e) =>
+        SetWordWrap(WrapToggle.IsChecked == true);
+
+    // Single entry point so the View menu item and the toolbar button can't drift.
+    private void SetWordWrap(bool on)
     {
-        _wordWrap = MenuWordWrap.IsChecked;
+        _wordWrap = on;
+        MenuWordWrap.IsChecked = on;
         ApplyWordWrap();
+        UpdateWrapToggleUi();
         SaveSettings();               // remember the choice across sessions
         if (_sourceMode) SourceBox.Focus();
     }
@@ -1691,6 +1705,16 @@ public partial class MainWindow : Window
         SourceBox.TextWrapping = _wordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
         SourceBox.HorizontalScrollBarVisibility =
             _wordWrap ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+    }
+
+    // Word wrap only means anything in the source view, so the toolbar button is
+    // disabled and reads "off" in WYSIWYG (which always reflows). The persisted
+    // preference is untouched — the View menu still shows it — so switching back to
+    // source restores the button to the real setting.
+    private void UpdateWrapToggleUi()
+    {
+        WrapToggle.IsEnabled = _sourceMode;
+        WrapToggle.IsChecked = _sourceMode && _wordWrap;
     }
 
     // ===== Drag & drop: open in this instance if idle, else launch a new one =====
