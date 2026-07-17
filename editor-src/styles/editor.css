@@ -405,3 +405,9 @@ body {
 .mdm-prosemirror .token.regex,
 .mdm-prosemirror .token.important,
 .mdm-prosemirror .token.variable { color: #ebcb8b; }
+
+/* SPIKE: host-driven spell squiggles (Stage 1 proof) */
+.mdm-misspelled {
+  text-decoration: red wavy underline;
+  text-decoration-skip-ink: none;
+}

@@ -20,6 +20,7 @@ import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { mermaidBlock } from './mermaid.js';
 import { codeSpellcheck, setCodeSpellcheck as setCodeSpell } from './code-spellcheck.js';
+import { spellDecorate, setSpellRanges, beginSpellCheck } from './spell-decorate.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
@@ -371,6 +372,7 @@ const MDM = {
       .use(tableCellEditing)
       .use(mermaidBlock)
       .use(codeSpellcheck)
+      .use(spellDecorate)
       .use(splitHeadingCommand)
       .use(headingEnterKeymap)
       .use(exitBlockCommand)
@@ -446,6 +448,14 @@ const MDM = {
   setCodeSpellcheck(skip) {
     if (editorView) setCodeSpell(editorView, skip);
   },
+
+  // TEMP (spell-check spike): expose the live EditorView so the position-mapping
+  // experiment can run against a real document. Revert before shipping.
+  __view() { return editorView; },
+
+  // TEMP (spike): host-supplied misspelling ranges (ProseMirror positions).
+  __setSpellRanges(ranges) { if (editorView) setSpellRanges(editorView, ranges); },
+  __beginSpellCheck() { beginSpellCheck(); },
 
   // Read-only: ProseMirror stops accepting edits and the caret/handles disappear.
   setEditable(on) {
