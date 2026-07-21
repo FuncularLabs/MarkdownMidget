@@ -14,14 +14,43 @@ deliberately parked).
 
 ### Real installer / uninstaller
 
-A proper signed installer (MSI or MSIX) and an Add/Remove-Programs-visible
-uninstaller, replacing the current portable-exe + "Register as .md editor"
-AppData-install flow. Candidates: WiX (MSI, full control), MSIX (store-style
-servicing, but packaging constraints on WebView2/file-association UX). The
-in-app updater (Help ▸ About, 0.6.0) covers keeping users current until this
-lands; the installer should absorb the updater's swap/registration logic rather
-than duplicate it. Not started — parked deliberately until the update flow has
-proven itself in the wild.
+A proper signed installer that behaves like software users expect on Windows —
+**not** the current one-off "Register as .md editor" AppData-copy flow.
+
+**Hard requirements (from user feedback):**
+
+1. **Shows up in Add/Remove Programs** (`appwiz.cpl` / Settings ▸ Apps &
+   Features) with a real entry — name, publisher (Funcular Labs, Inc.), version,
+   size, icon — and a working **Uninstall** that cleans up the exe, shortcuts,
+   the `.md` file association/ProgID, and (with confirmation) user data. The
+   custom register/unregister dialogs don't satisfy this; users expect the OS
+   uninstall UI. This is the ARP `Uninstall` registry key
+   (`HKCU\…\Uninstall\MarkdownMidget` for per-user, or `HKLM` for machine-wide)
+   that MSI/MSIX populate automatically.
+2. **Portable stays a first-class option.** The plain single-file exe must remain
+   downloadable from the GitHub releases page and fully usable with **no
+   installer** — run-from-anywhere, no ARP entry, no registry footprint beyond
+   what the user opts into via *Register as .md editor*. We ship BOTH: an
+   installer artifact AND the bare exe. Nobody is forced through the installer.
+
+**Approach candidates:** WiX (MSI — full control over ARP, associations,
+per-user vs per-machine, upgrade codes) vs MSIX (store-style servicing + clean
+uninstall, but packaging constraints around WebView2 and the file-association /
+"Open with default" UX are worth a spike before committing). Either way the
+release workflow gains a second artifact alongside the portable exe, and both
+must be Authenticode-signed.
+
+**Interplay with the in-app updater (Help ▸ About, 0.6.0):** the updater is the
+bridge until this lands, and afterward the two must not fight. An installed
+(MSI/MSIX) copy should update through the installer's own servicing channel (or
+the updater should detect the MSI/MSIX install and hand off / no-op), while the
+portable copy keeps using the in-app updater's swap. Detecting "how was I
+installed?" is part of this work. Share the swap/registration logic rather than
+duplicating it.
+
+Not started — parked deliberately until the update flow has proven itself in the
+wild. Likely wants its own de-risk spike (MSIX + WebView2 + file associations)
+before scoping.
 
 ### Multi-document tabs
 
