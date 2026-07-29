@@ -31,6 +31,12 @@
 
         <!-- Native editor context menus (shown on right-click / Menu key in WYSIWYG). -->
         <ContextMenu x:Key="TableContextMenu" Opened="ContextMenu_Opened">
+            <!-- Filled in and revealed when the click landed on a misspelling, so a
+                 squiggle inside a cell keeps its spelling actions without costing
+                 the table commands. Tag identifies it (resource menus can't use
+                 x:Name fields). -->
+            <MenuItem Header="Spellin_g" Tag="spellRoot" Visibility="Collapsed" />
+            <Separator Tag="spellSep" Visibility="Collapsed" />
             <MenuItem Header="_Insert">
                 <MenuItem Header="Column _Left" Tag="colLeft" Click="TableCmd_Click" />
                 <MenuItem Header="Column _Right" Tag="colRight" Click="TableCmd_Click" />

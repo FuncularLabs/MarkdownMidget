@@ -22,6 +22,7 @@ import { mermaidBlock } from './mermaid.js';
 import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
 import { spellDecorate, setSpellRanges, beginSpellCheck, misspellingAt } from './spell-decorate.js';
 import { extractSpellText } from './spell-extract.js';
+import { SEPARATOR } from './spell-separator.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
@@ -265,7 +266,34 @@ function imageInfo(img) {
   return { curW, curH, natW, natH };
 }
 
+// The misspelling under the pointer, or null. `before` carries the text leading
+// up to it so the host can tell a genuine misspelling from a context-only error
+// (a repeated word) without a second round-trip.
+function spellAt(view, clientX, clientY) {
+  try {
+    const hit = view.posAtCoords({ left: clientX, top: clientY });
+    if (!hit) return null;
+    const r = misspellingAt(view.state, hit.pos);
+    if (!r) return null;
+    return {
+      from: r.from,
+      to: r.to,
+      word: view.state.doc.textBetween(r.from, r.to),
+      before: view.state.doc.textBetween(Math.max(0, r.from - 60), r.from, ' '),
+    };
+  } catch (_) {
+    return null;   // no spell info is fine
+  }
+}
+
 function requestContextMenu(view, clientX, clientY, img) {
+  // Spelling info rides along with WHATEVER menu the click warrants — it must not
+  // pick the menu. Letting a misspelling win outright cost the table its
+  // insert/delete/select commands entirely: a click in a cell's padding resolves
+  // to the end of the cell's text, which is inside the range of a trailing
+  // misspelling, so cells full of flagged words (product codes, surnames) had no
+  // reachable table commands at all.
+  const spell = spellAt(view, clientX, clientY);
   if (img && img.tagName === 'IMG') {
     try {
       const pos = view.posAtDOM(img, 0);
@@ -275,19 +303,9 @@ function requestContextMenu(view, clientX, clientY, img) {
     return;
   }
   if (focusTableCell(view, clientX, clientY)) {
-    postToHost({ type: 'contextmenu', menu: 'table', x: clientX, y: clientY });
+    postToHost({ type: 'contextmenu', menu: 'table', x: clientX, y: clientY, spell });
     return;
   }
-  // If the click landed on a misspelled word, tell the host so it can prepend
-  // suggestions; also select nothing — the host replaces via replaceRange.
-  let spell = null;
-  try {
-    const hit = view.posAtCoords({ left: clientX, top: clientY });
-    if (hit) {
-      const r = misspellingAt(view.state, hit.pos);
-      if (r) spell = { from: r.from, to: r.to, word: view.state.doc.textBetween(r.from, r.to) };
-    }
-  } catch (_) { /* no spell info is fine */ }
   postToHost({ type: 'contextmenu', menu: 'text', x: clientX, y: clientY, spell });
 }
 
@@ -477,6 +495,29 @@ const MDM = {
   // Fresh check results as [{from,to}] ProseMirror ranges.
   setSpellRanges(ranges) {
     if (editorView) setSpellRanges(editorView, ranges || []);
+  },
+
+  // Delete a repeated word together with the separator in front of it. The gap
+  // must be measured in DOCUMENT POSITIONS here, not in characters: an inline
+  // leaf (image, inline HTML) occupies a position but contributes no text, so a
+  // character count taken from textBetween drifts from the real positions and the
+  // deletion silently refuses to apply.
+  deleteRepeated(from, to, word) {
+    if (!editorView) return false;
+    const { state } = editorView;
+    if (!(from >= 0 && to > from && to <= state.doc.content.size)) return false;
+    if (state.doc.textBetween(from, to) !== word) return false;   // moved/edited since
+    let start = from;
+    while (start > 0) {
+      const ch = state.doc.textBetween(start - 1, start);
+      // A leaf yields '' for its position — stop rather than swallow it.
+      if (ch.length !== 1 || !SEPARATOR.test(ch)) break;
+      start--;
+    }
+    if (start === from) return false;   // nothing separating the two occurrences
+    editorView.dispatch(state.tr.delete(start, to).scrollIntoView());
+    editorView.focus();
+    return true;
   },
 
   // Replace one range (a misspelled word) with new text — used by the host's

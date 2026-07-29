@@ -32,6 +32,16 @@ internal sealed class SquiggleAdorner : Adorner
         return pen;
     }
 
+    /// <summary>
+    /// The misspelled ranges currently drawn, in document-text offsets, kept shifted
+    /// through edits. These come from checking the WHOLE document, so they are the
+    /// authoritative answer to "is there a misspelling here, and what exactly is the
+    /// misspelled token" — re-checking a word in isolation gives different answers
+    /// (context-only errors such as a repeated word disappear) and re-tokenizing by
+    /// hand disagrees with the engine about hyphens and apostrophes.
+    /// </summary>
+    public IReadOnlyList<(int Start, int Length)> Ranges => _ranges;
+
     public void SetRanges(IReadOnlyList<(int Start, int Length)> ranges)
     {
         _ranges = ranges;

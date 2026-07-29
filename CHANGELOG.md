@@ -9,6 +9,42 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.0-beta2] – 2026-07-29
+
+### Fixed
+- **The spelling menu could offer no actions at all on a word it had squiggled** —
+  no suggestions, no **Add to Dictionary**, no **Ignore All**. In the source view
+  the menu re-checked the clicked word *on its own* before offering anything, but
+  squiggles come from checking the whole document, and errors that only exist in
+  context — a repeated word, `the the` — simply aren't errors when the word is
+  examined alone. The check disagreed with the squiggle, so the entire spell block
+  was dropped. The menu now uses the range the checker actually flagged.
+- **Applying a suggestion could eat neighbouring text**, and **Add to Dictionary
+  could silently fail to clear a squiggle.** The source view re-derived the word
+  under the cursor with its own rules, which treated `-` and `'` as part of a word
+  while the checker does not. Correcting `state-of-the-artz` replaced the whole
+  hyphenated phrase instead of `artz`, and adding `'wurdxqz'` to the dictionary
+  stored it with the quotation marks — a token the checker never matches, so the
+  squiggle stayed put forever. Both now use the checker's own word boundaries.
+- **A misspelling inside a table cell offered no spelling actions.** Right-clicking
+  a squiggled word in a table surfaced the table's insert/delete/select commands
+  and nothing else, because the table menu was chosen before the misspelling was
+  ever looked up. The table menu now grows a **Spelling** submenu when the click
+  landed on a flagged word, so both sets of commands stay available.
+- **A repeated word offered corrections that broke the sentence.** The checker
+  flags the second word in `the the`, but that word is spelled perfectly — so its
+  "corrections" were *them*, *then*, *they*, and accepting one silently rewrote the
+  sentence. **Add to Dictionary** was worse: it would have permanently added a
+  common word to your dictionary and suppressed every later warning about it. A
+  repeated word is now recognised as such and offers the one thing that helps,
+  **Delete Repeated Word**.
+
+### Changed
+- Context menus opened over the editor now pre-highlight the first item you can
+  actually use, instead of the first item outright — menus that lead with a
+  disabled entry (the "(no suggestions)" placeholder) opened with nothing
+  highlighted and needed an extra key press to get moving.
+
 ## [0.6.0-beta1] – 2026-07-17
 
 ### Added
@@ -446,7 +482,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.0-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.0-beta2...HEAD
+[0.6.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta2
 [0.6.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta1
 [0.5.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.1
 [0.5.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.0-beta1

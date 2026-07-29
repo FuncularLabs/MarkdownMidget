@@ -153,38 +153,30 @@ public partial class MainWindow
 
         (int Start, int Length)? hit = null;
         var text = SourceBox.Text;
-        if (idx >= 0 && _spellCheck && !_readOnly)
+        if (idx >= 0 && _spellCheck && !_readOnly && _squiggles is not null)
         {
-            // Identify the word under the cursor and confirm it's misspelled — the
-            // adorner's ranges may be a beat stale, so ask the words themselves.
-            var (ws, we) = WordAt(text, idx);
-            if (we > ws)
-            {
-                var word = text[ws..we];
-                if (!_spellService.IsKnown(word) &&
-                    (await _spellService.CheckAsync(word)).Count > 0)
-                    hit = (ws, we - ws);
-            }
+            // Take the range the ENGINE flagged, exactly as drawn. The previous
+            // approach — re-tokenize with WordAt, then re-check that word alone —
+            // was wrong twice over:
+            //   * context-only errors (a repeated "the the") are not errors when the
+            //     word is checked in isolation, so the whole spell block vanished
+            //     from the menu for words that were visibly squiggled;
+            //   * hand tokenization disagreed with the engine's around '-' and '\''
+            //     (the engine's boundaries are context-dependent, not a fixed
+            //     character class), so a squiggle on "artz" produced the target
+            //     "state-of-the-artz": applying a suggestion ate the adjacent text,
+            //     and Add to Dictionary stored a token the checker never matches, so
+            //     the squiggle never cleared.
+            hit = SpellHitTest.RangeAt(_squiggles.Ranges, idx, text.Length);
         }
 
         var menu = new ContextMenu();
         if (hit is { } h)
         {
             var word = text.Substring(h.Start, h.Length);
-            var suggestions = await _spellService.SuggestAsync(word);
-            AddSpellItems(menu, suggestions,
-                replace: s =>
-                {
-                    // The buffer may have changed between right-click and this click
-                    // (typing, auto-reload) — replace only if the word is still here.
-                    var now = SourceBox.Text;
-                    if (h.Start + h.Length > now.Length ||
-                        now.Substring(h.Start, h.Length) != word) { RequestSpellCheckSoon(); return; }
-                    SourceBox.Select(h.Start, h.Length);
-                    SourceBox.SelectedText = s;   // through the undo stack
-                    RequestSpellCheckSoon();
-                },
-                word);
+            var click = new SpellClick(h.Start, h.Start + h.Length, word, text[..h.Start]);
+            foreach (var it in await BuildSpellItemsAsync(click, SourceReplace(click)))
+                menu.Items.Add(it);
         }
         menu.Items.Add(MakeItem("Cu_t", () => SourceBox.Cut()));
         menu.Items.Add(MakeItem("_Copy", () => SourceBox.Copy()));
@@ -197,22 +189,12 @@ public partial class MainWindow
     }
 
     /// <summary>WYSIWYG right-click on a misspelled word (info arrives with the
-    /// contextmenu message): dynamic menu with suggestions + the standard items.</summary>
-    private async Task ShowSpellContextMenuAsync(double x, double y, int from, int to, string word)
+    /// contextmenu message): dynamic menu with the spelling actions + standard items.</summary>
+    private async Task ShowSpellContextMenuAsync(double x, double y, SpellClick click)
     {
-        var suggestions = await _spellService.SuggestAsync(word);
-
         var menu = new ContextMenu();
-        AddSpellItems(menu, suggestions,
-            replace: s =>
-            {
-                // from/to are the positions from the right-click message; the doc may
-                // have changed since, so replaceRange only acts if that range still
-                // holds `word` (else it no-ops and the next re-check refreshes).
-                _ = RunEditorAsync($"window.MDM.replaceRange({from}, {to}, {JsLiteral(s)}, {JsLiteral(word)})");
-                RequestSpellCheckSoon();
-            },
-            word);
+        foreach (var it in await BuildSpellItemsAsync(click, WysiwygReplace(click)))
+            menu.Items.Add(it);
         menu.Items.Add(MakeItem("Cu_t", () => Cut_Click(this, new RoutedEventArgs())));
         menu.Items.Add(MakeItem("_Copy", () => Copy_Click(this, new RoutedEventArgs())));
         menu.Items.Add(MakeItem("_Paste", () => Paste_Click(this, new RoutedEventArgs())));
@@ -222,35 +204,156 @@ public partial class MainWindow
         ShowMenuOverEditor(menu, x, y);
     }
 
-    private void AddSpellItems(ContextMenu menu, List<string> suggestions, Action<string> replace, string word)
+    /// <summary>A right-click that landed on a flagged word. <paramref name="Before"/>
+    /// is the text leading up to it, used to recognise a repeated word.</summary>
+    internal sealed record SpellClick(int From, int To, string Word, string Before);
+
+    /// <summary>
+    /// Characters the checker treats as a word break. Whitespace plus the
+    /// zero-width characters that routinely arrive in text pasted from Word or the
+    /// web — the checker flags a repeat across those too, and missing them left the
+    /// menu offering nothing actionable on a word it had squiggled.
+    /// </summary>
+    internal static bool IsSeparator(char c) =>
+        char.IsWhiteSpace(c) || c is '\u00AD' or '\u200B' or '\u200C' or '\u200D' or '\uFEFF';
+
+    /// <summary>
+    /// The separator run between a repeated word and the one before it. Deleting a
+    /// fixed single space is wrong: the checker flags repeats across a non-breaking
+    /// space or several spaces, so assuming <c>' '</c> either leaves stray
+    /// whitespace behind or misses the separator entirely.
+    /// </summary>
+    internal static string TrailingWhitespace(string before)
     {
+        var end = before.Length;
+        while (end > 0 && IsSeparator(before[end - 1])) end--;
+        return before[end..];
+    }
+
+    /// <summary>Replace the flagged range in the source view; when
+    /// <c>dropSeparator</c> is set it also swallows the whitespace before it.</summary>
+    private Action<string, bool> SourceReplace(SpellClick click) => (replacement, dropSeparator) =>
+    {
+        // The buffer may have changed between right-click and this click (typing,
+        // auto-reload) — only act if the flagged word is still exactly there.
+        var now = SourceBox.Text;
+        var len = click.To - click.From;
+        if (click.To > now.Length || now.Substring(click.From, len) != click.Word)
+        {
+            RequestSpellCheckSoon();
+            return;
+        }
+        var gap = dropSeparator ? TrailingWhitespace(click.Before).Length : 0;
+        var start = Math.Max(0, click.From - gap);
+        SourceBox.Select(start, click.To - start);
+        SourceBox.SelectedText = replacement;   // through the undo stack
+        RequestSpellCheckSoon();
+    };
+
+    /// <summary>The same for the WYSIWYG view. replaceRange re-verifies the range
+    /// still holds what the menu was built for and no-ops otherwise.</summary>
+    private Action<string, bool> WysiwygReplace(SpellClick click) => (replacement, dropSeparator) =>
+    {
+        // Deleting the separator is a POSITION operation, so the editor does it:
+        // an inline leaf (image, inline HTML) takes a position without contributing
+        // text, so a character count taken from `Before` drifts from the real
+        // positions and the deletion would silently refuse to apply.
+        _ = RunEditorAsync(dropSeparator
+            ? $"window.MDM.deleteRepeated({click.From}, {click.To}, {JsLiteral(click.Word)})"
+            : $"window.MDM.replaceRange({click.From}, {click.To}, {JsLiteral(replacement)}, {JsLiteral(click.Word)})");
+        RequestSpellCheckSoon();
+    };
+
+    /// <summary>
+    /// Build the spelling block for a flagged word.
+    ///
+    /// Not every flag is a misspelling: the engine also reports CONTEXT-ONLY errors,
+    /// above all a repeated word. Those words are spelled perfectly, so the ordinary
+    /// actions are actively harmful — the engine cheerfully suggests "them/then/they"
+    /// for the second "the" in "the the" (accepting one corrupts the sentence), and
+    /// Add to Dictionary would permanently whitelist a stopword, silently suppressing
+    /// every later error on that word. So detect the case and offer the action that
+    /// actually helps: delete the duplicate.
+    /// </summary>
+    private async Task<List<object>> BuildSpellItemsAsync(SpellClick click,
+        Action<string, bool> replace, bool trailingSeparator = true)
+    {
+        // A word that is fine on its own but flagged in context is a context error.
+        // NB: this decides WHICH actions to offer — it is not a gate on showing the
+        // block at all. Using it as a gate is the bug this release fixes.
+        var contextOnly = (await _spellService.CheckAsync(click.Word)).Count == 0;
+        var repeated = contextOnly && EndsWithRepeatOf(click.Before, click.Word);
+        var items = new List<object>();
+
+        if (repeated)
+        {
+            items.Add(new MenuItem { Header = $"Repeated word: {Escape(click.Word)}", IsEnabled = false });
+            items.Add(new Separator());
+            var del = MakeItem("_Delete Repeated Word", () => replace(string.Empty, true));
+            del.FontWeight = FontWeights.SemiBold;
+            items.Add(del);
+            if (trailingSeparator) items.Add(new Separator());
+            return items;
+        }
+
+        if (contextOnly)
+        {
+            // Flagged for some other contextual reason; the word itself is fine, so
+            // the dictionary actions would be meaningless. Say so rather than mislead.
+            items.Add(new MenuItem { Header = "(check the surrounding wording)", IsEnabled = false });
+            if (trailingSeparator) items.Add(new Separator());
+            return items;
+        }
+
+        var suggestions = await _spellService.SuggestAsync(click.Word);
         if (suggestions.Count == 0)
         {
-            menu.Items.Add(new MenuItem { Header = "(no suggestions)", IsEnabled = false });
+            items.Add(new MenuItem { Header = "(no suggestions)", IsEnabled = false });
         }
         else
         {
             foreach (var s in suggestions)
             {
-                var item = new MenuItem { Header = s.Replace("_", "__"), FontWeight = FontWeights.SemiBold };
-                item.Click += (_, _) => replace(s);
-                menu.Items.Add(item);
+                var item = new MenuItem { Header = Escape(s), FontWeight = FontWeights.SemiBold };
+                item.Click += (_, _) => replace(s, false);
+                items.Add(item);
             }
         }
-        menu.Items.Add(new Separator());
+        items.Add(new Separator());
         var add = MakeItem("A_dd to Dictionary", () =>
         {
-            _spellService.AddToDictionary(word);
+            _spellService.AddToDictionary(click.Word);
             RequestSpellCheckSoon();
         });
         add.ToolTip = "Stored privately in Markdown Midget's own dictionary — the Windows dictionary is not modified.";
-        menu.Items.Add(add);
-        menu.Items.Add(MakeItem("_Ignore All", () =>
+        items.Add(add);
+        items.Add(MakeItem("_Ignore All", () =>
         {
-            _spellService.IgnoreAll(word);
+            _spellService.IgnoreAll(click.Word);
             RequestSpellCheckSoon();
         }));
-        menu.Items.Add(new Separator());
+        if (trailingSeparator) items.Add(new Separator());
+        return items;
+    }
+
+    /// <summary>WPF menu headers eat a single underscore as a mnemonic marker.</summary>
+    private static string Escape(string header) => header.Replace("_", "__");
+
+    /// <summary>True when the text before the flagged word ends with that same word —
+    /// i.e. this occurrence is a duplicate of the one immediately before it.</summary>
+    internal static bool EndsWithRepeatOf(string before, string word)
+    {
+        if (string.IsNullOrEmpty(word)) return false;
+        var gap = TrailingWhitespace(before);
+        if (gap.Length == 0) return false;                          // nothing separating them
+        var trimmed = before[..^gap.Length];
+        if (trimmed.Length < word.Length) return false;
+        // Ordinal: the boundary arithmetic below assumes the matched suffix is exactly
+        // word.Length long, which culture-sensitive matching does not guarantee.
+        if (!trimmed.EndsWith(word, StringComparison.OrdinalIgnoreCase)) return false;
+        // Whole word only, so "bathe the" isn't read as a repeat of "the".
+        var head = trimmed.Length - word.Length;
+        return head == 0 || !char.IsLetterOrDigit(trimmed[head - 1]);
     }
 
     private static MenuItem MakeItem(string header, Action action)
@@ -260,21 +363,4 @@ public partial class MainWindow
         return item;
     }
 
-    /// <summary>Word boundaries around a character index (letters/digits/'/-).</summary>
-    internal static (int Start, int End) WordAt(string text, int index)
-    {
-        static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '\'' or '-';
-        if (text.Length == 0) return (0, 0);
-        index = Math.Clamp(index, 0, text.Length - 1);
-        if (!IsWordChar(text[index]))
-        {
-            if (index > 0 && IsWordChar(text[index - 1])) index--;
-            else return (index, index);
-        }
-        var start = index;
-        while (start > 0 && IsWordChar(text[start - 1])) start--;
-        var end = index + 1;
-        while (end < text.Length && IsWordChar(text[end])) end++;
-        return (start, end);
-    }
 }

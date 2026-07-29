@@ -349,20 +349,26 @@ public partial class MainWindow : Window
                         int Get(string k) => d.RootElement.TryGetProperty(k, out var v) ? v.GetInt32() : 0;
                         _imgResize = (Get("curW"), Get("curH"), Get("natW"), Get("natH"));
                     }
-                    // A right-click on a misspelled word carries its range + text.
-                    (int From, int To, string Word)? spell = null;
-                    if (menu == "text" && !_readOnly && _spellCheck &&
+                    // A right-click on a misspelled word carries its range + text, on
+                    // whatever menu the click warranted — spelling rides along, it
+                    // doesn't replace the structural menus.
+                    SpellClick? spell = null;
+                    if (!_readOnly && _spellCheck &&
                         d.RootElement.TryGetProperty("spell", out var sp) && sp.ValueKind == JsonValueKind.Object)
                     {
                         var w = sp.TryGetProperty("word", out var wv) ? wv.GetString() : null;
                         if (!string.IsNullOrWhiteSpace(w))
-                            spell = (sp.GetProperty("from").GetInt32(), sp.GetProperty("to").GetInt32(), w!);
+                            spell = new SpellClick(
+                                sp.GetProperty("from").GetInt32(),
+                                sp.GetProperty("to").GetInt32(),
+                                w!,
+                                sp.TryGetProperty("before", out var bv) ? bv.GetString() ?? "" : "");
                     }
                     // Defer so showing the menu doesn't block the WebView2 message pump.
-                    if (spell is { } si)
-                        Dispatcher.BeginInvoke(async () => await ShowSpellContextMenuAsync(x, y, si.From, si.To, si.Word));
+                    if (spell is { } si && menu == "text")
+                        Dispatcher.BeginInvoke(async () => await ShowSpellContextMenuAsync(x, y, si));
                     else
-                        Dispatcher.BeginInvoke(() => ShowEditorContextMenu(menu, x, y));
+                        Dispatcher.BeginInvoke(async () => await ShowEditorContextMenuAsync(menu, x, y, spell));
                 }
                 break;
             case "fileDrop":
@@ -389,13 +395,42 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")]
     private static extern IntPtr SetFocus(IntPtr hWnd);
 
-    private void ShowEditorContextMenu(string menu, double x, double y)
+    /// <summary>
+    /// Show a structural (table/image) or plain text menu, folding in the spelling
+    /// actions when the click also landed on a misspelling — so a squiggle inside a
+    /// table cell keeps both its spelling actions and the table commands.
+    /// </summary>
+    private async Task ShowEditorContextMenuAsync(string menu, double x, double y, SpellClick? spell)
     {
-        // Structure menus aren't available in read-only — fall back to the text menu.
         var key = (!_readOnly && menu == "table") ? "TableContextMenu"
                 : (!_readOnly && menu == "image") ? "ImageContextMenu"
                 : "TextContextMenu";
         if (FindResource(key) is not ContextMenu cm) return;
+
+        // Resource menus can't carry x:Name fields, so the placeholder is tagged.
+        var spellRoot = cm.Items.OfType<MenuItem>().FirstOrDefault(m => (m.Tag as string) == "spellRoot");
+        var spellSep = cm.Items.OfType<Separator>().FirstOrDefault(m => (m.Tag as string) == "spellSep");
+        if (spellRoot is not null)
+        {
+            if (spell is { } s)
+            {
+                // Build first, THEN swap in. This resource menu is a singleton, so a
+                // second right-click arriving during the awaited engine calls would
+                // otherwise interleave its items into the same collection.
+                var built = await BuildSpellItemsAsync(s, WysiwygReplace(s), trailingSeparator: false);
+                spellRoot.Items.Clear();
+                foreach (var it in built) spellRoot.Items.Add(it);
+                spellRoot.Header = $"Spellin_g: {s.Word.Replace("_", "__")}";
+                spellRoot.Visibility = Visibility.Visible;
+                if (spellSep is not null) spellSep.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                spellRoot.Items.Clear();
+                spellRoot.Visibility = Visibility.Collapsed;
+                if (spellSep is not null) spellSep.Visibility = Visibility.Collapsed;
+            }
+        }
         ShowMenuOverEditor(cm, x, y);
     }
 
@@ -427,15 +462,15 @@ public partial class MainWindow : Window
         cm.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
         {
             cm.Focus();
-            if (cm.ItemContainerGenerator.ContainerFromIndex(0) is MenuItem first)
+            // Focus the first ACTIVATABLE item, not blindly item 0 — see
+            // ContextMenuFocus for why a disabled first entry used to strand focus.
+            if (ContextMenuFocus.FirstActivatableItem(cm) is { } item)
             {
-                first.Focus();
-                Keyboard.Focus(first);
+                item.Focus();
+                Keyboard.Focus(item);
+                return;
             }
-            else
-            {
-                cm.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
-            }
+            cm.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
         }));
     }
 
