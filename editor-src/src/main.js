@@ -608,9 +608,17 @@ const MDM = {
     return true;
   },
 
+  // Focus through the EditorView when we have it: that restores/places the
+  // ProseMirror selection as well as focusing the DOM, so a blank document gets a
+  // real caret rather than just keyboard focus on the element.
   focus() {
-    const view = document.querySelector('.mdm-prosemirror');
-    if (view) view.focus();
+    if (editorView) {
+      editorView.focus();
+      return true;
+    }
+    const dom = document.querySelector('.mdm-prosemirror');
+    if (dom) { dom.focus(); return true; }
+    return false;
   },
 };
 

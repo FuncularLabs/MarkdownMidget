@@ -9,6 +9,17 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-30
+
+### Fixed
+- **A new document now has the cursor in it.** File > New (and Ctrl+N, and the
+  New link on the empty-document splash) left keyboard focus on whatever you
+  used to invoke it, so the first thing you typed went nowhere and you had to
+  click into the blank document first. The caret is now placed in the document
+  itself, in both the formatted and source views. The focus is applied after the
+  menu finishes closing, because a closing menu hands focus back to its owner and
+  would otherwise undo it.
+
 ## [0.6.0] – 2026-07-30
 
 First stable release on the 0.6 line — the two betas' content with the
@@ -501,7 +512,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.1
 [0.6.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0
 [0.6.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta2
 [0.6.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta1

@@ -661,6 +661,36 @@ public partial class MainWindow : Window
     {
         if (!await ConfirmDiscardAsync()) return;
         await LoadDocumentAsync(string.Empty, null);
+        await FocusDocumentAsync();   // a blank document should be ready to type into
+    }
+
+    /// <summary>
+    /// Put the caret in the document itself. Without this, New leaves focus on
+    /// whatever raised it — the menu, the toolbar button, the splash link — and the
+    /// first keystroke goes nowhere, so the user has to click into an empty document
+    /// before typing.
+    /// </summary>
+    private async Task FocusDocumentAsync()
+    {
+        if (_closed || _readOnly) return;      // nothing to type into
+
+        // Let whatever raised this finish closing first: a menu hands focus back to
+        // its owner as it tears down, which can undo a focus call made before that.
+        await Dispatcher.Yield(DispatcherPriority.Background);
+        // Background sits below Input, so a click on the window's close box can
+        // preempt this continuation — don't come back and touch a torn-down WebView.
+        if (_closed || !IsLoaded) return;
+
+        if (_sourceMode)
+        {
+            SourceBox.Focus();
+            SourceBox.CaretIndex = 0;
+            return;
+        }
+        // WPF focus has to land on the WebView2 (an HwndHost) before the editor's
+        // own DOM focus will stick, so do both.
+        Web.Focus();
+        if (_editorReady) await RunEditorAsync("window.MDM.focus()");
     }
 
     private async void Open_Click(object sender, RoutedEventArgs e)
