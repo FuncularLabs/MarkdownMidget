@@ -9,6 +9,25 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.0] – 2026-07-30
+
+First stable release on the 0.6 line — the two betas' content with the
+prerelease flag dropped, after dogfooding. Everything new on this line:
+
+- **In-app updates** with a real About box (Help ▸ About Markdown Midget):
+  copyright and licence links, the running version and its install shape, the
+  newest **release** and **prerelease** listed separately, and one-click updates
+  that verify the download's Funcular Labs signature before installing anything.
+  Installed copies update in place and restart; portable copies stay portable.
+- **Spelling menu fixes** — the actions now key off the range the checker
+  actually flagged, so a squiggled word always offers something useful: words the
+  checker can't correct still offer **Add to Dictionary**, hyphenated and quoted
+  words no longer lose their neighbours when a suggestion is applied, misspellings
+  inside table cells get a **Spelling** submenu, and a repeated word offers
+  **Delete Repeated Word** instead of corrections that break the sentence.
+
+See the beta notes below for the full detail.
+
 ## [0.6.0-beta2] – 2026-07-29
 
 ### Fixed
@@ -482,7 +501,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.0-beta2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0
 [0.6.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta2
 [0.6.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta1
 [0.5.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.5.1
