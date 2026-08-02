@@ -36,8 +36,7 @@ public partial class AboutDialog : Window
         if (check is null)
         {
             StableText.Text = "Newest release: couldn't check (offline?)";
-            PreText.Text = "Newest prerelease: couldn't check";
-            return;
+            return;   // the prerelease row stays hidden; one failure message is enough
         }
         _stable = check.Stable;
         _prerelease = check.PrereleaseRelease;
@@ -45,16 +44,31 @@ public partial class AboutDialog : Window
         StableText.Text = _stable is null
             ? "Newest release: none published"
             : $"Newest release: {_stable.Tag}";
-        PreText.Text = _prerelease is null
-            ? "Newest prerelease: none published"
-            : $"Newest prerelease: {_prerelease.Tag}";
 
-        var stableNewer = _stable is not null && _current is not null && _stable.Version.CompareTo(_current) > 0;
-        var preNewer = _prerelease is not null && _current is not null && _prerelease.Version.CompareTo(_current) > 0;
+        var stableNewer = UpdateOffer.ShowStableUpdate(_stable, _current);
         StableUpdateBtn.Visibility = stableNewer ? Visibility.Visible : Visibility.Collapsed;
-        PreUpdateBtn.Visibility = preNewer ? Visibility.Visible : Visibility.Collapsed;
 
-        if (!stableNewer && !preNewer)
+        // Only surface a prerelease while it still leads. A superseded one - say
+        // 0.6.0-beta2 alongside a shipped 0.6.2 - would read as the more advanced
+        // build when it is really older code, so the row is hidden entirely rather
+        // than shown with the button disabled.
+        var showPre = UpdateOffer.ShowPrerelease(_prerelease, _stable, _current);
+        if (showPre)
+        {
+            PreText.Text = $"Newest prerelease: {_prerelease!.Tag}";
+            PreText.Visibility = Visibility.Visible;
+            PreUpdateBtn.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _prerelease = null;   // nothing offered, so nothing installable from here
+            // Reset the view too, not just the model: a visible row left over from an
+            // earlier refresh would be a live-looking button that quietly does nothing.
+            PreText.Visibility = Visibility.Collapsed;
+            PreUpdateBtn.Visibility = Visibility.Collapsed;
+        }
+
+        if (!stableNewer && !showPre)
         {
             StatusText.Text = "You're up to date.";
             StatusText.Visibility = Visibility.Visible;

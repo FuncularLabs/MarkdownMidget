@@ -11,6 +11,11 @@ public class UpdateVersionTests
     [InlineData("0.6.0-beta1", "0.6.0-beta1", true)]
     [InlineData("V0.4.0-beta1", "0.4.0-beta1", true)]
     [InlineData("v0.6", "0.6.0", false)]           // normalized to 3 components
+    // SemVer build metadata isn't part of the version. This is what an
+    // InformationalVersion looks like when the +sha suffix isn't suppressed, and
+    // failing to parse it is what strands the update check on its fallback paths.
+    [InlineData("0.6.2+abc1234", "0.6.2", false)]
+    [InlineData("v0.7.0-beta1+abc1234", "0.7.0-beta1", true)]
     public void Parse_Roundtrips(string input, string expected, bool prerelease)
     {
         var v = UpdateVersion.Parse(input);

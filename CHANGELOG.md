@@ -9,6 +9,17 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Fixed
+- **Help ▸ About no longer offers a prerelease that a stable release has already
+  overtaken.** GitHub keeps reporting the newest prerelease forever, so the box
+  went on advertising `v0.6.0-beta2` long after 0.6.2 shipped - reading as the
+  newer, bolder build when it was in fact older code. A prerelease is now shown
+  only while it leads both the version you're running and the newest stable, and
+  the line disappears entirely when it doesn't.
+- **A release whose tag says beta can no longer be mistaken for a stable one.**
+  The prerelease flag is set by hand when publishing and has been wrong before; a
+  version tail like `-beta2` is now enough on its own.
+
 ## [0.6.2] - 2026-08-01
 
 ### Added

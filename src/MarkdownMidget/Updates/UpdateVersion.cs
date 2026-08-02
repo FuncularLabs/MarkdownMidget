@@ -19,6 +19,11 @@ internal sealed record UpdateVersion(Version Numeric, string? Prerelease) : ICom
         if (string.IsNullOrWhiteSpace(text)) return null;
         var s = text.Trim();
         if (s.StartsWith('v') || s.StartsWith('V')) s = s[1..];
+        // Drop SemVer build metadata: 0.6.2+abc1234 is the same version as 0.6.2 and
+        // must not fail to parse. An unreadable running version is what pushes the
+        // update check onto its fallback paths, so it's worth not creating one.
+        var plus = s.IndexOf('+');
+        if (plus >= 0) s = s[..plus];
         var dash = s.IndexOf('-');
         var numericPart = dash < 0 ? s : s[..dash];
         var pre = dash < 0 ? null : s[(dash + 1)..];

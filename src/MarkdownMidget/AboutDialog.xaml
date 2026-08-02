@@ -40,8 +40,11 @@
                        VerticalAlignment="Center" Text="Newest release: checking…" />
             <Button x:Name="StableUpdateBtn" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6"
                     Padding="12,3" Visibility="Collapsed" Click="StableUpdate_Click">Update</Button>
+            <!-- The whole prerelease row starts hidden and appears only when there
+                 is a prerelease still ahead of both the running version and the
+                 newest stable — see Updates/UpdateOffer.cs. -->
             <TextBlock x:Name="PreText" Grid.Row="1" Grid.Column="0" Margin="0,0,10,0"
-                       VerticalAlignment="Center" Text="Newest prerelease: checking…" />
+                       VerticalAlignment="Center" Visibility="Collapsed" />
             <Button x:Name="PreUpdateBtn" Grid.Row="1" Grid.Column="1"
                     Padding="12,3" Visibility="Collapsed" Click="PreUpdate_Click">Update (prerelease)</Button>
         </Grid>

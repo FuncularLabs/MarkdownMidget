@@ -39,7 +39,12 @@ internal static class ReleaseFeed
             var tag = el.TryGetProperty("tag_name", out var t) ? t.GetString() : null;
             var version = UpdateVersion.Parse(tag);
             if (tag is null || version is null) continue;
-            var pre = el.TryGetProperty("prerelease", out var p) && p.GetBoolean();
+            // Either signal is enough. The flag is set by hand at publish time and
+            // has been wrong before (v0.2.0-beta2 is flagged stable on GitHub), and
+            // mistaking a beta for a stable release is the one direction that
+            // actually hurts — it would be offered to everyone.
+            var pre = (el.TryGetProperty("prerelease", out var p) && p.GetBoolean())
+                      || version.IsPrerelease;
             var html = el.TryGetProperty("html_url", out var h) ? h.GetString() ?? "" : "";
 
             string? assetName = null, assetUrl = null;

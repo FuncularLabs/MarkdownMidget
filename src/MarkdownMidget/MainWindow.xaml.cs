@@ -2466,12 +2466,17 @@ public partial class MainWindow : Window
         try
         {
             var current = Updates.UpdateVersion.Parse(AppVersion);
-            if (current is null) return;
             var check = await Updates.UpdateService.CheckAsync();
             if (check is null) return;
-            var stableNewer = check.Stable is not null && check.Stable.Version.CompareTo(current) > 0;
-            var preNewer = current.IsPrerelease &&
-                check.PrereleaseRelease is not null && check.PrereleaseRelease.Version.CompareTo(current) > 0;
+            // Same predicates the About box uses, including how they behave when the
+            // running version can't be read — bailing out here instead would mean no
+            // flash on launch and a live Update button in About, which is the kind of
+            // disagreement between two surfaces that reads as a bug either way.
+            // The extra IsPrerelease gate is deliberate and stays: someone running a
+            // stable build shouldn't be nudged toward a beta they didn't ask for.
+            var stableNewer = Updates.UpdateOffer.ShowStableUpdate(check.Stable, current);
+            var preNewer = current is { IsPrerelease: true } &&
+                Updates.UpdateOffer.ShowPrerelease(check.PrereleaseRelease, check.Stable, current);
             if (stableNewer || preNewer)
                 FlashStatus("Update available — Help ▸ About");
         }
