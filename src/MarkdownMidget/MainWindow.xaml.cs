@@ -47,7 +47,6 @@ public partial class MainWindow : Window
     private bool _suppressDirty;
     private string? _pendingOpenPath;
 
-    private const int MaxRecent = 5;
     private readonly List<string> _recentFiles = new();
     private string _pageWidth = "landscape"; // portrait | landscape | full (persisted)
     private bool _startReadOnly;
@@ -76,9 +75,11 @@ public partial class MainWindow : Window
         SourceToggle.Content = GlyphSource; // start in WYSIWYG; button offers source view
         _dirtyTimer.Tick += async (_, _) => { _dirtyTimer.Stop(); await UpdateDirtyAsync(); };
 
+        // Settings first: LoadRecent and BuildRecentMenu both consult _recentLimit,
+        // so loading them in the other order silently applies the default of 10.
+        LoadSettings();
         LoadRecent();
         BuildRecentMenu();
-        LoadSettings();
 
         // Apply the persisted spell-check state. Checking is done by the app's own
         // engine (see MainWindow.Spell.cs); native spell check stays off everywhere.
@@ -94,6 +95,7 @@ public partial class MainWindow : Window
         MenuAutoReload.IsChecked = _autoReload;
         _noteTimer.Tick += (_, _) => { _noteTimer.Stop(); StatusNote.Text = string.Empty; };
 
+        // (Window placement is applied later, in OnSourceInitialized — it needs the HWND.)
         Updates.UpdateService.CleanupOldBinaries();
         _ = NotifyIfUpdateAvailableAsync();
         _externalChangeTimer.Tick += async (_, _) => await OnExternalChangeTimerAsync();
@@ -300,6 +302,12 @@ public partial class MainWindow : Window
                 {
                     _pendingOpenPath = null;
                     _ = OpenThenApplyStartupViewAsync(p);
+                }
+                else if (_startWithBlankDocument)
+                {
+                    // Settings: land on an empty document with the caret in it, so a
+                    // session can start by simply typing.
+                    _ = StartBlankDocumentAsync();
                 }
                 else
                 {
@@ -544,6 +552,129 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Smallest saved rectangle worth believing, in physical pixels. Deliberately a
+    /// flat number rather than MinWidth/MinHeight scaled by DPI: the window's DPI at
+    /// this point is the monitor it was CREATED on, not the one it's about to move
+    /// to, so on a 175% primary a legitimate 800x600 rect saved on a 100% secondary
+    /// would be rejected as garbage - and then overwritten on close, destroying the
+    /// user's size for good. This only has to reject nonsense; WPF's own MinWidth
+    /// and MinHeight still enforce the real floor once the window is up.
+    /// </summary>
+    private static readonly Size MinSaved = new(240, 160);
+
+    /// <summary>The rectangle we're trying to restore to, until it sticks.</summary>
+    private Rect? _restoreTarget;
+
+    /// <summary>
+    /// Reapply the remembered size/position, having first checked it still lands on
+    /// a screen that exists — a monitor can be gone since last run.
+    ///
+    /// Everything here is physical pixels: the saved rectangle, the monitor work
+    /// areas, and the Win32 call that applies it. Mixing in WPF's device-independent
+    /// Left/Top/Width/Height would put the window on the wrong monitor as soon as a
+    /// display isn't at 100% scaling.
+    /// </summary>
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);   // the HWND exists from here on
+        if (_isHelpWindow) return;     // a help viewer shouldn't land on top of the editor
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            _restoreTarget = WindowPlacement.Sanitize(_savedBounds, MonitorInfo.WorkAreas(), MinSaved);
+            if (_restoreTarget is { } b) NativeWindowPlacement.Apply(hwnd, b, _savedMaximized);
+            else if (_savedMaximized) WindowState = WindowState.Maximized;
+        }
+        catch { /* the default placement is a fine outcome */ }
+    }
+
+    /// <summary>
+    /// Re-assert the restored rectangle once the window is up.
+    ///
+    /// A window is created on the primary monitor, so restoring it onto a display
+    /// with a different scale factor raises WM_DPICHANGED, and WPF answers that by
+    /// resizing the window by the DPI ratio. The rectangle therefore arrives 1.5x
+    /// too big on a 150% display — and because the inflated size is what gets saved
+    /// on close, it inflates again on the next launch. Measured on a 150% monitor:
+    /// 2700 -> 4050 -> 5760 px wide over three launches.
+    ///
+    /// By now the window is already on its target monitor in that monitor's DPI
+    /// context, so applying the same rectangle a second time sticks and no further
+    /// DPI change follows.
+    ///
+    /// This applies to a maximized window too. Its restore-down rectangle takes the
+    /// same path and inflates the same way — invisibly, until the user restores down
+    /// and finds the window half again too big, with the inflated size saved on top
+    /// of theirs.
+    /// </summary>
+    protected override void OnContentRendered(EventArgs e)
+    {
+        base.OnContentRendered(e);
+        var target = _restoreTarget;
+        _restoreTarget = null;                       // one shot; the user owns it after this
+        if (target is not { } b) return;
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (NativeWindowPlacement.TryGet(hwnd, out var now, out _) && NearlyEqual(now, b)) return;
+            NativeWindowPlacement.Apply(hwnd, b, _savedMaximized);
+        }
+        catch { /* where it landed is where it stays */ }
+    }
+
+    /// <summary>Within a pixel or two — rounding through the placement struct isn't
+    /// worth a second resize.</summary>
+    private static bool NearlyEqual(Rect a, Rect b) =>
+        Math.Abs(a.X - b.X) <= 2 && Math.Abs(a.Y - b.Y) <= 2 &&
+        Math.Abs(a.Width - b.Width) <= 2 && Math.Abs(a.Height - b.Height) <= 2;
+
+    /// <summary>Capture placement for next launch: the NORMAL rectangle even while
+    /// maximized or minimized, which is what we want to come back to.</summary>
+    private void CaptureWindowPlacement()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (NativeWindowPlacement.TryGet(hwnd, out var normal, out var maximized))
+            {
+                _savedBounds = normal;
+                _savedMaximized = maximized;
+            }
+        }
+        catch { /* keep whatever was loaded */ }
+    }
+
+    private async Task StartBlankDocumentAsync()
+    {
+        await LoadDocumentAsync(string.Empty, null);
+        await FocusDocumentAsync();
+    }
+
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        _startWithBlankDocument = dlg.StartWithBlankDocument;
+        if (dlg.RecentLimit != _recentLimit)
+        {
+            // Only the menu length changes. Lowering the limit must not delete
+            // history from disk — the user would have no way to get it back, and
+            // raising the limit again should bring the older entries with it.
+            _recentLimit = dlg.RecentLimit;
+            BuildRecentMenu();
+        }
+        SaveSettings();
+    }
+
+    /// <summary>Cap what we keep on disk. This is the storage bound, deliberately
+    /// larger than any display limit — see <see cref="Settings_Click"/>.</summary>
+    private void TrimRecent()
+    {
+        while (_recentFiles.Count > SettingsDialog.MaxRecentLimit)
+            _recentFiles.RemoveAt(_recentFiles.Count - 1);
+    }
+
+    /// <summary>
     /// Returns focus to the active editing surface after a toolbar/menu action so the
     /// caret and selection stay put and the user can keep typing immediately.
     /// </summary>
@@ -578,6 +709,10 @@ public partial class MainWindow : Window
         SourceBox.Text = markdown;
         if (_editorReady)
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
+        // Count here rather than in each caller: installing content doesn't raise a
+        // 'change' message, so a freshly opened document would otherwise show no
+        // count at all until the first keystroke.
+        UpdateCounts(markdown);
     }
 
     private async Task OpenThenApplyStartupViewAsync(string path)
@@ -874,6 +1009,7 @@ public partial class MainWindow : Window
         SaveMenu.IsEnabled = !on && !_readOnly;
         if (on) { UndoBtn.IsEnabled = UndoMenu.IsEnabled = false; RedoBtn.IsEnabled = RedoMenu.IsEnabled = false; }
         StatusMode.Text = on ? "No document" : (_sourceMode ? "Markdown source" : "WYSIWYG");
+        ApplyCountText();   // no document, no count
     }
 
     // ===== External change detection (FileSystemWatcher + backup + prompt) =====
@@ -1583,7 +1719,9 @@ public partial class MainWindow : Window
         {
             if (!File.Exists(RecentStorePath)) return;
             var list = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(RecentStorePath));
-            if (list is not null) _recentFiles.AddRange(list.Take(MaxRecent));
+            // Load up to the storage cap, not the display limit: the store is the
+            // history, _recentLimit only decides how much of it the menu shows.
+            if (list is not null) _recentFiles.AddRange(list.Take(SettingsDialog.MaxRecentLimit));
         }
         catch { /* ignore a corrupt/absent MRU */ }
     }
@@ -1603,7 +1741,7 @@ public partial class MainWindow : Window
         var full = Path.GetFullPath(path);
         _recentFiles.RemoveAll(p => string.Equals(p, full, StringComparison.OrdinalIgnoreCase));
         _recentFiles.Insert(0, full);
-        while (_recentFiles.Count > MaxRecent) _recentFiles.RemoveAt(_recentFiles.Count - 1);
+        TrimRecent();
         SaveRecent();
         BuildRecentMenu();
     }
@@ -1621,9 +1759,15 @@ public partial class MainWindow : Window
             return;
         }
         var i = 1;
-        foreach (var path in _recentFiles)
+        foreach (var path in _recentFiles.Take(_recentLimit))
         {
-            var item = new MenuItem { Header = $"_{i} {Path.GetFileName(path)}", Tag = path, ToolTip = path };
+            // Only 1-9 get an access key: with a limit above 9, "_1" and "_10" would
+            // claim the same key and pressing it would cycle rather than open.
+            // Double the underscores in the name itself - WPF eats a single one and
+            // turns the next character into a stray access key.
+            var name = Path.GetFileName(path).Replace("_", "__");
+            var header = i <= 9 ? $"_{i} {name}" : $"{i} {name}";
+            var item = new MenuItem { Header = header, Tag = path, ToolTip = path };
             item.Click += RecentItem_Click;
             RecentMenu.Items.Add(item);
             i++;
@@ -1667,12 +1811,25 @@ public partial class MainWindow : Window
         public bool SkipCodeSpellCheck { get; set; } = true;
         public bool WordWrap { get; set; } // source-view line wrapping; off = horizontal scroll
         public bool AutoReload { get; set; } = true; // silently reload externally-changed files when nothing is unsaved
+        public int RecentLimit { get; set; } = 10;   // entries kept in Open Recent
+        public bool StartWithBlankDocument { get; set; } // else the no-document placeholder
+        // Remembered window placement. Null/zero means "never saved" -> default layout.
+        public double? WindowLeft { get; set; }
+        public double? WindowTop { get; set; }
+        public double? WindowWidth { get; set; }
+        public double? WindowHeight { get; set; }
+        public bool WindowMaximized { get; set; }
     }
 
     private bool _spellCheck = true;         // persisted; applied on editor-ready
     private bool _skipCodeSpell = true;      // persisted; exempt code from spell check
     private bool _wordWrap;                  // persisted; wrap long lines in the source view
     private bool _autoReload = true;         // persisted; see OnExternalChangeAsync
+    private int _recentLimit = 10;           // persisted; Open Recent length
+    private bool _settingsUnknown;           // the settings read failed: never write this session
+    private Rect? _savedBounds;              // persisted; normal (un-maximized) bounds
+    private bool _savedMaximized;
+    private bool _startWithBlankDocument;    // persisted; startup lands on a blank doc
 
     private sealed class PrintPrefs
     {
@@ -1700,8 +1857,14 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(SettingsStorePath)) return;
-            var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsStorePath));
+            // A read that fails leaves every field at its default. Writing those
+            // defaults back would wipe the user's real settings, so remember that we
+            // don't know what's on disk and stay read-only for the session.
+            if (!TryReadSettings(out var s))
+            {
+                _settingsUnknown = true;
+                return;
+            }
             if (s is null) return;
             if (s.PageWidth is "portrait" or "landscape" or "full")
                 _pageWidth = s.PageWidth;
@@ -1713,27 +1876,134 @@ public partial class MainWindow : Window
             _skipCodeSpell = s.SkipCodeSpellCheck;
             _wordWrap = s.WordWrap;
             _autoReload = s.AutoReload;
+            _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
+            _startWithBlankDocument = s.StartWithBlankDocument;
+            _savedBounds = s.WindowWidth is > 0 && s.WindowHeight is > 0
+                ? new Rect(s.WindowLeft ?? 0, s.WindowTop ?? 0, s.WindowWidth.Value, s.WindowHeight.Value)
+                : null;
+            _savedMaximized = s.WindowMaximized;
         }
         catch { /* defaults are fine */ }
     }
 
-    private void SaveSettings()
+    /// <summary>
+    /// Persist only the window rectangle, merged onto whatever is on disk right now.
+    /// Every window closes, including ones that never touched a setting: help windows
+    /// and the extra instances spawned by a multi-file drop all share settings.json,
+    /// so writing this window's whole launch-time snapshot on close would silently
+    /// revert toggles another instance changed in the meantime.
+    /// </summary>
+    private void SaveWindowPlacement()
     {
+        if (_isHelpWindow || _settingsUnknown) return;   // a help viewer's geometry isn't the app's
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(SettingsStorePath)!);
-            File.WriteAllText(SettingsStorePath, JsonSerializer.Serialize(new AppSettings
-            {
-                PageWidth = _pageWidth,
-                PrintPrefs = _printPrefs,
-                SpellCheck = _spellCheck,
-                SkipCodeSpellCheck = _skipCodeSpell,
-                WordWrap = _wordWrap,
-                AutoReload = _autoReload,
-            }));
+            // A read that FAILS is not the same as no file. Another instance may be
+            // mid-write, or the file briefly locked; treating that as "no settings"
+            // and writing defaults would wipe every preference the user has. Only a
+            // genuinely absent file justifies starting from defaults — otherwise
+            // skip this write entirely, because geometry is not worth that.
+            if (!TryReadSettings(out var s)) return;
+            // No file to merge onto — either a first run or the file was just
+            // quarantined as corrupt. Either way this session's own preferences are
+            // the best record there is; writing defaults would discard them.
+            s ??= CurrentSettings();
+            s.WindowLeft = _savedBounds?.X;
+            s.WindowTop = _savedBounds?.Y;
+            s.WindowWidth = _savedBounds?.Width;
+            s.WindowHeight = _savedBounds?.Height;
+            s.WindowMaximized = _savedMaximized;
+            WriteSettings(s);
         }
         catch { /* best-effort */ }
     }
+
+    /// <summary>
+    /// True when the stored settings are known: either parsed (<paramref name="s"/>
+    /// set) or definitely absent (<paramref name="s"/> null). False means the read
+    /// failed and the caller must not assume anything about what's on disk.
+    /// </summary>
+    private static bool TryReadSettings(out AppSettings? s)
+    {
+        s = null;
+        try
+        {
+            if (!File.Exists(SettingsStorePath)) return true;   // absent, not unknown
+            s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsStorePath));
+            return true;
+        }
+        catch (JsonException)
+        {
+            // Definitively unreadable rather than momentarily unavailable. Set it
+            // aside and carry on as though there were no settings file: refusing to
+            // write would leave the app permanently unable to save anything, on this
+            // and every future launch, with nothing to show the user why.
+            try { File.Move(SettingsStorePath, SettingsStorePath + ".bad", overwrite: true); }
+            catch { /* if it can't be moved, the next write overwrites it anyway */ }
+            return true;
+        }
+        catch { return false; }   // locked, in use, denied — unknown, so don't write
+    }
+
+    /// <summary>
+    /// Write via a temp file so a reader never sees a half-written document — extra
+    /// instances of the app share this file. The temp name carries the process id:
+    /// with one shared name, two instances writing at once would publish each
+    /// other's content, and the second's move would fail outright.
+    /// </summary>
+    private static void WriteSettings(AppSettings s)
+    {
+        var dir = Path.GetDirectoryName(SettingsStorePath)!;
+        Directory.CreateDirectory(dir);
+        var tmp = $"{SettingsStorePath}.{Environment.ProcessId}.tmp";
+        try
+        {
+            File.WriteAllText(tmp, JsonSerializer.Serialize(s));
+            File.Move(tmp, SettingsStorePath, overwrite: true);
+        }
+        finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* leave it */ } }
+    }
+
+    /// <summary>
+    /// Persist the preferences, leaving the stored window rectangle alone — geometry
+    /// is authored only at close, by <see cref="SaveWindowPlacement"/>. Writing this
+    /// instance's launch-time copy of it here would revert a position another
+    /// instance saved in the meantime.
+    /// </summary>
+    private void SaveSettings()
+    {
+        if (_settingsUnknown) return;   // see LoadSettings: don't write over the unknown
+        try
+        {
+            // Same rule as SaveWindowPlacement: if we can't read what's there, we
+            // can't preserve the geometry it holds, and writing nulls over it would
+            // lose the user's window position.
+            if (!TryReadSettings(out var existing)) return;
+            var s = CurrentSettings();
+            // Geometry is carried through from disk, not from this instance's fields.
+            s.WindowLeft = existing?.WindowLeft;
+            s.WindowTop = existing?.WindowTop;
+            s.WindowWidth = existing?.WindowWidth;
+            s.WindowHeight = existing?.WindowHeight;
+            s.WindowMaximized = existing?.WindowMaximized ?? false;
+            WriteSettings(s);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>This session's preferences, without any window geometry — the two
+    /// are persisted on different schedules and by different writers.</summary>
+    private AppSettings CurrentSettings() => new()
+    {
+        PageWidth = _pageWidth,
+        PrintPrefs = _printPrefs,
+        SpellCheck = _spellCheck,
+        SkipCodeSpellCheck = _skipCodeSpell,
+        WordWrap = _wordWrap,
+        AutoReload = _autoReload,
+        RecentLimit = _recentLimit,
+        StartWithBlankDocument = _startWithBlankDocument,
+    };
 
     // ===== Document width =====
 
@@ -1793,6 +2063,10 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        // Record placement first: the close may be cancelled by the prompt below, and
+        // this is the geometry the user last chose either way.
+        CaptureWindowPlacement();
+        SaveWindowPlacement();
         if (_dirty)
         {
             e.Cancel = true; // Defer; re-close after the async prompt resolves.
@@ -2231,7 +2505,29 @@ public partial class MainWindow : Window
             _dirty = dirty;
             UpdateTitle();
         }
+        UpdateCounts(current);
     }
+
+    /// <summary>Word/character count in the status bar, from markdown we already have.</summary>
+    private void UpdateCounts(string? markdown)
+    {
+        _countText = TextStats.Measure(markdown).ToStatusText();
+        ApplyCountText();
+    }
+
+    /// <summary>
+    /// Show the count only while a document is open. Held separately from the
+    /// measurement because content is installed before the closed flag clears, so
+    /// reading _closed at measure time would blank the count of the document that
+    /// was just opened.
+    /// </summary>
+    private void ApplyCountText()
+    {
+        StatusCount.Text = _closed ? string.Empty : _countText;
+        StatusCountDivider.Visibility = _closed ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private string _countText = string.Empty;
 
     /// <summary>Marks the current content as the clean baseline (after open/save/new).</summary>
     private async Task SetCleanBaselineAsync()

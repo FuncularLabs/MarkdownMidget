@@ -9,6 +9,29 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-01
+
+### Added
+- **The window remembers where you left it.** Size, position and maximized state
+  are restored on launch instead of resetting to a centred 1120x720 every time.
+  The saved rectangle is checked against the monitors that actually exist first,
+  so a window last used on a monitor that has since been unplugged comes back
+  where you can reach it rather than off-screen - and it's the title bar that has
+  to be reachable, not just any part of the window. Mixed-DPI desks are handled:
+  the position is remembered in real pixels, so a window on a 150%-scaled display
+  comes back the size you left it. The window also gains a sensible minimum size.
+- **Word and character count** in the status bar, updating as you type. Markdown
+  syntax a writer doesn't think of as words - `##`, `-`, `>`, `|`, `---` - is not
+  added to the total.
+- **File ▸ Settings…**, holding the settings that don't suit a menu:
+  - **How many files to keep in Open Recent** (1-50, was fixed at 5; now 10 by
+    default). Lowering it shortens the menu straight away but doesn't discard the
+    history, so raising it again brings the older entries back.
+  - **What to open on startup**: a new blank document with the cursor already in
+    it, or the no-document placeholder (the existing behaviour, still default).
+  Toggles you flip while working - spell check, word wrap, auto-reload, document
+  width - stay on the View menu where they're one click away.
+
 ### Fixed
 - **Opening a document now puts the cursor in it too.** 0.6.1 fixed this for File ▸
   New; the same first-keystroke loss applied to File ▸ Open, Open Recent, the
@@ -519,7 +542,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.2
 [0.6.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.1
 [0.6.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0
 [0.6.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0-beta2

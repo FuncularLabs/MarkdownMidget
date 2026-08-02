@@ -86,6 +86,37 @@ Not started — parked deliberately until the update flow has proven itself in t
 wild. Likely wants its own de-risk spike (MSIX + WebView2 + file associations)
 before scoping.
 
+### Selectable CSS templates / themes
+
+One hard-coded stylesheet drives the editing surface today (`editor-src/styles/editor.css`,
+built into the bundle), plus a separate `@media print` block. Let a user pick a
+look instead — and, further out, supply their own.
+
+Shape to think through when it's picked up:
+
+- **Two surfaces, not one.** The editing view and the print/PDF output are styled
+  independently today. Decide whether a template covers both (probably yes, with a
+  print section) or whether they stay separate choices.
+- **Built-ins first**, e.g. the current Nord-ish default, a light/paper theme, a
+  high-contrast one, and something book-like for long prose. Shipping several
+  proves the seams are in the right place before any user-supplied CSS is allowed.
+- **User templates** would live beside the other user data
+  (`%LocalAppData%/MarkdownMidget/themes/*.css`) and appear in the picker
+  automatically. Loading arbitrary CSS into the WebView is far less dangerous than
+  arbitrary HTML/JS, but it is still injection into the editor's document — decide
+  whether to sanitise (e.g. strip `@import`, `url()` pointing off-disk, and
+  `behavior`/`expression` legacy vectors) or to accept it as "your own machine,
+  your own CSS" with a clear warning. The existing DOMPurify posture for raw HTML
+  is the precedent to be consistent with.
+- **Interaction with what already styles things**: the Document Width modes
+  (portrait/landscape/full), the print prefs (header/footer, colour code blocks),
+  the spell-check squiggle class, and the mermaid/Prism rules all live in that same
+  stylesheet. A template must not be able to break the squiggles or the formatting
+  marks — so split the sheet into "chrome the app depends on" and "the themeable
+  part" before exposing it.
+- Persist the choice next to the other settings, and expose it in the new
+  **File ▸ Settings…** dialog rather than adding another menu.
+
 ### Multi-document tabs
 
 Tabbed editing with `Ctrl+Tab` / `Ctrl+Shift+Tab` and `Ctrl+PgUp` / `Ctrl+PgDn`

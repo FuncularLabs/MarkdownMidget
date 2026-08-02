@@ -1,0 +1,45 @@
+<Window x:Class="MarkdownMidget.SettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <Style TargetType="TextBlock" x:Key="Caption">
+            <Setter Property="Foreground" Value="#FF5B6570" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="24,2,0,0" />
+        </Style>
+    </Window.Resources>
+    <StackPanel Margin="22,18,22,16" Width="420">
+
+        <TextBlock Text="Startup" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <RadioButton x:Name="StartBlankRadio" GroupName="Startup"
+                     Content="Start with a new blank document" />
+        <TextBlock Style="{StaticResource Caption}"
+                   Text="Opens ready to type, with the cursor already in the document." />
+        <RadioButton x:Name="StartSplashRadio" GroupName="Startup" Margin="0,8,0,0"
+                     Content="Start with no document open" />
+        <TextBlock Style="{StaticResource Caption}"
+                   Text="Shows the placeholder, waiting for a file to be opened or dropped." />
+
+        <Separator Margin="0,14,0,12" />
+
+        <TextBlock Text="Recent files" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Remember" VerticalAlignment="Center" />
+            <TextBox x:Name="RecentLimitBox" Width="52" Margin="8,0" MaxLength="3"
+                     TextAlignment="Center" VerticalContentAlignment="Center"
+                     PreviewTextInput="DigitsOnly_PreviewTextInput" />
+            <TextBlock Text="files in the Open Recent list" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock x:Name="RecentHint" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                   TextWrapping="Wrap"
+                   Text="Between 1 and 50. Lowering this shortens the menu; older entries come back if you raise it again." />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="Cancel" IsCancel="True" Padding="16,3" Margin="0,0,8,0" />
+            <Button x:Name="OkBtn" Content="OK" IsDefault="True" Padding="20,3" Click="Ok_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>

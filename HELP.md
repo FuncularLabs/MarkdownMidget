@@ -188,6 +188,18 @@ un-checked while still spell-checking your prose — so identifiers, keywords an
 snippets don't get flagged. On by default, applies to **both** views, and is
 remembered between sessions.
 
+## Settings
+
+**File ▸ Settings…** holds the preferences that don't suit a menu: how many files
+**Open Recent** shows (1-50 - lowering it shortens the menu without discarding the
+history, so older entries come back if you raise it again), and whether a session
+opens with a **new blank document** (cursor already in it, ready to type) or the
+**no-document placeholder**. Everything you toggle while working - spell check,
+word wrap, auto-reload, document width - stays on the **View** menu.
+
+The window's size, position and maximized state are remembered between sessions,
+and the status bar shows a live **word and character count**.
+
 ## Windows integration
 
 **File ▸ Windows Integration ▸ Register as .md editor…** adds Markdown Midget to
@@ -242,8 +254,8 @@ line with `--readonly`.
 ## Files & windows
 
 - Native format is Markdown (`.md`). Plain text is also fine.
-- **File ▸ Open Recent** lists the last 5 files you opened or saved, with a
-  **Clear Recent** option.
+- **File ▸ Open Recent** lists the files you last opened or saved (10 by default;
+  change it in **File ▸ Settings…**), with a **Clear Recent** option.
 - **File ▸ Close** (Ctrl+W) closes the current document and shows a gray "drop a
   file here" placeholder. The window stays open and still accepts dropped files.
 - **External change detection:** if a file you have open is modified by another
