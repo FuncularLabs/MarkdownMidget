@@ -9,6 +9,8 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.3-beta1] - 2026-08-02
+
 ### Added
 - **Unsaved work survives a crash.** While a document has unsaved changes, a copy
   is written to `%LocalAppData%\MarkdownMidget\backup` every few seconds. If the
@@ -569,7 +571,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.3-beta1...HEAD
+[0.6.3-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3-beta1
 [0.6.2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.2
 [0.6.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.1
 [0.6.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.0
