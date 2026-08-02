@@ -9,6 +9,13 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Fixed
+- **Opening a document now puts the cursor in it too.** 0.6.1 fixed this for File ▸
+  New; the same first-keystroke loss applied to File ▸ Open, Open Recent, the
+  splash's Open link, a file dropped on the window, and a document passed on the
+  command line. Auto-reload deliberately still does *not* take focus — it happens
+  in the background and shouldn't pull you out of whatever you were doing.
+
 ## [0.6.1] - 2026-07-30
 
 ### Fixed

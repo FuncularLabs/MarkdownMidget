@@ -713,6 +713,7 @@ public partial class MainWindow : Window
             var text = await File.ReadAllTextAsync(path);
             await LoadDocumentAsync(text, path);
             AddRecent(path);
+            await FocusDocumentAsync();   // same reason as New: don't eat the first keystroke
         }
         catch (Exception ex)
         {
@@ -2109,6 +2110,7 @@ public partial class MainWindow : Window
             _suppressDirty = false;
             await SetCleanBaselineAsync();
             SetClosed(false);
+            await FocusDocumentAsync();
         }
         finally { HideBusy(); }
     }
