@@ -10,6 +10,40 @@ deliberately parked).
 
 ---
 
+## Next
+
+### Hide superseded prereleases in About / updates
+
+The About box lists **Newest prerelease** unconditionally whenever any prerelease
+exists, so it keeps advertising a build that nothing should install. Concretely,
+running 0.6.0-beta2 with 0.6.1 published shows:
+
+```
+Newest release:    v0.6.1
+Newest prerelease: v0.6.0-beta2      <- older than both the install AND the stable
+```
+
+The Update *button* is already gated on the version being newer
+(`AboutDialog.RefreshAsync`), so the button correctly stays hidden — it's the
+**row** that's noise, and it reads as if a prerelease were on offer.
+
+Suppress the prerelease line entirely unless its version is greater than **both**
+the running version and the newest stable. Points to cover when implementing:
+
+- The startup "Update available" notice already applies the right rule (it only
+  suggests prereleases to users already on one) — align the About box with it.
+- Decide what the row shows when there is no *qualifying* prerelease: hide the
+  line outright rather than printing "none published", which is misleading when
+  prereleases exist but are all superseded.
+- Same treatment for "Newest release" when it equals the running version? It
+  currently reads as informational rather than as an offer, so probably leave it —
+  but confirm the two rows read consistently.
+- Worth a unit test over `UpdateCheck` + the running version, in the style of the
+  existing `UpdateVersionTests`/`ReleaseFeedTests`, so the visibility rule is
+  pinned rather than living only in the dialog.
+
+---
+
 ## Someday / Big
 
 ### Real installer / uninstaller
