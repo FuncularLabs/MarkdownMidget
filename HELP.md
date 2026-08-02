@@ -294,9 +294,12 @@ line with `--readonly`.
 ## Updates
 
 **Help ▸ About Markdown Midget** shows the version you're running and the newest
-available versions — the newest **release** and the newest **prerelease** are
-listed separately, so you can knowingly opt into early builds. When something
-newer than your version exists, an **Update** button appears:
+available versions — the newest **release** and, separately, a **prerelease** if
+one is genuinely ahead, so you can knowingly opt into early builds. A prerelease
+is listed only while it is newer than both your version and the newest release; an
+older beta that a release has since overtaken isn't shown at all, because
+installing it would be a downgrade. When something newer than your version exists,
+an **Update** button appears:
 
 - **Installed** (you used *Register as .md editor* with the AppData install):
   the installed copy is replaced in place, shortcuts and the Open-with

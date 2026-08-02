@@ -2,8 +2,8 @@
 
 <img src="https://raw.githubusercontent.com/FuncularLabs/MarkdownMidget/master/art/midget-256.png" alt="Markdown Midget mascot" width="120" align="right" />
 
-[![Latest release](https://img.shields.io/github/v/release/FuncularLabs/MarkdownMidget?include_prereleases&sort=semver&color=blue&label=latest)](https://github.com/FuncularLabs/MarkdownMidget/releases)
-[![Release date](https://img.shields.io/github/release-date-pre/FuncularLabs/MarkdownMidget?color=informational)](https://github.com/FuncularLabs/MarkdownMidget/releases)
+[![Latest release](https://img.shields.io/github/v/release/FuncularLabs/MarkdownMidget?sort=semver&color=blue&label=latest)](https://github.com/FuncularLabs/MarkdownMidget/releases)
+[![Release date](https://img.shields.io/github/release-date/FuncularLabs/MarkdownMidget?color=informational)](https://github.com/FuncularLabs/MarkdownMidget/releases)
 [![Downloads](https://img.shields.io/github/downloads/FuncularLabs/MarkdownMidget/total?color=success)](https://github.com/FuncularLabs/MarkdownMidget/releases)
 [![CI](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/ci.yml/badge.svg)](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/ci.yml)
 [![Release](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/release.yml/badge.svg)](https://github.com/FuncularLabs/MarkdownMidget/actions/workflows/release.yml)
@@ -21,12 +21,15 @@ so markdown is the literal document model rather than a lossy import/export.
 
 ## Download
 
-The latest build is always on the
+Builds are on the
 [**Releases page**](https://github.com/FuncularLabs/MarkdownMidget/releases) —
-grab `MarkdownMidget-vX.Y.Z-…-net10.exe` from the top entry. Releases are
-currently marked as prereleases (`-alpha`, `-beta`) until we cut a stable 1.0;
-GitHub's sidebar "Releases" widget only highlights non-prereleases, so the
-badge above is the reliable "latest version" indicator.
+grab `MarkdownMidget-vX.Y.Z-…-net10.exe` from the entry marked **Latest**. That's
+the newest stable release, and it's what the badge above tracks.
+
+A prerelease (`-beta`) may sit above it on the page while a feature is being
+proven; take that one only if you want what's coming rather than what's settled.
+Markdown Midget can also update itself: **Help ▸ About** lists the newest release
+and any newer prerelease separately, so it's always clear which you're installing.
 
 Every tagged push builds on GitHub Actions and attaches the exe automatically
 (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
@@ -60,8 +63,10 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-Alpha (v0.1.x). Windows-only for now; the editor core is web-based so a
-cross-platform shell (MAUI/Avalonia) is a realistic future step.
+Beta (0.6.x), in daily use and signed on every release. Windows-only for now; the
+editor core is web-based, so a cross-platform shell (MAUI/Avalonia) is a realistic
+future step. A real installer that registers in Add/Remove Programs is on the
+[roadmap](ROADMAP.md) — the portable exe will stay available either way.
 
 ## Layout
 
@@ -122,7 +127,7 @@ npm run build    # writes src/MarkdownMidget/wwwroot/editor.bundle.{js,css}
 
 ## Distribution (single-file builds)
 
-The **framework-dependent** profile is the standard distributable — a single ~3 MB
+The **framework-dependent** profile is the standard distributable — a single ~6.5 MB
 `.exe` for machines that have the **.NET 10 Desktop runtime** (and the Edge
 **WebView2 runtime**, which ships with Windows 11):
 
@@ -200,53 +205,32 @@ is deferred from this first iteration. Notable deferrals / divergences:
 - **Read-only mode:** Edit ▸ Read Only locks the document; also available via the
   `--readonly` command-line switch. Help ▸ View Help opens the bundled
   [HELP.md](HELP.md) read-only in a new instance.
-- Deferred: print, page setup, find/replace, color, theming.
+- **Printing** (Ctrl+P) and **PDF export**, with header/footer and colour-code-block
+  options, and **Find** (Ctrl+F, F3) in Normal / Extended / Wildcards / Regex modes.
+- Deferred: page setup, **Replace** (find is done), colour, theming.
 
 ## Recent changes
 
-A condensed view of the latest changes. See [CHANGELOG.md](CHANGELOG.md) for the
-full version history, and [ROADMAP.md](ROADMAP.md) for what's on deck.
+The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
+[ROADMAP.md](ROADMAP.md) for what's on deck.
 
-- **v0.3.0-beta1** — Richer **Register / Unregister** dialogs (move vs. copy,
-  Start-menu + Desktop shortcuts, restore-to-original) with plain-language
-  diagrams; **Skip Spell Check in Code** (WYSIWYG); spell-check state persists;
-  **denser table styling**; **Win+arrow** native Windows Snap.
-- **v0.2.0-beta2** — Releases are now **Authenticode-signed** by Funcular Labs
-  via Azure Artifact Signing; exe metadata (Company, Copyright, description)
-  fully populated; `AppVersion` derived from assembly attribute so the title
-  bar auto-syncs to the tag.
-- **v0.2.0-beta1** — First beta. All 0.1.x-alpha work baked in;
-  release-engineering (CI, tag-driven publishing, unit tests, embedded HELP.md,
-  Windows integration) proven. Refreshed screenshot; README images now use
-  `raw.githubusercontent.com` absolute URLs.
-- **v0.1.8-alpha2** — Fix registration dedupe (also cleans the per-user
-  Explorer ProgID MRU and stale UserChoice); clearer "Set as default"
-  walkthrough; **F1 opens Help**.
-- **v0.1.8-alpha1** — **Windows integration** submenu (File): register /
-  unregister as a .md editor without an installer, dedupe stale references,
-  optional AppData install + Start-menu shortcut, optional "set as default"
-  via Windows Settings.
-- **v0.1.7-alpha2** — Fix Find Next/Prev cursor (was resetting to match 1 every
-  press) and skip hidden mermaid source in the index; add **Win+arrow**
-  window-management shortcuts (Up/Down/Shift+Up plus Left/Right snap).
-- **v0.1.7-alpha1** — **Find** (Ctrl+F, F3/Shift+F3) with Normal / Extended /
-  Wildcards / Regex modes, case + whole-word + wrap toggles, "Match m of n"
-  status; **busy overlay** when opening files.
-- **v0.1.6-alpha1** — **Mermaid diagrams** render live in WYSIWYG view for
-  fenced ` ```mermaid ` blocks; source is hidden by default and revealed for
-  inline editing when the cursor enters the block. Diagrams print and export
-  to PDF cleanly.
-- **v0.1.5-alpha2** — Default landing is the "No document open" splash with
-  clickable **Open** / **New** prompts; **Landscape** is the new default
-  Document Width for fresh installs.
-- **v0.1.5-alpha1** — File ▸ Close (Ctrl+W) with a gray drop-target placeholder;
-  external change detection with a timestamped backup + reload/save-as/keep
-  dialog; **Print (Ctrl+P) and Export to PDF** with per-Document-Width prefs;
-  tighter table preview CSS.
-- **v0.1.4-alpha1** — Spell-check toggle joins the View toolbar group (no
-  leading separator).
-- **v0.1.3** — Spell-check toggle button on the View toolbar (custom *abc + red
-  squiggle* icon), two-way bound to View ▸ Spell Check.
+- **v0.6.3-beta1** — **Unsaved work survives a crash**: a copy is kept while a
+  document has unsaved changes and handed back on the next launch, still marked
+  unsaved and still bound to its file. Superseded prereleases no longer clutter
+  the About box.
+- **v0.6.2** — The window **remembers where you left it** (validated against the
+  monitors that still exist, and correct on mixed-DPI desks); **word and character
+  count** in the status bar; **File ▸ Settings…** for the Open Recent length and
+  what a session opens with; and File ▸ Open, Open Recent, drag-and-drop and the
+  command line all put the cursor in the document too.
+- **v0.6.1** — File ▸ New puts the cursor **in the document**, so the first thing
+  you type doesn't go nowhere.
+- **v0.6.0** — **In-app updates** with a real About box: versions, licence and
+  copyright links, stable and prerelease listed separately, and one-click updates
+  that verify the Funcular Labs signature before installing. Plus a round of
+  spelling-menu fixes.
+- **v0.5.1 / v0.5.0-beta1** — Markdown Midget's **own spell checker**: squiggles
+  in both views, a private dictionary, and code blocks exempt.
 
 ## License
 
