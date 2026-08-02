@@ -94,6 +94,7 @@ public partial class MainWindow : Window
         UpdateWrapToggleUi();
         MenuAutoReload.IsChecked = _autoReload;
         _noteTimer.Tick += (_, _) => { _noteTimer.Stop(); StatusNote.Text = string.Empty; };
+        _backupTimer.Tick += async (_, _) => await WriteBackupAsync();
 
         // (Window placement is applied later, in OnSourceInitialized — it needs the HWND.)
         Updates.UpdateService.CleanupOldBinaries();
@@ -107,6 +108,11 @@ public partial class MainWindow : Window
             if (arg is "--readonly" or "-r" or "/readonly") _startReadOnly = true;
             else if (arg is "--source" or "/source") _startInSource = true;
             else if (arg is "--help-window") { _isHelpWindow = true; _startReadOnly = true; }
+            else if (arg == "--recover" && i + 1 < args.Length)
+            {
+                // Launched by another window to take one specific crashed session.
+                _recoverSessionId = args[++i];
+            }
             else if (arg == "--finish-move" && i + 1 < args.Length)
             {
                 // We were launched by a "move" install to delete the original download
@@ -117,6 +123,7 @@ public partial class MainWindow : Window
         }
 
         if (_isHelpWindow) MenuViewHelp.IsEnabled = false; // no help-of-help
+        StartBackup();
 
         Loaded += async (_, _) => await InitializeEditorAsync();
         Closing += MainWindow_Closing;
@@ -298,25 +305,7 @@ public partial class MainWindow : Window
                 _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
                 RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
-                if (_pendingOpenPath is { } p)
-                {
-                    _pendingOpenPath = null;
-                    _ = OpenThenApplyStartupViewAsync(p);
-                }
-                else if (_startWithBlankDocument)
-                {
-                    // Settings: land on an empty document with the caret in it, so a
-                    // session can start by simply typing.
-                    _ = StartBlankDocumentAsync();
-                }
-                else
-                {
-                    // Default landing state is the "no document open" splash, so a
-                    // brand-new session is purely a drop target / Open / New prompt.
-                    _ = SetCleanBaselineAsync();
-                    SetClosed(true);
-                }
-                if (_startReadOnly) SetReadOnly(true);
+                _ = ApplyLandingStateAsync();
                 break;
             case "change":
                 if (!_sourceMode)
@@ -652,9 +641,18 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit) { Owner = this };
+        var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit, _backupEnabled) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         _startWithBlankDocument = dlg.StartWithBlankDocument;
+        if (dlg.KeepBackup != _backupEnabled)
+        {
+            _backupEnabled = dlg.KeepBackup;
+            // Turning it off must take the existing copy with it — leaving unsaved
+            // content on disk after the user said not to keep it is the opposite of
+            // what they asked for. Turning it on starts protecting from here.
+            if (_backupEnabled) { StartBackup(); _backupDirty = true; }
+            else EndBackup();
+        }
         if (dlg.RecentLimit != _recentLimit)
         {
             // Only the menu length changes. Lowering the limit must not delete
@@ -694,21 +692,32 @@ public partial class MainWindow : Window
     {
         if (_sourceMode) return SourceBox.Text;
         if (!_editorReady) return null;
-        return await RunEditorAsync("window.MDM.getMarkdown()");
+        // "Couldn't be asked" has to include a WebView2 that has died, which throws
+        // instead of answering — and nothing sets _editorReady back to false, because
+        // there is no ProcessFailed handler. Without this catch every guard built on
+        // the null return is unreachable in exactly the failure it was written for,
+        // and the throw escapes through an async void handler and takes the process
+        // with it, unsaved work and all.
+        try { return await RunEditorAsync("window.MDM.getMarkdown()"); }
+        catch { return null; }
     }
 
-    private async Task<string> GetDocumentMarkdownAsync()
-    {
-        if (_sourceMode) return SourceBox.Text;
-        if (!_editorReady) return string.Empty;
-        return await RunEditorAsync("window.MDM.getMarkdown()") ?? string.Empty;
-    }
+    // There is deliberately no variant that returns "" when the editor can't answer.
+    // Every caller here either saves, discards, or decides whether there is unsaved
+    // work, and each of those reads an empty document as "nothing to protect". Make
+    // the failure impossible to ignore instead: TryGet returns null, and the caller
+    // has to say what that means.
 
     private async Task SetDocumentMarkdownAsync(string markdown)
     {
-        SourceBox.Text = markdown;
+        // Editor first, source box second. If the script throws, both surfaces are
+        // left showing the OLD document — which is what _currentPath still says, since
+        // callers assign it after this returns. Setting the source box first would
+        // leave the visible document ahead of the fields, and in source view that
+        // mismatch becomes a crash snapshot labelled with the wrong file.
         if (_editorReady)
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
+        SourceBox.Text = markdown;
         // Count here rather than in each caller: installing content doesn't raise a
         // 'change' message, so a freshly opened document would otherwise show no
         // count at all until the first keystroke.
@@ -735,20 +744,56 @@ public partial class MainWindow : Window
     private async Task SetSourceModeAsync(bool on)
     {
         if (on == _sourceMode) return;
-        if (_closed) return; // no document to flip between views
+        if (_closed)
+        {
+            // No document to flip between views. Put the controls back — a click has
+            // already flipped them, and nothing below will resync them.
+            SourceToggle.IsChecked = _sourceMode;
+            MenuViewSource.IsChecked = _sourceMode;
+            return;
+        }
 
         if (on)
         {
-            // Entering source: pull the latest markdown out of the editor.
-            SourceBox.Text = await GetDocumentMarkdownAsync();
+            // Entering source: pull the latest markdown out of the editor. If it
+            // can't answer, stay where we are rather than showing an empty box —
+            // once in source view that emptiness becomes the document, because the
+            // source box is then the authoritative copy.
+            var latest = await TryGetDocumentMarkdownAsync();
+            if (latest is null)
+            {
+                MessageBox.Show(this, "Couldn't read the document from the editor, so the " +
+                    "markdown view wasn't opened. Your work is unaffected.",
+                    "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // The toggle button flipped itself on the click; put it back.
+                SourceToggle.IsChecked = _sourceMode;
+                MenuViewSource.IsChecked = _sourceMode;
+                return;
+            }
+            SourceBox.Text = latest;
             Web.Visibility = Visibility.Collapsed;
             SourceBox.Visibility = Visibility.Visible;
             SourceBox.Focus();
         }
         else
         {
-            // Leaving source: push edits back into the WYSIWYG editor.
+            // Leaving source: push edits back into the WYSIWYG editor, then check it
+            // actually landed. A silently failed setMarkdown would leave the editor
+            // showing the pre-edit document while the source box — the only copy of
+            // the edits — is hidden and about to be treated as stale.
             await SetDocumentMarkdownAsync(SourceBox.Text);
+            // Ask the editor directly: TryGetDocumentMarkdownAsync would hand back
+            // SourceBox.Text, since _sourceMode is still true until below.
+            var landed = _editorReady ? await RunEditorAsync("window.MDM.getMarkdown()") : null;
+            if (landed is null)
+            {
+                MessageBox.Show(this, "Couldn't hand your markdown back to the formatted " +
+                    "view, so it's been left as it is. Your edits are still here.",
+                    "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+                SourceToggle.IsChecked = _sourceMode;
+                MenuViewSource.IsChecked = _sourceMode;
+                return;
+            }
             SourceBox.Visibility = Visibility.Collapsed;
             Web.Visibility = Visibility.Visible;
         }
@@ -780,7 +825,11 @@ public partial class MainWindow : Window
     private async Task<bool> ConfirmDiscardAsync()
     {
         if (!_dirty) return true;
-        var name = _currentPath is null ? "Untitled" : Path.GetFileName(_currentPath);
+        // Same name the title bar shows. Dropped content has no path but does have a
+        // name, and asking "Save changes to Untitled?" about a file the user can see
+        // named in the title is its own small betrayal.
+        var name = _currentPath is not null ? Path.GetFileName(_currentPath)
+                 : _displayName ?? "Untitled";
         var result = MessageBox.Show(
             $"Save changes to {name}?", "Markdown Midget",
             MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
@@ -861,15 +910,30 @@ public partial class MainWindow : Window
     /// <summary>Loads markdown into the editor and resets the clean baseline + history.</summary>
     private async Task LoadDocumentAsync(string markdown, string? path)
     {
+        // try/finally, because the awaits below reach into the editor and throw
+        // outright when the WebView2 has died. A _suppressDirty left stuck true stops
+        // dirty tracking AND backups for the rest of the session, so the app would
+        // close a modified document without asking and with no crash copy — the
+        // failure this whole feature exists to prevent, caused by its own guard.
         _suppressDirty = true;
-        // A new document invalidates any in-flight spell check — its results were
-        // computed against the OLD document and must never decorate this one.
-        _spellGeneration++;
-        await ApplyDocBaseAsync(path);            // resolve relative images before render
-        await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
-        _currentPath = path;
-        _displayName = null;
-        _suppressDirty = false;
+        try
+        {
+            // The document being replaced is gone: every caller has already asked,
+            // and the user either saved it or said discard. Its crash copy has to go
+            // with it, or a later crash would hand back the very content they told us
+            // to throw away — and "the copy is deleted as soon as you save or close"
+            // would be a promise the app didn't keep.
+            DiscardBackup();
+            _backupDirty = false;   // don't let a timer tick resurrect what we dropped
+            // A new document invalidates any in-flight spell check — its results were
+            // computed against the OLD document and must never decorate this one.
+            _spellGeneration++;
+            await ApplyDocBaseAsync(path);            // resolve relative images first
+            await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
+            _currentPath = path;
+            _displayName = null;
+        }
+        finally { _suppressDirty = false; }
         await SetCleanBaselineAsync();
         SetClosed(false);
         StartWatching(path);
@@ -939,17 +1003,45 @@ public partial class MainWindow : Window
             {
                 Filter = "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
                 DefaultExt = ".md",
-                FileName = _currentPath is null ? "Untitled.md" : Path.GetFileName(_currentPath),
+                // Dropped content already has a sensible name; offer it rather than
+                // making the user retype it. Through GetFileName even so — it reaches
+                // us from the browser and, after a recovery, from a file on disk.
+                FileName = _currentPath is not null ? Path.GetFileName(_currentPath)
+                         : (_displayName is null ? "Untitled.md" : Path.GetFileName(_displayName)),
             };
             if (dlg.ShowDialog(this) != true) return false;
             path = dlg.FileName;
         }
 
-        var markdown = await GetDocumentMarkdownAsync();
+        // TryGet, not Get. Get reports "the editor didn't answer" as an empty
+        // document, and this method truncates the file with FileMode.Create and then
+        // deletes the crash copy — so one unanswered call would replace the user's
+        // document with nothing AND destroy the backup holding the real content, with
+        // no error and a title bar that says saved.
+        var markdown = await TryGetDocumentMarkdownAsync();
+        if (markdown is null)
+        {
+            MessageBox.Show(this,
+                "Couldn't read the document from the editor, so nothing was saved.\n\n" +
+                "Your work is untouched — the file on disk is unchanged and the " +
+                "unsaved-changes copy has been kept. Try again, or restart the app.",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
         _suppressWatcher = true;
         try
         {
-            await File.WriteAllTextAsync(path, markdown);
+            // Flushed to the device, not just handed to the cache: the crash copy is
+            // deleted a few lines below on the strength of this write having happened.
+            // Losing power inside the write-back window would otherwise leave the
+            // classic zero-length file AND no backup — the exact case this feature is
+            // for. A few milliseconds per save is a fair price.
+            await using var file = new FileStream(path, FileMode.Create, FileAccess.Write,
+                FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);
+            await using var writer = new StreamWriter(file);
+            await writer.WriteAsync(markdown);
+            await writer.FlushAsync();
+            file.Flush(flushToDisk: true);
         }
         catch (Exception ex)
         {
@@ -968,7 +1060,247 @@ public partial class MainWindow : Window
         if (pathChanged) StartWatching(path);
         SetClosed(false);
         AddRecent(path);
+        DiscardBackup();   // it's on disk now; the crash copy has nothing left to protect
         return true;
+    }
+
+    /// <summary>
+    /// What the window shows when the editor comes up, and only then any crash
+    /// recovery. These have to be sequential: recovery decides whether it may use
+    /// this window by looking at what's in it, and firing both off concurrently
+    /// would have it read a half-applied landing state.
+    /// </summary>
+    private async Task ApplyLandingStateAsync()
+    {
+        // First, not last. Everything below awaits into the editor, and a script call
+        // that throws would fault this task silently (it's fire-and-forget), leaving a
+        // --readonly or Help window fully editable. Applying it up front also means
+        // the loads below already see the right value.
+        if (_startReadOnly) SetReadOnly(true);
+        try
+        {
+            if (_pendingOpenPath is { } path)
+            {
+                _pendingOpenPath = null;
+                await OpenThenApplyStartupViewAsync(path);
+            }
+            else if (_startWithBlankDocument)
+            {
+                // Settings: land on an empty document with the caret in it, so a
+                // session can start by simply typing.
+                await StartBlankDocumentAsync();
+            }
+            else
+            {
+                // Default landing state is the "no document open" splash, so a
+                // brand-new session is purely a drop target / Open / New prompt.
+                await SetCleanBaselineAsync();
+                SetClosed(true);
+            }
+        }
+        catch { /* a landing state that failed must not also cost them recovery */ }
+        await RecoverAsync();   // swallows its own failures
+    }
+
+    // ===== Crash recovery (periodic backup of unsaved work) =====
+
+    private Backup.BackupStore? _backup;
+    private readonly DispatcherTimer _backupTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private bool _backupDirty;      // content changed since the last snapshot
+
+    /// <summary>
+    /// Claim a backup session for this window. Read-only and help windows are
+    /// skipped: they can't have unsaved work, and a lock file each would be noise
+    /// that later launches have to probe.
+    /// </summary>
+    private void StartBackup()
+    {
+        // _startReadOnly, not _readOnly: this runs from the constructor, before the
+        // editor is up and SetReadOnly has applied it.
+        if (_startReadOnly || _isHelpWindow || !_backupEnabled) return;
+        _backup = new Backup.BackupStore(Backup.BackupStore.DefaultDirectory, Guid.NewGuid().ToString("N"));
+        if (!_backup.Start()) { _backup = null; return; }   // couldn't lock; don't pretend
+        _backupTimer.Start();   // Tick is wired once in the constructor, not here:
+                                // toggling the setting would otherwise stack handlers
+    }
+
+    /// <summary>
+    /// Snapshot the document if it has changed since last time. Reads the editor
+    /// directly rather than trusting a cached copy — the whole point is to be right
+    /// about what the user would lose.
+    /// </summary>
+    private async Task WriteBackupAsync()
+    {
+        // _suppressDirty means a document swap is mid-flight: the editor still holds
+        // the OLD content while the fields have moved on, so a tick landing here
+        // would snapshot the wrong document — and recreate a copy just discarded.
+        if (_backup is null || !_backupDirty || _closed || _suppressDirty) return;
+        _backupDirty = false;
+        try
+        {
+            // TryGet, not Get: a failed editor call comes back as "" from the latter,
+            // and this method's two decisions are both destructive. Empty would either
+            // delete the snapshot (when there's nothing on disk to compare against) or
+            // overwrite it with nothing — and a zero-byte snapshot handed back after a
+            // crash is a blank document the user is invited to save over their file.
+            var markdown = await TryGetDocumentMarkdownAsync();
+            if (markdown is null) { _backupDirty = true; return; }   // keep the last good one
+            // Only unsaved content is worth keeping. If it matches what's on disk,
+            // the file itself is the backup.
+            if (string.Equals(markdown, _cleanMarkdown, StringComparison.Ordinal)) { DiscardBackup(); return; }
+            _backup.Save(markdown, _currentPath, _displayName);
+        }
+        catch { _backupDirty = true; }   // try again on the next tick
+    }
+
+    private void DiscardBackup() => _backup?.Discard();
+
+    /// <summary>
+    /// Hand back whatever a crashed session left. Runs once the editor is ready, so
+    /// recovered content can go straight into it.
+    /// </summary>
+    private async Task RecoverAsync()
+    {
+        if (_backup is null || _readOnly || _isHelpWindow) return;
+        try
+        {
+            // Launched to recover one specific snapshot: take exactly that one and
+            // don't scan, or this window would race the parent for the others.
+            if (_recoverSessionId is { } wanted)
+            {
+                if (_backup.FindOrphan(wanted) is { } target)
+                    await LoadRecoveredAsync(target.Meta, target.Markdown);
+                return;
+            }
+
+            // One instance recovers at a time; whoever holds this is doing the work.
+            using var claim = _backup.BeginRecovery();
+            if (claim is null) return;
+
+            var orphans = _backup.FindOrphans();
+            if (orphans.Count == 0) return;
+
+            // "Free" means this window holds nothing the user would miss — the splash,
+            // or the empty document the blank-doc setting lands on. Recovery must
+            // never displace something they opened or typed.
+            var free = _currentPath is null && !_dirty && string.IsNullOrEmpty(_cleanMarkdown);
+            var plan = Backup.RecoveryPlan.Decide([.. orphans.Select(o => o.Meta)], free);
+            var byId = orphans.ToDictionary(o => o.Meta.SessionId, o => o.Markdown);
+
+            var opened = 0;
+            foreach (var other in plan.Elsewhere)
+            {
+                // Count the attempt BEFORE handing it over: if opening it kills the
+                // app, the incremented count is what stops the next launch repeating.
+                // The window we hand it to does NOT count it again. But only count a
+                // hand-off that actually happened — charging an attempt for a window
+                // that never opened would retire the document after three launches
+                // without it ever having been seen.
+                if (!OpenRecovered(other)) continue;
+                _backup.RecordAttempt(other);
+                opened++;
+            }
+
+            if (plan.Here is { } mine && byId.TryGetValue(mine.SessionId, out var markdown))
+            {
+                _backup.RecordAttempt(mine);
+                await LoadRecoveredAsync(mine, markdown);
+            }
+            else if (opened > 0)
+            {
+                FlashStatus($"Restoring {opened} unsaved document(s) from a previous session");
+            }
+
+            // Last, and not as a flash. These are documents we are giving up on, so
+            // the one message the user must not miss is the one that would otherwise
+            // be overwritten four seconds later by the recovery notice above — or by
+            // the next given-up document in the list. Windows that failed to open are
+            // in the same message: uncounted and still on disk, so they WILL be tried
+            // again — but the user should hear it now, not discover it never happened.
+            ReportAbandoned(plan.GivenUp, plan.Elsewhere.Count - opened);
+            foreach (var abandoned in plan.GivenUp) _backup.MarkGiveUpReported(abandoned);
+        }
+        catch { /* recovery is a bonus; never let it stop the app starting */ }
+    }
+
+    /// <summary>
+    /// Put recovered content in this window, dirty, still pointing at its original
+    /// file. Deliberately NOT written back to disk — the user decides whether this
+    /// version is the one they want.
+    /// </summary>
+    private async Task LoadRecoveredAsync(Backup.BackupSnapshot mine, string markdown)
+    {
+        await LoadDocumentAsync(markdown, mine.Path);
+        // Everything above treats a freshly loaded document as clean. This one isn't:
+        // it's unsaved work that never reached the file.
+        _cleanMarkdown = mine.Path is not null && File.Exists(mine.Path)
+            ? await ReadFileOrEmptyAsync(mine.Path)
+            : string.Empty;
+        _displayName = mine.Path is null ? mine.DisplayName : null;
+        _dirty = !string.Equals(markdown, _cleanMarkdown, StringComparison.Ordinal);
+        UpdateTitle();
+        // Take ownership so this window's timer keeps protecting it from here on. If
+        // that write fails the orphan is deliberately left alone, but nothing would
+        // retry — _backupDirty is false after a load — so arm the next tick.
+        if (_backup?.Adopt(mine, markdown) == false) _backupDirty = true;
+        FlashStatus($"Recovered unsaved changes to {mine.Describe()} — not yet saved");
+        await FocusDocumentAsync();
+    }
+
+    private static async Task<string> ReadFileOrEmptyAsync(string path)
+    {
+        try { return await File.ReadAllTextAsync(path); } catch { return string.Empty; }
+    }
+
+    /// <summary>
+    /// Hand a snapshot to a new window, which takes it by name. False means the
+    /// window never started, so the caller must not charge it an attempt.
+    /// </summary>
+    private bool OpenRecovered(Backup.BackupSnapshot snapshot)
+    {
+        var exe = Environment.ProcessPath;
+        if (exe is null) return false;
+        // The id comes from a filename in a folder we don't exclusively own, and it
+        // is about to become a child process's arguments. Require the shape we
+        // actually write, and pass it as an argument rather than splicing it into a
+        // command line, so a crafted name can't turn into extra switches.
+        if (!Backup.BackupStore.IsSessionId(snapshot.SessionId)) return false;
+        try
+        {
+            var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
+            psi.ArgumentList.Add("--recover");
+            psi.ArgumentList.Add(snapshot.SessionId);
+            Process.Start(psi);
+            return true;
+        }
+        catch { return false; }   // it stays on disk, uncounted, for the next launch
+    }
+
+    /// <summary>
+    /// Tell the user about work we have stopped trying to restore. Deliberately a
+    /// dialog rather than a status flash: this is the last time the app will mention
+    /// unsaved work that still exists on disk, and a message that disappears after
+    /// four seconds is the same as no message.
+    /// </summary>
+    private void ReportAbandoned(IReadOnlyList<Backup.BackupSnapshot> abandoned, int failedToOpen)
+    {
+        if (abandoned.Count == 0 && failedToOpen <= 0) return;
+        var body = new System.Text.StringBuilder();
+        if (abandoned.Count > 0)
+        {
+            body.Append("Markdown Midget couldn't restore this unsaved work after several attempts:\n\n  ");
+            body.Append(string.Join("\n  ", abandoned.Select(a => a.Describe())));
+            body.Append("\n\n");
+        }
+        if (failedToOpen > 0)
+            body.Append(abandoned.Count > 0
+                ? $"It also couldn't open a window for {failedToOpen} more recovered document(s); "
+                : $"Markdown Midget couldn't open a window for {failedToOpen} recovered document(s); ")
+                .Append("they'll be offered again next time.\n\n");
+        body.Append("The files are still here, as plain markdown you can open in any editor:\n");
+        body.Append(Backup.BackupStore.DefaultDirectory);
+        MessageBox.Show(this, body.ToString(),
+            "Unsaved work couldn't be restored", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     // ===== Close (no-document state) =====
@@ -983,15 +1315,19 @@ public partial class MainWindow : Window
         if (_closed) return;
         if (!await ConfirmDiscardAsync()) return;
         StopWatching();
-        _suppressDirty = true;
-        await SetDocumentMarkdownAsync(string.Empty);
-        _currentPath = null;
-        _displayName = null;
-        _cleanMarkdown = string.Empty;
-        _dirty = false;
-        _suppressDirty = false;
+        _suppressDirty = true;   // see LoadDocumentAsync: must not stay true on a throw
+        try
+        {
+            await SetDocumentMarkdownAsync(string.Empty);
+            _currentPath = null;
+            _displayName = null;
+            _cleanMarkdown = string.Empty;
+            _dirty = false;
+        }
+        finally { _suppressDirty = false; }
         UpdateTitle();
         SetClosed(true);
+        DiscardBackup();   // the user was asked and chose to let it go
     }
 
     private void SetClosed(bool on)
@@ -1813,6 +2149,7 @@ public partial class MainWindow : Window
         public bool AutoReload { get; set; } = true; // silently reload externally-changed files when nothing is unsaved
         public int RecentLimit { get; set; } = 10;   // entries kept in Open Recent
         public bool StartWithBlankDocument { get; set; } // else the no-document placeholder
+        public bool KeepBackup { get; set; } = true;     // crash copy of unsaved work
         // Remembered window placement. Null/zero means "never saved" -> default layout.
         public double? WindowLeft { get; set; }
         public double? WindowTop { get; set; }
@@ -1827,6 +2164,8 @@ public partial class MainWindow : Window
     private bool _autoReload = true;         // persisted; see OnExternalChangeAsync
     private int _recentLimit = 10;           // persisted; Open Recent length
     private bool _settingsUnknown;           // the settings read failed: never write this session
+    private bool _backupEnabled = true;      // persisted; keep a crash copy of unsaved work
+    private string? _recoverSessionId;       // --recover <id>: restore exactly this snapshot
     private Rect? _savedBounds;              // persisted; normal (un-maximized) bounds
     private bool _savedMaximized;
     private bool _startWithBlankDocument;    // persisted; startup lands on a blank doc
@@ -1878,6 +2217,7 @@ public partial class MainWindow : Window
             _autoReload = s.AutoReload;
             _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
             _startWithBlankDocument = s.StartWithBlankDocument;
+            _backupEnabled = s.KeepBackup;
             _savedBounds = s.WindowWidth is > 0 && s.WindowHeight is > 0
                 ? new Rect(s.WindowLeft ?? 0, s.WindowTop ?? 0, s.WindowWidth.Value, s.WindowHeight.Value)
                 : null;
@@ -2003,6 +2343,7 @@ public partial class MainWindow : Window
         AutoReload = _autoReload,
         RecentLimit = _recentLimit,
         StartWithBlankDocument = _startWithBlankDocument,
+        KeepBackup = _backupEnabled,
     };
 
     // ===== Document width =====
@@ -2074,11 +2415,28 @@ public partial class MainWindow : Window
             {
                 _dirty = false;
                 StopWatching();
+                // Asked and answered: they either saved it or chose to let it go, so
+                // there is nothing left for a crash copy to rescue.
+                EndBackup();
                 Close();
             }
             return;
         }
         StopWatching();
+        EndBackup();
+    }
+
+    /// <summary>
+    /// Close this window's backup session on a clean exit: drop the snapshot and
+    /// release the lock. Anything still on disk afterwards therefore means a session
+    /// that ended without getting here — which is exactly what recovery looks for.
+    /// </summary>
+    private void EndBackup()
+    {
+        _backupTimer.Stop();
+        DiscardBackup();
+        _backup?.Dispose();
+        _backup = null;
     }
 
     // ===== Edit menu (native shortcuts also work in each surface) =====
@@ -2377,16 +2735,31 @@ public partial class MainWindow : Window
         {
             StopWatching();
             _suppressDirty = true;
+            // Same reason as LoadDocumentAsync: the document being replaced was just
+            // saved or explicitly discarded, so its crash copy goes with it. This path
+            // builds the document by hand instead of going through LoadDocumentAsync,
+            // so it needs saying twice.
+            DiscardBackup();
+            _backupDirty = false;
             await ApplyDocBaseAsync(null); // dropped content has no folder context
             await SetDocumentMarkdownAsync(content);
             _currentPath = null;
             _displayName = name;
             _suppressDirty = false;
-            await SetCleanBaselineAsync();
+            // Dropped content exists nowhere but in this window — there is no file to
+            // compare it against and nothing to reopen if it's lost. Treat it as
+            // unsaved from the outset: closing prompts, and the crash copy actually
+            // covers it. Baselining it as "clean" made both of those silently skip it.
+            _cleanMarkdown = string.Empty;
+            _dirty = true;
+            _backupDirty = true;
+            UpdateTitle();
             SetClosed(false);
             await FocusDocumentAsync();
         }
-        finally { HideBusy(); }
+        // _suppressDirty here too: a throw partway would otherwise leave it stuck,
+        // freezing dirty tracking and backups for the rest of the session.
+        finally { HideBusy(); _suppressDirty = false; }
     }
 
     private static void OpenInNewInstance(string path, bool readOnly = false, bool helpWindow = false)
@@ -2503,13 +2876,21 @@ public partial class MainWindow : Window
     private async Task UpdateDirtyAsync()
     {
         if (_suppressDirty) return;
-        var current = await GetDocumentMarkdownAsync();
+        // A failed read must not be mistaken for an empty document: that would clear
+        // the modified flag, and an unmodified document is one the app throws away
+        // without asking — taking the crash copy with it. Keep the last known state.
+        var current = await TryGetDocumentMarkdownAsync();
+        if (current is null) return;
         var dirty = !string.Equals(current, _cleanMarkdown, StringComparison.Ordinal);
         if (dirty != _dirty)
         {
             _dirty = dirty;
             UpdateTitle();
         }
+        // Flag it; the snapshot itself happens on its own timer so typing never waits
+        // on the disk. Set whenever content differs from the file, not only on the
+        // transition, so a snapshot that failed gets retried.
+        if (dirty) _backupDirty = true;
         UpdateCounts(current);
     }
 
@@ -2537,7 +2918,18 @@ public partial class MainWindow : Window
     /// <summary>Marks the current content as the clean baseline (after open/save/new).</summary>
     private async Task SetCleanBaselineAsync()
     {
-        _cleanMarkdown = await GetDocumentMarkdownAsync();
+        // Keep the previous baseline if the editor can't be asked. Adopting "" would
+        // make every later comparison read as "there are unsaved changes" — the safe
+        // direction, but it also means an unnecessary prompt and an unnecessary
+        // backup on every document that follows.
+        //
+        // Still a FRESH instance either way: HandleExternalChangeAsync detects a
+        // document swap underneath its awaits by reference-comparing this field, so
+        // "reassigned but identical text" has to be distinguishable from "not
+        // reassigned at all". Leaving the old reference in place would make a reload
+        // of the same path invisible to that check.
+        var markdown = await TryGetDocumentMarkdownAsync();
+        _cleanMarkdown = markdown ?? new string(_cleanMarkdown.AsSpan());
         _dirty = false;
         UpdateTitle();
     }

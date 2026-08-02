@@ -20,11 +20,16 @@ public partial class SettingsDialog : Window
 
     public int RecentLimit { get; private set; }
 
-    public SettingsDialog(bool startWithBlankDocument, int recentLimit)
+    /// <summary>Keep a crash copy of unsaved work.</summary>
+    public bool KeepBackup { get; private set; }
+
+    public SettingsDialog(bool startWithBlankDocument, int recentLimit, bool keepBackup)
     {
         InitializeComponent();
         StartWithBlankDocument = startWithBlankDocument;
         RecentLimit = recentLimit;
+        KeepBackup = keepBackup;
+        KeepBackupCheck.IsChecked = keepBackup;
         StartBlankRadio.IsChecked = startWithBlankDocument;
         StartSplashRadio.IsChecked = !startWithBlankDocument;
         RecentLimitBox.Text = recentLimit.ToString();
@@ -48,6 +53,7 @@ public partial class SettingsDialog : Window
         }
         RecentLimit = limit;
         StartWithBlankDocument = StartBlankRadio.IsChecked == true;
+        KeepBackup = KeepBackupCheck.IsChecked == true;
         DialogResult = true;
     }
 }

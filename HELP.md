@@ -192,10 +192,30 @@ remembered between sessions.
 
 **File ▸ Settings…** holds the preferences that don't suit a menu: how many files
 **Open Recent** shows (1-50 - lowering it shortens the menu without discarding the
-history, so older entries come back if you raise it again), and whether a session
+history, so older entries come back if you raise it again), whether a session
 opens with a **new blank document** (cursor already in it, ready to type) or the
-**no-document placeholder**. Everything you toggle while working - spell check,
-word wrap, auto-reload, document width - stays on the **View** menu.
+**no-document placeholder**, and whether to **keep a backup of unsaved changes**.
+Everything you toggle while working - spell check, word wrap, auto-reload,
+document width - stays on the **View** menu.
+
+### If the app or the machine goes down
+
+While a document has unsaved changes, a copy is saved every few seconds to
+`%LocalAppData%\MarkdownMidget\backup`. The next time you start Markdown Midget it
+hands that work back automatically, still marked unsaved and still pointing at the
+file it came from — nothing is written to your file until you save it yourself. A
+document you'd never saved anywhere comes back too, under the name it had.
+
+The copy is deleted as soon as you save or close the document, so anything sitting
+in that folder means a session that ended badly. If several windows were open, each
+one comes back in its own window. In the rare case where a document can't be
+restored (three attempts is the limit), the app says so and leaves the file in the
+backup folder for you to open by hand — it's plain markdown.
+
+Switching this off in **File ▸ Settings…** stops both halves: no new copies are
+made, and copies already waiting from an earlier crash are not offered back. They
+stay in the backup folder, so turn the setting on again (or open the folder) if you
+think something is still in there.
 
 The window's size, position and maximized state are remembered between sessions,
 and the status bar shows a live **word and character count**.

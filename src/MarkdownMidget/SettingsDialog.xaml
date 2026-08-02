@@ -37,6 +37,13 @@
                    TextWrapping="Wrap"
                    Text="Between 1 and 50. Lowering this shortens the menu; older entries come back if you raise it again." />
 
+        <Separator Margin="0,14,0,12" />
+
+        <TextBlock Text="Unsaved work" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <CheckBox x:Name="KeepBackupCheck" Content="Keep a backup of unsaved changes" />
+        <TextBlock Style="{StaticResource Caption}"
+                   Text="Saves a copy every few seconds while a document has unsaved changes, and offers it back if the app or the machine goes down. The copy is deleted as soon as you save or close." />
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
             <Button Content="Cancel" IsCancel="True" Padding="16,3" Margin="0,0,8,0" />
             <Button x:Name="OkBtn" Content="OK" IsDefault="True" Padding="20,3" Click="Ok_Click" />

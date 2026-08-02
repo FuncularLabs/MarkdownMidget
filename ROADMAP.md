@@ -14,6 +14,9 @@ deliberately parked).
 
 _Nothing queued right now._
 
+Recently shipped from here: autosave / crash recovery (see CHANGELOG), which was
+the last of the usability gaps raised in the 0.6.x review.
+
 ---
 
 ## Someday / Big

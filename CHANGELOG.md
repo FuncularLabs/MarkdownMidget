@@ -9,6 +9,22 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Unsaved work survives a crash.** While a document has unsaved changes, a copy
+  is written to `%LocalAppData%\MarkdownMidget\backup` every few seconds. If the
+  app or the machine goes down, the next launch hands the work back - still marked
+  unsaved, still pointing at the file it came from, and nothing is written to your
+  file until you say so. Documents that were never saved anywhere are kept too.
+  The copy is deleted the moment you save or close, so anything left behind means
+  a session that ended badly. Turn it off in **File ▸ Settings…** if you'd rather
+  not have copies on disk.
+
+### Changed
+- **Content dropped onto the editor now counts as unsaved**, because it is - it
+  exists only in that window. Closing asks before discarding it, and the crash
+  copy above covers it. Previously it was treated as already-saved, so both
+  silently skipped it.
+
 ### Fixed
 - **Help ▸ About no longer offers a prerelease that a stable release has already
   overtaken.** GitHub keeps reporting the newest prerelease forever, so the box
