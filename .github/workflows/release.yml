@@ -38,19 +38,19 @@ jobs:
           "prerelease=$($isPre.ToString().ToLower())" >> $env:GITHUB_OUTPUT
           "Building $tag (base=$base, prerelease=$isPre)"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'editor-src/package-lock.json'
 
@@ -195,7 +195,12 @@ jobs:
           $full.Substring(0, [Math]::Min(500, $full.Length))
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        # Pinned to a commit, not a floating major. This one is third-party, holds a
+        # contents:write token, and is what publishes our signed binaries — silently
+        # adopting a future 3.x is not something to discover at tag time. The
+        # actions/* steps above are first-party and stay on floating majors.
+        # Bump deliberately; this sha is what @v3 pointed at when it was pinned.
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Markdown Midget ${{ steps.tag.outputs.tag }}
