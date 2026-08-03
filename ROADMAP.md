@@ -92,10 +92,41 @@ Shape to think through when it's picked up:
 - Persist the choice next to the other settings, and expose it in the new
   **File ▸ Settings…** dialog rather than adding another menu.
 
-### Multi-document tabs
+### Make multiple instances behave like one application
 
-Tabbed editing with `Ctrl+Tab` / `Ctrl+Shift+Tab` and `Ctrl+PgUp` / `Ctrl+PgDn`
-to switch (a reflex several testers have). Currently one document per window.
+**Staying SDI.** One document per window is the deliberate choice, and tabs are
+explicitly not wanted right now — the point is that each document is a real
+window the OS can tile, snap, alt-tab and put on its own monitor. What's missing
+is that the separate instances don't behave as though they belong to the same
+application.
+
+Concrete things that fall out of being N unrelated processes today:
+
+- **Shared state is last-writer-wins.** `settings.json` is merged on write and
+  the crash-backup store coordinates through lock files (0.6.3), but that's two
+  bespoke solutions to the same problem. A third shared thing will want a third.
+  Worth deciding whether there should be one small "shared user state" layer
+  before adding one.
+- **The same file can be open in two windows**, each with its own unsaved edits,
+  each happily saving over the other. The external-change watcher notices *after*
+  the fact and offers a merge-ish prompt; nothing notices *before*. Opening a
+  file already open elsewhere should at least surface that — ideally focus the
+  window that has it, the way most SDI editors do.
+- **No window list.** With six documents open there's no way to get from one to
+  another except the taskbar. A Window menu listing the open documents (and
+  focusing one) is the SDI answer to tabs, and needs the same cross-instance
+  registry as the point above.
+- **Crash recovery restores into new windows** (0.6.3) but has no notion of the
+  arrangement they were in — sizes and positions are per-window and the last one
+  to close wins the saved rectangle.
+
+The shared thread is that every one of these needs instances to know about each
+other. A named mutex or pipe plus a small registry of {pid, document path,
+window handle} would cover all four; that's the piece to design, not the
+individual symptoms.
+
+If tabs ever do arrive they should be a *view* over that same registry — never
+the reason to collapse back to a single process.
 
 ---
 

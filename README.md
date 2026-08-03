@@ -214,10 +214,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
-- **v0.6.3-beta1** — **Unsaved work survives a crash**: a copy is kept while a
-  document has unsaved changes and handed back on the next launch, still marked
-  unsaved and still bound to its file. Superseded prereleases no longer clutter
-  the About box.
+- **v0.6.3** — **Unsaved work survives a crash**: a copy is kept while a document
+  has unsaved changes and handed back on the next launch, still marked unsaved and
+  still bound to its file. Superseded prereleases no longer clutter the About box.
+  Ships patched **dompurify** and **postcss**.
 - **v0.6.2** — The window **remembers where you left it** (validated against the
   monitors that still exist, and correct on mixed-DPI desks); **word and character
   count** in the status bar; **File ▸ Settings…** for the Open Recent length and

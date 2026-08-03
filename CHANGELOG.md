@@ -9,6 +9,36 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-08-02
+
+First stable release on the 0.6.3 line: the beta's content, with the prerelease
+flag dropped after the crash-recovery path was exercised for real — killed
+mid-edit, relaunched, unsaved document handed back. Everything new on this line:
+
+- **Unsaved work survives a crash.** While a document has unsaved changes a copy
+  is kept in `%LocalAppData%\MarkdownMidget\backup`, and the next launch hands it
+  back — still marked unsaved, still pointing at the file it came from, and
+  nothing written to your file until you say so. Documents that were never saved
+  anywhere are kept too. The copy goes the moment you save or close. Switch it off
+  in **File ▸ Settings…** if you'd rather not have copies on disk.
+- **Content dropped onto the editor now counts as unsaved**, because it is — it
+  exists only in that window. Closing asks before discarding it, and the crash
+  copy covers it.
+- **Help ▸ About no longer offers a prerelease that a release has overtaken**, so
+  a long-superseded beta stops presenting itself as the newer, bolder build. A
+  release whose tag says beta can no longer be mistaken for a stable one either.
+
+See the beta notes below for the full detail.
+
+### Security
+- **dompurify 3.4.11 → 3.4.12** ([GHSA-c2j3-45gr-mqc4](https://github.com/advisories/GHSA-c2j3-45gr-mqc4)) and **postcss → 8.5.25**
+  ([GHSA-r28c-9q8g-f849](https://github.com/advisories/GHSA-r28c-9q8g-f849)). Neither is exploitable as this app is configured — the
+  DOMPurify issue needs an `afterSanitizeElements` hook and custom-element
+  allowlist that Markdown Midget doesn't use, and postcss is a build-time
+  transitive dependency that never runs and isn't in the shipped bundle. Taken
+  regardless, because DOMPurify is what stands between embedded raw HTML and the
+  editor document.
+
 ## [0.6.3-beta1] - 2026-08-02
 
 ### Added
@@ -571,7 +601,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.3-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3
 [0.6.3-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3-beta1
 [0.6.2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.2
 [0.6.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.1
