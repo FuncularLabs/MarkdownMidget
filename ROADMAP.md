@@ -12,7 +12,83 @@ deliberately parked).
 
 ## Next
 
-_Nothing queued right now._
+### Updating while several windows are open
+
+Reported from real use: update from one instance, forget the others are open, hit
+Update in a second one, and it fails with a raw Win32 message along the lines of
+*"Cannot create a file when that file already exists."*
+
+**The cause is understood**, so this doesn't need rediscovering. The installed flow
+(`UpdateService.ApplyInstalledAndRestart`) renames the running exe out of the way:
+
+```
+File.Copy(new, staged)
+try { File.Delete(target + ".old") } catch { }   // swallowed
+File.Move(target, target + ".old")               // <-- throws here
+File.Move(staged, target)
+```
+
+After the first instance updates, any still-running instance was launched from the
+file that has since been renamed to `.old` — so that file is its own process image
+and is locked. Its `File.Delete` of `.old` therefore fails (access denied) and is
+swallowed, and the very next `File.Move(target, old)` throws, because a non-
+overwriting Move onto an existing name is exactly that error. The message reaches
+the user through `AboutDialog.Fail` as `Update failed: <Win32 text>`, with no
+explanation. Same reason `CleanupOldBinaries` can't tidy up while a sibling is
+still running — "the next launch gets it" only becomes true once every
+old-version instance has exited. Two instances are enough to reproduce; the second
+one's delete fails against *itself*.
+
+Three facts that are easy to get wrong, all confirmed by probe:
+
+- **`Environment.ProcessPath` does not follow the rename.** Windows lets you
+  rename a running exe and the process survives, but `Environment.ProcessPath`
+  and `MainModule.FileName` — the two sources behind
+  `UpdateService.CurrentExePath`, both `GetModuleFileName` underneath — keep
+  reporting the *original* path, while `QueryFullProcessImageName` follows to
+  `.old`. This is load-bearing and counter-intuitive: `target` resolves to the
+  canonical path (now holding the NEW exe) while the process is actually
+  executing the `.old` file. It is also what makes the first fix below
+  implementable — reading the version off `CurrentExePath` in a stale instance
+  genuinely returns the new version.
+- **The portable flow has the same bug in a different shape** — same collision,
+  but no rename and no `.old` involved. `ApplyPortableAndRestart` copies to a
+  version-stamped name in the current directory; if a sibling is already running
+  that exact file, `File.Copy` throws *"The process cannot access the file …
+  because it is being used by another process."* If that sibling has since
+  exited, the copy succeeds and simply starts a *second* copy of the new version
+  — no error, but still not "the application updated". Note the detection below
+  is phrased for the installed flow and won't fire here, because a portable
+  instance's `CurrentExePath` really is the old exe; portable needs a different
+  signal (a versioned sibling already present, or already running).
+- **The failure leaks `.mdm-update-staged.exe`** into the install directory,
+  because the throw happens before any cleanup.
+
+What it should do instead:
+
+- **Notice, and say something useful.** If the exe on disk is already the version
+  being offered, this instance doesn't need updating — it needs restarting. Say
+  that ("Markdown Midget was already updated by another window; restart this one to
+  pick it up") rather than attempting a swap that can't work.
+- **Have the other instances update themselves.** After a successful swap, the
+  updating instance should tell its siblings; each reopens its own document under
+  the new exe. The user updated the *application*, so all of its windows should end
+  up on the new version without hunting them down.
+- **Don't lose unsaved work doing it.** Notepad++'s implicit save is the model —
+  a window with unsaved changes should come back with those changes still there and
+  still unsaved, not prompt per window mid-update. **The crash-recovery store from
+  0.6.3 already is this mechanism**: snapshot, relaunch, adopt. Reuse it rather than
+  inventing a second way to persist unsaved buffers; the difference is only that the
+  restart is deliberate rather than a crash, so the handoff can be orderly (snapshot
+  every window, then relaunch them) instead of inferred from an abandoned lock.
+- Notepad++ mostly sidesteps this by being single-instance; SDI means we can't. Any
+  window that fails to come back must leave its snapshot on disk rather than
+  vanishing — the existing recovery path then catches it on the next launch.
+
+Depends on the same cross-instance registry as
+[multiple instances behaving like one application](#make-multiple-instances-behave-like-one-application):
+knowing which instances exist and what each has open is the prerequisite for both
+telling them to restart and knowing whether any of them still needs to.
 
 Recently shipped from here: autosave / crash recovery (see CHANGELOG), which was
 the last of the usability gaps raised in the 0.6.x review.
