@@ -40,12 +40,21 @@ off-origin references fail validation.
 
 ### Updating while several windows are open
 
-Reported from real use: update from one instance, forget the others are open, hit
-Update in a second one, and it fails with a raw Win32 message along the lines of
-*"Cannot create a file when that file already exists."*
+**The failure itself is fixed in 0.6.4; the ergonomics are still open.** A window
+that has nothing to do now says so and tells you to restart it — worked out before
+downloading anything — and a window that genuinely does need the update steps
+around an older window's parked copy rather than colliding with it, re-deciding
+the name if it loses the race for one. What remains needs the cross-instance
+registry: siblings still don't update themselves, and a window that needs
+restarting still has to be restarted by hand.
 
-**The cause is understood**, so this doesn't need rediscovering. The installed flow
-(`UpdateService.ApplyInstalledAndRestart`) renames the running exe out of the way:
+Original report: update from one instance, forget the others are open, hit Update
+in a second one, and it fails with *"Cannot create a file when that file already
+exists."*
+
+**The cause is understood**, so this doesn't need rediscovering. It is kept here as
+diagnosis — the code below is how `ApplyInstalledAndRestart` looked *before* 0.6.4,
+which renamed the running exe out of the way like this:
 
 ```
 File.Copy(new, staged)
@@ -87,15 +96,16 @@ Three facts that are easy to get wrong, all confirmed by probe:
   is phrased for the installed flow and won't fire here, because a portable
   instance's `CurrentExePath` really is the old exe; portable needs a different
   signal (a versioned sibling already present, or already running).
-- **The failure leaks `.mdm-update-staged.exe`** into the install directory,
-  because the throw happens before any cleanup.
+- **The failure leaked the staging copy** into the install directory, because the
+  throw happened before any cleanup. Fixed in 0.6.4, along with a startup sweep for
+  the ones earlier versions left behind.
 
 What it should do instead:
 
-- **Notice, and say something useful.** If the exe on disk is already the version
-  being offered, this instance doesn't need updating — it needs restarting. Say
-  that ("Markdown Midget was already updated by another window; restart this one to
-  pick it up") rather than attempting a swap that can't work.
+- ~~**Notice, and say something useful.**~~ **Done in 0.6.4** — with one correction
+  worth keeping: "is the exe on disk already the version being offered" is not
+  enough. The real precondition is that the disk has moved past what we are
+  *running*, which also catches a window left open across two releases.
 - **Have the other instances update themselves.** After a successful swap, the
   updating instance should tell its siblings; each reopens its own document under
   the new exe. The user updated the *application*, so all of its windows should end

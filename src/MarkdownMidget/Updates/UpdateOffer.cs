@@ -36,4 +36,33 @@ internal static class UpdateOffer
     /// </summary>
     public static bool ShowStableUpdate(ReleaseInfo? stable, UpdateVersion? current) =>
         stable is not null && (current is null || stable.Version.CompareTo(current) > 0);
+
+    /// <summary>
+    /// Does this instance need *restarting* rather than updating?
+    ///
+    /// Two ways to be sure, and the second is the one that's easy to miss:
+    ///
+    /// - the exe on disk already satisfies what's being offered, so there is nothing
+    ///   to download or install; or
+    /// - the exe on disk is ahead of the version we are *running*, whatever is being
+    ///   offered. That is the real precondition for the failure this exists to
+    ///   prevent: it means another window renamed our image out from under us, so
+    ///   the swap's `File.Move(target, target + ".old")` would land on a name that
+    ///   already exists and is locked — by us.
+    ///
+    /// Checking only the first would miss a window left open across two releases:
+    /// disk at 0.6.4, this process still on 0.6.3, and 0.6.5 on offer. Nothing is
+    /// "already updated" from the offer's point of view, yet the swap still cannot
+    /// work.
+    ///
+    /// Unknown answers false — "let it try and report honestly" beats refusing an
+    /// update on a guess.
+    /// </summary>
+    public static bool NeedsRestartNotUpdate(
+        UpdateVersion? onDisk, UpdateVersion? wanted, UpdateVersion? running)
+    {
+        if (onDisk is null) return false;
+        if (wanted is not null && onDisk.CompareTo(wanted) >= 0) return true;
+        return running is not null && onDisk.CompareTo(running) > 0;
+    }
 }

@@ -214,6 +214,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v0.6.4** — Updating with several windows open now says *"restart this window"*
+  instead of a raw Windows error, and stops before downloading anything it doesn't
+  need.
 - **v0.6.3** — **Unsaved work survives a crash**: a copy is kept while a document
   has unsaved changes and handed back on the next launch, still marked unsaved and
   still bound to its file. Superseded prereleases no longer clutter the About box.

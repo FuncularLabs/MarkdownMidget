@@ -104,6 +104,48 @@ public class UpdateOfferTests
         Assert.True(UpdateOffer.ShowStableUpdate(Rel("v0.6.2", false), null));
     }
 
+    // ---- "restart me, don't update me" ----
+    //
+    // The multi-window case: another window updated, so the exe on disk moved on
+    // while this process kept running the old image. Attempting the swap here fails
+    // on a rename whose target is our own locked file, and the user sees a bare
+    // "Cannot create a file when that file already exists".
+
+    [Theory]
+    // onDisk, offered, running, expect-restart
+    [InlineData("0.6.4", "0.6.4", "0.6.3", true)]   // disk has exactly what's offered
+    [InlineData("0.6.5", "0.6.4", "0.6.3", true)]   // disk is even newer — still restart
+    [InlineData("0.6.3", "0.6.4", "0.6.3", false)]  // disk is behind: a real update to do
+    // The case a "disk >= offered" check alone misses: a window left open across two
+    // releases. Another window took us to 0.6.4 (renaming our image to .old), we are
+    // still 0.6.3, and 0.6.5 is now on offer. Nothing is "already updated" from the
+    // offer's point of view, but the swap would still land on our own locked file.
+    [InlineData("0.6.4", "0.6.5", "0.6.3", true)]
+    // ...and the same shape when nothing has moved: disk matches what we run.
+    [InlineData("0.6.3", "0.6.5", "0.6.3", false)]
+    [InlineData("0.6.4-beta1", "0.6.4", "0.6.3", true)]  // ahead of us, behind the offer
+    [InlineData("0.6.4", "0.6.4-beta1", "0.6.4", true)]  // stable satisfies the prerelease
+    public void RestartIsNeededWhenTheDiskHasMovedPastUsOrCaughtUpWithTheOffer(
+        string onDisk, string wanted, string running, bool restart)
+        => Assert.Equal(restart,
+            UpdateOffer.NeedsRestartNotUpdate(Cur(onDisk), Cur(wanted), Cur(running)));
+
+    [Fact]
+    public void UnreadableVersions_LetTheUpdateProceed()
+    {
+        // Refusing to update on a guess is the worse failure: the user would be
+        // stranded with no way to move forward. Let it try and report honestly.
+        Assert.False(UpdateOffer.NeedsRestartNotUpdate(null, Cur("0.6.4"), Cur("0.6.3")));
+        Assert.False(UpdateOffer.NeedsRestartNotUpdate(null, null, null));
+    }
+
+    [Fact]
+    public void AnUnknownRunningVersion_StillCatchesTheAlreadyOfferedCase()
+    {
+        Assert.True(UpdateOffer.NeedsRestartNotUpdate(Cur("0.6.4"), Cur("0.6.4"), null));
+        Assert.False(UpdateOffer.NeedsRestartNotUpdate(Cur("0.6.3"), Cur("0.6.4"), null));
+    }
+
     // Shaped like the project's real releases list, including the two quirks in it:
     // v0.6.0-beta1/beta2 sit above every other prerelease, and v0.2.0-beta2 is
     // flagged prerelease=false on GitHub by mistake.

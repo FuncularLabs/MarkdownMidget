@@ -9,6 +9,47 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-08-06
+
+### Fixed
+- **Updating with several windows open now explains itself.** Update from one
+  window, forget the others are open, press Update in a second, and it failed with
+  a raw Windows message — *"Cannot create a file when that file already exists."*
+  Nothing was wrong except that the update had already happened: that window was
+  still running the older copy. It now says so, and tells you to reopen the window,
+  before downloading anything. And where the update genuinely is needed but an
+  older window still has the previous copy open, it steps around that file instead
+  of colliding with it, retrying with a different name if a second window claims
+  the one it picked. If it still can't get out of its own way it says which windows
+  to close, instead of the Windows error. And if a program file appears at the
+  install path while this window is mid-swap, it is compared against what was
+  actually downloaded and signature-checked: identical means the update is simply
+  done, however it got there; anything else is left strictly alone and reported,
+  rather than being started as though it were the update. And an update that simply
+  couldn't be applied now says so in a sentence — which file, that nothing has
+  changed, and that a virus scanner is the usual reason and passes — instead of
+  handing you Windows' own *"the process cannot access the file because it is being
+  used by another process"*, which names no file at all. Nor is a successful update
+  reported as a failure any more when the restart itself is what didn't work: it
+  says the new version is installed and to start it from your shortcut.
+- **The portable build hit the same wall differently** — *"The process cannot access
+  the file because it is being used by another process"* — when the new version was
+  already sitting next to the old one. If the file that's there is already exactly
+  what we were about to write, it's simply started; if it's something else that's in
+  use, you're told another window is running it rather than shown the raw error.
+- **An update that fails partway no longer leaves you with nothing to launch and no
+  idea what to do about it.**
+  For a moment during the swap there is no program file in the folder, and if
+  putting the old one back failed too — a virus scanner holding a just-renamed
+  6.5 MB binary is the usual reason — that is where it stayed. It now waits and
+  retries, then falls back to installing the new version instead, and only if
+  neither will go does it give up: and then it tells you which file to rename to
+  what, rather than reporting a handle it cannot do anything about.
+- A failed update no longer leaves a ~6.5 MB staging copy behind in the install
+  folder — and one left there by an earlier version is cleared out on startup. That
+  cleanup stands down entirely when there is no program file where one is expected,
+  since the files it would tidy away are the only ones left to recover from.
+
 ## [0.6.3] - 2026-08-02
 
 First stable release on the 0.6.3 line: the beta's content, with the prerelease
@@ -601,7 +642,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.4
 [0.6.3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3
 [0.6.3-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3-beta1
 [0.6.2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.2

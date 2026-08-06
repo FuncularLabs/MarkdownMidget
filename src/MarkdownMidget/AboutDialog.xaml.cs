@@ -90,6 +90,28 @@ public partial class AboutDialog : Window
         if (_updating) return;
 
         var installed = UpdateService.IsInstalled();
+
+        // Another window may already have applied this exact update. Check before
+        // asking anything: there is nothing to download, nothing to install, and the
+        // swap would fail on the rename because the target name is this process's own
+        // locked image — surfacing "Cannot create a file when that file already
+        // exists", which tells the user nothing about what to do. Only the installed
+        // flow renames, so only it can be detected this way; the portable flow is
+        // handled inside ApplyPortableAndRestart.
+        if (installed && UpdateService.AlreadyUpdatedOnDisk(release.Version, _current, out var onDisk))
+        {
+            MessageBox.Show(this,
+                $"Markdown Midget on this machine is already at {onDisk} — most likely " +
+                "updated by another window.\n\nThis window is still running the older " +
+                "version, and can't update itself until it restarts. Close and reopen " +
+                "it to pick up what's already installed.",
+                "Restart to finish updating", MessageBoxButton.OK, MessageBoxImage.Information);
+            StatusText.Text = $"Already at {onDisk} on disk — restart this window to pick it up.";
+            StatusText.Visibility = Visibility.Visible;
+            StableUpdateBtn.Visibility = PreUpdateBtn.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         var what = prerelease
             ? $"{release.Tag} is a PRERELEASE — early access, may contain rough edges."
             : $"{release.Tag} is the newest stable release.";
@@ -125,6 +147,12 @@ public partial class AboutDialog : Window
                 UpdateService.ApplyPortableAndRestart(file, release.AssetName ?? "MarkdownMidget.exe");
             }
             Application.Current.Shutdown();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Ours, and already a full sentence about what happened and what to do —
+            // prefixing it produces "Update failed: Markdown Midget is updated, but…".
+            Fail(ex.Message);
         }
         catch (Exception ex)
         {

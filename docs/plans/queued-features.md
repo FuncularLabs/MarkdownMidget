@@ -65,24 +65,24 @@ detection*, which is the part already solved, not identity sharing or messaging.
 ## Next
 
 ### Updating while several windows are open
-**Size:** 1 day once the registry has messaging; ~3 days without it (and the result is worse).
-**Blocked on:** the registry, for the "tell the siblings" half.
+**Size:** 1 day once the registry has messaging. The cheap half is done (0.6.4).
+**Blocked on:** the registry, for the "tell the siblings" half — all that remains.
 
 The failure is fully diagnosed in the ROADMAP entry — including the counter-intuitive
 part, that `Environment.ProcessPath` does not follow the rename. Two halves:
 
-- *The bad error message* is **independent and cheap** — a few hours. Compare the
-  version of the file at `CurrentExePath` against the offered version; if it already
-  matches, this instance needs restarting, not updating, and should say exactly
-  that instead of surfacing raw Win32 text. Worth doing on its own the next time
-  anyone touches `UpdateService`, because it turns a confusing failure into an
-  instruction.
+- ~~*The bad error message*~~ — **shipped in 0.6.4.** One correction from doing it:
+  comparing the disk against the *offered* version is not enough. The real
+  precondition is that the disk has moved past what we are **running**, which also
+  catches a window left open across two releases (disk 0.6.4, us on 0.6.3, 0.6.5
+  offered) — that case still produced the original error under the narrower rule.
 - *Siblings updating themselves* needs the registry, and gets its unsaved-work
   handling free from the 0.6.3 backup store (snapshot → relaunch → adopt is already
   built; a deliberate restart is the easy case of what it does for a crash).
 
-Also fix while in here: the leaked `.mdm-update-staged.exe`, and the portable flow's
-distinct failure — neither is covered by the detection above.
+Both of the side issues that rode along here — the leaked staging copy and the
+portable flow's differently-worded failure — shipped in 0.6.4 too, as did stepping
+around an older window's parked copy rather than colliding with it.
 
 ---
 
@@ -224,7 +224,7 @@ Applied to what's queued, that gives roughly:
 
 | Release | Carries |
 |---|---|
-| 0.6.4 | Update error message (patch; independent, hours) |
+| ~~0.6.4~~ | ~~Update error message~~ — shipped |
 | 0.7.0-beta1 → 0.7.0 | **Themes** — stages 1-6, including the CSS refactor and layer order |
 | 0.8.0 | **Multi-window updating** — carrying the cross-instance registry that enables it |
 | 0.9.0 | **Find & Replace** |
@@ -236,8 +236,7 @@ Version numbers are illustrative — the point is the grouping, not the digits.
 
 ## Suggested order
 
-1. **Update error message** — hours, independent, and it shouldn't queue behind a
-   big feature; turns a confusing failure into an instruction
+1. ~~**Update error message**~~ — shipped in 0.6.4
 2. **Themes** — the active request; see [themes.md](themes.md)
 3. **Cross-instance registry** — unblocks three queued items; budget a week, not
    the 2–3 days a bare discovery registry suggests (see above)
