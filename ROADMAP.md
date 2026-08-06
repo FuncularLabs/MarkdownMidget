@@ -2,7 +2,8 @@
 
 Not-yet-committed ideas and deferred work for **Markdown Midget**. This is a
 living document — items move up, down, or off as priorities shift. Shipped work
-lives in [CHANGELOG.md](CHANGELOG.md).
+lives in [CHANGELOG.md](CHANGELOG.md); anything planned in detail lives in
+[docs/plans/](docs/plans/).
 
 Rough buckets: **Next** (likely soon), **Later** (wanted, not scheduled),
 **Someday / Big** (real projects), **Won't unless asked** (known limits we've
@@ -11,6 +12,30 @@ deliberately parked).
 ---
 
 ## Next
+
+### Themes
+
+**Planned in full: [docs/plans/themes.md](docs/plans/themes.md).** View ▸ Theme,
+six shipped themes (Default plus one dark, one slate, three light), user-supplied
+CSS in a `themes/custom` directory, invalid files listed but disabled with the
+first error in the tooltip.
+
+The sketch that used to live here has been replaced by decisions. The two that
+shaped everything else: colour moves into ~40 CSS custom properties so a theme
+overrides variables rather than rules, and the stylesheet declares an explicit
+cascade-layer order (`mdm-override, mdm-vendor, mdm-chrome, mdm-structure,
+mdm-base, mdm-theme`),
+which makes normal declarations flow toward the theme and `!important` flow toward
+chrome — so themes work *and* squiggles, formatting marks and print can't be
+removed. Chrome's *colours* still come from variables, so a dark theme doesn't
+leave a white mermaid box on a dark page. The vendor CSS has to be in a layer too,
+or nothing else works: unlayered rules outrank every layered normal declaration.
+Theme selection is evidenced by VS Code Marketplace install counts, and every
+palette shipped is MIT with attribution.
+
+The security question the old entry raised is answered rather than dropped: with no
+CSP in the editor page, a theme referencing a remote `url()` would beacon, so
+off-origin references fail validation.
 
 ### Updating while several windows are open
 
@@ -137,37 +162,6 @@ Not started — parked deliberately until the update flow has proven itself in t
 wild. Likely wants its own de-risk spike (MSIX + WebView2 + file associations)
 before scoping.
 
-### Selectable CSS templates / themes
-
-One hard-coded stylesheet drives the editing surface today (`editor-src/styles/editor.css`,
-built into the bundle), plus a separate `@media print` block. Let a user pick a
-look instead — and, further out, supply their own.
-
-Shape to think through when it's picked up:
-
-- **Two surfaces, not one.** The editing view and the print/PDF output are styled
-  independently today. Decide whether a template covers both (probably yes, with a
-  print section) or whether they stay separate choices.
-- **Built-ins first**, e.g. the current Nord-ish default, a light/paper theme, a
-  high-contrast one, and something book-like for long prose. Shipping several
-  proves the seams are in the right place before any user-supplied CSS is allowed.
-- **User templates** would live beside the other user data
-  (`%LocalAppData%/MarkdownMidget/themes/*.css`) and appear in the picker
-  automatically. Loading arbitrary CSS into the WebView is far less dangerous than
-  arbitrary HTML/JS, but it is still injection into the editor's document — decide
-  whether to sanitise (e.g. strip `@import`, `url()` pointing off-disk, and
-  `behavior`/`expression` legacy vectors) or to accept it as "your own machine,
-  your own CSS" with a clear warning. The existing DOMPurify posture for raw HTML
-  is the precedent to be consistent with.
-- **Interaction with what already styles things**: the Document Width modes
-  (portrait/landscape/full), the print prefs (header/footer, colour code blocks),
-  the spell-check squiggle class, and the mermaid/Prism rules all live in that same
-  stylesheet. A template must not be able to break the squiggles or the formatting
-  marks — so split the sheet into "chrome the app depends on" and "the themeable
-  part" before exposing it.
-- Persist the choice next to the other settings, and expose it in the new
-  **File ▸ Settings…** dialog rather than adding another menu.
-
 ### Make multiple instances behave like one application
 
 **Staying SDI.** One document per window is the deliberate choice, and tabs are
@@ -207,6 +201,10 @@ the reason to collapse back to a single process.
 ---
 
 ## Later
+
+All sized and ordered in [docs/plans/queued-features.md](docs/plans/queued-features.md), which also
+explains why the cross-instance registry is worth pulling forward: three of
+these are waiting on the same missing piece.
 
 - **Spell check follow-ups** (the 0.5.0 stack shipped en-US only, app-private
   dictionary): language selection, and an optional one-way "import words from
