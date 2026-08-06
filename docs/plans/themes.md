@@ -254,14 +254,24 @@ naming the original author and licence.
 |---|---|---|
 | **Default** | light | Today's look, unchanged — the safe fallback |
 | **Dracula** | dark | Dracula (MIT). Highest-install true-dark, and its port programme makes intent unambiguous |
-| **Nord** | slate / medium-dark | Nord (MIT). A blue-grey arctic palette — exactly the "slate" slot — and our Prism tokens are *already* Nord, so it's the cheapest to get right |
+| **GitHub Dark Dimmed** | slate / medium-dark | Primer (MIT). Canvas `#22272e` on `#adbac7` text — **7.6:1**, against Dark Default's 16.0:1 (`#0d1117`/`#e6edf3`). Purpose-built as a lower-contrast dark, and from the most-installed colour theme. **Decided over Nord.** |
 | **GitHub Light** | light | Primer (MIT). From the most-installed colour theme; the look most people read markdown in |
 | **Solarized Light** | light | Solarized (MIT). The warm/sepia option, low-glare, universally shipped |
 | **One Light** | light | Atom One Light (MIT). Cooler and higher-contrast than the other two, so the three lights are genuinely different rather than three greys |
 
-Alternative for the slate slot: **GitHub Dark Dimmed** (canvas `#22272e`, ~9:1
-contrast against Dark Default's ~15.9:1), purpose-built as a lower-contrast dark
-and from the top extension. Nord wins on cost only.
+Nord was the alternative and was rejected: it would have been cheaper (our Prism
+tokens are already its palette) but Dimmed is purpose-built for this slot and comes
+from the same family as GitHub Light, so the two share a syntax vocabulary.
+
+**Knock-on:** GitHub Dark Dimmed's nine syntax-token variables come from Primer, not
+from the Nord values already in the tree — a little more work than Nord would have
+been, and the one place stage 6 isn't just "type in the palette". Note also that
+Nord doesn't leave the project: `editor.css:379-407` uses the Nord palette for
+syntax in the **Default** theme, and `@milkdown/theme-nord` remains a dependency
+whose CSS we ship. So the Nord MIT attribution is owed regardless — it belongs in
+`theme-default.css`'s header, not in a theme we're no longer shipping. (The
+CC BY-NC-SA caveat on `nordtheme/assets` is moot now that no theme carries the
+name prominently, but the palette attribution still stands.)
 
 Naming: use the original names — they're the reason a user recognises the theme,
 and MIT with attribution covers it.
@@ -352,9 +362,13 @@ injected.
   Worth stating in HELP.md, because it will otherwise read as a bug the first time
   someone prints from Dracula.
 
-Explicitly **out of scope for v1**: the WPF menu bar, toolbar and status bar. They
-are native Windows chrome, they look correct in the OS theme, and doing them well
-is separate work with its own dark-title-bar problems. Recorded as a decision.
+**Out of scope, decided:** the WPF menu bar, toolbar and status bar are not themed.
+They are native Windows chrome, they look correct in the OS theme, and doing them
+well is separate work with its own dark-title-bar problems. This is a settled
+decision rather than a deferral — if it is ever revisited it should be because the
+menu bar is being restyled for some other reason, not because a dark theme made it
+look inconsistent. The source view is the exception and *is* themed (§4), because it
+is the document, not chrome.
 
 ---
 

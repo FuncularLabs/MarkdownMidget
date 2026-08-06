@@ -189,10 +189,56 @@ question and will need extending rather than replacing.
 
 ---
 
+## How these should land
+
+**One user-visible feature per release. Not one per commit, and not one per stage.**
+
+The evidence for it is this project's own history: 0.6.2 mixed three unrelated
+additions and took six adversarial rounds to get clean, and 0.6.3's crash recovery
+took seven. In both cases nearly every defect came from a *fix* to a previous
+finding, not from the original work. When a release carries one concern, a
+regression report points at one thing, `git bisect` lands somewhere useful, and the
+release notes say something a user can act on.
+
+Three refinements, because "one feature per release" taken literally goes wrong in
+places:
+
+- **Infrastructure rides with the feature it enables.** The theme work's stage 1 is
+  a pure no-op CSS refactor; the cross-instance registry has no user-visible surface
+  at all. Neither can headline a release — "this version changes nothing you can
+  see" is not a release note. They land on master as their own commits, reviewed on
+  their own, and ship with the first feature that needs them. Separate *commits*,
+  shared *tag*.
+- **Anything that touches every rendered pixel gets a beta first.** The layer-order
+  change in theme stage 2 restyles the entire editing surface, and the parts most
+  likely to break — vendor `!important` interactions, the mermaid frame, table cell
+  padding — are exactly the ones that don't fail loudly. 0.6.3-beta1 worked well for
+  this: it caught nothing, but it cost a day and made the stable tag a formality
+  rather than a hope.
+- **Small independent fixes shouldn't queue behind big features.** The update error
+  message is a few hours and touches nothing else. Holding it for the release that
+  finally fixes multi-window updating means users keep hitting a raw Win32 message
+  for weeks longer than necessary. Ship it as a patch when it's done.
+
+Applied to what's queued, that gives roughly:
+
+| Release | Carries |
+|---|---|
+| 0.6.4 | Update error message (patch; independent, hours) |
+| 0.7.0-beta1 → 0.7.0 | **Themes** — stages 1-6, including the CSS refactor and layer order |
+| 0.8.0 | **Multi-window updating** — carrying the cross-instance registry that enables it |
+| 0.9.0 | **Find & Replace** |
+| then | bundle lazy-load → .NET 8 matrix (paired: the first shrinks what the second multiplies), spell-check language selection, installer spike |
+
+Version numbers are illustrative — the point is the grouping, not the digits.
+
+---
+
 ## Suggested order
 
-1. **Themes** — the active request; see [themes.md](themes.md)
-2. **Update error message** — hours, independent, turns a confusing failure into an instruction
+1. **Update error message** — hours, independent, and it shouldn't queue behind a
+   big feature; turns a confusing failure into an instruction
+2. **Themes** — the active request; see [themes.md](themes.md)
 3. **Cross-instance registry** — unblocks three queued items; budget a week, not
    the 2–3 days a bare discovery registry suggests (see above)
 4. **Update with multiple windows** — nearly free once (3) exists

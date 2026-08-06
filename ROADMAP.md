@@ -31,7 +31,8 @@ removed. Chrome's *colours* still come from variables, so a dark theme doesn't
 leave a white mermaid box on a dark page. The vendor CSS has to be in a layer too,
 or nothing else works: unlayered rules outrank every layered normal declaration.
 Theme selection is evidenced by VS Code Marketplace install counts, and every
-palette shipped is MIT with attribution.
+palette shipped is MIT with attribution. Slate slot is **GitHub Dark Dimmed**;
+theming the WPF menu bar, toolbar and status bar is settled as out of scope.
 
 The security question the old entry raised is answered rather than dropped: with no
 CSP in the editor page, a theme referencing a remote `url()` would beacon, so
@@ -202,9 +203,11 @@ the reason to collapse back to a single process.
 
 ## Later
 
-All sized and ordered in [docs/plans/queued-features.md](docs/plans/queued-features.md), which also
-explains why the cross-instance registry is worth pulling forward: three of
-these are waiting on the same missing piece.
+All sized and ordered in
+[docs/plans/queued-features.md](docs/plans/queued-features.md), which also explains
+why the cross-instance registry is worth pulling forward — three of these wait on
+the same missing piece — and how the work should land: one user-visible feature per
+release, with infrastructure riding along with whatever needs it.
 
 - **Spell check follow-ups** (the 0.5.0 stack shipped en-US only, app-private
   dictionary): language selection, and an optional one-way "import words from
