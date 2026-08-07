@@ -19,4 +19,11 @@
     <ProjectReference Include="..\..\src\MarkdownMidget\MarkdownMidget.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Linked, not copied: the validator's first real input should be the palette
+         we actually ship, and a second copy would drift the day someone edits one. -->
+    <None Include="..\..\editor-src\styles\theme-default.css"
+          Link="theme-default.css" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

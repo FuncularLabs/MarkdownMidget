@@ -1,6 +1,6 @@
 # Implementation plan: themes
 
-Status: **stages 1-2 landed; stages 3-6 planned.** Supersedes the ROADMAP "Selectable
+Status: **stages 1-3 landed; stages 4-6 planned.** Supersedes the ROADMAP "Selectable
 CSS templates / themes" sketch, which this replaces with decisions.
 
 Stage 1 extracted the 36 screen colours into 43 custom properties in
