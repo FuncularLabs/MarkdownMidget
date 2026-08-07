@@ -9,6 +9,22 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Security
+- **mermaid 11.16.0 → 11.16.1** — five advisories
+  ([GHSA-c4c3-pg64-4m4v](https://github.com/advisories/GHSA-c4c3-pg64-4m4v),
+  [GHSA-6x64-9x62-f2gx](https://github.com/advisories/GHSA-6x64-9x62-f2gx),
+  [GHSA-3rrr-jr9j-h3q3](https://github.com/advisories/GHSA-3rrr-jr9j-h3q3),
+  [GHSA-2v8p-3f2j-5mp7](https://github.com/advisories/GHSA-2v8p-3f2j-5mp7),
+  [GHSA-rhh3-jpg6-66xh](https://github.com/advisories/GHSA-rhh3-jpg6-66xh)).
+  Unlike the last two rounds of these, **three were genuinely reachable**: the
+  contents of a `` ```mermaid `` block are rendered as written, so a markdown file
+  from a stranger could inject CSS into the editor canvas, or hang the window with
+  a two-line radar or chart diagram. Nothing could run script or reach
+  outside the editor — diagrams are already rendered at mermaid's `strict` security
+  level, and the menus, dialogs and toolbar are native Windows, not web content —
+  but a hung renderer is a lost window, and that is worth a patch release on its
+  own terms.
+
 ## [0.6.4] - 2026-08-06
 
 ### Fixed
