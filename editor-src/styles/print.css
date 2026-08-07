@@ -1,0 +1,169 @@
+/* Paper. One block now, where there used to be three scattered through the file.
+ *
+ * This is the FIRST declared layer and every declaration carries !important, which
+ * together mean print wins every contest it enters — against a later layer's normal declarations
+ * because !important always does, and against a later layer's !important because
+ * the earliest layer takes those. Nothing a theme can write reaches paper.
+ *
+ * Same caveat as chrome, and worth stating rather than implying otherwise: this
+ * defends the properties declared here. A theme can still reach paper with
+ * something nothing here sets — `visibility: hidden` on a paragraph prints eight
+ * blank pages. The guarantee is that a theme cannot repaint or repaginate what
+ * print specifies, not that it cannot ruin a printout.
+ *
+ * That last part is the point. A dark theme on paper is unreadable and empties a
+ * toner cartridge, so print keeps its own literals rather than reading theme
+ * variables, and keeps them out of a theme's reach.
+ *
+ * The !important is new. These declarations used to win by being last in the file,
+ * which stops being true the moment anything is layered: `height: auto`,
+ * `color: #000` and the source-mode block had no !important and would have lost to
+ * structure and base. Same rendering, stated in a way that survives the move. */
+
+@media print {
+  .mdm-prosemirror pre[data-language="mermaid"] {
+    display: none !important;
+  }
+
+  .mdm-mermaid {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    height: auto !important;
+  }
+
+  .milkdown {
+    margin: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    min-height: 0 !important;
+  }
+
+  .mdm-prosemirror {
+    padding: 0 !important;
+    color: #000 !important;
+  }
+
+  .mdm-mark {
+    display: none !important;
+  }
+
+  .mdm-prosemirror blockquote {
+    background: transparent !important;
+    color: #333 !important;
+    border-left: 3px solid #999 !important;
+    border-radius: 0 !important;
+  }
+
+  .mdm-prosemirror h1,
+  .mdm-prosemirror h2,
+  .mdm-prosemirror h3,
+  .mdm-prosemirror h4,
+  .mdm-prosemirror h5,
+  .mdm-prosemirror h6 {
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .mdm-prosemirror table,
+  .mdm-prosemirror pre,
+  .mdm-prosemirror blockquote {
+    page-break-inside: avoid !important;
+  }
+
+  .mdm-prosemirror pre {
+    background: #f6f8fa !important;
+    color: #24292e !important;
+    border: 1px solid #d0d7de !important;
+  }
+
+  .mdm-prosemirror pre code {
+    color: #24292e !important;
+    background: transparent !important;
+  }
+
+  .mdm-prosemirror code {
+    background: #f6f8fa !important;
+    color: #24292e !important;
+  }
+
+  .mdm-prosemirror .token.comment {
+    color: #6a737d !important;
+    font-style: italic !important;
+  }
+
+  .mdm-prosemirror .token.punctuation,
+  .mdm-prosemirror .token.operator {
+    color: #24292e !important;
+  }
+
+  .mdm-prosemirror .token.keyword,
+  .mdm-prosemirror .token.atrule,
+  .mdm-prosemirror .token.attr-value,
+  .mdm-prosemirror .token.tag {
+    color: #d73a49 !important;
+  }
+
+  .mdm-prosemirror .token.string,
+  .mdm-prosemirror .token.char,
+  .mdm-prosemirror .token.attr-name,
+  .mdm-prosemirror .token.builtin {
+    color: #032f62 !important;
+  }
+
+  .mdm-prosemirror .token.number,
+  .mdm-prosemirror .token.boolean,
+  .mdm-prosemirror .token.constant {
+    color: #005cc5 !important;
+  }
+
+  .mdm-prosemirror .token.function,
+  .mdm-prosemirror .token.class-name {
+    color: #6f42c1 !important;
+  }
+
+  .mdm-prosemirror .token.property {
+    color: #22863a !important;
+  }
+
+  body.mdm-print-mono-code .mdm-prosemirror .token {
+    color: #24292e !important;
+    font-style: normal !important;
+  }
+
+  body.mdm-print-source #app {
+    display: none !important;
+  }
+
+  .mdm-print-source-pre {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: Consolas, "Cascadia Code", monospace !important;
+    font-size: 10pt !important;
+    line-height: 1.45 !important;
+    white-space: pre-wrap !important;
+    color: #000 !important;
+  }
+
+  body.mdm-print-source .mdm-print-source-pre {
+    display: block !important;
+  }
+
+  /* !important like everything else here. A normal declaration in the first layer
+     is the weakest thing in the cascade, so without it a theme containing nothing
+     but `@layer mdm-theme { @media print { @page { margin: 2in } } }` repaginates
+     the document — measured at four pages becoming six. */
+  @page { margin: 0.6in !important; }
+
+  .mdm-misspelled {
+    text-decoration: none !important;
+  }
+}

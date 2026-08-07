@@ -1,0 +1,161 @@
+/* Decoration: text, headings, links, quotes, code, tables and syntax colours.
+ *
+ * Every colour is a variable defined by the selected theme; theme-default.css ships
+ * the values Markdown Midget has always used. This layer sits immediately before
+ * mdm-theme, so a theme overrides all of it with ordinary declarations and needs no
+ * !important to do so. */
+
+:root {
+  color-scheme: var(--mdm-color-scheme, light);
+}
+
+html,
+body {
+  background: var(--mdm-app-bg);
+}
+
+.milkdown {
+  background: var(--mdm-page-bg);
+  box-shadow: 0 1px 6px var(--mdm-page-shadow);
+}
+
+.mdm-prosemirror {
+  color: var(--mdm-text);
+}
+
+.mdm-prosemirror h1,
+.mdm-prosemirror h2,
+.mdm-prosemirror h3,
+.mdm-prosemirror h4,
+.mdm-prosemirror h5,
+.mdm-prosemirror h6 {
+  color: var(--mdm-heading);
+}
+
+.mdm-prosemirror h4 {
+  color: var(--mdm-h4);
+}
+
+.mdm-prosemirror h5 {
+  color: var(--mdm-h5);
+}
+
+.mdm-prosemirror h6 {
+  color: var(--mdm-h6);
+}
+
+.mdm-prosemirror u {
+  text-decoration: underline;
+}
+
+.mdm-prosemirror a {
+  color: var(--mdm-link);
+  text-decoration: underline;
+}
+
+.mdm-prosemirror a:hover {
+  color: var(--mdm-link-hover);
+}
+
+.mdm-prosemirror blockquote {
+  background: var(--mdm-quote-bg);
+  border-left: 6px solid var(--mdm-quote-bar);
+  color: var(--mdm-quote-text);
+}
+
+.mdm-prosemirror code {
+  background: var(--mdm-code-bg);
+}
+
+.mdm-prosemirror pre {
+  background: var(--mdm-pre-bg);
+  color: var(--mdm-pre-fg);
+}
+
+.mdm-prosemirror pre code {
+  background: transparent;
+  color: inherit;
+}
+
+.mdm-prosemirror hr {
+  border: none;
+  border-top: 1px solid var(--mdm-hr);
+}
+
+.mdm-prosemirror table {
+  border: 1px solid var(--mdm-table-border);
+}
+
+.mdm-prosemirror th,
+.mdm-prosemirror td {
+  border: 1px solid var(--mdm-cell-border) !important;
+}
+
+.mdm-prosemirror td {
+  background: var(--mdm-td-bg) !important;
+}
+
+.mdm-prosemirror th {
+  background: var(--mdm-th-bg) !important;
+  color: var(--mdm-th-text) !important;
+}
+
+.mdm-prosemirror tbody tr:nth-child(odd) td {
+  background: var(--mdm-row-alt-bg) !important;
+}
+
+.mdm-prosemirror .token.comment,
+.mdm-prosemirror .token.prolog,
+.mdm-prosemirror .token.doctype,
+.mdm-prosemirror .token.cdata {
+  color: var(--mdm-token-comment);
+}
+
+.mdm-prosemirror .token.punctuation {
+  color: var(--mdm-token-punctuation);
+}
+
+.mdm-prosemirror .token.property,
+.mdm-prosemirror .token.tag,
+.mdm-prosemirror .token.constant,
+.mdm-prosemirror .token.symbol,
+.mdm-prosemirror .token.deleted {
+  color: var(--mdm-token-property);
+}
+
+.mdm-prosemirror .token.boolean,
+.mdm-prosemirror .token.number {
+  color: var(--mdm-token-number);
+}
+
+.mdm-prosemirror .token.selector,
+.mdm-prosemirror .token.attr-name,
+.mdm-prosemirror .token.string,
+.mdm-prosemirror .token.char,
+.mdm-prosemirror .token.builtin,
+.mdm-prosemirror .token.inserted {
+  color: var(--mdm-token-string);
+}
+
+.mdm-prosemirror .token.operator,
+.mdm-prosemirror .token.entity,
+.mdm-prosemirror .token.url {
+  color: var(--mdm-token-operator);
+}
+
+.mdm-prosemirror .token.atrule,
+.mdm-prosemirror .token.attr-value,
+.mdm-prosemirror .token.keyword {
+  color: var(--mdm-token-keyword);
+}
+
+.mdm-prosemirror .token.function,
+.mdm-prosemirror .token.class-name {
+  color: var(--mdm-token-function);
+}
+
+.mdm-prosemirror .token.regex,
+.mdm-prosemirror .token.important,
+.mdm-prosemirror .token.variable {
+  color: var(--mdm-token-regex);
+}

@@ -1,0 +1,87 @@
+/* The editor's own furniture: the parts the app needs in order to work.
+ *
+ * A theme may recolour everything here — every colour is a variable, and a dark
+ * theme that could not reach them would get a white mermaid box on a dark page.
+ * What a theme cannot do is remove them, which is what the early layer plus
+ * !important buys: chrome's !important beats any later layer at any specificity.
+ *
+ * The protection is real but partial, and worth stating honestly: layer order only
+ * defends properties something here actually declares. A theme can still reach for
+ * visibility, opacity: 0, or position: absolute; left: -99999px. The guarantee is
+ * "a theme cannot delete the squiggle by restyling .mdm-misspelled", not "a theme
+ * cannot make the editor unusable".
+ *
+ * Spacing and sizing are NOT here even for chrome elements — they live in
+ * structure.css with all the other geometry. Splitting by rule instead of by
+ * declaration puts the mermaid block's margin-bottom in this early layer, where a
+ * later layer's normal declaration beats it and the block silently gains 12px. */
+
+.mdm-prosemirror .selectedCell {
+  background: var(--mdm-cell-selected) !important;
+}
+
+.mdm-prosemirror .column-resize-handle {
+  position: absolute !important;
+  right: -2px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 4px !important;
+  background: var(--mdm-resize-handle) !important;
+  pointer-events: none !important;
+}
+
+.mdm-prosemirror pre[data-language="mermaid"] {
+  display: none !important;
+}
+
+.mdm-prosemirror pre[data-language="mermaid"].mdm-mermaid-active {
+  display: block !important;
+}
+
+.mdm-mermaid {
+  display: block !important;
+  background: var(--mdm-mermaid-bg) !important;
+  border: 1px solid var(--mdm-mermaid-border) !important;
+  border-radius: 6px !important;
+  overflow-x: auto !important;
+  text-align: center !important;
+  page-break-inside: avoid !important;
+}
+
+.mdm-mermaid svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.mdm-mermaid-error {
+  background: var(--mdm-mermaid-error-bg) !important;
+  border-color: var(--mdm-mermaid-error-border) !important;
+  text-align: left !important;
+}
+
+.mdm-mermaid-error-msg {
+  color: var(--mdm-mermaid-error-text) !important;
+  font-family: Consolas, "Cascadia Code", monospace !important;
+  font-size: 0.9em !important;
+}
+
+.mdm-mermaid-empty {
+  color: var(--mdm-mermaid-empty) !important;
+  font-style: italic !important;
+  font-size: 0.9em !important;
+}
+
+.mdm-mark {
+  color: var(--mdm-mark) !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.mdm-prosemirror:not(.mdm-show-marks) .mdm-mark {
+  display: none !important;
+}
+
+.mdm-misspelled {
+  text-decoration: var(--mdm-squiggle) wavy underline !important;
+  text-decoration-skip-ink: none !important;
+}

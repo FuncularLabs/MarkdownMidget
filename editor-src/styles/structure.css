@@ -1,0 +1,230 @@
+/* Layout, spacing and sizing for the whole editor surface — including for the
+ * chrome elements, whose geometry belongs with everything else's.
+ *
+ * Everything geometric is in this one layer so that the rules which fight each
+ * other still meet on specificity, exactly as they do today. Two that must:
+ * `.mdm-prosemirror > :first-child { margin-top: 0 }` against the headings' 24px,
+ * and the active mermaid block's 4px against the 16px block gap. Separate those
+ * into different layers and layer order overrules specificity — the first heading
+ * in every document drops 24px down the page, and nothing errors.
+ *
+ * A theme sits in a later layer, so it can widen a blockquote if it wants to. Any
+ * measurement that must NOT move needs !important here to say so. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Calibri, "Segoe UI", system-ui, sans-serif;
+}
+
+#app {
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.milkdown {
+  width: 100%;
+  max-width: var(--mdm-page-width, 850px);
+  margin: 24px auto;
+  border-radius: 2px;
+  flex: 1 0 auto;
+  min-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.mdm-prosemirror {
+  flex: 1 1 auto;
+  padding: 56px 72px;
+  outline: none;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.mdm-prosemirror:focus {
+  outline: none;
+}
+
+.mdm-prosemirror p,
+.mdm-prosemirror blockquote,
+.mdm-prosemirror ul,
+.mdm-prosemirror ol,
+.mdm-prosemirror pre,
+.mdm-prosemirror table {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.mdm-prosemirror h1,
+.mdm-prosemirror h2,
+.mdm-prosemirror h3,
+.mdm-prosemirror h4,
+.mdm-prosemirror h5,
+.mdm-prosemirror h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.mdm-prosemirror > :first-child {
+  margin-top: 0;
+}
+
+.mdm-prosemirror h1 {
+  font-size: 2em;
+}
+
+.mdm-prosemirror h2 {
+  font-size: 1.5em;
+}
+
+.mdm-prosemirror h3 {
+  font-size: 1.3em;
+}
+
+.mdm-prosemirror h4 {
+  font-size: 1.15em;
+}
+
+.mdm-prosemirror h5 {
+  font-size: 1.05em;
+}
+
+.mdm-prosemirror h6 {
+  font-size: 1em;
+}
+
+.mdm-prosemirror a {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mdm-prosemirror blockquote {
+  border-radius: 4px 0 0 4px;
+  margin-left: 0;
+  padding: 8px 18px;
+}
+
+.mdm-prosemirror blockquote > :first-child {
+  margin-top: 0;
+}
+
+.mdm-prosemirror blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.mdm-prosemirror code {
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: Consolas, "Cascadia Code", monospace;
+  font-size: 0.92em;
+}
+
+.mdm-prosemirror pre {
+  border-radius: 6px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  line-height: 1.45;
+}
+
+.mdm-prosemirror pre code {
+  padding: 0;
+  font-size: 0.875em;
+}
+
+.mdm-prosemirror hr {
+  margin: 24px 0;
+}
+
+.mdm-prosemirror table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 8px 0 10px;
+}
+
+.mdm-prosemirror.milkdown-theme-nord.prose table {
+  border-radius: 0 !important;
+  font-size: 12px !important;
+}
+
+.mdm-prosemirror th,
+.mdm-prosemirror td {
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.3;
+}
+
+.mdm-prosemirror th > p,
+.mdm-prosemirror td > p {
+  margin: 0;
+  padding: 0;
+}
+
+.mdm-prosemirror th {
+  font-weight: 600;
+}
+
+.mdm-prosemirror th > *,
+.mdm-prosemirror td > * {
+  margin: 0;
+}
+
+.mdm-prosemirror pre[data-language="mermaid"].mdm-mermaid-active {
+  margin-bottom: 4px;
+}
+
+.mdm-mermaid {
+  margin: 6px 0 14px;
+  padding: 12px;
+}
+
+.mdm-mermaid-error-msg {
+  margin: 0;
+}
+
+.mdm-html {
+  display: inline;
+}
+
+.mdm-html img {
+  max-width: 100%;
+  height: auto;
+}
+
+.mdm-html p {
+  margin: 8px 0;
+}
+
+.mdm-html table {
+  border-collapse: collapse;
+}
+
+.mdm-prosemirror li > p {
+  margin: 0;
+}
+
+.mdm-prosemirror li {
+  margin: 1px 0;
+}
+
+.mdm-prosemirror li > ul,
+.mdm-prosemirror li > ol {
+  margin: 1px 0 2px;
+}
+
+.mdm-mark-break {
+  padding: 0 1px;
+}
+
+.mdm-prosemirror .token.comment,
+.mdm-prosemirror .token.prolog,
+.mdm-prosemirror .token.doctype,
+.mdm-prosemirror .token.cdata {
+  font-style: italic;
+}

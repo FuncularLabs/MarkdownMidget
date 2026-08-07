@@ -1,0 +1,43 @@
+/* The editor's single stylesheet entry, and the file that decides who wins.
+ *
+ * The layer statement below is the whole cascade design, so read it before
+ * changing anything here. Two rules, and they point in opposite directions:
+ *
+ *   normal declarations  -> the LATEST layer wins, and unlayered beats every layer
+ *   !important           -> the EARLIEST layer wins, and unlayered is the weakest
+ *
+ * Read the order left to right for !important and right to left for normal, and
+ * both requirements fall out of one line: a theme (last) wins every ordinary
+ * colour, while print and chrome (first) cannot be switched off at any specificity.
+ *
+ * The vendor CSS is imported INTO a layer rather than left alone. That is not
+ * tidiness — anything unlayered outranks every layer for normal declarations, and
+ * Milkdown's Nord theme leaves ~55 rules unlayered. Leave them loose and the theme
+ * variables silently stop working: verified at 105 differing computed declarations,
+ * including a light background behind near-white code text, a mermaid frame with no
+ * border or padding, and the page losing its 56px/72px margins to Tailwind's
+ * preflight.
+ *
+ * ORDER OF THE STATEMENT AND THE IMPORTS BOTH MATTER, and neither fails loudly:
+ *   - A layer name that first appears in an @import lands at the END of the order.
+ *     So the statement has to name every layer, and a typo in a layer() call
+ *     creates a brand-new last-position layer instead of an error.
+ *   - A @layer statement placed after the imports is inert: positions are already
+ *     fixed by first appearance. It parses, it builds, it does nothing.
+ * test/layers.test.mjs checks both against the built bundle. */
+
+@layer mdm-print, mdm-override, mdm-vendor, mdm-chrome, mdm-structure, mdm-base, mdm-theme;
+
+/* Ours, but ahead of the vendor: see override.css. */
+@import "./override.css" layer(mdm-override);
+
+/* Milkdown + ProseMirror. Their own @layer blocks nest under mdm-vendor, and
+   their 23 @property registrations are unaffected by layering. */
+@import "@milkdown/kit/prose/view/style/prosemirror.css" layer(mdm-vendor);
+@import "@milkdown/theme-nord/style.css" layer(mdm-vendor);
+
+@import "./chrome.css" layer(mdm-chrome);
+@import "./structure.css" layer(mdm-structure);
+@import "./base.css" layer(mdm-base);
+@import "./theme-default.css" layer(mdm-base);
+@import "./print.css" layer(mdm-print);

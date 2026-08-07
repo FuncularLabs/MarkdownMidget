@@ -1,11 +1,12 @@
 # Implementation plan: themes
 
-Status: **stage 1 landed; stages 2-6 planned.** Supersedes the ROADMAP "Selectable
+Status: **stages 1-2 landed; stages 3-6 planned.** Supersedes the ROADMAP "Selectable
 CSS templates / themes" sketch, which this replaces with decisions.
 
 Stage 1 extracted the 36 screen colours into 43 custom properties in
 `editor-src/styles/theme-default.css`, with `editor-src/test/theme-parity.test.mjs`
-holding the palette to what shipped before it. Three notes for whoever takes stage 2:
+holding the palette to what shipped before it. Stage 2 then declared the cascade
+order. Notes for whoever takes stage 3:
 
 - Everything from section 1 down describes the file as it stood *before* stage 1,
   so its `editor.css` / `main.js` line numbers are pre-refactor — the extraction
@@ -15,6 +16,57 @@ holding the palette to what shipped before it. Three notes for whoever takes sta
   cannot be added to a palette until the declaration that reads it exists. Inline
   code takes its foreground from Nord today, and adding our own is a rendering
   change, not a refactor — it belongs with the layer work.
+- **Chrome containment holds where it was measured, and there are three holes.**
+  A theme cannot remove the spell squiggle by restyling `.mdm-misspelled` —
+  verified against a deliberately hostile theme in Chrome, three attempts, all
+  beaten by chrome's `!important` from an earlier layer. What it CAN still do:
+
+  1. **Set the variable instead of the rule.** `:root { --mdm-squiggle: transparent }`
+     — no selectors at all, entirely within the sanctioned theming channel — takes
+     the squiggle's `text-decoration-color` to transparent. The same trick empties
+     `--mdm-mark`, `--mdm-cell-selected`, `--mdm-resize-handle` and the mermaid
+     frame. This is the direct cost of "recolouring is a variable, so `!important`
+     costs no theming": the `!important` protects the declaration's shape, not its
+     visible effect. Closing it would mean chrome not reading theme variables at
+     all, which is the white-mermaid-box-on-a-dark-page failure §4 exists to
+     prevent. It is a real limit, not an oversight, and belongs in the docs a theme
+     author reads.
+  2. **Set a property chrome never declares.** Layer order defends a property only
+     where an earlier layer actually declares it, and chrome declares no *visible*
+     `display` for any of its elements — the only `display` rules it has are the
+     `none` ones. So `display: none !important` from a theme removes `.mdm-mark`,
+     `.column-resize-handle`, `.mdm-mermaid svg`, `.mdm-mermaid-error-msg` and
+     `.mdm-mermaid-empty`. The last three matter most and were the ones I missed by
+     counting holes instead of naming the rule: a theme can hide every rendered
+     diagram while leaving its empty bordered frame, and silence mermaid's syntax
+     errors. Print has the same shape — `visibility: hidden` on a paragraph prints
+     blank pages.
+
+  (2) closes one declaration at a time, and stage 5 should enumerate from the rule
+  rather than from this list. (1) does not close at all.
+
+- **The declared order is `mdm-print, mdm-override, mdm-vendor, mdm-chrome,
+  mdm-structure, mdm-base, mdm-theme`** — print first, which §"How chrome actually
+  wins" below does not show. Print needs the earliest position AND `!important`
+  throughout for the same reason chrome does: its rules used to win by sitting last
+  in a single file, and layering ends that. `@page` is included in "throughout" —
+  a theme's `@page` repaginated the document four pages to six before it carried
+  `!important`. `theme-default.css` shares `mdm-base` with `base.css` rather than
+  taking a layer of its own; nothing needs to separate them.
+- **Adding `--mdm-code-fg` means editing both test fixtures, by hand, and neither
+  may be regenerated.** Adding a declaration the original file never had fails two
+  checks — the key-set comparison against `editor-css-baseline.json`, and
+  `rank.has(key)` — so INSERT the new key into both fixtures at the position it
+  occupies, rather than rebuilding either from the current files. Inserting keeps
+  every existing relationship pinned; rebuilding re-anchors the tests to whatever
+  the files now say, and they can no longer disagree with them. Verified: rebuild
+  both from a split with `h4 { color }` deliberately moved into the wrong layer —
+  a real regression, h4 turns steelblue — and the suite goes green.
+
+  Which layer: paint to `mdm-base`, metrics to `mdm-structure`, and anything on the
+  app's own furniture to `mdm-chrome` — furniture wins over paint, which is why
+  `chrome.css` holds eight colour declarations of its own. `--mdm-code-fg` belongs
+  in `mdm-base`, next to the `--mdm-code-bg` already there.
 - The resolved-declaration diff is blind to variables that share a value. Three
   groups do: the three `#ffffff` surfaces, the two `#569ad4` accents, and four of
   the nine syntax tokens at `#81a1c1`. The wiring test pins each site by name; keep

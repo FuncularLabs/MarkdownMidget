@@ -51,10 +51,10 @@ import typescript from 'refractor/typescript';
 import css from 'refractor/css';
 import markup from 'refractor/markup'; // html / xml
 
-import '@milkdown/kit/prose/view/style/prosemirror.css';
-import '@milkdown/theme-nord/style.css';
-import '../styles/theme-default.css';
-import '../styles/editor.css';
+// One entry, because the cascade order is decided in there — see bundle.css.
+// Importing any of these files separately as well would emit part of the vendor
+// CSS unlayered, with no warning.
+import '../styles/bundle.css';
 
 [csharp, javascript, typescript, css, markup].forEach((l) => refractor.register(l));
 

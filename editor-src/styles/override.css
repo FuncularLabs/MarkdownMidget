@@ -1,0 +1,21 @@
+/* The only rules that must out-rank a VENDOR !important.
+ *
+ * Nord sets padding-block/padding-inline !important on `.milkdown-theme-nord.prose
+ * td/th` (0,2,1). Today ours wins by out-specifying it at (0,3,1), because both are
+ * unlayered and specificity decides. The moment the vendor moves into a layer,
+ * !important sorts by layer FIRST and the earliest wins — so specificity stops
+ * mattering and Nord's padding takes over, jumping table cells from 1px/6px to
+ * 12px/24px in every theme including Default.
+ *
+ * Nothing fails loudly when that happens, which is why this file exists as its own
+ * layer rather than as a comment somewhere. Measured: leaving this rule in place
+ * and layering everything else produced exactly 13 differing computed declarations,
+ * all of them this padding.
+ *
+ * Add to this file only for the same reason: a vendor !important that has to lose. */
+
+.mdm-prosemirror.milkdown-theme-nord.prose th,
+.mdm-prosemirror.milkdown-theme-nord.prose td {
+  padding-block: 1px !important;
+  padding-inline: 6px !important;
+}
