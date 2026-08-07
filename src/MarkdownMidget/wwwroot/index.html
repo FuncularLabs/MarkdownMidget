@@ -2,6 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!--
+      The second of two layers stopping a document or a theme reaching the network;
+      the first is the host, which refuses every off-origin request in
+      MainWindow.OnResourceRequested. This one is declarative and covers what the
+      renderer initiates.
+
+      `connect-src 'none'` is the sharp edge: the editor talks to the app through
+      postMessage, never over HTTP, so fetch and XHR have nothing legitimate to do.
+      Images allow ANY origin — `https:` and `http:`, not just ours — because a
+      markdown file that references a picture on githubusercontent renders it
+      everywhere else markdown is read, and an editor that quietly stopped would be
+      broken rather than careful. That is the one thing that goes out. `style-src` needs
+      'unsafe-inline' because themes ARE injected inline and both Milkdown and
+      mermaid set inline styles — the one place this is weaker than it looks, and
+      the reason it is a second layer rather than the only one.
+
+      `base-uri` has to name the document host: doc-relative images work by the host
+      installing `<base href="https://mdm-doc.invalid/">`, so `base-uri 'self'` alone
+      silently breaks every `![](pic.png)` in every document — the tightest-looking
+      policy here was also the one that broke the app.
+
+      `media-src` is spelled out for the same reason: it does not inherit from
+      `img-src`, so without it a document's `<video>` falls through to `default-src`
+      and is refused.
+
+      Pictures and media are the one thing allowed off-origin, here and in the host
+      filter, because a markdown file referencing an image on githubusercontent
+      renders that image everywhere else markdown is read. Everything else — script,
+      stylesheet, font, fetch, XHR, websocket — is confined to us. `script-src 'self'`
+      with no 'unsafe-inline' and no 'unsafe-eval' is what makes "no script execution
+      of any kind" true of anything a document or a theme can contain: the bundle is
+      the only script that runs.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: http: data:; media-src 'self' https: http: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self' https://mdm-doc.invalid; form-action 'none'" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Markdown Midget Editor</title>

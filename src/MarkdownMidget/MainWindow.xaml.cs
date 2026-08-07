@@ -171,14 +171,36 @@ public partial class MainWindow : Window
         }
 
         var core = Web.CoreWebView2;
+        _webEnvironment = core.Environment;
         core.SetVirtualHostNameToFolderMapping(
             VirtualHost, wwwroot, CoreWebView2HostResourceAccessKind.Allow);
         core.WebMessageReceived += OnWebMessage;
         core.NavigationCompleted += OnEditorNavigationCompleted;
 
-        // Serve the open document's images ourselves (see ApplyDocBaseAsync).
-        core.AddWebResourceRequestedFilter($"https://{DocHost}/*", CoreWebView2WebResourceContext.All);
-        core.WebResourceRequested += OnDocResourceRequested;
+        // Every request, not just the document host's. This is where off-origin is
+        // refused, and serving the open document's images (see ApplyDocBaseAsync) is
+        // now one branch of a handler whose main job is to let nothing else out.
+        core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+        core.WebResourceRequested += OnResourceRequested;
+
+        // The request filter refuses an off-origin LOAD, but a top-level navigation
+        // still commits — the WebView would become the refusal page at the foreign
+        // address, with the editing surface gone and no way back. Cancel it instead.
+        core.NavigationStarting += OnNavigationStarting;
+
+        // And no second window, ever. A new window is a SEPARATE CoreWebView2: it does
+        // not inherit the request filter, the navigation guard, or the CSP — that last
+        // one because the policy is a meta tag on our own page. So a document holding
+        // `<a target="_blank" href="http://…">` was one click from a fully unguarded
+        // browser, where an off-origin script ran and fetch reached the wire. `target`
+        // survives the sanitizer deliberately, because asking to open in a new tab is
+        // a reasonable thing for a document to do.
+        //
+        // Suppressed rather than redirected, which also makes links behave uniformly:
+        // a plain link click is already cancelled by the navigation guard, so this is
+        // the same answer to the same question. Opening the system browser instead
+        // would be a product decision rather than a security one.
+        core.NewWindowRequested += (_, e) => e.Handled = true;
 
         // Lock down the host shell: it is a local app, not a browser.
         core.Settings.AreDefaultContextMenusEnabled = false;
@@ -968,22 +990,165 @@ public partial class MainWindow : Window
                 : "window.MDM.setDocBase(null)");
     }
 
-    // Serve files from the current document's folder for requests to the doc host.
-    // Restricted to the document's own folder subtree.
-    private void OnDocResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+    /// <summary>
+    /// The editor navigates exactly once, to its own bundle. Anything else — script
+    /// setting `location`, a form, a redirect off our hosts — would replace the
+    /// editing surface with whatever loaded, so it is cancelled rather than blocked
+    /// at the request layer, where the navigation commits anyway.
+    /// </summary>
+    private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
     {
-        if (_docFolder is null) return;
+        if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri)) { e.Cancel = true; return; }
+        if (uri.Scheme is not ("http" or "https")) return;
+        if (!string.Equals(uri.Host, VirtualHost, StringComparison.OrdinalIgnoreCase))
+            e.Cancel = true;
+    }
+
+    /// <summary>
+    /// Every resource request THIS WebView makes passes through here, and anything
+    /// off-origin that is not a picture is refused.
+    ///
+    /// Both halves of that are narrower than they look. It is resources, not sockets
+    /// — a WebSocket, a `preconnect`, and the TCP connect behind a cancelled
+    /// navigation never reach this handler, and the CSP covers those. And it is THIS
+    /// WebView: a new window would be a separate one with none of this attached,
+    /// which is why NewWindowRequested is refused outright.
+    ///
+    /// This is the answer to a question the CSS theme validator kept getting wrong.
+    /// That validator reads a stylesheet and decides whether it contains a network
+    /// reference — and four review rounds each found another way to write one it
+    /// could not see, because it pattern-matches text that the URL parser rewrites
+    /// before it parses: leading control characters stripped, tabs deleted from the
+    /// middle, backslashes read as slashes, `//` optional, identifiers spelled with
+    /// escapes. Every round fixed the spellings that round had found.
+    ///
+    /// A filter here does not have to recognise how a URL was written. It sees the
+    /// request the renderer actually made, after all of that, and asks a question with
+    /// an easy answer.
+    ///
+    /// The question is NOT "is this host ours", because it cannot be: a markdown file
+    /// referencing an image on githubusercontent renders that image everywhere else
+    /// markdown is read, and an editor that quietly stopped would be broken rather
+    /// than careful. So pictures and media are allowed off-origin and everything else
+    /// is not — no off-origin script, stylesheet, font, fetch or XHR, whoever asks.
+    ///
+    /// That exception is also the limit of what this layer can do about themes. A CSS
+    /// `url()` produces an Image request like any other, and nothing here can tell a
+    /// document's picture from a stylesheet's. CssValidator WILL refuse those once
+    /// themes are wired — it is called by nothing yet — and will still be best-effort
+    /// at it. What changed is that its other job, no remote script and no remote
+    /// stylesheet, is now enforced somewhere that cannot be out-spelled.
+    ///
+    /// Only http and https are judged. Anything else the renderer resolves without a
+    /// request — `data:`, `blob:`, and WebView2's own internal schemes — never
+    /// reaches the network and is left alone.
+    /// </summary>
+    private void OnResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+    {
         try
         {
-            var full = DocAsset.ResolveWithinRoot(_docFolder, e.Request.Uri);
-            if (full is null || !File.Exists(full)) return;
+            // A URI that won't parse gets refused rather than waved through. This is a
+            // chokepoint, and the only safe direction for "I don't understand this" is
+            // the one that doesn't reach the network.
+            if (!Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri))
+            {
+                e.Response = Blocked("unparseable request URI");
+                return;
+            }
+
+            // `data:`, `blob:` and WebView2's own internal schemes resolve without a
+            // request, so there is nothing here to allow or refuse.
+            if (uri.Scheme is not ("http" or "https")) return;
+
+            // Our own bundle. In practice this never fires: a folder mapping is served
+            // without raising WebResourceRequested at all, which is also why widening
+            // the filter to `*` costs nothing. Kept as an explicit allow rather than
+            // removed, in case that ever changes.
+            if (string.Equals(uri.Host, VirtualHost, StringComparison.OrdinalIgnoreCase)) return;
+
+            if (!string.Equals(uri.Host, DocHost, StringComparison.OrdinalIgnoreCase))
+            {
+                // Pictures are the exception, and not a grudging one: a markdown file
+                // that references an image on githubusercontent renders that image
+                // everywhere else markdown is read, and an editor that quietly stopped
+                // would be broken rather than careful. Media goes with them.
+                //
+                // Which is the honest cost of this design: a CSS `url()` produces an
+                // Image request too, so a theme CAN still fetch a picture, and nothing
+                // at this layer can tell one initiator from the other. CssValidator is
+                // what refuses those, best-effort — see the note at the top of it. The
+                // narrower thing this buys is still worth having: no off-origin script,
+                // stylesheet, font, fetch or XHR, whoever asks.
+                if (e.ResourceContext is CoreWebView2WebResourceContext.Image
+                                      or CoreWebView2WebResourceContext.Media) return;
+
+                // Everything else is refused with a response rather than left to fail
+                // on its own: a real failure would still have gone out to DNS first.
+                e.Response = Blocked($"off-origin {e.ResourceContext} request");
+                return;
+            }
+
+            ServeDocumentAsset(e);
+        }
+        catch
+        {
+            // Nothing may escape into a WebView2 event handler — an exception here
+            // takes the whole app down, and during teardown reading e.Request can
+            // throw. Fail closed.
+            try { e.Response = Blocked("request could not be handled"); } catch { }
+        }
+    }
+
+    // Held from initialisation rather than reached through `Web.CoreWebView2` each
+    // time: during teardown that property is exactly what goes away, and it is also
+    // what BUILDS the refusal — so a throw there sent the outer catch to retry the
+    // same call, swallow it, and return with no response set, which hands the request
+    // to WebView2's default handling. The fail-safe failed open.
+    private CoreWebView2Environment? _webEnvironment;
+
+    private CoreWebView2WebResourceResponse? Blocked(string why) =>
+        _webEnvironment?.CreateWebResourceResponse(
+            null, 403, "Blocked", $"Content-Type: text/plain\r\nX-MDM-Blocked: {why}");
+
+    /// <summary>
+    /// Serve files from the current document's folder, restricted to that folder's
+    /// subtree — and ALWAYS answer, even when there is nothing to serve.
+    ///
+    /// Returning without a response used to look harmless: WebView2 would fall back
+    /// to default handling and the image would simply fail. Except default handling
+    /// means the real network stack, so `mdm-doc.invalid/beacon-123.png` left the
+    /// handler and reached the OS resolver — with the attacker's path attached, which
+    /// a system proxy or a resolver that hijacks NXDOMAIN will happily carry. The one
+    /// host this trusts was the way out. A 404 here costs nothing and closes it.
+    /// </summary>
+    private void ServeDocumentAsset(CoreWebView2WebResourceRequestedEventArgs e)
+    {
+        try
+        {
+            var full = _docFolder is null ? null : DocAsset.ResolveWithinRoot(_docFolder, e.Request.Uri);
+            if (full is null || !File.Exists(full))
+            {
+                e.Response = _webEnvironment?.CreateWebResourceResponse(
+                    null, 404, "Not Found", "Content-Type: text/plain");
+                return;
+            }
 
             var ms = new MemoryStream(File.ReadAllBytes(full));
             var headers = $"Content-Type: {DocAsset.ContentTypeFor(Path.GetExtension(full))}\r\n" +
                           "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache";
-            e.Response = Web.CoreWebView2.Environment.CreateWebResourceResponse(ms, 200, "OK", headers);
+            e.Response = _webEnvironment?.CreateWebResourceResponse(ms, 200, "OK", headers);
         }
-        catch { /* fall through to a normal failure */ }
+        catch
+        {
+            // Unreadable, locked, too large — still answered here rather than handed
+            // to the network stack.
+            try
+            {
+                e.Response = _webEnvironment?.CreateWebResourceResponse(
+                    null, 404, "Not Found", "Content-Type: text/plain");
+            }
+            catch { }
+        }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync(false);
