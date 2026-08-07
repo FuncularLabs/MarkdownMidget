@@ -53,6 +53,7 @@ import markup from 'refractor/markup'; // html / xml
 
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/theme-nord/style.css';
+import '../styles/theme-default.css';
 import '../styles/editor.css';
 
 [csharp, javascript, typescript, css, markup].forEach((l) => refractor.register(l));

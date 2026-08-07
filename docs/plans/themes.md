@@ -1,7 +1,24 @@
 # Implementation plan: themes
 
-Status: **planned, not started.** Supersedes the ROADMAP "Selectable CSS templates
-/ themes" sketch, which this replaces with decisions.
+Status: **stage 1 landed; stages 2-6 planned.** Supersedes the ROADMAP "Selectable
+CSS templates / themes" sketch, which this replaces with decisions.
+
+Stage 1 extracted the 36 screen colours into 43 custom properties in
+`editor-src/styles/theme-default.css`, with `editor-src/test/theme-parity.test.mjs`
+holding the palette to what shipped before it. Three notes for whoever takes stage 2:
+
+- Everything from section 1 down describes the file as it stood *before* stage 1,
+  so its `editor.css` / `main.js` line numbers are pre-refactor — the extraction
+  moved them by four or five, and a couple name literals that are now variables.
+  The reasoning holds; treat the citations as orientation, not navigation.
+- The parity tests forbid defining a variable nothing reads, so `--mdm-code-fg`
+  cannot be added to a palette until the declaration that reads it exists. Inline
+  code takes its foreground from Nord today, and adding our own is a rendering
+  change, not a refactor — it belongs with the layer work.
+- The resolved-declaration diff is blind to variables that share a value. Three
+  groups do: the three `#ffffff` surfaces, the two `#569ad4` accents, and four of
+  the nine syntax tokens at `#81a1c1`. The wiring test pins each site by name; keep
+  it that way when the split into `structure.css` / `chrome.css` moves rules around.
 
 ## What we're building
 

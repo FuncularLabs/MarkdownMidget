@@ -1,0 +1,1232 @@
+[
+ {
+  "where": ":root",
+  "prop": "color-scheme",
+  "value": "light",
+  "important": false
+ },
+ {
+  "where": "body, html",
+  "prop": "margin",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": "body, html",
+  "prop": "padding",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": "body, html",
+  "prop": "height",
+  "value": "100%",
+  "important": false
+ },
+ {
+  "where": "body, html",
+  "prop": "background",
+  "value": "#e7e7e7",
+  "important": false
+ },
+ {
+  "where": "body, html",
+  "prop": "font-family",
+  "value": "Calibri, \"Segoe UI\", system-ui, sans-serif",
+  "important": false
+ },
+ {
+  "where": "#app",
+  "prop": "height",
+  "value": "100%",
+  "important": false
+ },
+ {
+  "where": "#app",
+  "prop": "overflow",
+  "value": "auto",
+  "important": false
+ },
+ {
+  "where": "#app",
+  "prop": "display",
+  "value": "flex",
+  "important": false
+ },
+ {
+  "where": "#app",
+  "prop": "flex-direction",
+  "value": "column",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "width",
+  "value": "100%",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "max-width",
+  "value": "850px",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "margin",
+  "value": "24px auto",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "background",
+  "value": "#ffffff",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "box-shadow",
+  "value": "0 1px 6px rgba(0, 0, 0, 0.18)",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "border-radius",
+  "value": "2px",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "flex",
+  "value": "1 0 auto",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "min-height",
+  "value": "calc(100vh - 48px)",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "display",
+  "value": "flex",
+  "important": false
+ },
+ {
+  "where": ".milkdown",
+  "prop": "flex-direction",
+  "value": "column",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "flex",
+  "value": "1 1 auto",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "padding",
+  "value": "56px 72px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "outline",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "font-size",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "line-height",
+  "value": "1.5",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "color",
+  "value": "#1a1a1a",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror:focus",
+  "prop": "outline",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote, .mdm-prosemirror ol, .mdm-prosemirror p, .mdm-prosemirror pre, .mdm-prosemirror table, .mdm-prosemirror ul",
+  "prop": "margin-top",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote, .mdm-prosemirror ol, .mdm-prosemirror p, .mdm-prosemirror pre, .mdm-prosemirror table, .mdm-prosemirror ul",
+  "prop": "margin-bottom",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "margin-top",
+  "value": "24px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "margin-bottom",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "font-weight",
+  "value": "600",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "line-height",
+  "value": "1.25",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "color",
+  "value": "#4682b4",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror > :first-child",
+  "prop": "margin-top",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h1",
+  "prop": "font-size",
+  "value": "2em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h2",
+  "prop": "font-size",
+  "value": "1.5em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h3",
+  "prop": "font-size",
+  "value": "1.3em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h4",
+  "prop": "font-size",
+  "value": "1.15em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h4",
+  "prop": "color",
+  "value": "#555555",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h5",
+  "prop": "font-size",
+  "value": "1.05em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h5",
+  "prop": "color",
+  "value": "#606060",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h6",
+  "prop": "font-size",
+  "value": "1em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror h6",
+  "prop": "color",
+  "value": "#707070",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror u",
+  "prop": "text-decoration",
+  "value": "underline",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror a",
+  "prop": "color",
+  "value": "#4582b4",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror a",
+  "prop": "font-weight",
+  "value": "600",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror a",
+  "prop": "text-decoration",
+  "value": "underline",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror a",
+  "prop": "cursor",
+  "value": "pointer",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror a:hover",
+  "prop": "color",
+  "value": "#2f5f87",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote",
+  "prop": "background",
+  "value": "#f2f7fb",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote",
+  "prop": "border-left",
+  "value": "6px solid #569ad4",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote",
+  "prop": "border-radius",
+  "value": "4px 0 0 4px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote",
+  "prop": "margin-left",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote",
+  "prop": "padding",
+  "value": "8px 18px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote",
+  "prop": "color",
+  "value": "#3a4a58",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote > :first-child",
+  "prop": "margin-top",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror blockquote > :last-child",
+  "prop": "margin-bottom",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror code",
+  "prop": "background",
+  "value": "#f2f2f2",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror code",
+  "prop": "border-radius",
+  "value": "3px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror code",
+  "prop": "padding",
+  "value": "1px 4px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror code",
+  "prop": "font-family",
+  "value": "Consolas, \"Cascadia Code\", monospace",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror code",
+  "prop": "font-size",
+  "value": "0.92em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "background",
+  "value": "#2e3440",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "color",
+  "value": "#d8dee9",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "border-radius",
+  "value": "6px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "padding",
+  "value": "14px 16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "overflow-x",
+  "value": "auto",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "line-height",
+  "value": "1.45",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre code",
+  "prop": "background",
+  "value": "transparent",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre code",
+  "prop": "padding",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre code",
+  "prop": "color",
+  "value": "inherit",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre code",
+  "prop": "font-size",
+  "value": "0.875em",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror hr",
+  "prop": "border",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror hr",
+  "prop": "border-top",
+  "value": "1px solid #d0d0d0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror hr",
+  "prop": "margin",
+  "value": "24px 0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror table",
+  "prop": "width",
+  "value": "100%",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror table",
+  "prop": "border-collapse",
+  "value": "collapse",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror table",
+  "prop": "border",
+  "value": "1px solid #d7dbe0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror table",
+  "prop": "table-layout",
+  "value": "fixed",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror table",
+  "prop": "margin",
+  "value": "8px 0 10px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror.milkdown-theme-nord.prose table",
+  "prop": "border-radius",
+  "value": "0",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror.milkdown-theme-nord.prose table",
+  "prop": "font-size",
+  "value": "12px",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror.milkdown-theme-nord.prose td, .mdm-prosemirror.milkdown-theme-nord.prose th",
+  "prop": "padding-block",
+  "value": "1px",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror.milkdown-theme-nord.prose td, .mdm-prosemirror.milkdown-theme-nord.prose th",
+  "prop": "padding-inline",
+  "value": "6px",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror td, .mdm-prosemirror th",
+  "prop": "border",
+  "value": "1px solid #dde1e6",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror td, .mdm-prosemirror th",
+  "prop": "text-align",
+  "value": "left",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror td, .mdm-prosemirror th",
+  "prop": "vertical-align",
+  "value": "top",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror td, .mdm-prosemirror th",
+  "prop": "line-height",
+  "value": "1.3",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror td > p, .mdm-prosemirror th > p",
+  "prop": "margin",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror td > p, .mdm-prosemirror th > p",
+  "prop": "padding",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror td",
+  "prop": "background",
+  "value": "#ffffff",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror th",
+  "prop": "background",
+  "value": "#c4c9d1",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror th",
+  "prop": "color",
+  "value": "#1f2328",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror th",
+  "prop": "font-weight",
+  "value": "600",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror tbody tr:nth-child(odd) td",
+  "prop": "background",
+  "value": "#f4f6f8",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror td > *, .mdm-prosemirror th > *",
+  "prop": "margin",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .selectedCell",
+  "prop": "background",
+  "value": "rgba(86, 154, 212, 0.25)",
+  "important": true
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "position",
+  "value": "absolute",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "right",
+  "value": "-2px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "top",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "bottom",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "width",
+  "value": "4px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "background",
+  "value": "#569ad4",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .column-resize-handle",
+  "prop": "pointer-events",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre[data-language=\"mermaid\"]",
+  "prop": "display",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre[data-language=\"mermaid\"].mdm-mermaid-active",
+  "prop": "display",
+  "value": "block",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre[data-language=\"mermaid\"].mdm-mermaid-active",
+  "prop": "margin-bottom",
+  "value": "4px",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "display",
+  "value": "block",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "margin",
+  "value": "6px 0 14px",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "padding",
+  "value": "12px",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "background",
+  "value": "#ffffff",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "border",
+  "value": "1px solid #e2e4e8",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "border-radius",
+  "value": "6px",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "overflow-x",
+  "value": "auto",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "text-align",
+  "value": "center",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid",
+  "prop": "page-break-inside",
+  "value": "avoid",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid svg",
+  "prop": "max-width",
+  "value": "100%",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid svg",
+  "prop": "height",
+  "value": "auto",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error",
+  "prop": "background",
+  "value": "#fdf2f2",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error",
+  "prop": "border-color",
+  "value": "#f0b8b6",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error",
+  "prop": "text-align",
+  "value": "left",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error-msg",
+  "prop": "margin",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error-msg",
+  "prop": "color",
+  "value": "#b83232",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error-msg",
+  "prop": "font-family",
+  "value": "Consolas, \"Cascadia Code\", monospace",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-error-msg",
+  "prop": "font-size",
+  "value": "0.9em",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-empty",
+  "prop": "color",
+  "value": "#888888",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-empty",
+  "prop": "font-style",
+  "value": "italic",
+  "important": false
+ },
+ {
+  "where": ".mdm-mermaid-empty",
+  "prop": "font-size",
+  "value": "0.9em",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror pre[data-language=\"mermaid\"]",
+  "prop": "display",
+  "value": "none",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-mermaid",
+  "prop": "background",
+  "value": "transparent",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-mermaid",
+  "prop": "border",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-mermaid",
+  "prop": "padding",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-html",
+  "prop": "display",
+  "value": "inline",
+  "important": false
+ },
+ {
+  "where": ".mdm-html img",
+  "prop": "max-width",
+  "value": "100%",
+  "important": false
+ },
+ {
+  "where": ".mdm-html img",
+  "prop": "height",
+  "value": "auto",
+  "important": false
+ },
+ {
+  "where": ".mdm-html p",
+  "prop": "margin",
+  "value": "8px 0",
+  "important": false
+ },
+ {
+  "where": ".mdm-html table",
+  "prop": "border-collapse",
+  "value": "collapse",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror li > p",
+  "prop": "margin",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror li",
+  "prop": "margin",
+  "value": "1px 0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror li > ol, .mdm-prosemirror li > ul",
+  "prop": "margin",
+  "value": "1px 0 2px",
+  "important": false
+ },
+ {
+  "where": ".mdm-mark",
+  "prop": "color",
+  "value": "#c4c8d0",
+  "important": false
+ },
+ {
+  "where": ".mdm-mark",
+  "prop": "user-select",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-mark",
+  "prop": "pointer-events",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": ".mdm-mark-break",
+  "prop": "padding",
+  "value": "0 1px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror:not(.mdm-show-marks) .mdm-mark",
+  "prop": "display",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": "@media print > body, html",
+  "prop": "background",
+  "value": "#ffffff",
+  "important": true
+ },
+ {
+  "where": "@media print > body, html",
+  "prop": "height",
+  "value": "auto",
+  "important": false
+ },
+ {
+  "where": "@media print > .milkdown",
+  "prop": "margin",
+  "value": "0",
+  "important": true
+ },
+ {
+  "where": "@media print > .milkdown",
+  "prop": "max-width",
+  "value": "none",
+  "important": true
+ },
+ {
+  "where": "@media print > .milkdown",
+  "prop": "width",
+  "value": "auto",
+  "important": true
+ },
+ {
+  "where": "@media print > .milkdown",
+  "prop": "box-shadow",
+  "value": "none",
+  "important": true
+ },
+ {
+  "where": "@media print > .milkdown",
+  "prop": "border-radius",
+  "value": "0",
+  "important": true
+ },
+ {
+  "where": "@media print > .milkdown",
+  "prop": "min-height",
+  "value": "0",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror",
+  "prop": "padding",
+  "value": "0",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror",
+  "prop": "color",
+  "value": "#000000",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-mark",
+  "prop": "display",
+  "value": "none",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror blockquote",
+  "prop": "background",
+  "value": "transparent",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror blockquote",
+  "prop": "color",
+  "value": "#333333",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror blockquote",
+  "prop": "border-left",
+  "value": "3px solid #999999",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror blockquote",
+  "prop": "border-radius",
+  "value": "0",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "page-break-after",
+  "value": "avoid",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "page-break-inside",
+  "value": "avoid",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror blockquote, .mdm-prosemirror pre, .mdm-prosemirror table",
+  "prop": "page-break-inside",
+  "value": "avoid",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror pre",
+  "prop": "background",
+  "value": "#f6f8fa",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror pre",
+  "prop": "color",
+  "value": "#24292e",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror pre",
+  "prop": "border",
+  "value": "1px solid #d0d7de",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror pre code",
+  "prop": "color",
+  "value": "#24292e",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror pre code",
+  "prop": "background",
+  "value": "transparent",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror code",
+  "prop": "background",
+  "value": "#f6f8fa",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror code",
+  "prop": "color",
+  "value": "#24292e",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.comment",
+  "prop": "color",
+  "value": "#6a737d",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.comment",
+  "prop": "font-style",
+  "value": "italic",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.operator, .mdm-prosemirror .token.punctuation",
+  "prop": "color",
+  "value": "#24292e",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.atrule, .mdm-prosemirror .token.attr-value, .mdm-prosemirror .token.keyword, .mdm-prosemirror .token.tag",
+  "prop": "color",
+  "value": "#d73a49",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.attr-name, .mdm-prosemirror .token.builtin, .mdm-prosemirror .token.char, .mdm-prosemirror .token.string",
+  "prop": "color",
+  "value": "#032f62",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.boolean, .mdm-prosemirror .token.constant, .mdm-prosemirror .token.number",
+  "prop": "color",
+  "value": "#005cc5",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.class-name, .mdm-prosemirror .token.function",
+  "prop": "color",
+  "value": "#6f42c1",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.property",
+  "prop": "color",
+  "value": "#22863a",
+  "important": true
+ },
+ {
+  "where": "@media print > body.mdm-print-mono-code .mdm-prosemirror .token",
+  "prop": "color",
+  "value": "#24292e",
+  "important": true
+ },
+ {
+  "where": "@media print > body.mdm-print-mono-code .mdm-prosemirror .token",
+  "prop": "font-style",
+  "value": "normal",
+  "important": true
+ },
+ {
+  "where": "@media print > body.mdm-print-source #app",
+  "prop": "display",
+  "value": "none",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "display",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "margin",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "padding",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "font-family",
+  "value": "Consolas, \"Cascadia Code\", monospace",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "font-size",
+  "value": "10pt",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "line-height",
+  "value": "1.45",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "white-space",
+  "value": "pre-wrap",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-print-source-pre",
+  "prop": "color",
+  "value": "#000000",
+  "important": false
+ },
+ {
+  "where": "@media print > body.mdm-print-source .mdm-print-source-pre",
+  "prop": "display",
+  "value": "block",
+  "important": false
+ },
+ {
+  "where": "@media print > @page",
+  "prop": "margin",
+  "value": "0.6in",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.cdata, .mdm-prosemirror .token.comment, .mdm-prosemirror .token.doctype, .mdm-prosemirror .token.prolog",
+  "prop": "color",
+  "value": "#616e88",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.cdata, .mdm-prosemirror .token.comment, .mdm-prosemirror .token.doctype, .mdm-prosemirror .token.prolog",
+  "prop": "font-style",
+  "value": "italic",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.punctuation",
+  "prop": "color",
+  "value": "#81a1c1",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.constant, .mdm-prosemirror .token.deleted, .mdm-prosemirror .token.property, .mdm-prosemirror .token.symbol, .mdm-prosemirror .token.tag",
+  "prop": "color",
+  "value": "#81a1c1",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.boolean, .mdm-prosemirror .token.number",
+  "prop": "color",
+  "value": "#b48ead",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.attr-name, .mdm-prosemirror .token.builtin, .mdm-prosemirror .token.char, .mdm-prosemirror .token.inserted, .mdm-prosemirror .token.selector, .mdm-prosemirror .token.string",
+  "prop": "color",
+  "value": "#a3be8c",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.entity, .mdm-prosemirror .token.operator, .mdm-prosemirror .token.url",
+  "prop": "color",
+  "value": "#81a1c1",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.atrule, .mdm-prosemirror .token.attr-value, .mdm-prosemirror .token.keyword",
+  "prop": "color",
+  "value": "#81a1c1",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.class-name, .mdm-prosemirror .token.function",
+  "prop": "color",
+  "value": "#88c0d0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror .token.important, .mdm-prosemirror .token.regex, .mdm-prosemirror .token.variable",
+  "prop": "color",
+  "value": "#ebcb8b",
+  "important": false
+ },
+ {
+  "where": ".mdm-misspelled",
+  "prop": "text-decoration",
+  "value": "#e51d1d wavy underline",
+  "important": false
+ },
+ {
+  "where": ".mdm-misspelled",
+  "prop": "text-decoration-skip-ink",
+  "value": "none",
+  "important": false
+ },
+ {
+  "where": "@media print > .mdm-misspelled",
+  "prop": "text-decoration",
+  "value": "none",
+  "important": false
+ }
+]

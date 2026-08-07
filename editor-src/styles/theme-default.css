@@ -1,0 +1,91 @@
+/* =====================================================================
+ *  Default — the palette Markdown Midget has always shipped.
+ *
+ *  Every colour the editor surface draws on screen is named here, and
+ *  `editor.css` reads all of them through `var()`. A theme is this file with
+ *  different values; nothing else has to change for one to work.
+ *
+ *  Two rules this file exists to keep honest:
+ *
+ *  - Values that differ stay separate variables even when they look like they
+ *    shouldn't. `--mdm-heading` (#4682b4) and `--mdm-link` (#4582b4) differ by
+ *    one digit and are almost certainly an original typo; the three muted
+ *    heading greys are three near-identical greys. Merging any of them is a
+ *    visual change, and a deliberate one is a different commit from a refactor.
+ *  - Nine syntax token names map six distinct Nord colours. The duplication is
+ *    the point: a theme can give keywords and punctuation different colours
+ *    without Nord's palette having done so first.
+ *
+ *  Print is deliberately absent. Paper stays light whatever theme is chosen —
+ *  a dark theme reaching the printer produces unreadable pages and empties a
+ *  toner cartridge — so `@media print` keeps its own literals.
+ * ===================================================================== */
+:root {
+  /* Surface. `color-scheme` is not a colour, and is the one every dark theme
+     forgets: leave it `light` and the WebView's scrollbar, form controls and
+     default canvas stay light against a dark page. */
+  --mdm-color-scheme: light;
+  --mdm-app-bg: #e7e7e7;
+  --mdm-page-bg: #ffffff;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.18);
+  --mdm-text: #1a1a1a;
+
+  /* Headings — steelblue, then three separately-tuned greys for h4/h5/h6. */
+  --mdm-heading: #4682b4;
+  --mdm-h4: #555555;
+  --mdm-h5: #606060;
+  --mdm-h6: #707070;
+
+  /* Links. One digit from --mdm-heading; see above. */
+  --mdm-link: #4582b4;
+  --mdm-link-hover: #2f5f87;
+
+  /* Blockquote (Markdown Monster "PDF Output" theme). */
+  --mdm-quote-bg: #f2f7fb;
+  --mdm-quote-bar: #569ad4;
+  --mdm-quote-text: #3a4a58;
+
+  /* Code. Inline code takes its foreground from Nord, not from us, so there is
+     no --mdm-code-fg yet — adding one means adding a declaration the editor
+     doesn't currently make, which is a change rather than a refactor. */
+  --mdm-code-bg: #f2f2f2;
+  --mdm-pre-bg: #2e3440;   /* nord polar night */
+  --mdm-pre-fg: #d8dee9;
+
+  --mdm-hr: #d0d0d0;
+
+  /* Tables. Two border colours, not one — the table's outer border and the
+     cell borders differ, and --mdm-td-bg reads like "the page colour" but is a
+     separate !important declaration that leaves every dark theme with white
+     cells if it stays hardcoded. */
+  --mdm-table-border: #d7dbe0;
+  --mdm-cell-border: #dde1e6;
+  --mdm-td-bg: #ffffff;
+  --mdm-th-bg: #c4c9d1;
+  --mdm-th-text: #1f2328;
+  --mdm-row-alt-bg: #f4f6f8;
+
+  /* Chrome — the app's own furniture. A theme may recolour these; it may not
+     remove them (see the layer order in docs/plans/themes.md). */
+  --mdm-squiggle: #e51d1d;
+  --mdm-mark: #c4c8d0;
+  --mdm-cell-selected: rgba(86, 154, 212, 0.25);
+  --mdm-resize-handle: #569ad4;
+  --mdm-mermaid-bg: #ffffff;
+  --mdm-mermaid-border: #e2e4e8;
+  --mdm-mermaid-error-bg: #fdf2f2;
+  --mdm-mermaid-error-border: #f0b8b6;
+  --mdm-mermaid-error-text: #b83232;
+  --mdm-mermaid-empty: #888888;
+
+  /* Syntax (Prism / refractor, Nord palette). Nine names, six values. */
+  --mdm-token-comment: #616e88;
+  --mdm-token-punctuation: #81a1c1;
+  --mdm-token-property: #81a1c1;
+  --mdm-token-number: #b48ead;
+  --mdm-token-string: #a3be8c;
+  --mdm-token-operator: #81a1c1;
+  --mdm-token-keyword: #81a1c1;
+  --mdm-token-function: #88c0d0;
+  --mdm-token-regex: #ebcb8b;
+}
