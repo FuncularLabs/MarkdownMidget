@@ -67,12 +67,12 @@ internal static class CssValidator
         var parenLine = 1;
         var parenColumn = 1;
 
-        // Attribute-selector depth. A string in here is matched, never fetched.
-        //
-        // Reset at every `{`, `}` and `;`, because an attribute selector cannot span
-        // one — so a `[` that never closes is confined to the statement it is in
-        // rather than switching the URL check off for the remainder of the file.
+        // Attribute-selector depth, and what is inside one. A theme may test that an
+        // attribute EXISTS — `[disabled]` — but not what it contains, so this tracks
+        // whether the current bracket has met a value operator.
         var bracket = 0;
+        var bracketLine = 1;
+        var bracketColumn = 1;
 
         // Start of the run of text since the last ; { or } — where a declaration
         // missing its colon has to be reported, rather than at the punctuation that
@@ -161,7 +161,7 @@ internal static class CssValidator
                 // the commonest string containing a URL in a documentation theme, and
                 // it is matched against the page, never fetched. Nothing about the
                 // string itself distinguishes it — only where it sits.
-                if (bracket == 0 && LooksLikeUrl(Decode(css.AsSpan(contentStart, j - contentStart))))
+                if (LooksLikeUrl(Decode(css.AsSpan(contentStart, j - contentStart))))
                     return new CssProblem(startLine, startColumn, RemoteMessage);
 
                 if (!runHasContent) { runLine = startLine; runColumn = startColumn; }
@@ -194,7 +194,29 @@ internal static class CssValidator
 
                 case '[':
                     bracket++;
+                    bracketLine = line;
+                    bracketColumn = column;
                     break;
+
+                case '=' when bracket > 0:
+                    // The oracle, refused at its selector rather than at its payload.
+                    //
+                    // `span[data-value^="a"] { background-image: url(…) }` fires only
+                    // when it matches, so a few hundred of those read a value out of
+                    // the document one character at a time — and `data-value` carries
+                    // the original unsanitized HTML. Each match is an image request,
+                    // which is the one thing that has to stay allowed off-origin,
+                    // because documents legitimately reference pictures.
+                    //
+                    // Nothing downstream can tell that request from a document's. So
+                    // it goes here: with no way to select on what an attribute
+                    // CONTAINS, a beacon that slips through the url() rules fires once
+                    // and says nothing. `[disabled]` and `[open]` still work — this
+                    // refuses the comparison, not the attribute.
+                    return new CssProblem(bracketLine, bracketColumn,
+                        "an attribute selector that tests a VALUE is not allowed in a theme — " +
+                        "matching on document content is how a stylesheet reads it back out. " +
+                        "Testing that an attribute is present, like `[disabled]`, is fine");
 
                 case ']':
                     if (bracket > 0) bracket--;
@@ -202,7 +224,6 @@ internal static class CssValidator
 
                 case '{' when paren == 0:
                     depth++;
-                    bracket = 0;
                     ResetRun(ref runHasColon, ref runHasContent, ref runIsAtRule);
                     Step(c, ref line, ref column);
                     continue;
@@ -215,7 +236,6 @@ internal static class CssValidator
                     if (MissingColon(runHasContent, runHasColon, runIsAtRule))
                         return new CssProblem(runLine, runColumn, MissingColonMessage);
                     depth--;
-                    bracket = 0;
                     ResetRun(ref runHasColon, ref runHasContent, ref runIsAtRule);
                     Step(c, ref line, ref column);
                     continue;
@@ -228,7 +248,6 @@ internal static class CssValidator
                     // message.
                     if (MissingColon(runHasContent, runHasColon, runIsAtRule))
                         return new CssProblem(runLine, runColumn, MissingColonMessage);
-                    bracket = 0;
                     ResetRun(ref runHasColon, ref runHasContent, ref runIsAtRule);
                     Step(c, ref line, ref column);
                     continue;
@@ -282,6 +301,10 @@ internal static class CssValidator
                     continue;
                 }
             }
+            else if (Refused(css, i) is { } refusal)
+            {
+                return new CssProblem(line, column, refusal);
+            }
             else if (runIsAtRule && Matches(css, i, "@import"))
             {
                 return new CssProblem(line, column,
@@ -305,6 +328,42 @@ internal static class CssValidator
 
         return null;
     }
+
+    /// <summary>
+    /// The safety scan: features a theme has no business using, refused by name.
+    ///
+    /// This is deliberately over-broad, and that is the policy rather than an
+    /// accident of implementation. A theme is a palette someone was handed; the cost
+    /// of refusing a construct it does not need is a message, and the cost of
+    /// allowing one it can misuse is an attack surface that four review rounds could
+    /// not close by cleverness. So anything on this list goes, whether or not the
+    /// particular spelling in front of us is exploitable.
+    ///
+    /// - `:has()` selects a parent by what is inside it, which is the same conditional
+    ///   match the attribute oracle uses and the same lever on document content.
+    /// - `@font-face` fetches, and a font load is its own exfiltration and
+    ///   fingerprinting channel. A theme picks from installed families instead.
+    /// - `expression()`, `behavior:` and `-moz-binding:` are how stylesheets used to
+    ///   run script. Chromium ignores all three, so this changes nothing today — it
+    ///   is here because "no script execution of any kind" should be enforced by
+    ///   something more durable than a browser's disinterest.
+    /// </summary>
+    private static string? Refused(string css, int at) => true switch
+    {
+        _ when Matches(css, at, ":has(") =>
+            "`:has()` is not allowed in a theme — selecting by what an element contains " +
+            "is a way to read the document back out through which rules match",
+        _ when Matches(css, at, "@font-face") =>
+            "`@font-face` is not allowed in a theme — it fetches a font, and which fonts " +
+            "load is itself a channel. Name an installed family in `font-family` instead",
+        _ when Matches(css, at, "expression(") =>
+            "`expression()` is not allowed in a theme — it is a way to run script from a " +
+            "stylesheet",
+        _ when Matches(css, at, "-moz-binding") || Matches(css, at, "behavior:") =>
+            "this is not allowed in a theme — it is a way to attach script to an element " +
+            "from a stylesheet",
+        _ => null,
+    };
 
     private const string MissingColonMessage =
         "this looks like a declaration with no `:` between the property and its value";

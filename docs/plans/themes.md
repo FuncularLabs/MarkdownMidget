@@ -486,13 +486,25 @@ This matters more than it sounds because of what is in the attributes:
 `span[data-value]` carries the ORIGINAL unsanitized raw-HTML string. So the channel
 reads document content, not just decoration.
 
-Neither layer can close it — a theme's `url()` is an Image request indistinguishable
-from a document's — so stage 4 has to close it structurally. The options worth
-weighing: scope injected themes so they cannot select on attributes carrying
-document data; serve a theme from the host over its own origin via a `<link>` so
-`img-src` can be tightened for it specifically; or strip attribute selectors from a
-theme at injection and say so in the docs. Whichever, it is a design decision that
-belongs before the menu, not after.
+Neither request layer can close it — a theme's `url()` is an Image request
+indistinguishable from a document's — **so it is closed at validation instead, by
+refusing the selector rather than chasing the payload.** A theme may test that an
+attribute exists (`[disabled]`, `[open]`) but not what it contains, and `:has()` goes
+with it for the same reason. With no way to select on document content, a beacon that
+slips past the `url()` rules fires once and says nothing.
+
+This is a deliberate over-rejection, and the trade is stated so nobody quietly
+reverses it later: `a[href^="https://"] { }` is a reasonable thing for a
+documentation theme to write, it is harmless in itself, and it is refused anyway
+because it is the exact shape of the oracle and nothing downstream can tell them
+apart. The same posture retires `@font-face` (a font load is its own channel) and
+`expression()` / `-moz-binding` / `behavior:` (legacy script-from-stylesheet, inert
+in Chromium, refused so that "no script execution" rests on more than a browser's
+disinterest).
+
+What stage 4 still owes this: the menu has to SHOW the refusal. A theme greyed out
+with "an attribute selector that tests a VALUE is not allowed" is a feature; one
+that silently does nothing is a bug report.
 
 ---
 

