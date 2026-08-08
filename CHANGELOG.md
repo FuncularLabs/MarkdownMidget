@@ -9,6 +9,15 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.7.0-beta1] - 2026-08-08
+
+Themes, plus three smaller things that landed alongside them: File ▸ New opens a
+new window, Settings moved to the Edit menu, and a What's New viewer. The minor
+bump marks Themes — the largest single addition since the in-app updater, and the
+first feature to bring its own security model (a CSS validator with a dedicated
+safety scan, and a rewrite of the WebView2 network sandbox to enforce the network
+half at the request layer rather than by pattern-matching text).
+
 ### Added
 - **Themes.** **View ▸ Theme** recolours the editing surface, instantly, and
   remembers your choice. Six ship with the app — the original **Default**, plus
