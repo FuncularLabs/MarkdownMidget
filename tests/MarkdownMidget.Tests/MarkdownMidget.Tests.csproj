@@ -26,4 +26,15 @@
           Link="theme-default.css" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- A stand-in for the app's embedded themes, so ThemeStore.Refresh can be driven
+       against a real assembly rather than a mock of one. `themes/sub/nested.css`
+       carries a separator deliberately: it is the resource name that would land
+       outside the folder, and a test asserts that it doesn't. -->
+  <ItemGroup>
+    <EmbeddedResource Include="ThemeRes\apple.css"><LogicalName>themes/apple.css</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="ThemeRes\zebra.css"><LogicalName>themes/zebra.css</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="ThemeRes\sub\nested.css"><LogicalName>themes/sub/nested.css</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="ThemeRes\sample.css"><LogicalName>themes-sample.css</LogicalName></EmbeddedResource>
+  </ItemGroup>
+
 </Project>

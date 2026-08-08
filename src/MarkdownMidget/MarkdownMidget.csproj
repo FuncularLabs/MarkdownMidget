@@ -53,4 +53,18 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- Themes. The built-ins are extracted to the themes folder on launch and
+       overwritten when the version moves, so an update delivers fixes to them;
+       the sample is copied into themes\custom\ once and then left alone. The
+       logical names are what ThemeStore matches on, so the "themes/" prefix and
+       the flat shape are load-bearing, not decoration. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Themes\builtin\*.css">
+      <LogicalName>themes/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Themes\sample.css">
+      <LogicalName>themes-sample.css</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

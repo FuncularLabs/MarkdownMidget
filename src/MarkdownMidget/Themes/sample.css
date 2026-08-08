@@ -1,0 +1,122 @@
+/* =====================================================================
+ *  Sample theme — a starting point, and the only file in this folder that
+ *  Markdown Midget ever writes.
+ *
+ *  COPY IT AND RENAME IT before you change much. This one comes back if you
+ *  empty the folder, and the name you give the copy is the name that appears
+ *  in View > Theme (so `midnight-blue.css` shows up as "Midnight Blue").
+ *
+ *  Files in `custom\` are yours. The ones in the folder ABOVE this one are
+ *  built-ins: they are rewritten from the app whenever you update, so edits to
+ *  them are lost. If you want to change a built-in, copy it in here — a custom
+ *  file with the same name wins, and the menu marks it.
+ *
+ *  A theme sets variables. Every colour the editor draws is named below and
+ *  read through `var()`, so setting one here is enough; you do not need to know
+ *  which rule uses it. You can also write ordinary selectors, but you can't
+ *  turn off the app's own furniture — spelling squiggles, formatting marks and
+ *  the table resize handle survive whatever you say about them, on purpose.
+ *
+ *  Three things a theme may not do, and the menu will tell you which one you
+ *  hit and on what line:
+ *
+ *    - reference anything off the machine. `url(https://…)` is refused; a
+ *      stylesheet that fetches is a stylesheet that reports. `url(data:…)` is
+ *      fine, so a small embedded background image still works.
+ *    - match on what an attribute CONTAINS. `[disabled]` is fine — that is
+ *      structure. `[href^="https://"]` is not, and neither is `:has()`, because
+ *      selecting on document content is how a stylesheet reads one back out.
+ *      This refuses some harmless things too. That is the intended trade.
+ *    - run script, in any of the spellings that ever worked.
+ *
+ *  Printing ignores the theme. Paper stays light whatever you pick.
+ * ===================================================================== */
+
+:root {
+  /* ---- surface ----------------------------------------------------- */
+
+  /* Not a colour, and the one every dark theme forgets. Set it to `dark` and
+     the scrollbar, form controls and default canvas follow; leave it and they
+     stay light against your dark page. */
+  --mdm-color-scheme: light;
+
+  --mdm-app-bg: #e7e7e7;        /* around the page */
+  --mdm-page-bg: #ffffff;       /* the page itself */
+  --mdm-page-shadow: rgba(0, 0, 0, 0.18);
+  --mdm-text: #1a1a1a;
+
+  /* ---- headings and links ------------------------------------------ */
+
+  --mdm-heading: #4682b4;       /* h1–h3 */
+  --mdm-h4: #555555;
+  --mdm-h5: #606060;
+  --mdm-h6: #707070;
+
+  --mdm-link: #4582b4;
+  --mdm-link-hover: #2f5f87;
+
+  /* ---- blockquote --------------------------------------------------- */
+
+  --mdm-quote-bg: #f2f7fb;
+  --mdm-quote-bar: #569ad4;
+  --mdm-quote-text: #3a4a58;
+
+  /* ---- code --------------------------------------------------------- */
+
+  --mdm-code-bg: #f2f2f2;       /* `inline` */
+  --mdm-pre-bg: #2e3440;        /* fenced blocks */
+  --mdm-pre-fg: #d8dee9;
+
+  --mdm-hr: #d0d0d0;
+
+  /* ---- tables ------------------------------------------------------- */
+
+  /* Outer border and cell borders are separate on purpose, and --mdm-td-bg is
+     the one to remember: leave it white and a dark theme has white cells. */
+  --mdm-table-border: #d7dbe0;
+  --mdm-cell-border: #dde1e6;
+  --mdm-td-bg: #ffffff;
+  --mdm-th-bg: #c4c9d1;
+  --mdm-th-text: #1f2328;
+  --mdm-row-alt-bg: #f4f6f8;
+
+  /* ---- the app's own furniture -------------------------------------- */
+
+  /* Recolour these; you cannot remove them. Check them after a big change —
+     a squiggle or a resize handle that vanishes into the background is the
+     usual way a good-looking theme turns out to be broken. */
+  --mdm-squiggle: #e51d1d;              /* misspelling underline */
+  --mdm-mark: #c4c8d0;                  /* pilcrows, spaces, tabs */
+  --mdm-cell-selected: rgba(86, 154, 212, 0.25);
+  --mdm-resize-handle: #569ad4;
+
+  --mdm-mermaid-bg: #ffffff;
+  --mdm-mermaid-border: #e2e4e8;
+  --mdm-mermaid-error-bg: #fdf2f2;
+  --mdm-mermaid-error-border: #f0b8b6;
+  --mdm-mermaid-error-text: #b83232;
+  --mdm-mermaid-empty: #888888;
+
+  /* ---- syntax highlighting ------------------------------------------ */
+
+  /* Nine names, six values here — several tokens share a colour in the default
+     palette, and splitting them is a normal thing for a theme to do. */
+  --mdm-token-comment: #616e88;
+  --mdm-token-punctuation: #81a1c1;
+  --mdm-token-property: #81a1c1;
+  --mdm-token-number: #b48ead;
+  --mdm-token-string: #a3be8c;
+  --mdm-token-operator: #81a1c1;
+  --mdm-token-keyword: #81a1c1;
+  --mdm-token-function: #88c0d0;
+  --mdm-token-regex: #ebcb8b;
+}
+
+/* Anything a variable doesn't cover, write as a rule. This one is a no-op —
+   it restates a default — and is here to show the shape.
+
+.mdm-prosemirror h1 {
+  letter-spacing: -0.01em;
+}
+
+*/
