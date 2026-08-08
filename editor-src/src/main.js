@@ -18,7 +18,7 @@ import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { formattingMarks } from './marks.js';
 import { tableCellEditing, insertTableAction, runTableCommand, focusTableCell } from './tables.js';
-import { mermaidBlock } from './mermaid.js';
+import { mermaidBlock, setMermaidTheme } from './mermaid.js';
 import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
 import { spellDecorate, setSpellRanges, beginSpellCheck, misspellingAt } from './spell-decorate.js';
 import { extractSpellText } from './spell-extract.js';
@@ -352,6 +352,85 @@ function installFileDrop() {
   }, true);
 }
 
+// ===== theme read-back =====
+//
+// The host has to follow the theme in two places the WebView can't reach: the WPF
+// source-view TextBox, and mermaid. Both need to know what the CSS *resolved to*,
+// which is a question only the engine can answer — so it is asked rather than
+// guessed. Parsing the stylesheet in C# to find the colours breaks on var()
+// indirection, multiple :root blocks, `html {}` instead of `:root`, a declaration
+// inside @media, and on every colour syntax WPF's ColorConverter can't read, which
+// is most of them.
+
+/**
+ * Flatten a CSS colour to opaque 8-bit sRGB.
+ *
+ * getComputedStyle is only half an answer: modern Chromium preserves the author's
+ * colour space, so a theme written in `oklch()` or `color-mix()` comes back as
+ * `oklch(...)` and the host is parsing colour syntax again. A 1×1 canvas is the
+ * engine's own converter — whatever CSS accepts, it composites to four bytes.
+ *
+ * Painted over an opaque base rather than returned with its alpha, because the
+ * caller is a TextBox background: a translucent page colour has to become the
+ * colour you can actually see through it, and #fff is where the window starts.
+ */
+function flattenColor(value, base) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  for (const layer of [base, value]) {
+    if (!layer) continue;
+    // fillStyle silently keeps its previous value when handed something it can't
+    // parse, so it is reset to a known colour first — otherwise an unreadable value
+    // paints with whatever the last one was.
+    ctx.fillStyle = '#000000';
+    ctx.fillStyle = layer;
+    ctx.fillRect(0, 0, 1, 1);
+  }
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return { r, g, b };
+}
+
+function readThemeBack() {
+  // Inside the editing surface when there is one. A theme is free to set its
+  // variables on `.mdm-prosemirror` rather than on `:root`, and a probe parked on
+  // <body> would not inherit those.
+  const host = document.querySelector('.mdm-prosemirror') || document.body || document.documentElement;
+
+  const probe = document.createElement('div');
+  probe.setAttribute('aria-hidden', 'true');
+  probe.style.cssText =
+    'position:absolute;left:-9999px;top:0;width:0;height:0;pointer-events:none;' +
+    'background:var(--mdm-page-bg);color:var(--mdm-text);border-color:var(--mdm-app-bg)';
+  host.appendChild(probe);
+
+  let result;
+  try {
+    const cs = getComputedStyle(probe);
+    // Layered the way the window is: app background over white, page over that,
+    // text over the page.
+    const app = flattenColor(cs.borderTopColor, '#ffffff');
+    const appCss = app ? `rgb(${app.r},${app.g},${app.b})` : '#ffffff';
+    const bg = flattenColor(cs.backgroundColor, appCss);
+    const bgCss = bg ? `rgb(${bg.r},${bg.g},${bg.b})` : appCss;
+    const fg = flattenColor(cs.color, bgCss);
+
+    result = {
+      background: bg,
+      foreground: fg,
+      mermaid: (cs.getPropertyValue('--mdm-mermaid-theme') || '').trim().toLowerCase(),
+    };
+  } finally {
+    probe.remove();
+  }
+
+  // Mermaid follows the theme too — a dark editor around a bright white diagram
+  // reads as broken. It redraws itself if the name changed.
+  setMermaidTheme(editorView, result.mermaid);
+  return result;
+}
+
 const MDM = {
   async create(initialMarkdown) {
     const root = document.getElementById('app');
@@ -560,6 +639,28 @@ const MDM = {
     } else if (pre) {
       pre.remove();
     }
+  },
+
+  // Install a theme, and tell the host what it actually resolved to.
+  //
+  // The CSS goes in verbatim, wrapped in `@layer mdm-theme` — the last layer in the
+  // order declared by bundle.css, so a theme outranks everything for a normal
+  // declaration and loses to the app's own `!important` rules for the handful of
+  // things (squiggles, formatting marks, the resize handle) it must not be able to
+  // remove. Empty means "the palette already in the bundle", which is the Default
+  // entry and is what an unreadable or refused file falls back to.
+  //
+  // textContent, never innerHTML: a <style> element's text is handed to the CSS
+  // parser, so a `</style>` in the middle of it is a parse error and not a way out.
+  setTheme(css) {
+    let el = document.getElementById('mdm-theme');
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'mdm-theme';
+      document.head.appendChild(el);
+    }
+    el.textContent = css ? '@layer mdm-theme {\n' + css + '\n}\n' : '';
+    return readThemeBack();
   },
 
   // Document width: portrait (~A4), landscape (11/8 wider), or full window width.

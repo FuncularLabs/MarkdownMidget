@@ -1,7 +1,25 @@
 # Implementation plan: themes
 
-Status: **stages 1-3 landed; stages 4-6 planned.** Supersedes the ROADMAP "Selectable
-CSS templates / themes" sketch, which this replaces with decisions.
+Status: **all six stages landed.** Supersedes the ROADMAP "Selectable CSS templates
+/ themes" sketch, which this replaces with decisions.
+
+What changed against the plan as written, so a reader trusts the rest of it:
+
+- **The attribute-value oracle in §5 is closed, at validation rather than at the
+  request layer** — see below. Stage 4's design question is answered and the answer
+  was "refuse the selector", which is stricter than any of the three options this
+  document weighed.
+- **The Nord selected-cell overlay in Risks was real and stage 2 did not catch it.**
+  `--mdm-cell-selected` set the ELEMENT's background while prosemirror-tables and
+  Nord both paint the selection as an `:after` pseudo-element on top of it, so the
+  variable never reached what you see. Fixed in `chrome.css` by overriding the
+  pseudo-element's colour and nothing else; verified in a browser against a hostile
+  theme, which loses to it.
+- **The Solarized resize handle** measured 2.93:1 against base3 — just under the
+  WCAG 1.4.11 floor for something you grab with a mouse — and is blue rather than
+  the quote bar's cyan as a result. The contrast floors are now a test
+  (`BuiltInThemeTests`), including the one Solarized is exempted from BY NAME, with
+  its measurement recorded, so the exemption can't spread.
 
 Stage 1 extracted the 36 screen colours into 43 custom properties in
 `editor-src/styles/theme-default.css`, with `editor-src/test/theme-parity.test.mjs`

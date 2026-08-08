@@ -20,6 +20,24 @@
   background: var(--mdm-cell-selected) !important;
 }
 
+/* The overlay, which is where the selection is actually drawn.
+ *
+ * prosemirror-tables paints the selection as an `:after` pseudo-element covering
+ * the cell (`content:""; position:absolute; inset:0`), and Nord recolours that same
+ * pseudo-element to a nord8 tint. The rule above sets the ELEMENT's background —
+ * a different box, underneath — so --mdm-cell-selected never reached what you see,
+ * and every dark theme kept a pale blue wash on selected cells no matter what it
+ * declared.
+ *
+ * Only the colour is overridden: the geometry and the `content` still come from the
+ * vendor rule, so the overlay keeps existing and just stops being nord8. This is a
+ * normal-vs-important contest across layers rather than a specificity one — the
+ * vendor selector is far more specific, and loses anyway, because an `!important`
+ * declaration outranks a normal one whatever layer either sits in. */
+.mdm-prosemirror .selectedCell::after {
+  background: var(--mdm-cell-selected) !important;
+}
+
 .mdm-prosemirror .column-resize-handle {
   position: absolute !important;
   right: -2px !important;

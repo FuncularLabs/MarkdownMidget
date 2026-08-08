@@ -1,0 +1,75 @@
+/* =====================================================================
+ *  GitHub Dark Dimmed — dark, deliberately lower-contrast.
+ *
+ *  Palette from GitHub's Primer design system,
+ *  https://github.com/primer/primitives — MIT licence. Colours only.
+ *
+ *  Dimmed exists because Dark Default is bright: #adbac7 on #22272e is about
+ *  7.6:1, against Dark Default's 16:1. If a true dark feels like staring at a
+ *  torch, this is the one to try before giving up on dark themes.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* Primer dark-dimmed: canvas.default #22272e, canvas.subtle #2d333b,
+     fg.default #adbac7, fg.muted #768390, border.default #444c56,
+     accent.fg #539bf5. */
+
+  --mdm-color-scheme: dark;
+  --mdm-app-bg: #1c2128;
+  --mdm-page-bg: #22272e;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.5);
+  --mdm-text: #adbac7;
+
+  --mdm-heading: #539bf5;
+  --mdm-h4: #909dab;
+  --mdm-h5: #838f9c;
+  --mdm-h6: #768390;
+
+  --mdm-link: #539bf5;
+  --mdm-link-hover: #7cb4f8;
+
+  --mdm-quote-bg: #2d333b;
+  --mdm-quote-bar: #444c56;
+  --mdm-quote-text: #909dab;
+
+  --mdm-code-bg: #2d333b;
+  --mdm-pre-bg: #1c2128;
+  --mdm-pre-fg: #adbac7;
+
+  --mdm-hr: #444c56;
+
+  --mdm-table-border: #444c56;
+  --mdm-cell-border: #3d444d;
+  --mdm-td-bg: #22272e;
+  --mdm-th-bg: #2d333b;
+  --mdm-th-text: #adbac7;
+  --mdm-row-alt-bg: #262c34;
+
+  --mdm-mermaid-theme: dark;
+
+  /* Chrome. Primer's danger.fg for dimmed is #e5534b — brighter than the
+     default squiggle and legible against #22272e, which #e51d1d is not. */
+  --mdm-squiggle: #e5534b;
+  --mdm-mark: #636e7b;
+  --mdm-cell-selected: rgba(83, 155, 245, 0.24);
+  --mdm-resize-handle: #539bf5;
+
+  --mdm-mermaid-bg: #22272e;
+  --mdm-mermaid-border: #444c56;
+  --mdm-mermaid-error-bg: #372b2b;
+  --mdm-mermaid-error-border: #e5534b;
+  --mdm-mermaid-error-text: #ff938a;
+  --mdm-mermaid-empty: #768390;
+
+  --mdm-token-comment: #768390;
+  --mdm-token-punctuation: #adbac7;
+  --mdm-token-property: #6cb6ff;
+  --mdm-token-number: #6cb6ff;
+  --mdm-token-string: #96d0ff;
+  --mdm-token-operator: #f47067;
+  --mdm-token-keyword: #f47067;
+  --mdm-token-function: #dcbdfb;
+  --mdm-token-regex: #f69d50;
+}

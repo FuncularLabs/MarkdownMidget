@@ -48,6 +48,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Fenced code blocks** with syntax highlighting (C#, JavaScript, TypeScript,
   HTML, CSS).
 - **Formatting marks** toggle (¶ / ↵ / →) and **spell check**.
+- **Themes** — six built in (Dracula, GitHub Dark Dimmed, GitHub Light, One Light,
+  Solarized Light, and the original Default), plus your own: drop a CSS file in the
+  themes folder and it appears in the menu. Printing stays light whatever you pick.
 - **Document width** (Portrait / Landscape / Full, remembered between sessions) and
   a **zoom** indicator (Ctrl + mouse wheel).
 - **Recent files**, drag-and-drop to open, **read-only** mode, and a bundled Help

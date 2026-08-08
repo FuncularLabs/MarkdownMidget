@@ -67,6 +67,13 @@
 
   /* Chrome — the app's own furniture. A theme may recolour these; it may not
      remove them (see the layer order in docs/plans/themes.md). */
+  /* Not a colour: the name of one of mermaid's own built-in themes (default,
+     dark, neutral, forest, base). Read back through getComputedStyle after the
+     theme is installed and handed to mermaid.initialize — CSS custom properties
+     can't reach inside an SVG mermaid generates, so this is the only lever on it
+     a theme has. An unrecognised name falls back rather than throwing. */
+  --mdm-mermaid-theme: default;
+
   --mdm-squiggle: #e51d1d;
   --mdm-mark: #c4c8d0;
   --mdm-cell-selected: rgba(86, 154, 212, 0.25);

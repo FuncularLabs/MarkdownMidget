@@ -291,9 +291,34 @@ test('the default theme defines nothing the editor never reads', () => {
   // An orphan variable is a promise to theme authors that nothing keeps: it shows
   // up in the sample file, gets set, and changes nothing.
   const used = new Set([...editorCss.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]));
-  const orphans = [...rootVariables(defaultTheme).keys()].filter((v) => !used.has(v));
+
+  // Read by JavaScript instead of by a var() — and read out of getComputedStyle,
+  // so it is a real declaration on :root and not somewhere a grep for var() will
+  // ever find it. Mermaid draws its own SVG from its own palette; no CSS variable
+  // of ours reaches inside one, so naming a mermaid built-in is the only lever a
+  // theme has on it. Each entry names where it IS read, so an orphan can't be
+  // parked here to silence the test.
+  const readByScript = new Map([
+    ['--mdm-mermaid-theme', 'src/main.js readThemeBack() -> mermaid.js setMermaidTheme()'],
+  ]);
+  for (const [name] of readByScript) {
+    assert.ok(rootVariables(defaultTheme).has(name),
+      `${name} is listed as read by script but the theme no longer defines it`);
+  }
+
+  const orphans = [...rootVariables(defaultTheme).keys()]
+    .filter((v) => !used.has(v) && !readByScript.has(v));
 
   assert.deepEqual(orphans, [], 'defined by the theme but read by nothing');
+});
+
+test('a variable read by script is actually read by that script', () => {
+  // The exemption above is only honest if the claim in it is checked. Otherwise
+  // deleting the JS that reads a variable leaves the variable exempt forever, and
+  // the sample file keeps advertising a setting that does nothing.
+  const mainJs = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(mainJs, /getPropertyValue\(\s*'--mdm-mermaid-theme'\s*\)/,
+    'main.js no longer reads --mdm-mermaid-theme back out of computed style');
 });
 
 test('the nine syntax token names cover the six Nord colours', () => {

@@ -1,0 +1,71 @@
+/* =====================================================================
+ *  Dracula — dark.
+ *
+ *  Palette from the Dracula theme by Zeno Rocha and contributors,
+ *  https://draculatheme.com — MIT licence. Colours only; no artwork.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* Dracula: bg #282a36, current-line #44475a, fg #f8f8f2, comment #6272a4,
+     cyan #8be9fd, green #50fa7b, orange #ffb86c, pink #ff79c6, purple #bd93f9,
+     red #ff5555, yellow #f1fa8c. */
+
+  --mdm-color-scheme: dark;
+  --mdm-app-bg: #21222c;
+  --mdm-page-bg: #282a36;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.55);
+  --mdm-text: #f8f8f2;
+
+  --mdm-heading: #bd93f9;
+  --mdm-h4: #b3b6c7;
+  --mdm-h5: #a2a5b8;
+  --mdm-h6: #9194a8;
+
+  --mdm-link: #8be9fd;
+  --mdm-link-hover: #b8f2ff;
+
+  --mdm-quote-bg: #2f3140;
+  --mdm-quote-bar: #bd93f9;
+  --mdm-quote-text: #d6d8e4;
+
+  --mdm-code-bg: #343746;
+  --mdm-pre-bg: #21222c;
+  --mdm-pre-fg: #f8f8f2;
+
+  --mdm-hr: #44475a;
+
+  --mdm-table-border: #44475a;
+  --mdm-cell-border: #3c3f52;
+  --mdm-td-bg: #282a36;
+  --mdm-th-bg: #44475a;
+  --mdm-th-text: #f8f8f2;
+  --mdm-row-alt-bg: #2e3040;
+
+  --mdm-mermaid-theme: dark;
+
+  /* Chrome. Dracula's red is #ff5555, which is the squiggle — it reads clearly
+     on #282a36 where the default's #e51d1d goes muddy. */
+  --mdm-squiggle: #ff5555;
+  --mdm-mark: #6272a4;
+  --mdm-cell-selected: rgba(189, 147, 249, 0.28);
+  --mdm-resize-handle: #bd93f9;
+
+  --mdm-mermaid-bg: #282a36;
+  --mdm-mermaid-border: #44475a;
+  --mdm-mermaid-error-bg: #3a2b32;
+  --mdm-mermaid-error-border: #ff5555;
+  --mdm-mermaid-error-text: #ff8080;
+  --mdm-mermaid-empty: #6272a4;
+
+  --mdm-token-comment: #6272a4;
+  --mdm-token-punctuation: #f8f8f2;
+  --mdm-token-property: #ff79c6;
+  --mdm-token-number: #bd93f9;
+  --mdm-token-string: #f1fa8c;
+  --mdm-token-operator: #ff79c6;
+  --mdm-token-keyword: #ff79c6;
+  --mdm-token-function: #50fa7b;
+  --mdm-token-regex: #ffb86c;
+}

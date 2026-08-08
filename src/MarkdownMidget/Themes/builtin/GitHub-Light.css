@@ -1,0 +1,75 @@
+/* =====================================================================
+ *  GitHub Light — light.
+ *
+ *  Palette from GitHub's Primer design system,
+ *  https://github.com/primer/primitives — MIT licence. Colours only.
+ *
+ *  The look most people have read markdown in, because it is the one
+ *  github.com renders a README in.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* Primer light: canvas.default #ffffff, canvas.subtle #f6f8fa,
+     fg.default #1f2328, fg.muted #656d76, border.default #d0d7de,
+     accent.fg #0969da, danger.fg #d1242f. */
+
+  --mdm-color-scheme: light;
+  --mdm-app-bg: #eaeef2;
+  --mdm-page-bg: #ffffff;
+  --mdm-page-shadow: rgba(31, 35, 40, 0.15);
+  --mdm-text: #1f2328;
+
+  --mdm-heading: #1f2328;
+  --mdm-h4: #424a53;
+  --mdm-h5: #57606a;
+  --mdm-h6: #656d76;
+
+  --mdm-link: #0969da;
+  --mdm-link-hover: #0550ae;
+
+  --mdm-quote-bg: #f6f8fa;
+  --mdm-quote-bar: #d0d7de;
+  --mdm-quote-text: #656d76;
+
+  --mdm-code-bg: #eff1f3;
+  --mdm-pre-bg: #f6f8fa;
+  --mdm-pre-fg: #1f2328;
+
+  --mdm-hr: #d8dee4;
+
+  --mdm-table-border: #d0d7de;
+  --mdm-cell-border: #d8dee4;
+  --mdm-td-bg: #ffffff;
+  --mdm-th-bg: #f6f8fa;
+  --mdm-th-text: #1f2328;
+  --mdm-row-alt-bg: #f6f8fa;
+
+  --mdm-mermaid-theme: default;
+
+  --mdm-squiggle: #d1242f;
+  --mdm-mark: #afb8c1;
+  --mdm-cell-selected: rgba(9, 105, 218, 0.18);
+  --mdm-resize-handle: #0969da;
+
+  --mdm-mermaid-bg: #ffffff;
+  --mdm-mermaid-border: #d0d7de;
+  --mdm-mermaid-error-bg: #ffebe9;
+  --mdm-mermaid-error-border: #ff818266;
+  --mdm-mermaid-error-text: #d1242f;
+  --mdm-mermaid-empty: #6e7781;
+
+  /* A light theme needs a DARK code block to stay readable, and Primer's own
+     light syntax is designed on #f6f8fa — so --mdm-pre-bg is light here and the
+     token colours are Primer's light set, not a dark set on a dark block. */
+  --mdm-token-comment: #6e7781;
+  --mdm-token-punctuation: #1f2328;
+  --mdm-token-property: #0550ae;
+  --mdm-token-number: #0550ae;
+  --mdm-token-string: #0a3069;
+  --mdm-token-operator: #cf222e;
+  --mdm-token-keyword: #cf222e;
+  --mdm-token-function: #8250df;
+  --mdm-token-regex: #953800;
+}

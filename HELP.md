@@ -168,6 +168,56 @@ is remembered between sessions.
 The **zoom** percentage is shown at the bottom-right of the status bar — zoom with
 **Ctrl + mouse wheel**, and click the indicator to reset to 100%.
 
+## Themes
+
+**View ▸ Theme** recolours the editing surface. Six ship with the app:
+
+| Theme | |
+|---|---|
+| **Default** | The look Markdown Midget has always had |
+| **Dracula** | Dark |
+| **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
+| **GitHub Light** | Light — how a README looks on github.com |
+| **One Light** | Light, cool and crisp |
+| **Solarized Light** | Light, warm, low-glare |
+
+Switching is instant, applies to the source view as well as the formatted one, and
+is remembered between sessions. Diagrams follow along; the menu bar, toolbar and
+status bar do not — those are Windows' own furniture and stay in the system theme.
+
+**Printing ignores the theme.** Paper stays light whatever you pick, because a dark
+theme reaching the printer produces unreadable pages and an empty toner cartridge.
+
+### Writing your own
+
+**View ▸ Theme ▸ Open Themes Folder** opens `custom\`, where a commented
+`sample.css` explains the whole thing. Copy it, rename it, edit the colours — the
+new name appears in the menu without restarting the app.
+
+Two folders, and the difference matters:
+
+- **`themes\`** holds the six built-ins. They are rewritten from the app whenever
+  you update, so that a fix to one reaches you — which also means **edits to them
+  are lost**.
+- **`themes\custom\`** is yours. Nothing there is ever overwritten. A custom file
+  with the same name as a built-in wins, and the menu marks it.
+
+A theme mostly just sets variables (`--mdm-page-bg`, `--mdm-text`, and about forty
+more, all listed in the sample). You can write ordinary CSS rules too, but you
+can't switch off the app's own furniture — spelling squiggles, formatting marks and
+the table resize handle survive whatever a theme says about them.
+
+Three things a theme may **not** do. A file that tries one is greyed out in the
+menu, with the line number and the reason in its tooltip:
+
+- **Reference anything off your machine.** `url(https://…)` is refused; a
+  stylesheet that fetches is a stylesheet that reports. `url(data:…)` is fine.
+- **Match on what an attribute contains.** `[disabled]` is fine — that is
+  structure. `a[href^="https://"]` is not, and neither is `:has()`. Selecting on
+  document content is how a stylesheet reads a document back out, so the whole
+  shape goes. This refuses some harmless things too; that is the intended trade.
+- **Run script**, in any of the spellings that ever worked.
+
 ## Spell check
 
 Markdown Midget runs its **own** spell checker (built on the Windows spelling

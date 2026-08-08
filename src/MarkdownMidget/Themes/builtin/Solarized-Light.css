@@ -1,0 +1,80 @@
+/* =====================================================================
+ *  Solarized Light — light, warm, low-glare.
+ *
+ *  Palette by Ethan Schoonover, https://ethanschoonover.com/solarized —
+ *  MIT licence. Colours only.
+ *
+ *  The sepia option. Body text is base00 (#657b83) on base3 (#fdf6e3) rather
+ *  than black on white, which is the whole idea: Solarized picks a deliberately
+ *  reduced contrast so long reading sessions hurt less. If it looks washed out
+ *  at first glance, that is the design and not a mistake.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* Solarized: base03 #002b36, base02 #073642, base01 #586e75, base00 #657b83,
+     base0 #839496, base1 #93a1a1, base2 #eee8d5, base3 #fdf6e3;
+     yellow #b58900, orange #cb4b16, red #dc322f, magenta #d33682,
+     violet #6c71c4, blue #268bd2, cyan #2aa198, green #859900. */
+
+  --mdm-color-scheme: light;
+  --mdm-app-bg: #e9e2cf;
+  --mdm-page-bg: #fdf6e3;
+  --mdm-page-shadow: rgba(0, 43, 54, 0.15);
+  --mdm-text: #657b83;
+
+  --mdm-heading: #268bd2;
+  --mdm-h4: #586e75;
+  --mdm-h5: #657b83;
+  --mdm-h6: #839496;
+
+  --mdm-link: #268bd2;
+  --mdm-link-hover: #1a6fa8;
+
+  --mdm-quote-bg: #f3ecd8;
+  --mdm-quote-bar: #2aa198;
+  --mdm-quote-text: #586e75;
+
+  --mdm-code-bg: #eee8d5;
+  --mdm-pre-bg: #073642;
+  --mdm-pre-fg: #93a1a1;
+
+  --mdm-hr: #ded6c0;
+
+  --mdm-table-border: #ded6c0;
+  --mdm-cell-border: #e5ddc7;
+  --mdm-td-bg: #fdf6e3;
+  --mdm-th-bg: #eee8d5;
+  --mdm-th-text: #586e75;
+  --mdm-row-alt-bg: #f6efdc;
+
+  --mdm-mermaid-theme: neutral;
+
+  --mdm-squiggle: #dc322f;
+  --mdm-mark: #b9b09a;
+  --mdm-cell-selected: rgba(42, 161, 152, 0.22);
+  /* Blue, not the cyan the quote bar uses: cyan on base3 measures 2.93:1, just
+     under the 3:1 floor for something you are meant to grab with a mouse. */
+  --mdm-resize-handle: #268bd2;
+
+  --mdm-mermaid-bg: #fdf6e3;
+  --mdm-mermaid-border: #ded6c0;
+  --mdm-mermaid-error-bg: #f7e6e0;
+  --mdm-mermaid-error-border: #e6a79a;
+  --mdm-mermaid-error-text: #dc322f;
+  --mdm-mermaid-empty: #93a1a1;
+
+  /* Code blocks stay on base02 — Solarized's dark background — because the
+     accent colours are chosen to work on both ends of the scale, and a dark
+     block on a warm page is what the original does. */
+  --mdm-token-comment: #586e75;
+  --mdm-token-punctuation: #93a1a1;
+  --mdm-token-number: #d33682;
+  --mdm-token-property: #268bd2;
+  --mdm-token-string: #2aa198;
+  --mdm-token-operator: #859900;
+  --mdm-token-keyword: #859900;
+  --mdm-token-function: #268bd2;
+  --mdm-token-regex: #cb4b16;
+}

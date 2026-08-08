@@ -313,7 +313,7 @@ public class ThemeStoreTests : IDisposable
     {
         var store = NewRefreshed();
         File.WriteAllText(Path.Combine(store.CustomDir, "APPLE.CSS"), ":root { --mdm-text: #abcdef; }");
-        Assert.Single(store.List().Where(t => t.Name.Equals("Apple", StringComparison.OrdinalIgnoreCase)));
+        Assert.Single(store.List(), t => t.Name.Equals("Apple", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

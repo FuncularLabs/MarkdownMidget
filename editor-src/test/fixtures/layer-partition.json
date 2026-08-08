@@ -5,6 +5,7 @@
  ],
  "chrome": [
   ".mdm-prosemirror .selectedCell { background }",
+  ".mdm-prosemirror .selectedCell::after { background }",
   ".mdm-prosemirror .column-resize-handle { position }",
   ".mdm-prosemirror .column-resize-handle { right }",
   ".mdm-prosemirror .column-resize-handle { top }",

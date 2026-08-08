@@ -189,6 +189,8 @@
                             <MenuItem x:Name="PageWidthFull" Header="_Full Width" IsCheckable="True"
                                       Tag="full" Click="PageWidth_Click" />
                         </MenuItem>
+                        <MenuItem x:Name="ThemeMenu" Header="_Theme" SubmenuOpened="ThemeMenu_Opened"
+                                  ToolTip="Recolour the editing surface. Printing is unaffected — paper stays light." />
                         <Separator />
                         <MenuItem x:Name="MenuSpellCheck" Header="_Spell Check"
                                   IsCheckable="True" IsChecked="True" Click="SpellCheck_Click" />

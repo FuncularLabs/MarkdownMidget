@@ -81,6 +81,12 @@ public partial class MainWindow : Window
         LoadRecent();
         BuildRecentMenu();
 
+        // After LoadSettings, which is where the persisted theme name comes from, and
+        // before the editor is ready — the theme itself is applied on 'ready', once
+        // there is a page to apply it to.
+        InitializeThemes();
+        BuildThemeMenu();
+
         // Apply the persisted spell-check state. Checking is done by the app's own
         // engine (see MainWindow.Spell.cs); native spell check stays off everywhere.
         MenuSpellCheck.IsChecked = _spellCheck;
@@ -325,6 +331,11 @@ public partial class MainWindow : Window
                 // Native (browser) spell check stays OFF — the app runs its own engine
                 // with a private dictionary; squiggles come from host-computed ranges.
                 _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
+                // Applied here rather than at construction: setTheme needs a page.
+                // announceFallback, because a theme that has gone missing between
+                // launches must say so — silently reverting to Default is exactly the
+                // thing that reads as the app losing a setting.
+                _ = ApplyThemeAsync(_themeKey, announceFallback: true);
                 RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
                 _ = ApplyLandingStateAsync();
@@ -2315,6 +2326,9 @@ public partial class MainWindow : Window
         public int RecentLimit { get; set; } = 10;   // entries kept in Open Recent
         public bool StartWithBlankDocument { get; set; } // else the no-document placeholder
         public bool KeepBackup { get; set; } = true;     // crash copy of unsaved work
+        // The theme's FILENAME, not its position in the menu — the list changes when
+        // a file is added or removed, and an index would then select a different one.
+        public string Theme { get; set; } = "";
         // Remembered window placement. Null/zero means "never saved" -> default layout.
         public double? WindowLeft { get; set; }
         public double? WindowTop { get; set; }
@@ -2383,6 +2397,7 @@ public partial class MainWindow : Window
             _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
+            _themeKey = s.Theme ?? Themes.ThemeStore.DefaultKey;
             _savedBounds = s.WindowWidth is > 0 && s.WindowHeight is > 0
                 ? new Rect(s.WindowLeft ?? 0, s.WindowTop ?? 0, s.WindowWidth.Value, s.WindowHeight.Value)
                 : null;
@@ -2509,6 +2524,7 @@ public partial class MainWindow : Window
         RecentLimit = _recentLimit,
         StartWithBlankDocument = _startWithBlankDocument,
         KeepBackup = _backupEnabled,
+        Theme = _themeKey,
     };
 
     // ===== Document width =====

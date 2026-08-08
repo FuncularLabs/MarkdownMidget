@@ -85,6 +85,12 @@
   /* Recolour these; you cannot remove them. Check them after a big change —
      a squiggle or a resize handle that vanishes into the background is the
      usual way a good-looking theme turns out to be broken. */
+  /* Not a colour. Mermaid draws its own SVG, so no variable of ours reaches
+     inside it — instead, name one of mermaid's built-in themes and it is handed
+     to mermaid directly. One of: default, dark, neutral, forest, base. Anything
+     else falls back to `default` rather than filling the page with error boxes. */
+  --mdm-mermaid-theme: default;
+
   --mdm-squiggle: #e51d1d;              /* misspelling underline */
   --mdm-mark: #c4c8d0;                  /* pilcrows, spaces, tabs */
   --mdm-cell-selected: rgba(86, 154, 212, 0.25);

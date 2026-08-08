@@ -588,6 +588,12 @@
   "important": true
  },
  {
+  "where": ".mdm-prosemirror .selectedCell::after",
+  "prop": "background",
+  "value": "rgba(86, 154, 212, 0.25)",
+  "important": true
+ },
+ {
   "where": ".mdm-prosemirror .column-resize-handle",
   "prop": "position",
   "value": "absolute",

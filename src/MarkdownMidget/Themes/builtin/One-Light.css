@@ -1,0 +1,75 @@
+/* =====================================================================
+ *  One Light — light, cool, high-contrast.
+ *
+ *  Palette from Atom's One Light syntax theme,
+ *  https://github.com/atom/one-light-syntax — MIT licence. Colours only.
+ *
+ *  The crispest of the three lights: #383a42 on #fafafa, cool where Solarized
+ *  is warm and firmer where GitHub Light is soft.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* One Light: bg #fafafa, fg #383a42, comment #a0a1a7, red #e45649,
+     green #50a14f, orange #c18401 / #986801, blue #4078f2, purple #a626a4,
+     cyan #0184bc. */
+
+  --mdm-color-scheme: light;
+  --mdm-app-bg: #ebebec;
+  --mdm-page-bg: #fafafa;
+  --mdm-page-shadow: rgba(56, 58, 66, 0.16);
+  --mdm-text: #383a42;
+
+  --mdm-heading: #4078f2;
+  --mdm-h4: #4f5561;
+  --mdm-h5: #606672;
+  --mdm-h6: #6f7580;
+
+  --mdm-link: #4078f2;
+  --mdm-link-hover: #2c5bd0;
+
+  --mdm-quote-bg: #f0f3f9;
+  --mdm-quote-bar: #4078f2;
+  --mdm-quote-text: #4f5561;
+
+  --mdm-code-bg: #eef0f2;
+  --mdm-pre-bg: #282c34;   /* One Dark's background: the code block One Light pairs with */
+  --mdm-pre-fg: #abb2bf;
+
+  --mdm-hr: #dcdee1;
+
+  --mdm-table-border: #d4d6da;
+  --mdm-cell-border: #e0e2e5;
+  --mdm-td-bg: #fafafa;
+  --mdm-th-bg: #eceef1;
+  --mdm-th-text: #383a42;
+  --mdm-row-alt-bg: #f3f4f6;
+
+  --mdm-mermaid-theme: default;
+
+  --mdm-squiggle: #e45649;
+  --mdm-mark: #b6b8bd;
+  --mdm-cell-selected: rgba(64, 120, 242, 0.18);
+  --mdm-resize-handle: #4078f2;
+
+  --mdm-mermaid-bg: #fafafa;
+  --mdm-mermaid-border: #dcdee1;
+  --mdm-mermaid-error-bg: #fbeceb;
+  --mdm-mermaid-error-border: #eeaaa4;
+  --mdm-mermaid-error-text: #e45649;
+  --mdm-mermaid-empty: #a0a1a7;
+
+  /* Tokens are One DARK's, because the code block is One Dark's background —
+     One Light's own syntax colours are tuned for #fafafa and would be
+     unreadable on #282c34. */
+  --mdm-token-comment: #5c6370;
+  --mdm-token-punctuation: #abb2bf;
+  --mdm-token-property: #e06c75;
+  --mdm-token-number: #d19a66;
+  --mdm-token-string: #98c379;
+  --mdm-token-operator: #56b6c2;
+  --mdm-token-keyword: #c678dd;
+  --mdm-token-function: #61afef;
+  --mdm-token-regex: #e5c07b;
+}
