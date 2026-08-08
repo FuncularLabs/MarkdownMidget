@@ -54,7 +54,8 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Document width** (Portrait / Landscape / Full, remembered between sessions) and
   a **zoom** indicator (Ctrl + mouse wheel).
 - **Recent files**, drag-and-drop to open, **read-only** mode, and a bundled Help
-  document.
+  document and changelog (**Help ▸ What's New**, or click the mascot — it flags
+  unread entries with a small gold asterisk).
 - Ships as a **single `.exe`**.
 
 ## Requirements
@@ -226,7 +227,7 @@ The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
   Ships patched **dompurify** and **postcss**.
 - **v0.6.2** — The window **remembers where you left it** (validated against the
   monitors that still exist, and correct on mixed-DPI desks); **word and character
-  count** in the status bar; **File ▸ Settings…** for the Open Recent length and
+  count** in the status bar; **Edit ▸ Settings…** for the Open Recent length and
   what a session opens with; and File ▸ Open, Open Recent, drag-and-drop and the
   command line all put the cursor in the document too.
 - **v0.6.1** — File ▸ New puts the cursor **in the document**, so the first thing

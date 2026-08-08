@@ -51,6 +51,11 @@
     <EmbeddedResource Include="..\..\HELP.md">
       <LogicalName>HELP.md</LogicalName>
     </EmbeddedResource>
+    <!-- Release notes, shown read-only via Help ▸ What's New and the mascot. Newest
+         entry first, per Keep a Changelog — the viewer doesn't reorder anything. -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md">
+      <LogicalName>CHANGELOG.md</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <!-- Themes. The built-ins are extracted to the themes folder on launch and

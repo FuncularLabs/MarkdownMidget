@@ -37,6 +37,18 @@ changes between alpha tags.
 
   A theme also can't switch off the app's own furniture — spelling squiggles,
   formatting marks and the table resize handle survive whatever it says about them.
+- **What's New.** **Help ▸ What's New** opens this file, read-only, newest entry
+  first — including this one. The mascot in the top-right corner opens the same
+  thing when clicked, and carries a small gold asterisk whenever there's an entry
+  for your current version you haven't opened yet. Opening it, from either place,
+  clears the asterisk for that window.
+- **File ▸ New** (Ctrl+N) now opens a **new window** with a blank document instead
+  of replacing what's in the current one — matching Word rather than Notepad. There
+  is no longer a discard prompt on New, because nothing about the window you're in
+  changes.
+
+### Changed
+- **Settings…** moved from the **File** menu to the **Edit** menu.
 
 ### Security
 - **mermaid 11.16.0 → 11.16.1** — five advisories

@@ -240,7 +240,7 @@ remembered between sessions.
 
 ## Settings
 
-**File ▸ Settings…** holds the preferences that don't suit a menu: how many files
+**Edit ▸ Settings…** holds the preferences that don't suit a menu: how many files
 **Open Recent** shows (1-50 - lowering it shortens the menu without discarding the
 history, so older entries come back if you raise it again), whether a session
 opens with a **new blank document** (cursor already in it, ready to type) or the
@@ -262,7 +262,7 @@ one comes back in its own window. In the rare case where a document can't be
 restored (three attempts is the limit), the app says so and leaves the file in the
 backup folder for you to open by hand — it's plain markdown.
 
-Switching this off in **File ▸ Settings…** stops both halves: no new copies are
+Switching this off in **Edit ▸ Settings…** stops both halves: no new copies are
 made, and copies already waiting from an earlier crash are not offered back. They
 stay in the backup folder, so turn the setting on again (or open the folder) if you
 think something is still in there.
@@ -325,7 +325,7 @@ line with `--readonly`.
 
 - Native format is Markdown (`.md`). Plain text is also fine.
 - **File ▸ Open Recent** lists the files you last opened or saved (10 by default;
-  change it in **File ▸ Settings…**), with a **Clear Recent** option.
+  change it in **Edit ▸ Settings…**), with a **Clear Recent** option.
 - **File ▸ Close** (Ctrl+W) closes the current document and shows a gray "drop a
   file here" placeholder. The window stays open and still accepts dropped files.
 - **External change detection:** if a file you have open is modified by another
@@ -340,6 +340,20 @@ line with `--readonly`.
   new untitled document — the OS doesn't reveal a dropped file's path to the
   editor, so **Save** will prompt for a location. You can also pass a file path
   (and optional `--readonly`) on the command line.
+- **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,
+  rather than replacing what's in the current one — so there's never a prompt
+  about unsaved changes. The window you clicked New from is untouched.
+
+## What's new
+
+**Help ▸ What's New** opens the full changelog, read-only, newest entry first.
+
+The mascot in the top-right corner does the same thing when clicked, and carries a
+small gold asterisk whenever there's a changelog entry — including this one — you
+haven't opened yet for the version you're currently running. Opening it, from
+either place, clears the asterisk. It only tracks what *this* window has seen; a
+window that was already open when you updated won't clear its own asterisk until
+you open the changelog from it.
 
 ## Updates
 

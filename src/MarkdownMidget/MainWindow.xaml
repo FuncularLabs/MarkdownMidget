@@ -98,8 +98,6 @@
                         <Separator />
                         <MenuItem Header="C_lose" InputGestureText="Ctrl+W" Click="Close_Click" />
                         <Separator />
-                        <MenuItem Header="_Settings…" Click="Settings_Click" />
-                        <Separator />
                         <MenuItem Header="_Windows Integration">
                             <MenuItem Header="_Register as .md editor…" Click="RegisterMdEditor_Click" />
                             <MenuItem x:Name="UnregisterMenu" Header="_Unregister as .md editor" Click="UnregisterMdEditor_Click" />
@@ -121,6 +119,8 @@
                         <Separator />
                         <MenuItem x:Name="MenuReadOnly" Header="_Read Only"
                                   IsCheckable="True" Click="ReadOnly_Click" />
+                        <Separator />
+                        <MenuItem Header="_Settings…" Click="Settings_Click" />
                     </MenuItem>
                     <MenuItem x:Name="FormatMenu" Header="F_ormat">
                         <MenuItem Header="_Bold" InputGestureText="Ctrl+B" Click="Bold_Click" />
@@ -200,6 +200,7 @@
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem x:Name="MenuViewHelp" Header="_View Help" InputGestureText="F1" Click="Help_Click" />
+                        <MenuItem x:Name="MenuWhatsNew" Header="_What's New" Click="WhatsNew_Click" />
                         <Separator />
                         <MenuItem Header="_About Markdown Midget" Click="About_Click" />
                     </MenuItem>
@@ -299,9 +300,25 @@
                 </ToolBarTray>
             </StackPanel>
 
-            <Image Grid.Column="1" Source="/Assets/midget-256.png"
-                   Width="52" Height="52" Margin="10,2,16,2" VerticalAlignment="Center"
-                   ToolTip="Markdown Midget" RenderOptions.BitmapScalingMode="HighQuality" />
+            <Grid Grid.Column="1" Margin="10,2,16,2" VerticalAlignment="Center">
+                <Image x:Name="MascotImage" Source="/Assets/midget-256.png"
+                       Width="52" Height="52" Cursor="Hand"
+                       ToolTip="See what's new" RenderOptions.BitmapScalingMode="HighQuality"
+                       MouseLeftButtonUp="Mascot_Click" />
+                <!-- Unseen-changelog badge. Collapsed by default and toggled in
+                     code-behind (UpdateWhatsNewBadge) rather than bound, matching how
+                     the rest of this window's per-launch state is set. Hit-test
+                     disabled so a click landing on the sliver of badge still reaches
+                     the image underneath instead of needing its own handler. -->
+                <TextBlock x:Name="WhatsNewBadge" Text="✱" FontSize="20" FontWeight="Bold"
+                           Foreground="#FFC9A227" IsHitTestVisible="False"
+                           HorizontalAlignment="Right" VerticalAlignment="Top"
+                           Margin="0,-6,-6,0" Visibility="Collapsed">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="3" ShadowDepth="0" />
+                    </TextBlock.Effect>
+                </TextBlock>
+            </Grid>
         </Grid>
 
         <!-- ===== Status bar ===== -->

@@ -52,6 +52,10 @@ public partial class MainWindow : Window
     private bool _startReadOnly;
     private bool _startInSource;  // --source: open showing the raw markdown
     private bool _isHelpWindow;
+    // --new: force a blank editable document regardless of _startWithBlankDocument,
+    // so File ▸ New always lands you somewhere you can type, never on the splash.
+    private bool _forceBlankDocument;
+    private string? _lastSeenChangelogVersion;
     private bool _readOnly;
     private bool _closed;            // closed/no-document state — shows ClosedSplash
     private (int curW, int curH, int natW, int natH) _imgResize;
@@ -114,6 +118,7 @@ public partial class MainWindow : Window
             if (arg is "--readonly" or "-r" or "/readonly") _startReadOnly = true;
             else if (arg is "--source" or "/source") _startInSource = true;
             else if (arg is "--help-window") { _isHelpWindow = true; _startReadOnly = true; }
+            else if (arg is "--new") _forceBlankDocument = true;
             else if (arg == "--recover" && i + 1 < args.Length)
             {
                 // Launched by another window to take one specific crashed session.
@@ -128,7 +133,8 @@ public partial class MainWindow : Window
             else if (File.Exists(arg)) _pendingOpenPath ??= arg;
         }
 
-        if (_isHelpWindow) MenuViewHelp.IsEnabled = false; // no help-of-help
+        if (_isHelpWindow) MenuViewHelp.IsEnabled = MenuWhatsNew.IsEnabled = false; // no help-of-help
+        else UpdateWhatsNewBadge();   // a help/changelog viewer doesn't get its own badge
         StartBackup();
 
         Loaded += async (_, _) => await InitializeEditorAsync();
@@ -874,11 +880,21 @@ public partial class MainWindow : Window
         };
     }
 
-    private async void New_Click(object sender, RoutedEventArgs e)
+    // Word-like: New always opens a fresh window with its own blank document rather
+    // than replacing what's in this one. That's not just fidelity to the reference —
+    // it removes the discard prompt entirely, since nothing about the current window
+    // changes. --new forces the new instance to land on a blank document rather than
+    // whatever its own startup settings would otherwise choose.
+    private void New_Click(object sender, RoutedEventArgs e)
     {
-        if (!await ConfirmDiscardAsync()) return;
-        await LoadDocumentAsync(string.Empty, null);
-        await FocusDocumentAsync();   // a blank document should be ready to type into
+        var exe = Environment.ProcessPath;
+        if (exe is null) return;
+        try { Process.Start(new ProcessStartInfo(exe, "--new") { UseShellExecute = false }); }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Couldn't open a new window:\n{ex.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     /// <summary>
@@ -1260,10 +1276,12 @@ public partial class MainWindow : Window
                 _pendingOpenPath = null;
                 await OpenThenApplyStartupViewAsync(path);
             }
-            else if (_startWithBlankDocument)
+            else if (_forceBlankDocument || _startWithBlankDocument)
             {
-                // Settings: land on an empty document with the caret in it, so a
-                // session can start by simply typing.
+                // Either File ▸ New's --new (always blank, whatever the setting says —
+                // that's the whole point of New) or the setting itself: land on an
+                // empty document with the caret in it, so a session can start by
+                // simply typing.
                 await StartBlankDocumentAsync();
             }
             else
@@ -2329,6 +2347,10 @@ public partial class MainWindow : Window
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
         public string Theme { get; set; } = "";
+        // The newest version whose changelog the user has actually opened — compared
+        // with WhatsNewState, not equality, so an older value after an update is the
+        // ordinary case rather than something to migrate.
+        public string? LastSeenChangelogVersion { get; set; }
         // Remembered window placement. Null/zero means "never saved" -> default layout.
         public double? WindowLeft { get; set; }
         public double? WindowTop { get; set; }
@@ -2398,6 +2420,7 @@ public partial class MainWindow : Window
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
             _themeKey = s.Theme ?? Themes.ThemeStore.DefaultKey;
+            _lastSeenChangelogVersion = s.LastSeenChangelogVersion;
             _savedBounds = s.WindowWidth is > 0 && s.WindowHeight is > 0
                 ? new Rect(s.WindowLeft ?? 0, s.WindowTop ?? 0, s.WindowWidth.Value, s.WindowHeight.Value)
                 : null;
@@ -2525,6 +2548,7 @@ public partial class MainWindow : Window
         StartWithBlankDocument = _startWithBlankDocument,
         KeepBackup = _backupEnabled,
         Theme = _themeKey,
+        LastSeenChangelogVersion = _lastSeenChangelogVersion,
     };
 
     // ===== Document width =====
@@ -2943,16 +2967,23 @@ public partial class MainWindow : Window
         finally { HideBusy(); _suppressDirty = false; }
     }
 
-    private static void OpenInNewInstance(string path, bool readOnly = false, bool helpWindow = false)
+    /// <summary>Returns whether the new process actually started — WhatsNew_Click
+    /// needs to know before it records the changelog as seen.</summary>
+    private static bool OpenInNewInstance(string path, bool readOnly = false, bool helpWindow = false)
     {
         var exe = Environment.ProcessPath;
-        if (exe is null) return;
+        if (exe is null) return false;
         var flags = helpWindow ? " --help-window" : (readOnly ? " --readonly" : "");
-        try { Process.Start(new ProcessStartInfo(exe, $"\"{path}\"{flags}") { UseShellExecute = false }); }
+        try
+        {
+            Process.Start(new ProcessStartInfo(exe, $"\"{path}\"{flags}") { UseShellExecute = false });
+            return true;
+        }
         catch (Exception ex)
         {
             MessageBox.Show($"Couldn't open a new window:\n{ex.Message}", "Markdown Midget",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
     }
 
@@ -2980,33 +3011,81 @@ public partial class MainWindow : Window
         UpdateTitle();
     }
 
-    // ===== Help (opens this guide read-only in a new instance) =====
+    // ===== Help & What's New (open a bundled doc read-only in a new instance) =====
 
-    private void Help_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Refresh an embedded doc onto disk and open it read-only in a new instance.
+    /// Shared by Help and What's New — same shape, different resource. Returns
+    /// whether the reader window actually launched, which is what tells
+    /// <see cref="OpenWhatsNew"/> whether marking the changelog "seen" would be
+    /// honest.
+    /// </summary>
+    private static bool OpenEmbeddedReaderDoc(string resourceName, string fileName)
     {
         try
         {
             var path = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MarkdownMidget", "HELP.md");
+                "MarkdownMidget", fileName);
 
-            // Always restore the canonical help text from the embedded copy, then mark
-            // the file read-only so it's harder to overwrite by accident.
+            // Always restore the canonical text from the embedded copy, then mark the
+            // file read-only so it's harder to overwrite by accident.
             if (File.Exists(path)) File.SetAttributes(path, FileAttributes.Normal);
             var asm = Assembly.GetExecutingAssembly();
-            using (var stream = asm.GetManifestResourceStream("HELP.md"))
+            using (var stream = asm.GetManifestResourceStream(resourceName))
             using (var file = File.Create(path))
                 stream!.CopyTo(file);
             File.SetAttributes(path, FileAttributes.ReadOnly);
 
-            OpenInNewInstance(path, helpWindow: true);
+            return OpenInNewInstance(path, helpWindow: true);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Couldn't open Help:\n{ex.Message}", "Markdown Midget",
+            MessageBox.Show($"Couldn't open {fileName}:\n{ex.Message}", "Markdown Midget",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
     }
+
+    private void Help_Click(object sender, RoutedEventArgs e) =>
+        OpenEmbeddedReaderDoc("HELP.md", "HELP.md");
+
+    private void WhatsNew_Click(object sender, RoutedEventArgs e) => OpenWhatsNew();
+
+    // MouseLeftButtonUp rather than Click — the mascot is an Image, not a button.
+    private void Mascot_Click(object sender, MouseButtonEventArgs e) => OpenWhatsNew();
+
+    private void OpenWhatsNew()
+    {
+        // The mascot is always clickable — unlike MenuWhatsNew, WPF doesn't disable
+        // it for a help/changelog window, so the "no help-of-help" rule has to be
+        // enforced here or clicking the mascot INSIDE the changelog viewer spawns
+        // another one of itself.
+        if (_isHelpWindow) return;
+
+        // Gated on the reader window actually coming up. A failed launch — disk full,
+        // the folder locked, whatever OpenEmbeddedReaderDoc already put in a message
+        // box — must not silently clear a badge for something the user never got to
+        // see; that would be the same completion-marker mistake as writing a "done"
+        // stamp before the work it describes actually finished.
+        if (OpenEmbeddedReaderDoc("CHANGELOG.md", "CHANGELOG.md"))
+            MarkChangelogSeen();
+    }
+
+    private void MarkChangelogSeen()
+    {
+        _lastSeenChangelogVersion = AppVersion;
+        SaveSettings();
+        WhatsNewBadge.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Show or hide the mascot's unseen-changelog badge for THIS window.
+    /// Other already-open windows don't update live — the same limitation the theme
+    /// and settings menus already have, and for the same reason: each window is its
+    /// own in-memory snapshot of settings.json, refreshed only at its own launch.</summary>
+    private void UpdateWhatsNewBadge() => WhatsNewBadge.Visibility =
+        Updates.WhatsNewState.HasUnseenChangelog(AppVersion, _lastSeenChangelogVersion)
+            ? Visibility.Visible : Visibility.Collapsed;
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
