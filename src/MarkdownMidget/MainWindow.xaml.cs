@@ -1026,7 +1026,17 @@ public partial class MainWindow : Window
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
     {
         if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri)) { e.Cancel = true; return; }
-        if (uri.Scheme is not ("http" or "https")) return;
+        // Any non-http(s) scheme is refused outright, not just left uncancelled —
+        // that used to include `javascript:`, which this handler let straight
+        // through. It's very likely already stopped by the page's own CSP
+        // (script-src 'self' treats a javascript: navigation as inline script,
+        // and Chromium enforces that), but this handler's own doc comment claims
+        // to be an INDEPENDENT guard alongside the resource filter, and resting
+        // that claim on a single remaining layer — the CSP meta tag — is exactly
+        // the single-point-of-failure this file exists to avoid. The app itself
+        // only ever navigates to https://{VirtualHost}/..., so nothing legitimate
+        // is lost by refusing every other scheme at the top level.
+        if (uri.Scheme is not ("http" or "https")) { e.Cancel = true; return; }
         if (!string.Equals(uri.Host, VirtualHost, StringComparison.OrdinalIgnoreCase))
             e.Cancel = true;
     }
@@ -1376,8 +1386,15 @@ public partial class MainWindow : Window
 
             // "Free" means this window holds nothing the user would miss — the splash,
             // or the empty document the blank-doc setting lands on. Recovery must
-            // never displace something they opened or typed.
-            var free = _currentPath is null && !_dirty && string.IsNullOrEmpty(_cleanMarkdown);
+            // never displace something they opened or typed. It also must never
+            // displace what File ▸ New explicitly asked for: --new's whole point is a
+            // guaranteed-blank document, stated three times in this release's own
+            // docs, and a blank document is otherwise indistinguishable from "free" —
+            // an orphaned crash snapshot claiming this window would silently swap it
+            // out from under a deliberate, freshly-clicked New. The orphan isn't lost;
+            // it just waits for a launch that didn't ask to be guaranteed blank.
+            var free = !_forceBlankDocument
+                && _currentPath is null && !_dirty && string.IsNullOrEmpty(_cleanMarkdown);
             var plan = Backup.RecoveryPlan.Decide([.. orphans.Select(o => o.Meta)], free);
             var byId = orphans.ToDictionary(o => o.Meta.SessionId, o => o.Markdown);
 
@@ -2512,6 +2529,15 @@ public partial class MainWindow : Window
     /// is authored only at close, by <see cref="SaveWindowPlacement"/>. Writing this
     /// instance's launch-time copy of it here would revert a position another
     /// instance saved in the meantime.
+    ///
+    /// Theme and LastSeenChangelogVersion are carried through from disk the same
+    /// way, and for the same reason: they are each written by their OWN dedicated
+    /// caller (<see cref="Themes.ThemeStore"/>'s consumer via SetThemeKey, and
+    /// MarkChangelogSeen) via <see cref="SavePersistentField"/>, not by this generic
+    /// path. Multiple windows share this one file; a window that toggled word wrap
+    /// an hour ago is not carrying today's theme choice or today's "seen" version in
+    /// its in-memory fields, and a generic save from THAT toggle must not overwrite
+    /// what a different, more current window already wrote for either.
     /// </summary>
     private void SaveSettings()
     {
@@ -2529,6 +2555,33 @@ public partial class MainWindow : Window
             s.WindowWidth = existing?.WindowWidth;
             s.WindowHeight = existing?.WindowHeight;
             s.WindowMaximized = existing?.WindowMaximized ?? false;
+            s.Theme = existing?.Theme ?? s.Theme;
+            s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
+            WriteSettings(s);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Persist ONE field, merged onto whatever else is on disk right now — the same
+    /// pattern <see cref="SaveWindowPlacement"/> already uses for geometry, extended
+    /// to any single value whose writer knows it just changed something real.
+    ///
+    /// The generic <see cref="SaveSettings"/> restates every OTHER field from this
+    /// window's own in-memory snapshot, which is exactly correct for a toggle this
+    /// window just made and exactly wrong for a field it merely loaded once at
+    /// startup and never touched again. Going through disk here, rather than through
+    /// CurrentSettings(), means a caller that only wants to change one thing can't
+    /// accidentally also republish a stale copy of everything else.
+    /// </summary>
+    private void SavePersistentField(Action<AppSettings> apply)
+    {
+        if (_settingsUnknown) return;
+        try
+        {
+            if (!TryReadSettings(out var existing)) return;
+            var s = existing ?? CurrentSettings();
+            apply(s);
             WriteSettings(s);
         }
         catch { /* best-effort */ }
@@ -3047,8 +3100,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Help_Click(object sender, RoutedEventArgs e) =>
+    private void Help_Click(object sender, RoutedEventArgs e)
+    {
+        // Guards F1 as well as the menu item — F1 is a raw keybinding (see
+        // RegisterShortcuts) with no IsEnabled to disable, so MenuViewHelp.IsEnabled
+        // = false alone does not stop it. Without this, F1 pressed inside an
+        // already-open Help or What's New window spawns another reader window —
+        // exactly the "no help-of-help" case OpenWhatsNew already guards against.
+        if (_isHelpWindow) return;
         OpenEmbeddedReaderDoc("HELP.md", "HELP.md");
+    }
 
     private void WhatsNew_Click(object sender, RoutedEventArgs e) => OpenWhatsNew();
 
@@ -3075,7 +3136,11 @@ public partial class MainWindow : Window
     private void MarkChangelogSeen()
     {
         _lastSeenChangelogVersion = AppVersion;
-        SaveSettings();
+        // SavePersistentField, not SaveSettings — the same reason SetThemeKey uses
+        // it: an unrelated toggle later in a DIFFERENT window, still holding this
+        // window's PRE-open value in memory, must not republish it and bring the
+        // badge back for a changelog the user genuinely already read.
+        SavePersistentField(s => s.LastSeenChangelogVersion = AppVersion);
         WhatsNewBadge.Visibility = Visibility.Collapsed;
     }
 

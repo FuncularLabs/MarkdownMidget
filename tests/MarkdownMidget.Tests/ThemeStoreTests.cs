@@ -138,6 +138,56 @@ public class ThemeStoreTests : IDisposable
     }
 
     [Fact]
+    public void AMissingFileDoesNotOverrideTheVersionGateForAnOlderExe()
+    {
+        // The sharper form of the portable-thrash case above: it is not enough for
+        // the gate to resist an older exe that simply DIFFERS from the newer stamp —
+        // it also has to resist one that finds a file IT expects is missing.
+        // A naive "missing overrides everything" rule bypasses the version check
+        // entirely and lets the older exe force a full re-extraction from its own
+        // (older) resources, regressing every OTHER built-in the newer exe already
+        // fixed and writing the stamp itself backwards.
+        //
+        // Real trigger: an AV product quarantines one file, or — more durably — a
+        // later release's built-in set genuinely diverges (a theme renamed or
+        // retired) so an older exe's OWN expected set includes a name the newer one
+        // no longer manages. This test can't construct two truly different resource
+        // sets from one embedded assembly, but it exercises the exact vulnerable
+        // branch: missing file, and a stamp that is NEWER than this exe's own
+        // version.
+        var store = New();
+        store.Refresh("0.8.0", Res);
+        var zebra = Path.Combine(_dir, "zebra.css");
+        File.WriteAllText(zebra, "/* fixed by 0.8.0 */");
+        var apple = Path.Combine(_dir, "apple.css");
+        File.Delete(apple);   // "missing", from whichever cause
+
+        Assert.False(store.Refresh("0.7.0", Res));
+        // Nothing touched: the older exe declined entirely, rather than "repairing"
+        // apple.css at the cost of regressing zebra.css and the stamp.
+        Assert.Contains("fixed by 0.8.0", File.ReadAllText(zebra));
+        Assert.Equal("0.8.0", File.ReadAllText(Stamp));
+        Assert.False(File.Exists(apple));
+    }
+
+    [Fact]
+    public void AMissingFileStillSelfHealsWhenNothingNewerHasStamped()
+    {
+        // The other half: the fix must not turn INTO "a missing file is never
+        // enough," which would silently undo the whole point of the missing-file
+        // check. When there is no newer stamp to defer to — no stamp at all, or a
+        // stamp this exe's own version is not older than — a genuinely missing
+        // built-in still gets restored.
+        var store = New();
+        File.WriteAllText(Stamp, "0.6.0");   // older than the exe about to run
+        File.WriteAllText(Path.Combine(_dir, "apple.css"), "/* whatever was there */");
+
+        Assert.True(store.Refresh("0.7.0", Res));
+        Assert.True(File.Exists(Path.Combine(_dir, "zebra.css")));
+        Assert.Equal("0.7.0", File.ReadAllText(Stamp));
+    }
+
+    [Fact]
     public void TheSameVersionLaunchingTwiceDoesNotRewriteEveryTime()
     {
         var store = New();

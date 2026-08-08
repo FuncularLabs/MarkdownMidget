@@ -40,7 +40,7 @@ function escapeHtml(s) {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 }
 
-async function renderInto(container, source) {
+async function renderInto(container, source, epoch) {
   if (!source.trim()) {
     container.innerHTML = '<div class="mdm-mermaid-empty">(empty mermaid block)</div>';
     container.classList.remove('mdm-mermaid-error');
@@ -56,10 +56,22 @@ async function renderInto(container, source) {
   try {
     const id = 'mdm-mermaid-' + (++renderTicket);
     const { svg } = await mermaid.render(id, source);
+    // A theme switch during the await just cleared the cache and asked every
+    // diagram to re-render under the NEW theme — including this exact source,
+    // in a fresh call with the new epoch. If this older call is still the one
+    // to resolve, writing its (stale-theme) result to the cache now would
+    // silently overwrite what the new call already wrote — the "stale diagram"
+    // bug this file's whole epoch/cache-clear mechanism exists to prevent,
+    // reintroduced through a race in the cache instead of the decoration key.
+    // The container itself is already detached — ProseMirror swapped it for a
+    // new one under the new decoration key — so discarding here loses nothing
+    // that was still visible.
+    if (epoch !== themeEpoch) return;
     svgCache.set(source, { svg, error: false });
     container.innerHTML = svg;
     container.classList.remove('mdm-mermaid-error');
   } catch (e) {
+    if (epoch !== themeEpoch) return;
     const msg = (e && e.message ? e.message : String(e)).split('\n')[0];
     const html = '<pre class="mdm-mermaid-error-msg">' + escapeHtml(msg) + '</pre>';
     svgCache.set(source, { svg: html, error: true });
@@ -93,13 +105,17 @@ function buildDecorations(doc, selection) {
       decos.push(Decoration.node(start, end, { class: 'mdm-mermaid-active' }));
     }
 
-    // Render the diagram after the block.
-    const key = 'mermaid:' + themeEpoch + ':' + hash(source) + ':' + source.length;
+    // Render the diagram after the block. The epoch is captured HERE, at widget
+    // creation, not read fresh inside renderInto — it has to be the epoch this
+    // particular render was asked for under, so a later switch can tell this call
+    // apart from the new one it triggered for the same source.
+    const epoch = themeEpoch;
+    const key = 'mermaid:' + epoch + ':' + hash(source) + ':' + source.length;
     decos.push(Decoration.widget(end, () => {
       const container = document.createElement('div');
       container.className = 'mdm-mermaid';
       container.setAttribute('contenteditable', 'false');
-      renderInto(container, source);
+      renderInto(container, source, epoch);
       return container;
     }, { side: 1, ignoreSelection: true, key }));
   });

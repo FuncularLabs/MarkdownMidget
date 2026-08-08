@@ -192,14 +192,16 @@ public partial class MainWindow
     }
 
     /// <summary>Record a theme that actually applied. The only writer of the
-    /// persisted preference.</summary>
+    /// persisted preference — via SavePersistentField, not SaveSettings, so an
+    /// unrelated toggle in a DIFFERENT open window can't later republish that
+    /// window's stale in-memory theme over the choice made here.</summary>
     private void SetThemeKey(string key)
     {
         _appliedKey = key;
         if (!string.Equals(_themeKey, key, StringComparison.OrdinalIgnoreCase))
         {
             _themeKey = key;
-            SaveSettings();
+            SavePersistentField(s => s.Theme = key);
         }
         BuildThemeMenu();
     }

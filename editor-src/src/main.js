@@ -405,7 +405,7 @@ function readThemeBack() {
     'background:var(--mdm-page-bg);color:var(--mdm-text);border-color:var(--mdm-app-bg)';
   host.appendChild(probe);
 
-  let result;
+  let result = { background: null, foreground: null, mermaid: '' };
   try {
     const cs = getComputedStyle(probe);
     // Layered the way the window is: app background over white, page over that,
@@ -421,12 +421,24 @@ function readThemeBack() {
       foreground: fg,
       mermaid: (cs.getPropertyValue('--mdm-mermaid-theme') || '').trim().toLowerCase(),
     };
+  } catch {
+    // Something in the flattening step threw. The WYSIWYG page's <style> was
+    // already installed before this function ran — half a theme is on screen
+    // regardless of what happens here — so an uncaught throw would additionally
+    // skip setMermaidTheme below and leave mermaid on whatever theme it had
+    // before, which is the exact half-themed gap this function exists to close.
+    // Falling through with the empty result declared above: the host's
+    // ThemeReadBack.Parse rejects a null colour pair and reverts the source view
+    // with a status message, which is the honest answer for that half.
   } finally {
     probe.remove();
   }
 
   // Mermaid follows the theme too — a dark editor around a bright white diagram
-  // reads as broken. It redraws itself if the name changed.
+  // reads as broken. It redraws itself if the name changed, and runs even when
+  // the colour read-back above failed: an empty name isn't one of mermaid's own
+  // themes, so setMermaidTheme falls back to 'default' rather than leaving
+  // mermaid on a theme two switches out of date.
   setMermaidTheme(editorView, result.mermaid);
   return result;
 }

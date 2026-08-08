@@ -178,27 +178,32 @@ internal sealed class ThemeStore
 
     private bool NeedsExtract(string version, Assembly assembly)
     {
-        // A missing built-in overrides the version gate entirely. Without this the
-        // stamp is a promise about a folder nobody re-examines: delete a theme — or
-        // have an AV product quarantine one, which is the same thing and not the
-        // user's decision — and it is gone until the next release happens to ship.
-        //
-        // Cheap, and it cannot reintroduce the thrash the version gate exists to stop:
-        // extraction only ever writes, never deletes, so a newer version's files are
-        // all present when an older exe looks, and the older exe skips.
-        if (BuiltInNames(assembly).Any(leaf => !File.Exists(Path.Combine(_root, leaf)))) return true;
-
         var mine = UpdateVersion.Parse(version);
         if (mine is null) return true;                  // can't reason about it: refresh
+
+        UpdateVersion? theirs = null;
         try
         {
             var stampPath = Path.Combine(_root, StampFile);
-            if (!File.Exists(stampPath)) return true;
-            var theirs = UpdateVersion.Parse(File.ReadAllText(stampPath).Trim());
-            if (theirs is null) return true;            // unreadable stamp: refresh
-            return mine.CompareTo(theirs) > 0;
+            if (File.Exists(stampPath))
+                theirs = UpdateVersion.Parse(File.ReadAllText(stampPath).Trim());
         }
-        catch { return true; }
+        catch { /* unreadable stamp: treated the same as no stamp, below */ }
+
+        // A missing built-in overrides the version gate — but ONLY when this exe is
+        // not older than whatever is already stamped. Without the "not older" half,
+        // a file this exe's OWN set happens to be missing (AV quarantine, a manual
+        // delete, or — the case that actually bit — a set that has genuinely
+        // diverged because a later release renamed or retired a theme) lets an OLDER
+        // exe force a full re-extraction from ITS OWN older resources, which
+        // regresses every other built-in a newer exe already fixed and re-stamps the
+        // folder backwards. "Running last must not mean winning" has to hold here
+        // too, not just in the ordinary version comparison below.
+        var missing = BuiltInNames(assembly).Any(leaf => !File.Exists(Path.Combine(_root, leaf)));
+        if (missing && (theirs is null || mine.CompareTo(theirs) >= 0)) return true;
+
+        if (theirs is null) return true;                // no stamp at all: first run
+        return mine.CompareTo(theirs) > 0;
     }
 
     /// <summary>
