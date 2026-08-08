@@ -60,6 +60,16 @@ half at the request layer rather than by pattern-matching text).
 - **Settings…** moved from the **File** menu to the **Edit** menu.
 
 ### Security
+- **DOMPurify 3.4.12 → 3.4.13** ([GHSA-55q2-fjhq-7xh7](https://github.com/advisories/GHSA-55q2-fjhq-7xh7),
+  moderate) — a detached subtree could survive `IN_PLACE` hook removal still
+  executable, i.e. a sanitizer bypass. DOMPurify is what filters raw HTML embedded
+  in a markdown file, so this is squarely in the path untrusted documents take.
+  **Not reachable as configured** — the app sets neither `IN_PLACE` nor any hook —
+  but a patch to the thing standing between a stranger's file and the editor is
+  worth taking on its own, without waiting to be certain it was reachable.
+- **nanoid 3.3.16 → 3.3.18** ([GHSA-2v37-7h3g-55p8](https://github.com/advisories/GHSA-2v37-7h3g-55p8),
+  high) — a custom generator could loop forever at size zero. Build-time only: it
+  arrives under `postcss`, which never ships in the exe.
 - **mermaid 11.16.0 → 11.16.1** — five advisories
   ([GHSA-c4c3-pg64-4m4v](https://github.com/advisories/GHSA-c4c3-pg64-4m4v),
   [GHSA-6x64-9x62-f2gx](https://github.com/advisories/GHSA-6x64-9x62-f2gx),
