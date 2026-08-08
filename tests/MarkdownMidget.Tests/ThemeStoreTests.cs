@@ -205,6 +205,36 @@ public class ThemeStoreTests : IDisposable
     }
 
     [Fact]
+    public void ABuiltInThatWentMissingComesBackWithoutWaitingForARelease()
+    {
+        // The version gate's blind spot, and the reason the absence check overrides it.
+        // A stamp is a promise about a folder nobody re-examines: delete a theme — or
+        // have an AV product quarantine one, which is the same outcome and not the
+        // user's decision — and under a version-only gate it stays gone until some
+        // future release happens to ship.
+        var store = NewRefreshed();
+        File.Delete(Path.Combine(_dir, "apple.css"));
+
+        Assert.True(store.Refresh("0.7.0", Res));            // same version, still acts
+        Assert.True(File.Exists(Path.Combine(_dir, "apple.css")));
+    }
+
+    [Fact]
+    public void RestoringOneMissingBuiltInDoesNotReopenThePortableThrash()
+    {
+        // The absence check has to not undo what the version check bought. It cannot,
+        // because extraction only ever writes and never deletes — so a newer version's
+        // files are all present when an older exe looks, and the older exe still skips.
+        var store = New();
+        store.Refresh("0.8.0", Res);
+        var marker = Path.Combine(_dir, "apple.css");
+        File.WriteAllText(marker, "/* written by 0.8.0 */");
+
+        Assert.False(store.Refresh("0.7.0", Res));
+        Assert.Contains("written by 0.8.0", File.ReadAllText(marker));
+    }
+
+    [Fact]
     public void AResourceNameWithASeparatorInItDoesNotEscapeTheFolder()
     {
         // `themes/sub/nested.css` is a resource name, not a path, and combining it
@@ -457,6 +487,45 @@ public class ThemeStoreTests : IDisposable
 
         Assert.Null(store.Read(listed, out var failure));
         Assert.False(string.IsNullOrWhiteSpace(failure));
+    }
+
+    [Fact]
+    public void AThemeCannotBreakOutOfTheLayerItIsWrappedIn()
+    {
+        // MDM.setTheme wraps a theme in `@layer mdm-theme { … }`. That containment is
+        // the entire basis for "a theme may recolour the app's furniture but cannot
+        // remove it" — and it rests on something that lives over here, not there: a
+        // theme beginning with `}` would close the wrapper and leave the rest
+        // UNLAYERED, and unlayered beats every layer for a normal declaration.
+        //
+        // It is refused, but only as a side effect of the brace balancing. Pinned
+        // explicitly so that relaxing the brace rules — which would otherwise look
+        // like a harmless leniency about malformed CSS — fails here, where the reason
+        // is written down, instead of silently widening what a theme can do.
+        var store = NewRefreshed();
+        foreach (var (name, css) in new[]
+        {
+            ("lead", "} .mdm-misspelled { text-decoration: none; } @layer x {"),
+            ("mid", ".a { color: red; } } .mdm-misspelled { text-decoration: none; }"),
+            ("nest", ".a { .b { color: red; } } } .c { color: red; }"),
+        })
+        {
+            var path = Path.Combine(store.CustomDir, name + ".css");
+            File.WriteAllText(path, css);
+            var listed = store.List().Single(t => t.Key == name + ".css");
+            Assert.False(listed.IsUsable, $"{name}: `{css}` was accepted");
+            Assert.Contains("never opened", listed.Unusable);
+            File.Delete(path);
+        }
+
+        // And the other direction, because an unclosed brace is the mirror image: it
+        // swallows the wrapper's own `}` instead. Refused too — CSS would forgive it
+        // at end-of-file, but "forgiven by the parser" is not the same as "means what
+        // the author wrote".
+        File.WriteAllText(Path.Combine(store.CustomDir, "open.css"), ".a { color: red;");
+        var open = store.List().Single(t => t.Key == "open.css");
+        Assert.False(open.IsUsable);
+        Assert.Contains("never closed", open.Unusable);
     }
 
     // ===== the persisted key =====

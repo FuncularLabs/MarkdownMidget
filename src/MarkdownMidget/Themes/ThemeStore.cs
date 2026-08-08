@@ -149,17 +149,15 @@ internal sealed class ThemeStore
             Directory.CreateDirectory(_root);
             SeedSample(assembly);
 
-            if (!NeedsExtract(version)) return false;
+            if (!NeedsExtract(version, assembly)) return false;
 
-            foreach (var name in assembly.GetManifestResourceNames())
+            // The same list NeedsExtract checks for absence, so "which files are
+            // built-ins" is settled in exactly one place — two copies of that rule
+            // could disagree, and the disagreement would be an extraction that runs
+            // every launch or one that never runs again.
+            foreach (var leaf in BuiltInNames(assembly))
             {
-                if (!name.StartsWith(ResourcePrefix, StringComparison.Ordinal)) continue;
-                var leaf = name[ResourcePrefix.Length..];
-                // Flat by construction — a resource name with a separator in it would
-                // otherwise land outside the folder.
-                if (leaf.Length == 0 || leaf.Contains('/') || leaf.Contains('\\')) continue;
-
-                using var stream = assembly.GetManifestResourceStream(name);
+                using var stream = assembly.GetManifestResourceStream(ResourcePrefix + leaf);
                 if (stream is null) continue;
                 using var file = File.Create(Path.Combine(_root, leaf));
                 stream.CopyTo(file);
@@ -178,8 +176,18 @@ internal sealed class ThemeStore
         }
     }
 
-    private bool NeedsExtract(string version)
+    private bool NeedsExtract(string version, Assembly assembly)
     {
+        // A missing built-in overrides the version gate entirely. Without this the
+        // stamp is a promise about a folder nobody re-examines: delete a theme — or
+        // have an AV product quarantine one, which is the same thing and not the
+        // user's decision — and it is gone until the next release happens to ship.
+        //
+        // Cheap, and it cannot reintroduce the thrash the version gate exists to stop:
+        // extraction only ever writes, never deletes, so a newer version's files are
+        // all present when an older exe looks, and the older exe skips.
+        if (BuiltInNames(assembly).Any(leaf => !File.Exists(Path.Combine(_root, leaf)))) return true;
+
         var mine = UpdateVersion.Parse(version);
         if (mine is null) return true;                  // can't reason about it: refresh
         try
@@ -192,6 +200,17 @@ internal sealed class ThemeStore
         }
         catch { return true; }
     }
+
+    /// <summary>
+    /// The built-in filenames this build ships. Flat by construction — a resource
+    /// name is not a path, and one carrying a separator would land outside the
+    /// folder, so it is skipped rather than flattened into a name nobody chose.
+    /// </summary>
+    private static IEnumerable<string> BuiltInNames(Assembly assembly) =>
+        assembly.GetManifestResourceNames()
+            .Where(n => n.StartsWith(ResourcePrefix, StringComparison.Ordinal))
+            .Select(n => n[ResourcePrefix.Length..])
+            .Where(leaf => leaf.Length > 0 && !leaf.Contains('/') && !leaf.Contains('\\'));
 
     /// <summary>
     /// Put the commented sample in <c>custom\</c> — but only into an empty folder.

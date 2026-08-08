@@ -332,10 +332,10 @@ public partial class MainWindow : Window
                 // with a private dictionary; squiggles come from host-computed ranges.
                 _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
                 // Applied here rather than at construction: setTheme needs a page.
-                // announceFallback, because a theme that has gone missing between
-                // launches must say so — silently reverting to Default is exactly the
-                // thing that reads as the app losing a setting.
-                _ = ApplyThemeAsync(_themeKey, announceFallback: true);
+                // A theme that has gone missing between launches says so and falls
+                // back WITHOUT forgetting the choice — reverting silently is the thing
+                // that reads as the app losing a setting.
+                _ = ApplyThemeAsync(_themeKey);
                 RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
                 _ = ApplyLandingStateAsync();

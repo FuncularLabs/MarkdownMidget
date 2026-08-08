@@ -25,7 +25,18 @@ namespace MarkdownMidget;
 public partial class MainWindow
 {
     private ThemeStore? _themeStore;
+
+    /// <summary>The theme the user chose, which is what settings.json holds.</summary>
     private string _themeKey = ThemeStore.DefaultKey;
+
+    /// <summary>
+    /// The theme actually on screen, which is what the menu ticks.
+    ///
+    /// Separate from <see cref="_themeKey"/> because the two genuinely differ when a
+    /// chosen theme isn't there this launch, and collapsing them costs the user their
+    /// preference — see <see cref="ApplyThemeAsync"/>.
+    /// </summary>
+    private string _appliedKey = ThemeStore.DefaultKey;
 
     /// <summary>What the source view was before a theme touched it, so Default puts
     /// it back exactly rather than to something that looks about right.</summary>
@@ -72,7 +83,10 @@ public partial class MainWindow
                 Header = theme.Name.Replace("_", "__"),
                 Tag = theme.Key,
                 IsCheckable = true,
-                IsChecked = string.Equals(theme.Key, _themeKey, StringComparison.OrdinalIgnoreCase),
+                // Ticks what is ON SCREEN, not what is remembered. When a chosen theme
+                // is missing this launch the two differ, and ticking the preference
+                // would claim a palette the user is not looking at.
+                IsChecked = string.Equals(theme.Key, _appliedKey, StringComparison.OrdinalIgnoreCase),
                 IsEnabled = theme.IsUsable,
             };
 
@@ -99,7 +113,7 @@ public partial class MainWindow
     private async void ThemeItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: string key }) return;
-        await ApplyThemeAsync(key, announceFallback: true);
+        await ApplyThemeAsync(key);
         RefocusEditor();
     }
 
@@ -120,24 +134,45 @@ public partial class MainWindow
     // ===== applying =====
 
     /// <summary>
-    /// Install a theme by its persisted name, and remember it if it worked.
+    /// Install a theme by name, and remember it if it worked.
     ///
-    /// Every failure lands in the same place: say what happened and fall back to
-    /// Default. Silence would leave the user looking at the palette they didn't
-    /// choose with no idea why — which is the specific complaint the plan set out to
-    /// avoid for a theme that has gone missing between launches.
+    /// Two failures, and they are answered differently on purpose:
+    ///
+    /// - **Not in the folder.** Fall back to Default — there is nothing else to show —
+    ///   but keep the preference, because one launch that couldn't find the file is
+    ///   not evidence the user changed their mind.
+    /// - **There but unreadable or refused.** Change nothing. Whatever is on screen is
+    ///   still a theme the user chose; replacing it with Default would be a second,
+    ///   unasked-for change on top of the failure.
+    ///
+    /// Both say so. Silence would leave someone looking at a palette they didn't pick
+    /// with no idea why, which is the complaint this whole path exists to avoid.
     /// </summary>
-    private async Task ApplyThemeAsync(string? key, bool announceFallback)
+    private async Task ApplyThemeAsync(string? key)
     {
         if (_themeStore is null) return;
 
         var theme = _themeStore.Find(key);
         if (theme is null)
         {
-            if (announceFallback && !string.IsNullOrEmpty(key))
-                FlashStatus($"Theme \"{key}\" is no longer there — using Default.");
+            // Fall back to Default, and KEEP the preference. Overwriting it here is
+            // the tempting one line, and it silently throws the user's choice away on
+            // the strength of one launch that couldn't see the file.
+            //
+            // "Couldn't see the file" is not the same as "the file is gone". A
+            // portable copy whose exe directory is briefly unwritable resolves its
+            // themes to the profile instead, where a custom theme was never written —
+            // so run N falls back, run N erases the preference, and run N+1, with the
+            // directory writable again and the theme sitting right there, opens on
+            // Default with nothing left to say why.
+            //
+            // So the preference outlives a launch that couldn't honour it. It is only
+            // ever replaced by a theme that actually applied.
+            if (!string.IsNullOrEmpty(key))
+                FlashStatus($"Theme \"{key}\" isn't in the themes folder — using Default for now.");
             await InstallThemeAsync(string.Empty);
-            SetThemeKey(ThemeStore.DefaultKey);
+            _appliedKey = ThemeStore.DefaultKey;
+            BuildThemeMenu();
             return;
         }
 
@@ -156,11 +191,16 @@ public partial class MainWindow
         SetThemeKey(theme.Key);
     }
 
+    /// <summary>Record a theme that actually applied. The only writer of the
+    /// persisted preference.</summary>
     private void SetThemeKey(string key)
     {
-        if (string.Equals(_themeKey, key, StringComparison.OrdinalIgnoreCase)) { BuildThemeMenu(); return; }
-        _themeKey = key;
-        SaveSettings();
+        _appliedKey = key;
+        if (!string.Equals(_themeKey, key, StringComparison.OrdinalIgnoreCase))
+        {
+            _themeKey = key;
+            SaveSettings();
+        }
         BuildThemeMenu();
     }
 
@@ -174,6 +214,12 @@ public partial class MainWindow
     /// </summary>
     private async Task InstallThemeAsync(string css)
     {
+        // Nothing to install into yet, and nothing to report either: the menu is live
+        // from the moment the window opens but the editor takes a moment, so an early
+        // click lands here. Persisting the choice anyway is correct rather than
+        // sloppy — the 'ready' handler applies _themeKey the instant there is a page,
+        // so the theme is simply already on when the editor appears. Do not "fix"
+        // this into an error message without moving that apply.
         if (!_editorReady || Web.CoreWebView2 is null) return;
         try
         {
@@ -203,12 +249,20 @@ public partial class MainWindow
 
         if (ThemeReadBack.Parse(json) is not { } read)
         {
-            // Nothing usable came back. Put the original colours back rather than
-            // leaving the previous theme's on a pane that no longer matches it.
+            // The page took the theme and then failed to describe it — a script error,
+            // or a canvas context the machine wouldn't hand out. So the formatted view
+            // is themed and this pane cannot know to what.
+            //
+            // Restoring the original is the only defined answer available, and under a
+            // dark theme it is a white pane, which is precisely the half-themed state
+            // the read-back exists to prevent. So it SAYS so. A silent revert here
+            // would be indistinguishable from the feature not working, and would send
+            // someone looking in the theme file for a fault that isn't in it.
             var (bg, fg, caret) = _sourceOriginal.Value;
             SourceBox.Background = bg;
             SourceBox.Foreground = fg;
             SourceBox.CaretBrush = caret;
+            FlashStatus("The theme was applied, but the markdown source view couldn't follow it.");
             return;
         }
 

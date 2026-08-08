@@ -9,6 +9,35 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Themes.** **View ▸ Theme** recolours the editing surface, instantly, and
+  remembers your choice. Six ship with the app — the original **Default**, plus
+  **Dracula**, **GitHub Dark Dimmed**, **GitHub Light**, **One Light** and
+  **Solarized Light**, all MIT with attribution. The markdown source view follows
+  along, and so do mermaid diagrams; the menu bar, toolbar and status bar do not,
+  because those are Windows' own furniture. **Printing ignores the theme entirely** —
+  paper stays light whatever you pick.
+- **Write your own.** **View ▸ Theme ▸ Open Themes Folder** opens a folder holding a
+  commented `sample.css`: copy it, rename it, change the colours, and the new name
+  appears in the menu without restarting. Anything in `custom\` is yours and is never
+  written over; the six built-ins live one folder up and are refreshed when you
+  update, so a fix to one reaches you — which also means edits to *them* are lost.
+
+  A theme is checked before it is used, and one that can't be is greyed out with the
+  line number and the reason in its tooltip. Three things it may not do: **reference
+  anything off your machine** (`url(https://…)` is refused — a stylesheet that
+  fetches is a stylesheet that reports; `url(data:…)` is fine), **match on what an
+  attribute contains** (`[disabled]` is fine, `a[href^="https://"]` is not, and
+  neither is `:has()` — selecting on document content is how a stylesheet reads a
+  document back out), and **run script**, in any of the spellings that ever worked.
+
+  The middle one refuses some perfectly harmless stylesheets too, and that is
+  deliberate: the harmless shape and the harmful one are indistinguishable, and
+  over-rejecting a theme costs a tooltip.
+
+  A theme also can't switch off the app's own furniture — spelling squiggles,
+  formatting marks and the table resize handle survive whatever it says about them.
+
 ### Security
 - **mermaid 11.16.0 → 11.16.1** — five advisories
   ([GHSA-c4c3-pg64-4m4v](https://github.com/advisories/GHSA-c4c3-pg64-4m4v),
