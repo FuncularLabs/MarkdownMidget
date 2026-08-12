@@ -1,0 +1,138 @@
+/* =====================================================================
+ *  Midget Solarized — light, warm, and deliberately higher-contrast.
+ *
+ *  Solarized's hues, re-tuned. Palette lineage: Ethan Schoonover,
+ *  https://ethanschoonover.com/solarized — MIT licence. Colours only.
+ *
+ *  This is NOT Solarized Light, and the differences are the point. Solarized
+ *  chooses a reduced contrast on purpose (base00 on base3 is 4.13:1, below
+ *  WCAG AA) so long sessions hurt less. That trade suits some readers and
+ *  loses others. This palette keeps the warmth and the family of hues and
+ *  spends the difference on legibility instead:
+ *
+ *    body text     4.13:1  ->  13.19:1   (#657b83 -> #1d3238, near-black)
+ *    headings      3.41:1  ->   6.58:1   (#268bd2 -> #15618f, deeper + calmer)
+ *    page          #fdf6e3 ->  #fffdf7   (a lighter ivory; less sepia cast)
+ *    alt row delta   1.06  ->    1.19    (banding you can actually follow)
+ *    table header  light   ->  dark, with the text reversed out of it
+ *    body size       16px  ->  15.04px   (prose only, on screen only)
+ *
+ *  "Subtler" and "more contrast" are not in tension here: the accents are
+ *  desaturated (the vivid azure/cyan/red go deep and muted) while the
+ *  foreground/background separation widens. Less shouting, easier reading.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* Solarized for reference: base03 #002b36, base02 #073642, base01 #586e75,
+     base00 #657b83, base0 #839496, base1 #93a1a1, base2 #eee8d5, base3 #fdf6e3;
+     yellow #b58900, orange #cb4b16, red #dc322f, magenta #d33682,
+     violet #6c71c4, blue #268bd2, cyan #2aa198, green #859900.
+     Values below are darkened/desaturated derivatives, not the originals. */
+
+  --mdm-color-scheme: light;
+  --mdm-app-bg: #ece5d4;      /* surround stays deeper than the page, so the page reads as paper */
+  --mdm-page-bg: #fffdf7;     /* lighter ivory than base3 — the sepia pulled back */
+  --mdm-page-shadow: rgba(0, 43, 54, 0.16);
+  --mdm-text: #1d3238;        /* near-black with a cool cast from the base03 family; 13.19:1 */
+
+  /* Headings. Deeper and calmer than Solarized blue, which at 3.41:1 was the
+     lightest thing on the page pretending to be a title. */
+  --mdm-heading: #15618f;
+  --mdm-h4: #3a545e;
+  --mdm-h5: #4a646e;
+  --mdm-h6: #5c757f;
+
+  --mdm-link: #15618f;
+  --mdm-link-hover: #0f4a70;
+
+  --mdm-quote-bg: #f7f1e0;
+  --mdm-quote-bar: #1f7d75;   /* cyan, taken down two steps */
+  --mdm-quote-text: #2b444c;
+
+  --mdm-code-bg: #f1ead8;     /* inline code: a warm tint, not a grey box */
+  --mdm-pre-bg: #06303c;      /* fenced blocks stay dark — a lit panel on a warm page */
+  --mdm-pre-fg: #b8c6c6;
+
+  --mdm-hr: #ddd3bb;
+
+  /* Tables. The header is dark enough that its text reverses out; the two row
+     shades are further apart than Solarized's near-invisible 1.06:1 banding,
+     while staying quiet enough to read a column down. */
+  --mdm-table-border: #cec4aa;
+  --mdm-cell-border: #ded4bc;
+  --mdm-td-bg: #fffdf7;
+  --mdm-th-bg: #35525c;
+  --mdm-th-text: #f7f2e4;     /* reversed: 7.47:1 on the header */
+  --mdm-row-alt-bg: #f2e9d3;
+
+  --mdm-mermaid-theme: neutral;
+
+  /* Chrome. The squiggle is Solarized red pulled darker so it reads as a mark
+     rather than an alarm, and still clears the 3:1 non-text floor at 6.17:1. */
+  --mdm-squiggle: #b32b26;
+  --mdm-mark: #b3a894;
+  --mdm-cell-selected: rgba(21, 97, 143, 0.20);
+  --mdm-resize-handle: #15618f;
+
+  --mdm-mermaid-bg: #fffdf7;
+  --mdm-mermaid-border: #ddd3bb;
+  --mdm-mermaid-error-bg: #f9ebe6;
+  --mdm-mermaid-error-border: #dda99d;
+  --mdm-mermaid-error-text: #b32b26;
+  --mdm-mermaid-empty: #8b9a9a;
+
+  /* Syntax. These sit on the DARK code block, so unlike everything above they
+     are lightened rather than darkened — the page's contrast rule inverts here.
+     Kept close to Solarized's accents, which were already tuned for base02. */
+  --mdm-token-comment: #5f7c85;
+  --mdm-token-punctuation: #93a1a1;
+  --mdm-token-number: #d3689f;
+  --mdm-token-property: #4fa3d8;
+  --mdm-token-string: #3fb3a6;
+  --mdm-token-operator: #93a832;
+  --mdm-token-keyword: #93a832;
+  --mdm-token-function: #4fa3d8;
+  --mdm-token-regex: #d1743a;
+}
+
+/* Body text one step down from the app's 16px default.
+ *
+ * Size is not part of the theme contract — themes are colours — so this is an
+ * ordinary rule rather than a variable, and it works because `mdm-theme` is the
+ * last layer in the cascade order and so outranks `structure`.
+ *
+ * Deliberately on `p`, not on `.mdm-prosemirror`: the headings are sized in `em`
+ * off the root (h1 2em, h2 1.5em, ...), so shrinking the root would shrink them
+ * too. `p` is where the body text actually lives — Milkdown wraps list items,
+ * table cells and block quotes in one — so this catches prose everywhere and
+ * leaves the heading scale untouched. Inline `code` (0.92em) tracks it down with
+ * the surrounding text; fenced blocks sit outside `p` and keep their own size. */
+/* Listed by context rather than as a bare `p`, and the reason is measured.
+ *
+ * The app pins `table { font-size: 12px !important }` for density, but a cell's
+ * paragraph does NOT inherit that 12px — it renders at 16px, because a `p` rule
+ * upstream sets it outright. So a bare `.mdm-prosemirror p { 0.94em }` lands on
+ * cells too, resolves its `em` against the td's 12px, and drags cell text to
+ * 11.28px — a 30% cut nobody asked for. (The first attempt at avoiding that,
+ * pinning cells to `1em`, was no better: it gave them 12px, still well under the
+ * 16px they normally render at.)
+ *
+ * Naming the three body-prose contexts sidesteps the whole problem: each one
+ * inherits the editor's 16px, so `0.94em` is a clean 15.04px, and table cells are
+ * never matched at all — they keep exactly the size they have today.
+ *
+ * Screen only, and that is not incidental. HELP.md tells users "Printing ignores
+ * the theme", and the 0.7.0-beta1 changelog says "entirely" — a promise that was
+ * true when every theme was colours and that an unscoped size rule would quietly
+ * break, since print.css pins the palette with !important but never pins prose
+ * size. `@media screen` keeps paper identical across all seven themes and keeps
+ * the released claim honest. */
+@media screen {
+  .mdm-prosemirror > p,
+  .mdm-prosemirror li > p,
+  .mdm-prosemirror blockquote p {
+    font-size: 0.94em;
+  }
+}

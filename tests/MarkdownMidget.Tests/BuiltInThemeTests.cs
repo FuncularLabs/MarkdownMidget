@@ -56,6 +56,7 @@ public class BuiltInThemeTests
             "themes/Dracula.css",
             "themes/GitHub-Dark-Dimmed.css",
             "themes/GitHub-Light.css",
+            "themes/Midget-Solarized.css",
             "themes/One-Light.css",
             "themes/Solarized-Light.css",
         }, shipped);
@@ -67,7 +68,7 @@ public class BuiltInThemeTests
         // derived from them and nothing else — `github-light.css` would appear as
         // "Github Light", which is not what the theme is called.
         => Assert.Equal(
-            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "One Light", "Solarized Light" },
+            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized", "One Light", "Solarized Light" },
             App.GetManifestResourceNames()
                 .Where(n => n.StartsWith("themes/", StringComparison.Ordinal))
                 .OrderBy(n => n, StringComparer.Ordinal)
@@ -145,8 +146,14 @@ public class BuiltInThemeTests
         // of Solarized: base00 on base3 is a deliberately reduced contrast chosen so
         // long reading sessions hurt less. Exempted by name, with the measurement
         // recorded, so that any OTHER theme dropping below AA still fails here.
+        //
+        // Matched EXACTLY, not by substring. `Contains("Solarized")` also matches
+        // `Midget-Solarized.css` — a theme whose entire purpose is MORE contrast —
+        // so the substring form silently handed the lax floor to the one palette
+        // that must never have it. An exemption that spreads by name-similarity is
+        // not the "by name" exemption this comment claims to describe.
         var vars = Variables(Read(resource));
-        var floor = resource.Contains("Solarized", StringComparison.Ordinal) ? 4.0 : 4.5;
+        var floor = resource == "themes/Solarized-Light.css" ? 4.0 : 4.5;
         AssertContrast(vars, "--mdm-text", floor, resource);
     }
 

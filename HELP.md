@@ -170,7 +170,7 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 
 ## Themes
 
-**View ▸ Theme** recolours the editing surface. Six ship with the app:
+**View ▸ Theme** recolours the editing surface. Seven ship with the app:
 
 | Theme | |
 |---|---|
@@ -178,6 +178,7 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
+| **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
 | **One Light** | Light, cool and crisp |
 | **Solarized Light** | Light, warm, low-glare |
 
@@ -196,7 +197,7 @@ new name appears in the menu without restarting the app.
 
 Two folders, and the difference matters:
 
-- **`themes\`** holds the six built-ins. They are rewritten from the app whenever
+- **`themes\`** holds the seven built-ins. They are rewritten from the app whenever
   you update, so that a fix to one reaches you — which also means **edits to them
   are lost**.
 - **`themes\custom\`** is yours. Nothing there is ever overwritten. A custom file

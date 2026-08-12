@@ -9,6 +9,18 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **A seventh theme: Midget Solarized.** Solarized's warmth and family of hues, tuned
+  for legibility rather than for low glare. Solarized Light deliberately runs *below*
+  WCAG AA — body text at 4.13:1 — which suits some readers and loses others; this one
+  spends that difference on contrast instead: body text **13.19:1** (near-black rather
+  than grey-teal), headings **6.58:1** (a deeper, calmer blue in place of the vivid
+  azure), a lighter ivory page with less sepia cast, alternating table rows you can
+  actually follow down a column, and a dark table header with its text reversed out.
+  Body prose also sits one step down at 15.04px — headings, table cells and code
+  blocks keep their usual sizes, and printing is unaffected. The accents are *quieter*
+  than Solarized's while the page contrast is *wider* — the two are not in tension.
+
 ## [0.7.0-beta1] - 2026-08-08
 
 Themes, plus three smaller things that landed alongside them: File ▸ New opens a
