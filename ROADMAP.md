@@ -95,7 +95,9 @@ Three facts that are easy to get wrong, all confirmed by probe:
   — no error, but still not "the application updated". Note the detection below
   is phrased for the installed flow and won't fire here, because a portable
   instance's `CurrentExePath` really is the old exe; portable needs a different
-  signal (a versioned sibling already present, or already running).
+  signal. **Which signal is now settled — see [the 2026-08-13 decision](#decided-2026-08-13--how-a-portable-sibling-learns-it-is-superseded);
+  the two candidates floated here, a versioned sibling present on disk or one
+  already running, were both considered and rejected there.**
 - **The failure leaked the staging copy** into the install directory, because the
   throw happened before any cleanup. Fixed in 0.6.4, along with a startup sweep for
   the ones earlier versions left behind.
@@ -155,10 +157,68 @@ registry an optimisation rather than a prerequisite.
   version — that is exactly why the detection works today. A *portable* update
   writes the new exe under a **different filename** beside the old one and leaves the
   old one in place, so the stale instance's path still reports its own old version
-  and the check is silently always-false. Portable needs a different signal (scan the
-  folder for a newer `MarkdownMidget-v*.exe`, or have the updater drop a marker) —
-  decide that deliberately rather than shipping a feature that quietly only works for
-  half the users.
+  and the check is silently always-false. Portable needs its own signal, or the
+  feature ships working for half the users with nothing to indicate which half.
+
+#### Decided 2026-08-13 — how a portable sibling learns it is superseded
+
+Marker as the trigger, signature check at apply time, no scanning. Recorded with
+the reasoning, because the rejected option is the one that looks cheaper.
+
+*Why not scan the folder for a newer `MarkdownMidget-v*.exe`.* It is perfectly
+feasible — `ApplyPortableAndRestart` names the new exe after the release asset, so
+the pattern is predictable — and that is the problem. A portable folder is very
+often **Downloads**. Anything landing there called
+`MarkdownMidget-v9.9.9-win-x64-net10.exe` would be picked up and offered by the app
+itself as a one-click "Apply v9.9.9 update": a social-engineering path into running
+an arbitrary binary, inside the one feature whose premise is that nothing runs
+without a valid Funcular Labs signature. Scanning *plus* verifying each candidate
+would be safe, but then `WinVerifyTrust` builds a trust chain per file, repeatedly,
+on a timer, against a directory that may be huge and on a USB stick or a network
+share. Its only unique coverage is "the user manually dropped a newer exe in" —
+where they can simply double-click it. Worst risk-and-cost for the least gain.
+
+*Why not "a sibling process already running a newer version"* — the other candidate
+floated earlier in this section. It is appealing because it carries no new state and
+cannot go stale. It loses on two counts. It is **ephemeral**: it only holds while
+that newer instance is still open, so the ordinary sequence — update, keep working
+in the new window, close it, come back to the old one — leaves nothing to detect,
+which is precisely the case the feature exists for. And it is **no more trustworthy
+than a file**: any process can be named `MarkdownMidget`, so it would still need the
+same apply-time signature check, while adding process enumeration that can be denied
+outright for processes owned by another user or running elevated.
+
+*The marker is a **fact**, not a task.* Not "an update is pending" — that is a task,
+which goes stale, needs cleaning up, and eventually has something skip work on the
+strength of it. Instead: *"the newest exe I installed is at path P, version V."* A
+sibling compares V against its own running version; once V is no longer newer the
+marker is simply irrelevant. No cleanup, no staleness bug, and nothing ever skips
+work because of it — it only ever *offers* work, so a stale marker degrades to "the
+menu item doesn't appear" or "the apply-time check refuses", never to data loss.
+
+| | |
+|---|---|
+| Lives in | `%LocalAppData%\MarkdownMidget\` — **not** beside the exe; the portable dir may be read-only, as `ThemeStore.ResolveRoot` already has to handle. Precedent: `install-info.json` |
+| Contains | absolute path of the new exe, its version, timestamp |
+| Written | inside `ApplyPortableAndRestart`, after the copy block — **including when the copy was skipped** because a sibling had already written identical bytes, since the fact is still true |
+| Scoped | a sibling acts only if the recorded path is in **its own** directory, so two portable copies in different folders don't cross-offer |
+| Apply-time gate | re-run the existing `UpdateService.VerifySignature(path, out signer)` before `Process.Start` — **non-negotiable** |
+
+The apply-time check is the actual security boundary, and it is why the marker does
+not have to be trusted: the marker says *where to look*, the signature says *whether
+to run it*. Once per click, so the cost that ruled out scan-as-trigger does not
+apply. `VerifySignature` already exists and already does the full Authenticode plus
+Organization check.
+
+**Do not later "unify" installed mode onto the marker.** Installed keeps its
+existing `VersionOnDisk()` check, which is strictly stronger — it reads the actual
+file that will run, so it cannot go stale and needs no cleanup. The asymmetry is
+deliberate: each mode uses the strongest signal available to it. Tidying the two
+into one path regresses the better half.
+
+If the marker is lost (profile cleared, a different user account), portable simply
+never offers the menu item and the user does what they do today. Acceptable
+degradation, and stated so nobody treats its absence as a bug.
 
 - **Show installed vs running in the About box when they differ.** Currently it shows
   the running version only (`Version 0.7.0  (installed)`), and the on-disk version
