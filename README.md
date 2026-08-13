@@ -68,7 +68,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-Beta (0.6.x), in daily use and signed on every release. Windows-only for now; the
+Beta (0.7.x), in daily use and signed on every release. Windows-only for now; the
 editor core is web-based, so a cross-platform shell (MAUI/Avalonia) is a realistic
 future step. A real installer that registers in Add/Remove Programs is on the
 [roadmap](ROADMAP.md) — the portable exe will stay available either way.
@@ -212,13 +212,21 @@ is deferred from this first iteration. Notable deferrals / divergences:
   [HELP.md](HELP.md) read-only in a new instance.
 - **Printing** (Ctrl+P) and **PDF export**, with header/footer and colour-code-block
   options, and **Find** (Ctrl+F, F3) in Normal / Extended / Wildcards / Regex modes.
-- Deferred: page setup, **Replace** (find is done), colour, theming.
+- Deferred: page setup, **Replace** (find is done), text colour. *(Theming shipped in
+  0.7.0.)*
 
 ## Recent changes
 
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v0.7.0** — **Themes.** Seven built in — Dracula, GitHub Dark Dimmed, GitHub
+  Light, Midget Solarized, One Light, Solarized Light and the original Default —
+  plus your own: drop a CSS file in the themes folder and it appears in the menu,
+  checked before it is used and greyed out with a reason if it can't be. The source
+  view and mermaid diagrams follow the theme; printing stays light whatever you
+  pick. Also: **File ▸ New** opens a new window, **Settings** moved to the **Edit**
+  menu, and **Help ▸ What's New** (or the mascot) opens the changelog.
 - **v0.6.4** — Updating with several windows open now says *"restart this window"*
   instead of a raw Windows error, and stops before downloading anything it doesn't
   need.
@@ -237,8 +245,6 @@ The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
   copyright links, stable and prerelease listed separately, and one-click updates
   that verify the Funcular Labs signature before installing. Plus a round of
   spelling-menu fixes.
-- **v0.5.1 / v0.5.0-beta1** — Markdown Midget's **own spell checker**: squiggles
-  in both views, a private dictionary, and code blocks exempt.
 
 ## License
 

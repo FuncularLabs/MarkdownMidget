@@ -9,6 +9,19 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-13
+
+First stable release on the 0.7 line — the beta's content with the prerelease flag
+dropped, after dogfooding, plus one theme added since. Everything new on this line:
+
+- **Themes**, with seven built in and support for your own. The full account is in
+  the beta notes below: the palettes, the `custom\` folder, what a theme may and may
+  not do, and why the validator over-rejects on purpose.
+- **File ▸ New** opens a new window, **Settings** moved to the **Edit** menu, and a
+  **What's New** changelog viewer (with the mascot flagging unread entries).
+- **A seventh theme, Midget Solarized** — see below.
+- Security: **DOMPurify 3.4.13** and **nanoid 3.3.18**, both detailed in the beta notes.
+
 ### Added
 - **A seventh theme: Midget Solarized.** Solarized's warmth and family of hues, tuned
   for legibility rather than for low glare. Solarized Light deliberately runs *below*
@@ -20,6 +33,8 @@ changes between alpha tags.
   Body prose also sits one step down at 15.04px — headings, table cells and code
   blocks keep their usual sizes, and printing is unaffected. The accents are *quieter*
   than Solarized's while the page contrast is *wider* — the two are not in tension.
+
+See the beta notes below for the full detail.
 
 ## [0.7.0-beta1] - 2026-08-08
 
