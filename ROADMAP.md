@@ -121,7 +121,54 @@ What it should do instead:
   window that fails to come back must leave its snapshot on disk rather than
   vanishing — the existing recovery path then catches it on the next launch.
 
-Depends on the same cross-instance registry as
+#### Three pieces that do NOT need the registry (raised 2026-08-13, after 0.7.0)
+
+Most of the value above is reachable without knowing which instances exist, because
+a sibling can **poll** instead of being **told**. Worth doing first; it makes the
+registry an optimisation rather than a prerequisite.
+
+- **Reopen the document across an update-restart.** Today both restart paths call
+  `Process.Start(exe)` with **no arguments** (`UpdateService.cs`, in
+  `ApplyInstalledAndRestart` and `ApplyPortableAndRestart`), so the open file is
+  simply dropped and the new instance lands on the splash. The mechanism already
+  exists — `OpenInNewInstance` passes a quoted path, and startup already honours a
+  file argument via `_pendingOpenPath`. Pass the current document's path through the
+  relaunch. Unsaved changes are the harder half and are covered above: snapshot via
+  the crash-recovery store first, then relaunch, so the buffer comes back still
+  unsaved rather than prompting mid-update.
+
+- **"Help ▸ Apply vX.Y.Z update" in the siblings.** When another instance has
+  already swapped the binary, an old window should offer a one-click relaunch into
+  it — no download, no signature check, no update flow, because the new file is
+  already there and was verified by whoever installed it. **The detection is already
+  written and shipping**: `UpdateService.AlreadyUpdatedOnDisk` /
+  `UpdateOffer.NeedsRestartNotUpdate` compare the on-disk version against the
+  running one, and the About box already renders the conclusion as *"Already at
+  {onDisk} on disk — restart this window to pick it up."* What is missing is only
+  that it fires **once, inside a manual update check**, rather than being surfaced
+  proactively. Poll it on a timer (or on window activation) and light up the menu
+  item; the action is the same relaunch-with-document as above.
+
+  **Caveat that will bite if unnoticed: this works for installed copies, not
+  portable ones.** An installed update swaps the file at one canonical path, so a
+  stale instance reading `VersionOnDisk()` off its own `CurrentExePath` sees the new
+  version — that is exactly why the detection works today. A *portable* update
+  writes the new exe under a **different filename** beside the old one and leaves the
+  old one in place, so the stale instance's path still reports its own old version
+  and the check is silently always-false. Portable needs a different signal (scan the
+  folder for a newer `MarkdownMidget-v*.exe`, or have the updater drop a marker) —
+  decide that deliberately rather than shipping a feature that quietly only works for
+  half the users.
+
+- **Show installed vs running in the About box when they differ.** Currently it shows
+  the running version only (`Version 0.7.0  (installed)`), and the on-disk version
+  appears solely as transient status text during a check. When the two differ, both
+  belong on screen permanently — that is the state where a user is most likely to be
+  confused about what they are actually running, and it is the same comparison the
+  menu item above keys off.
+
+Beyond those three, the rest — pushing an update to siblings rather than having them
+notice it — depends on the same cross-instance registry as
 [multiple instances behaving like one application](#make-multiple-instances-behave-like-one-application):
 knowing which instances exist and what each has open is the prerequisite for both
 telling them to restart and knowing whether any of them still needs to.
