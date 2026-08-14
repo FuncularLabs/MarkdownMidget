@@ -99,7 +99,7 @@ The real work isn't the UI, it's that **replace has to mutate two different
 surfaces**: the WPF `TextBox` in source view, and ProseMirror in WYSIWYG, where a
 replacement is a transaction against positions that shift as you go. The spell-check
 work already solved exactly this shape. **`MDM.replaceRange(from, to, text, expected)`
-(`main.js:528`) is the Find & Replace primitive already sitting in the tree** — it
+(`main.js:620`) is the Find & Replace primitive already sitting in the tree** — it
 re-verifies the range against the expected text before dispatching, which is
 precisely what Replace needs, and `MainWindow.Spell.cs:263` already drives it.
 `SpellTextMap` exists because character offsets and PM positions diverge across
@@ -126,7 +126,7 @@ constraint a later change erodes by accident.
 
 Mermaid took the bundle from ~560 KB to 3.9 MB and the exe from 2.9 to ~6.5 MB.
 Code-splitting it means esbuild emits ESM chunks. `ExtractEmbeddedEditor`
-(`MainWindow.xaml.cs:258`) already globs every manifest resource under `wwwroot/`, so
+(`MainWindow.xaml.cs:292`) already globs every manifest resource under `wwwroot/`, so
 it needs no change — the three fixed names are in the csproj's `EmbeddedResource`
 item (`MarkdownMidget.csproj:47`), and that is what a chunked build has to become,
 along with the `index.html` cache-busting hash.
