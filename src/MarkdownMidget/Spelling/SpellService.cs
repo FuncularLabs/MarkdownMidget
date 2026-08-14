@@ -91,6 +91,40 @@ internal sealed class SpellService
         catch { /* in-memory add still works this session */ }
     }
 
+    /// <summary>
+    /// Add many words at once — the CUSTOM.DIC import path. One lock, one file
+    /// write, unlike N calls to <see cref="AddToDictionary"/>, which would rewrite
+    /// the dictionary file once per word.
+    ///
+    /// Import ONLY: this adds to the app-private dictionary and nothing is ever
+    /// written back to the source the words came from (see CustomDicImport).
+    /// </summary>
+    public (int Added, int AlreadyKnown) ImportWords(IEnumerable<string> words)
+    {
+        int added = 0, known = 0;
+        string[]? snapshot = null;
+        lock (_sync)
+        {
+            foreach (var raw in words)
+            {
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                if (_dictionary.Add(raw.Trim())) added++; else known++;
+            }
+            if (added > 0)
+                snapshot = _dictionary.OrderBy(w => w, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+        if (snapshot is not null)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(DictionaryPath)!);
+                File.WriteAllLines(DictionaryPath, snapshot);
+            }
+            catch { /* in-memory import still works this session */ }
+        }
+        return (added, known);
+    }
+
     /// <summary>Ignore a word for the rest of this session.</summary>
     public void IgnoreAll(string word)
     {

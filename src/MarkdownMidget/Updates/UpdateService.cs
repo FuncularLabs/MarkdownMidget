@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -206,7 +207,10 @@ internal static class UpdateService
     /// registration/shortcuts, then restart. Throws with a readable message on
     /// failure (nothing destructive happens before the copy succeeds).
     /// </summary>
-    public static void ApplyInstalledAndRestart(string verifiedNewExe)
+    /// <param name="relaunchArgs">Arguments for the restarted instance — the document
+    /// path and view flags, so the update doesn't cost the user their place. Each is
+    /// passed via ArgumentList (no quoting bugs on paths with spaces).</param>
+    public static void ApplyInstalledAndRestart(string verifiedNewExe, IReadOnlyList<string>? relaunchArgs = null)
     {
         var target = CurrentExePath;
         var dir = Path.GetDirectoryName(target)!;
@@ -253,7 +257,9 @@ internal static class UpdateService
         // would be wrong twice over: it succeeded, and the sentence names no file.
         try
         {
-            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+            var psi = new ProcessStartInfo(target) { UseShellExecute = true };
+            foreach (var a in relaunchArgs ?? []) psi.ArgumentList.Add(a);
+            Process.Start(psi);
         }
         catch (Exception ex)
         {
@@ -666,7 +672,7 @@ internal static class UpdateService
     /// Portable flow: place the (already verified) versioned exe next to the
     /// running one and start it. Returns the new exe path.
     /// </summary>
-    public static string ApplyPortableAndRestart(string verifiedNewExe, string assetName)
+    public static string ApplyPortableAndRestart(string verifiedNewExe, string assetName, IReadOnlyList<string>? relaunchArgs = null)
     {
         var dir = Path.GetDirectoryName(CurrentExePath)!;
         var safeName = Path.GetFileName(assetName);   // never let the release name escape `dir`
@@ -702,7 +708,9 @@ internal static class UpdateService
                     "try again.", ex);
             }
         }
-        Process.Start(new ProcessStartInfo(dest) { UseShellExecute = true });
+        var psiP = new ProcessStartInfo(dest) { UseShellExecute = true };
+        foreach (var a in relaunchArgs ?? []) psiP.ArgumentList.Add(a);
+        Process.Start(psiP);
         return dest;
     }
 

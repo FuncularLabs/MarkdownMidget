@@ -47,7 +47,8 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Links** rendered like a browser, with the URL as a hover tooltip.
 - **Fenced code blocks** with syntax highlighting (C#, JavaScript, TypeScript,
   HTML, CSS).
-- **Formatting marks** toggle (¶ / ↵ / →) and **spell check**.
+- **Formatting marks** toggle (¶ / ↵ / →) and **spell check** (private dictionary,
+  with one-way import from Word's CUSTOM.DIC).
 - **Themes** — seven built in (Dracula, GitHub Dark Dimmed, GitHub Light, Midget
   Solarized, One Light, Solarized Light, and the original Default), plus your own:
   drop a CSS file in the themes folder and it appears in the menu. Printing stays

@@ -198,9 +198,14 @@
                                   IsCheckable="True" IsChecked="True" Click="SkipCodeSpell_Click"
                                   ToolTip="Don't spell-check code blocks or inline code — in both the formatted and source views." />
                     </MenuItem>
-                    <MenuItem Header="_Help">
+                    <MenuItem x:Name="HelpMenu" Header="_Help" SubmenuOpened="HelpMenu_Opened">
                         <MenuItem x:Name="MenuViewHelp" Header="_View Help" InputGestureText="F1" Click="Help_Click" />
                         <MenuItem x:Name="MenuWhatsNew" Header="_What's New" Click="WhatsNew_Click" />
+                        <!-- Appears only when another window has already installed a newer
+                             version than this one is running: a one-click relaunch into the
+                             exe that is already on disk — no download, no update flow.
+                             Visibility is decided in HelpMenu_Opened. -->
+                        <MenuItem x:Name="MenuApplyUpdate" Visibility="Collapsed" Click="ApplyUpdate_Click" />
                         <Separator />
                         <MenuItem Header="_About Markdown Midget" Click="About_Click" />
                     </MenuItem>

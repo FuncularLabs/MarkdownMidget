@@ -23,7 +23,15 @@ public partial class SettingsDialog : Window
     /// <summary>Keep a crash copy of unsaved work.</summary>
     public bool KeepBackup { get; private set; }
 
-    public SettingsDialog(bool startWithBlankDocument, int recentLimit, bool keepBackup)
+    // The dictionary import, supplied by MainWindow (which owns the SpellService and
+    // the file-picking). Returns a human-readable result, or null when cancelled.
+    // Runs immediately rather than on OK: it is an action with its own result to
+    // show, not a preference to stage — and cancelling the dialog afterwards should
+    // not (and could not) un-import the words.
+    private readonly System.Func<Window, string?>? _importDictionary;
+
+    public SettingsDialog(bool startWithBlankDocument, int recentLimit, bool keepBackup,
+                          System.Func<Window, string?>? importDictionary = null)
     {
         InitializeComponent();
         StartWithBlankDocument = startWithBlankDocument;
@@ -33,7 +41,18 @@ public partial class SettingsDialog : Window
         StartBlankRadio.IsChecked = startWithBlankDocument;
         StartSplashRadio.IsChecked = !startWithBlankDocument;
         RecentLimitBox.Text = recentLimit.ToString();
+        _importDictionary = importDictionary;
+        ImportDicBtn.IsEnabled = importDictionary is not null;
         Loaded += (_, _) => { RecentLimitBox.Focus(); RecentLimitBox.SelectAll(); };
+    }
+
+    private void ImportDic_Click(object sender, RoutedEventArgs e)
+    {
+        if (_importDictionary is null) return;
+        var result = _importDictionary(this);
+        if (result is null) return;   // cancelled — say nothing rather than "0 imported"
+        ImportResult.Text = result;
+        ImportResult.Visibility = Visibility.Visible;
     }
 
     private void DigitsOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)

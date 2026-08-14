@@ -239,6 +239,12 @@ un-checked while still spell-checking your prose — so identifiers, keywords an
 snippets don't get flagged. On by default, applies to **both** views, and is
 remembered between sessions.
 
+**Already taught Word your vocabulary?** **Edit ▸ Settings… ▸ Import words from
+Word's custom dictionary** copies the words from CUSTOM.DIC into Markdown Midget's
+own dictionary, so years of "Add to Dictionary" clicks carry over in one go. The
+copy is strictly one-way: Word's file is only read — never changed — and the two
+dictionaries stay independent afterwards.
+
 ## Settings
 
 **Edit ▸ Settings…** holds the preferences that don't suit a menu: how many files
@@ -246,8 +252,9 @@ remembered between sessions.
 history, so older entries come back if you raise it again), whether a session
 opens with a **new blank document** (cursor already in it, ready to type) or the
 **no-document placeholder**, and whether to **keep a backup of unsaved changes**.
-Everything you toggle while working - spell check, word wrap, auto-reload,
-document width - stays on the **View** menu.
+It's also where **Import words from Word's custom dictionary** lives (see
+[Spell check](#spell-check)). Everything you toggle while working - spell check,
+word wrap, auto-reload, document width - stays on the **View** menu.
 
 ### If the app or the machine goes down
 
@@ -378,6 +385,17 @@ signature** before it is started or installed — a corrupted or tampered downlo
 is refused. A quiet "Update available" note also appears in the status bar at
 startup when a newer version exists (prereleases are only suggested if you're
 already running one).
+
+**When one window updates, the others catch up in one click.** Updating replaces
+the installed program on disk, but windows that were already open keep running the
+old version until they restart. Those windows now notice: **Help ▸ Apply vX.Y.Z
+Update** appears in each of them, and clicking it reopens that window — same
+document, same view mode — using the version that's already installed. Nothing is
+downloaded and no update runs; it's just a restart that keeps your place (you'll
+be asked to save first if there are unsaved changes). The About box also shows
+both versions whenever they differ, so it's always clear what you're running
+versus what's installed. This applies to installed copies; a portable exe never
+changes under a running window, so the item doesn't appear there.
 
 ## Distribution
 

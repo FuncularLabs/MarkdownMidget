@@ -9,6 +9,31 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **One-click catch-up after an update.** Updating from one window replaces the
+  installed program on disk, but other open windows keep running the old version
+  until they restart. They now notice: **Help ▸ Apply vX.Y.Z Update** appears in
+  each stale window and reopens it — same document, same view mode — using the
+  version already installed. Nothing is downloaded, no update runs; it's a restart
+  that keeps your place, asking about unsaved changes first exactly as closing
+  does. Installed copies only: a portable exe never changes underneath a running
+  window, so the item never appears there (the portable equivalent is designed in
+  ROADMAP.md and lands separately).
+- **The About box shows both versions when they differ.** "Version 0.7.0
+  (installed)" was the running version only; when the disk has moved ahead, a
+  second line now says so permanently — *Installed on disk: X — this window is
+  still running Y* — instead of only as transient status text during a manual
+  update check. The "already updated by another window" message now points at the
+  new menu item instead of telling you to close and reopen by hand.
+- **Import your Word vocabulary.** **Edit ▸ Settings… ▸ Import words from Word's
+  custom dictionary** copies the words from CUSTOM.DIC into Markdown Midget's own
+  private dictionary — years of "Add to Dictionary" clicks carried over in one go,
+  with a count of what was new and what was already known. Strictly one-way:
+  Word's file is only ever read, and the importer has no code path that could
+  write it. Handles the encodings real CUSTOM.DIC files come in (UTF-16 with and
+  without BOM, UTF-8, plain ASCII), and refuses mojibake rather than importing
+  words that would silently bless misspellings forever.
+
 ## [0.7.0] - 2026-08-13
 
 First stable release on the 0.7 line — the beta's content with the prerelease flag

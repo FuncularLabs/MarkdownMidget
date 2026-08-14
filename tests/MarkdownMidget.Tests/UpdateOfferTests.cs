@@ -146,6 +146,31 @@ public class UpdateOfferTests
         Assert.False(UpdateOffer.NeedsRestartNotUpdate(Cur("0.6.3"), Cur("0.6.4"), null));
     }
 
+    // The Help ▸ Apply-update menu item's exact shape: no offer in play at all
+    // (wanted: null) — the only question is whether the disk has moved past what
+    // this window is running. Pinned separately because the menu item is built on
+    // precisely this call, and none of the cases above exercise wanted:null with a
+    // real running version.
+    [Theory]
+    [InlineData("0.8.0", "0.7.0", true)]         // sibling updated us: offer the switch
+    [InlineData("0.8.0-beta1", "0.7.0", true)]   // a newer prerelease counts too
+    [InlineData("0.7.0", "0.7.0", false)]        // normal life: disk is what we run
+    [InlineData("0.7.0", "0.8.0", false)]        // disk OLDER than running (rollback): no offer
+    [InlineData("0.7.0", "0.7.0-beta1", true)]   // beta window after the stable promote
+    public void TheApplyUpdateMenuOffersExactlyWhenTheDiskLeadsTheProcess(
+        string onDisk, string running, bool offer)
+        => Assert.Equal(offer,
+            UpdateOffer.NeedsRestartNotUpdate(Cur(onDisk), wanted: null, Cur(running)));
+
+    [Fact]
+    public void TheApplyUpdateMenuStaysQuietWhenAVersionIsUnreadable()
+    {
+        // A menu item claiming "Apply v?" on garbage data helps nobody; both
+        // unreadable sides mean no offer, and the user still has the normal paths.
+        Assert.False(UpdateOffer.NeedsRestartNotUpdate(null, wanted: null, Cur("0.7.0")));
+        Assert.False(UpdateOffer.NeedsRestartNotUpdate(Cur("0.8.0"), wanted: null, running: null));
+    }
+
     // Shaped like the project's real releases list, including the two quirks in it:
     // v0.6.0-beta1/beta2 sit above every other prerelease, and v0.2.0-beta2 is
     // flagged prerelease=false on GitHub by mistake.

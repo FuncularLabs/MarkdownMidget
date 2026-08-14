@@ -112,11 +112,15 @@ What it should do instead:
   window that fails to come back must leave its snapshot on disk rather than
   vanishing — the existing recovery path then catches it on the next launch.
 
-#### Three pieces that do NOT need the registry (raised 2026-08-13, after 0.7.0)
+#### Three pieces that do NOT need the registry (raised 2026-08-13; shipped 0.8.0-beta1 except where noted)
 
 Most of the value above is reachable without knowing which instances exist, because
-a sibling can **poll** instead of being **told**. Worth doing first; it makes the
-registry an optimisation rather than a prerequisite.
+a sibling can **poll** instead of being **told**. Proven right: all three shipped in
+0.8.0-beta1 with no registry, leaving it an optimisation. What remains open from
+them: the **unsaved-changes handoff** (the update flow still prompts rather than
+snapshotting through the crash-recovery store) and the **portable marker** (the
+"Decided 2026-08-13" design below — installed mode ships first, and the menu item
+simply doesn't appear for portable copies until the marker lands).
 
 - **Reopen the document across an update-restart.** Today both restart paths call
   `Process.Start(exe)` with **no arguments** (`UpdateService.cs`, in

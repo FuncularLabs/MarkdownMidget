@@ -680,7 +680,8 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit, _backupEnabled) { Owner = this };
+        var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit, _backupEnabled,
+                                     ImportCustomDic) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         _startWithBlankDocument = dlg.StartWithBlankDocument;
         if (dlg.KeepBackup != _backupEnabled)
@@ -3154,7 +3155,100 @@ public partial class MainWindow : Window
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
-        new AboutDialog { Owner = this }.ShowDialog();
+        // Hand over this window's place so an update started from the dialog can
+        // reopen the same document in the same view after its restart.
+        new AboutDialog(_currentPath, _readOnly, _sourceMode) { Owner = this }.ShowDialog();
+    }
+
+    // ===== Help ▸ Apply vX.Y.Z update =====
+    //
+    // The situation: another window updated the installed copy, so the exe at the
+    // canonical install path is newer than the one THIS process is executing (the
+    // running image was renamed to .old by the swap; GetModuleFileName keeps
+    // reporting the original path — the load-bearing Win32 asymmetry the 0.6.4 work
+    // established). The fix is not an update at all: just relaunch from the same
+    // path, which now yields the new version.
+    //
+    // Detection is a file-version read on Help-menu open — no timer, no registry.
+    // The menu is the one place the user goes looking for exactly this, and reading
+    // one FileVersionInfo on submenu-open costs nothing perceptible. Installed mode
+    // only, and not because portable was forgotten: a portable instance's own path
+    // still holds its own old exe, so this comparison is always-false there. The
+    // portable signal (a marker written by the updater) is designed in ROADMAP.md —
+    // "Decided 2026-08-13" — and lands separately.
+    private void HelpMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        MenuApplyUpdate.Visibility = Visibility.Collapsed;
+        if (_isHelpWindow) return;                    // a transient viewer relaunching itself is clutter
+        try
+        {
+            if (!Updates.UpdateService.IsInstalled()) return;
+            var onDisk = Updates.UpdateService.VersionOnDisk();
+            var running = Updates.UpdateVersion.Parse(AppVersion);
+            if (!Updates.UpdateOffer.NeedsRestartNotUpdate(onDisk, wanted: null, running)) return;
+
+            // No literal-underscore risk: version strings are digits, dots and
+            // dashes, so no Replace("_","__") is needed here.
+            MenuApplyUpdate.Header = $"Apply v{onDisk} _Update";
+            MenuApplyUpdate.ToolTip =
+                $"v{onDisk} is already installed (another window updated). " +
+                "Reopens this window using the new version — nothing is downloaded.";
+            MenuApplyUpdate.Visibility = Visibility.Visible;
+        }
+        catch { /* a failed version read just means no menu item this time */ }
+    }
+
+    private async void ApplyUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        // Re-derive at click time: the menu text was computed when the menu opened,
+        // and the disk is not frozen between then and now.
+        Updates.UpdateVersion? onDisk;
+        try
+        {
+            onDisk = Updates.UpdateService.VersionOnDisk();
+            var running = Updates.UpdateVersion.Parse(AppVersion);
+            if (!Updates.UpdateOffer.NeedsRestartNotUpdate(onDisk, wanted: null, running))
+            {
+                FlashStatus("Nothing to apply — this window is already on the newest installed version.");
+                MenuApplyUpdate.Visibility = Visibility.Collapsed;
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            FlashStatus("Couldn't read the installed version: " + ex.Message);
+            return;
+        }
+
+        // Same contract as closing the window: save / discard / cancel. Asked FIRST,
+        // because the new instance must not start until the user has committed to
+        // this window going away — a cancel after Process.Start would leave two
+        // windows showing the same document.
+        if (!await ConfirmDiscardAsync()) return;
+        _dirty = false;   // asked and answered — MainWindow_Closing must not re-prompt
+
+        var exe = Updates.UpdateService.CurrentExePath;   // canonical path → the NEW exe
+        var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
+        // Reopen what this window holds, the way this window holds it. The document
+        // path rides as an argument (the startup parser already honours it), and the
+        // view flags keep read-only and source mode faithful across the relaunch.
+        if (_currentPath is not null) psi.ArgumentList.Add(_currentPath);
+        if (_readOnly) psi.ArgumentList.Add("--readonly");
+        if (_sourceMode) psi.ArgumentList.Add("--source");
+
+        try
+        {
+            Process.Start(psi);
+        }
+        catch (Exception ex)
+        {
+            // Start failed, so this window stays. _dirty was only cleared after the
+            // user answered the save prompt, so nothing was lost by asking.
+            MessageBox.Show(this, $"Couldn't start v{onDisk}:\n{ex.Message}",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        Close();
     }
 
     // Quiet startup check: a status note, never a dialog. Prereleases are only

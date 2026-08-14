@@ -55,6 +55,60 @@ public partial class MainWindow
         SourceBox.SpellCheck.IsEnabled = false;
     }
 
+    /// <summary>
+    /// The Settings dialog's "Import words from Word's custom dictionary" action.
+    /// One-way by design: CUSTOM.DIC is opened for READ and never written — the
+    /// app's dictionary stays private, and Word's stays Word's (see
+    /// <see cref="CustomDicImport"/>, which has no write method on purpose).
+    /// Returns the message to show, or null when the user cancelled the picker.
+    /// </summary>
+    private string? ImportCustomDic(Window owner)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Import words from a Word custom dictionary",
+            Filter = "Word custom dictionary (*.dic)|*.dic|All files (*.*)|*.*",
+            CheckFileExists = true,
+        };
+        // Land the picker on Word's default CUSTOM.DIC when it exists, so the
+        // common case is picker → Open. A user with a differently-located or
+        // renamed dictionary still has the full picker.
+        try
+        {
+            if (File.Exists(CustomDicImport.DefaultPath))
+            {
+                dlg.InitialDirectory = Path.GetDirectoryName(CustomDicImport.DefaultPath);
+                dlg.FileName = Path.GetFileName(CustomDicImport.DefaultPath);
+            }
+        }
+        catch { /* picker just opens at its default location */ }
+
+        if (dlg.ShowDialog(owner) != true) return null;
+
+        try
+        {
+            var words = CustomDicImport.ParseFile(dlg.FileName);
+            if (words.Count == 0)
+                return "No words found in that file — is it a Word custom dictionary?";
+
+            var (added, known) = _spellService.ImportWords(words);
+            if (added > 0)
+            {
+                // New words can clear existing squiggles; re-check both views now
+                // rather than waiting for the next edit.
+                RequestSpellCheckSoon();
+                return known > 0
+                    ? $"Imported {added} new word{(added == 1 ? "" : "s")} ({known} already known)."
+                    : $"Imported {added} new word{(added == 1 ? "" : "s")}.";
+            }
+            return $"Nothing new — all {known} words were already in the dictionary.";
+        }
+        catch (Exception ex)
+        {
+            return $"Couldn't read that file: {ex.Message}";
+        }
+    }
+
     /// <summary>Debounced entry point — safe to call on every edit.</summary>
     private void RequestSpellCheckSoon()
     {

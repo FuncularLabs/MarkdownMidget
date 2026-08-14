@@ -20,13 +20,45 @@ public partial class AboutDialog : Window
     private ReleaseInfo? _prerelease;
     private bool _updating;
 
-    public AboutDialog()
+    // What the restarted instance should reopen — the owning window's document and
+    // view flags, captured when the dialog opens. An update should not cost the
+    // user their place; the startup argument parser already honours all of these.
+    private readonly System.Collections.Generic.List<string> _relaunchArgs = new();
+
+    public AboutDialog(string? currentDocumentPath = null, bool readOnly = false, bool sourceMode = false)
     {
         InitializeComponent();
+        if (currentDocumentPath is not null) _relaunchArgs.Add(currentDocumentPath);
+        if (readOnly) _relaunchArgs.Add("--readonly");
+        if (sourceMode) _relaunchArgs.Add("--source");
         var info = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
         _current = UpdateVersion.Parse(info);
-        CurrentVersionText.Text = $"Version {info}" + (UpdateService.IsInstalled() ? "  (installed)" : "  (portable)");
+        var installed = UpdateService.IsInstalled();
+        CurrentVersionText.Text = $"Version {info}" + (installed ? "  (installed)" : "  (portable)");
+
+        // When the exe on disk has moved past what this window is running — another
+        // window updated the installed copy — say so HERE, permanently, not only as
+        // transient status text during a manual update check. "Running" is what the
+        // first line already shows; this line is the other half. Installed mode
+        // only: a portable instance's own path still holds its own exe, so the two
+        // can never differ there.
+        if (installed)
+        {
+            try
+            {
+                var onDisk = UpdateService.VersionOnDisk();
+                if (UpdateOffer.NeedsRestartNotUpdate(onDisk, wanted: null, _current))
+                {
+                    OnDiskVersionText.Text =
+                        $"Installed on disk: {onDisk} — this window is still running " +
+                        $"{_current}. Use Help ▸ Apply v{onDisk} Update to switch.";
+                    OnDiskVersionText.Visibility = Visibility.Visible;
+                }
+            }
+            catch { /* unreadable file version — the line just stays hidden */ }
+        }
+
         Loaded += async (_, _) => await RefreshAsync();
     }
 
@@ -103,10 +135,10 @@ public partial class AboutDialog : Window
             MessageBox.Show(this,
                 $"Markdown Midget on this machine is already at {onDisk} — most likely " +
                 "updated by another window.\n\nThis window is still running the older " +
-                "version, and can't update itself until it restarts. Close and reopen " +
-                "it to pick up what's already installed.",
+                $"version. Use Help ▸ Apply v{onDisk} Update to switch to it in one " +
+                "click, or close and reopen the window.",
                 "Restart to finish updating", MessageBoxButton.OK, MessageBoxImage.Information);
-            StatusText.Text = $"Already at {onDisk} on disk — restart this window to pick it up.";
+            StatusText.Text = $"Already at {onDisk} on disk — Help ▸ Apply v{onDisk} Update switches to it.";
             StatusText.Visibility = Visibility.Visible;
             StableUpdateBtn.Visibility = PreUpdateBtn.Visibility = Visibility.Collapsed;
             return;
@@ -140,11 +172,11 @@ public partial class AboutDialog : Window
             StatusText.Text = "Installing…";
             if (installed)
             {
-                UpdateService.ApplyInstalledAndRestart(file);
+                UpdateService.ApplyInstalledAndRestart(file, _relaunchArgs);
             }
             else
             {
-                UpdateService.ApplyPortableAndRestart(file, release.AssetName ?? "MarkdownMidget.exe");
+                UpdateService.ApplyPortableAndRestart(file, release.AssetName ?? "MarkdownMidget.exe", _relaunchArgs);
             }
             Application.Current.Shutdown();
         }

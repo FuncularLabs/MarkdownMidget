@@ -44,6 +44,16 @@
         <TextBlock Style="{StaticResource Caption}"
                    Text="Saves a copy every few seconds while a document has unsaved changes, and offers it back if the app or the machine goes down. The copy is deleted as soon as you save or close." />
 
+        <Separator Margin="0,14,0,12" />
+
+        <TextBlock Text="Spell check" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <Button x:Name="ImportDicBtn" HorizontalAlignment="Left" Padding="10,3"
+                Content="Import words from Word's custom dictionary…" Click="ImportDic_Click" />
+        <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0"
+                   Text="One-way copy from CUSTOM.DIC into Markdown Midget's own dictionary. Word's file is only read — never changed." />
+        <TextBlock x:Name="ImportResult" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                   Foreground="#FF3B6EA5" Visibility="Collapsed" />
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
             <Button Content="Cancel" IsCancel="True" Padding="16,3" Margin="0,0,8,0" />
             <Button x:Name="OkBtn" Content="OK" IsDefault="True" Padding="20,3" Click="Ok_Click" />
