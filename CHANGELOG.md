@@ -9,6 +9,13 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.8.0-beta1] - 2026-08-14
+
+Quality-of-life around updates and spelling. A prerelease for the usual reason:
+the headline paths (a two-window update, the Word-dictionary import through the
+file picker) are reviewed and unit-tested but want real dogfooding before the
+stable promote.
+
 ### Added
 - **One-click catch-up after an update.** Updating from one window replaces the
   installed program on disk, but other open windows keep running the old version
@@ -33,6 +40,14 @@ changes between alpha tags.
   write it. Handles the encodings real CUSTOM.DIC files come in (UTF-16 with and
   without BOM, UTF-8, plain ASCII), and refuses mojibake rather than importing
   words that would silently bless misspellings forever.
+
+### Fixed
+- **Added dictionary words no longer vanish when another window writes the
+  dictionary.** Since 0.5.0, every window held its own copy of the dictionary and
+  wrote the whole file back on "Add to Dictionary" — so a word added in one window
+  could be silently erased by an older window adding a different word later. Writes
+  now merge with what is on disk (and windows pick up each other's words as they
+  do), which matters rather more now that an import can add hundreds at once.
 
 ## [0.7.0] - 2026-08-13
 
