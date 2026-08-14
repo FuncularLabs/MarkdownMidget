@@ -13,30 +13,19 @@ deliberately parked).
 
 ## Next
 
-### Themes
+### Themes — shipped in 0.7.0
 
-**Planned in full: [docs/plans/themes.md](docs/plans/themes.md).** View ▸ Theme,
-six shipped themes (Default plus one dark, one slate, three light), user-supplied
-CSS in a `themes/custom` directory, invalid files listed but disabled with the
-first error in the tooltip.
+Delivered: **View ▸ Theme**, seven built-in palettes, user CSS in `themes\custom`,
+and invalid files listed-but-disabled with the first error in the tooltip. The
+user-facing account is in [CHANGELOG.md](CHANGELOG.md); the design record — the
+custom-property extraction, the cascade-layer order, the validator's deliberate
+over-rejection and the network rule moving to the request layer — is kept in
+[docs/plans/themes.md](docs/plans/themes.md).
 
-The sketch that used to live here has been replaced by decisions. The two that
-shaped everything else: colour moves into ~40 CSS custom properties so a theme
-overrides variables rather than rules, and the stylesheet declares an explicit
-cascade-layer order (`mdm-override, mdm-vendor, mdm-chrome, mdm-structure,
-mdm-base, mdm-theme`),
-which makes normal declarations flow toward the theme and `!important` flow toward
-chrome — so themes work *and* squiggles, formatting marks and print can't be
-removed. Chrome's *colours* still come from variables, so a dark theme doesn't
-leave a white mermaid box on a dark page. The vendor CSS has to be in a layer too,
-or nothing else works: unlayered rules outrank every layered normal declaration.
-Theme selection is evidenced by VS Code Marketplace install counts, and every
-palette shipped is MIT with attribution. Slate slot is **GitHub Dark Dimmed**;
-theming the WPF menu bar, toolbar and status bar is settled as out of scope.
-
-The security question the old entry raised is answered rather than dropped: with no
-CSP in the editor page, a theme referencing a remote `url()` would beacon, so
-off-origin references fail validation.
+Left here only as the open tail: **Midget Solarized is the one built-in carrying a
+non-`:root` rule** (a screen-only body font-size). If a second theme ever wants
+typography as well as colour, that is the point to decide whether size becomes part
+of the theme contract rather than an ordinary rule each theme repeats.
 
 ### Updating while several windows are open
 
