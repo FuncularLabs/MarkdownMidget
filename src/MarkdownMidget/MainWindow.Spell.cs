@@ -87,19 +87,31 @@ public partial class MainWindow
 
         try
         {
+            // Refuse absurd files before reading them: parsing runs on the UI
+            // thread, and the cap is generous (a real CUSTOM.DIC is kilobytes).
+            var size = new FileInfo(dlg.FileName).Length;
+            if (size > CustomDicImport.MaxFileBytes)
+                return $"That file is {size / 1048576} MB — a Word custom dictionary is a few " +
+                       "kilobytes. Not imported; is it the right file?";
+
             var words = CustomDicImport.ParseFile(dlg.FileName);
             if (words.Count == 0)
                 return "No words found in that file — is it a Word custom dictionary?";
 
-            var (added, known) = _spellService.ImportWords(words);
+            var (added, known, persisted) = _spellService.ImportWords(words);
             if (added > 0)
             {
                 // New words can clear existing squiggles; re-check both views now
                 // rather than waiting for the next edit.
                 RequestSpellCheckSoon();
-                return known > 0
+                var head = known > 0
                     ? $"Imported {added} new word{(added == 1 ? "" : "s")} ({known} already known)."
                     : $"Imported {added} new word{(added == 1 ? "" : "s")}.";
+                // A success message over a failed save would be a claim nothing
+                // executed — the words would quietly vanish next session.
+                return persisted ? head
+                    : head + " BUT the dictionary file couldn't be saved — they'll work " +
+                      "this session only. Check disk space and permissions.";
             }
             return $"Nothing new — all {known} words were already in the dictionary.";
         }

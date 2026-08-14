@@ -32,6 +32,14 @@ internal static class CustomDicImport
     public const int MaxWordLength = 64;
 
     /// <summary>
+    /// Largest file accepted. A real CUSTOM.DIC is kilobytes; 2 MB of UTF-16 is
+    /// roughly a hundred thousand words, far past any human vocabulary file. The
+    /// cap exists because parsing runs synchronously on the UI thread from the
+    /// Settings dialog — a mistakenly-picked huge file should be refused with a
+    /// sentence, not freeze the window while it chews.</summary>
+    public const long MaxFileBytes = 2 * 1024 * 1024;
+
+    /// <summary>
     /// Parse the words from a .dic file's bytes. Order preserved, duplicates removed
     /// (case-insensitively, matching the app dictionary's own comparer).
     /// </summary>
@@ -48,6 +56,14 @@ internal static class CustomDicImport
             // whitespace is not a word — likely a header or a different file format —
             // and importing "half" of it would add a word the user never chose.
             if (w.Any(char.IsWhiteSpace)) continue;
+            // Not-words from the wrong kind of .dic. Hunspell dictionaries share the
+            // extension: their first line is a bare entry count and their entries
+            // carry affix flags ("abandon/DGS") — both would sail through the checks
+            // above and import thousands of flagged non-words permanently, reported
+            // as success. An all-digit line is never a spelling, and '/' never
+            // appears in one.
+            if (w.All(char.IsDigit)) continue;
+            if (w.Contains('/')) continue;
             // Control characters and the U+FFFD replacement char both mean the bytes
             // were not text in the encoding we decoded with; skip rather than import
             // mojibake into the dictionary, where it would be near-impossible to

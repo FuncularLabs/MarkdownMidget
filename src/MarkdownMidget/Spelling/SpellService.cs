@@ -33,16 +33,24 @@ internal sealed class SpellService
     private readonly HashSet<string> _dictionary = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _ignored = new(StringComparer.OrdinalIgnoreCase);
 
-    private static string DictionaryPath => Path.Combine(
+    private readonly string _dictionaryPath;
+
+    private static string DefaultDictionaryPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "MarkdownMidget", "dictionary.txt");
 
-    public SpellService()
+    public SpellService() : this(DefaultDictionaryPath) { }
+
+    /// <summary>Test seam: same behaviour against a caller-chosen file, so the
+    /// cross-process merge-on-write semantics are testable against a temp path
+    /// instead of the user's real dictionary.</summary>
+    internal SpellService(string dictionaryPath)
     {
+        _dictionaryPath = dictionaryPath;
         try
         {
-            if (File.Exists(DictionaryPath))
-                foreach (var w in File.ReadAllLines(DictionaryPath))
+            if (File.Exists(_dictionaryPath))
+                foreach (var w in File.ReadAllLines(_dictionaryPath))
                     if (!string.IsNullOrWhiteSpace(w)) _dictionary.Add(w.Trim());
         }
         catch { /* no dictionary is fine */ }
@@ -77,18 +85,11 @@ internal sealed class SpellService
     public void AddToDictionary(string word)
     {
         if (string.IsNullOrWhiteSpace(word)) return;
-        string[] snapshot;
         lock (_sync)
         {
             if (!_dictionary.Add(word.Trim())) return;
-            snapshot = _dictionary.OrderBy(w => w, StringComparer.OrdinalIgnoreCase).ToArray();
         }
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(DictionaryPath)!);
-            File.WriteAllLines(DictionaryPath, snapshot);
-        }
-        catch { /* in-memory add still works this session */ }
+        PersistMerged();
     }
 
     /// <summary>
@@ -99,10 +100,12 @@ internal sealed class SpellService
     /// Import ONLY: this adds to the app-private dictionary and nothing is ever
     /// written back to the source the words came from (see CustomDicImport).
     /// </summary>
-    public (int Added, int AlreadyKnown) ImportWords(IEnumerable<string> words)
+    /// <returns>Counts, and whether the dictionary file was actually saved —
+    /// false means the words work this session but will not survive it, and the
+    /// UI must say so rather than reporting a success that didn't persist.</returns>
+    public (int Added, int AlreadyKnown, bool Persisted) ImportWords(IEnumerable<string> words)
     {
         int added = 0, known = 0;
-        string[]? snapshot = null;
         lock (_sync)
         {
             foreach (var raw in words)
@@ -110,19 +113,56 @@ internal sealed class SpellService
                 if (string.IsNullOrWhiteSpace(raw)) continue;
                 if (_dictionary.Add(raw.Trim())) added++; else known++;
             }
-            if (added > 0)
-                snapshot = _dictionary.OrderBy(w => w, StringComparer.OrdinalIgnoreCase).ToArray();
         }
-        if (snapshot is not null)
+        var persisted = added == 0 || PersistMerged();
+        return (added, known, persisted);
+    }
+
+    /// <summary>
+    /// Write the dictionary MERGED with whatever is on disk right now — never a
+    /// blind snapshot of this process's memory.
+    ///
+    /// The app is multi-process: every window loads dictionary.txt once at startup
+    /// and holds its own copy. A blind snapshot-write meant that window B, adding
+    /// one word an hour after window A imported five hundred, would publish B's
+    /// stale view and silently erase A's entire import from disk. Re-reading and
+    /// unioning inside the write closes that hole for every sequential pair of
+    /// writes; two writes in the same instant can still race (there is no
+    /// cross-process lock), but each writer now preserves everything the last
+    /// completed write contained, so the damage window collapses from "always"
+    /// to "simultaneous". Words found on disk are also folded into memory, so
+    /// this window learns its siblings' vocabulary at the same moment.
+    ///
+    /// Written via temp-file + atomic rename (the settings.json pattern) so a
+    /// reader never sees a half-written dictionary.
+    /// </summary>
+    private bool PersistMerged()
+    {
+        try
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(_dictionaryPath)!);
+            string[] snapshot;
+            lock (_sync)
+            {
+                try
+                {
+                    if (File.Exists(_dictionaryPath))
+                        foreach (var w in File.ReadAllLines(_dictionaryPath))
+                            if (!string.IsNullOrWhiteSpace(w)) _dictionary.Add(w.Trim());
+                }
+                catch { /* unreadable file: write what we have rather than lose it */ }
+                snapshot = _dictionary.OrderBy(w => w, StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            var tmp = _dictionaryPath + "." + Environment.ProcessId + ".tmp";
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(DictionaryPath)!);
-                File.WriteAllLines(DictionaryPath, snapshot);
+                File.WriteAllLines(tmp, snapshot);
+                File.Move(tmp, _dictionaryPath, overwrite: true);
             }
-            catch { /* in-memory import still works this session */ }
+            finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* leave it */ } }
+            return true;
         }
-        return (added, known);
+        catch { return false; }   // in-memory state still works this session
     }
 
     /// <summary>Ignore a word for the rest of this session.</summary>

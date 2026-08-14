@@ -1294,6 +1294,14 @@ public partial class MainWindow : Window
                 // empty document with the caret in it, so a session can start by
                 // simply typing.
                 await StartBlankDocumentAsync();
+                // --source must hold for a pathless launch too — an untitled window
+                // relaunched by Apply-update carries the flag with no file argument,
+                // and dropping it here silently broke the "same view mode" promise.
+                if (_startInSource && !_closed)
+                {
+                    _startInSource = false;
+                    await SetSourceModeAsync(true);
+                }
             }
             else
             {
@@ -3157,7 +3165,7 @@ public partial class MainWindow : Window
     {
         // Hand over this window's place so an update started from the dialog can
         // reopen the same document in the same view after its restart.
-        new AboutDialog(_currentPath, _readOnly, _sourceMode) { Owner = this }.ShowDialog();
+        new AboutDialog(_currentPath, _readOnly, _sourceMode, hasApplyMenu: !_isHelpWindow) { Owner = this }.ShowDialog();
     }
 
     // ===== Help ▸ Apply vX.Y.Z update =====
@@ -3225,7 +3233,6 @@ public partial class MainWindow : Window
         // this window going away — a cancel after Process.Start would leave two
         // windows showing the same document.
         if (!await ConfirmDiscardAsync()) return;
-        _dirty = false;   // asked and answered — MainWindow_Closing must not re-prompt
 
         var exe = Updates.UpdateService.CurrentExePath;   // canonical path → the NEW exe
         var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
@@ -3242,12 +3249,18 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            // Start failed, so this window stays. _dirty was only cleared after the
-            // user answered the save prompt, so nothing was lost by asking.
+            // Start failed, so this window stays — with _dirty untouched. Clearing
+            // it before this point would leave a window holding an unsaved buffer
+            // behind a clean flag: the next close would skip the prompt and the
+            // work would be gone. The user's "discard" answer applied to a restart
+            // that never happened, so the question is honestly re-askable.
             MessageBox.Show(this, $"Couldn't start v{onDisk}:\n{ex.Message}",
                 "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        // Only now, with the replacement window genuinely started: asked and
+        // answered, so MainWindow_Closing must not re-prompt.
+        _dirty = false;
         Close();
     }
 

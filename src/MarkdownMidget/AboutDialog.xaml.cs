@@ -25,9 +25,16 @@ public partial class AboutDialog : Window
     // user their place; the startup argument parser already honours all of these.
     private readonly System.Collections.Generic.List<string> _relaunchArgs = new();
 
-    public AboutDialog(string? currentDocumentPath = null, bool readOnly = false, bool sourceMode = false)
+    // Whether the owning window's Help menu actually offers Apply-update. Help
+    // viewer windows suppress the item, so advice pointing at it there would name
+    // a control that does not exist for the reader.
+    private readonly bool _hasApplyMenu;
+
+    public AboutDialog(string? currentDocumentPath = null, bool readOnly = false,
+                       bool sourceMode = false, bool hasApplyMenu = true)
     {
         InitializeComponent();
+        _hasApplyMenu = hasApplyMenu;
         if (currentDocumentPath is not null) _relaunchArgs.Add(currentDocumentPath);
         if (readOnly) _relaunchArgs.Add("--readonly");
         if (sourceMode) _relaunchArgs.Add("--source");
@@ -37,22 +44,29 @@ public partial class AboutDialog : Window
         var installed = UpdateService.IsInstalled();
         CurrentVersionText.Text = $"Version {info}" + (installed ? "  (installed)" : "  (portable)");
 
-        // When the exe on disk has moved past what this window is running — another
-        // window updated the installed copy — say so HERE, permanently, not only as
-        // transient status text during a manual update check. "Running" is what the
-        // first line already shows; this line is the other half. Installed mode
-        // only: a portable instance's own path still holds its own exe, so the two
-        // can never differ there.
+        // When the exe on disk differs from what this window is running — in either
+        // direction — say so HERE, permanently, not only as transient status text
+        // during a manual update check. "Running" is what the first line already
+        // shows; this line is the other half. Newer-on-disk is the ordinary case
+        // (another window updated); older-on-disk is a rollback or a window left
+        // open across one, and hiding the difference there would be exactly the
+        // confusion this line exists to prevent. Installed mode only: a portable
+        // instance's own path still holds its own exe, so the two can never differ.
         if (installed)
         {
             try
             {
                 var onDisk = UpdateService.VersionOnDisk();
-                if (UpdateOffer.NeedsRestartNotUpdate(onDisk, wanted: null, _current))
+                if (onDisk is not null && _current is not null && onDisk.CompareTo(_current) != 0)
                 {
+                    var newer = onDisk.CompareTo(_current) > 0;
+                    var action = !newer
+                        ? "(older than this window — the installed copy was rolled back)"
+                        : _hasApplyMenu
+                            ? $"Use Help ▸ Apply v{onDisk} Update to switch."
+                            : "Close and reopen this window to switch.";
                     OnDiskVersionText.Text =
-                        $"Installed on disk: {onDisk} — this window is still running " +
-                        $"{_current}. Use Help ▸ Apply v{onDisk} Update to switch.";
+                        $"Installed on disk: {onDisk} — this window is running {_current}. {action}";
                     OnDiskVersionText.Visibility = Visibility.Visible;
                 }
             }
@@ -132,13 +146,18 @@ public partial class AboutDialog : Window
         // handled inside ApplyPortableAndRestart.
         if (installed && UpdateService.AlreadyUpdatedOnDisk(release.Version, _current, out var onDisk))
         {
+            var howToSwitch = _hasApplyMenu
+                ? $"Use Help ▸ Apply v{onDisk} Update to switch to it in one click, " +
+                  "or close and reopen the window."
+                : "Close and reopen the window to pick it up.";
             MessageBox.Show(this,
                 $"Markdown Midget on this machine is already at {onDisk} — most likely " +
                 "updated by another window.\n\nThis window is still running the older " +
-                $"version. Use Help ▸ Apply v{onDisk} Update to switch to it in one " +
-                "click, or close and reopen the window.",
+                $"version. {howToSwitch}",
                 "Restart to finish updating", MessageBoxButton.OK, MessageBoxImage.Information);
-            StatusText.Text = $"Already at {onDisk} on disk — Help ▸ Apply v{onDisk} Update switches to it.";
+            StatusText.Text = _hasApplyMenu
+                ? $"Already at {onDisk} on disk — Help ▸ Apply v{onDisk} Update switches to it."
+                : $"Already at {onDisk} on disk — close and reopen this window to pick it up.";
             StatusText.Visibility = Visibility.Visible;
             StableUpdateBtn.Visibility = PreUpdateBtn.Visibility = Visibility.Collapsed;
             return;

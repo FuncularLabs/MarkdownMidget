@@ -100,7 +100,7 @@ public class CustomDicImportTests
     [Fact]
     public void ControlCharactersDisqualifyTheWord()
         => Assert.Equal(new[] { "clean" },
-            CustomDicImport.Parse(Utf16Le("badword\r\nclean\r\n")));
+            CustomDicImport.Parse(Utf16Le("bad\u0001word\r\nclean\r\n")));
 
     [Fact]
     public void DuplicatesCollapseCaseInsensitively()
@@ -108,6 +108,34 @@ public class CustomDicImportTests
         // both "Sentinel" and "sentinel" must count one word, first spelling wins.
         => Assert.Equal(new[] { "Sentinel", "other" },
             CustomDicImport.Parse(Utf16Le("Sentinel\r\nsentinel\r\nSENTINEL\r\nother\r\n")));
+
+    [Fact]
+    public void AHunspellDictionaryImportsNothingItShouldnt()
+    {
+        // Hunspell .dic files share the extension and the picker's filter: first
+        // line is a bare entry count, entries carry affix flags after a slash.
+        // Both shapes passed every original filter — no whitespace, no control
+        // chars, under the length cap — and would have imported thousands of
+        // "abandon/DGS"-style non-words permanently, reported as success.
+        var words = CustomDicImport.Parse(Utf16Le("49271\r\nabandon/DGS\r\nplainword\r\nzero/0\r\n"));
+        Assert.Equal(new[] { "plainword" }, words);
+    }
+
+    [Fact]
+    public void AllDigitLinesAreNeverWords()
+        // Covers the Hunspell count header wherever it appears, and stray numbers
+        // generally — a number is not a spelling.
+        => Assert.Equal(new[] { "real" },
+            CustomDicImport.Parse(Utf16Le("12345\r\nreal\r\n007\r\n")));
+
+    [Fact]
+    public void TheFileSizeCapIsSaneForRealDictionaries()
+    {
+        // A genuine CUSTOM.DIC is kilobytes. The cap guards the UI thread against a
+        // mispicked huge file, and must stay far above any plausible real one.
+        Assert.True(CustomDicImport.MaxFileBytes >= 1024 * 1024,
+            "cap must comfortably exceed any real custom dictionary");
+    }
 
     [Fact]
     public void AnEmptyFileYieldsNoWordsAndNoThrow()
