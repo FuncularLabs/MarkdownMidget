@@ -16,6 +16,12 @@ the headline paths (a two-window update, the Word-dictionary import through the
 file picker) are reviewed and unit-tested but want real dogfooding before the
 stable promote.
 
+> **The two update features take effect from the *next* update onward.** An
+> update is carried out by the version you are updating *from* — so the
+> 0.7.0 updater, which predates them, ran the update that delivered this
+> release, and one more "reopened with no document" is expected on the way
+> in. From 0.8.0-beta1 on, updates keep your place.
+
 ### Added
 - **One-click catch-up after an update.** Updating from one window replaces the
   installed program on disk, but other open windows keep running the old version
