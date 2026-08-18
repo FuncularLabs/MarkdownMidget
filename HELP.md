@@ -186,8 +186,11 @@ Switching is instant, applies to the source view as well as the formatted one, a
 is remembered between sessions. Diagrams follow along; the menu bar, toolbar and
 status bar do not — those are Windows' own furniture and stay in the system theme.
 
-**Printing ignores the theme.** Paper stays light whatever you pick, because a dark
-theme reaching the printer produces unreadable pages and an empty toner cartridge.
+**Printing keeps paper light** — the page prints white with dark text whatever you
+pick, because a dark page on paper is unreadable and empties a toner cartridge.
+Your **tables** are the exception: the header row and the alternating row shading
+print the way they look on screen (dark themes print a light row shade so the text
+stays readable; their header row keeps its dark look).
 
 ### Writing your own
 

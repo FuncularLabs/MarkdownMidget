@@ -1234,5 +1234,53 @@
   "prop": "text-decoration",
   "value": "none",
   "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror th",
+  "prop": "background",
+  "value": "#c4c9d1",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror th",
+  "prop": "color",
+  "value": "#1f2328",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror th",
+  "prop": "-webkit-print-color-adjust",
+  "value": "exact",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror th",
+  "prop": "print-color-adjust",
+  "value": "exact",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror td",
+  "prop": "background",
+  "value": "#ffffff",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror tbody tr:nth-child(odd) td",
+  "prop": "background",
+  "value": "#f4f6f8",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror tbody tr:nth-child(odd) td",
+  "prop": "-webkit-print-color-adjust",
+  "value": "exact",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror tbody tr:nth-child(odd) td",
+  "prop": "print-color-adjust",
+  "value": "exact",
+  "important": true
  }
 ]

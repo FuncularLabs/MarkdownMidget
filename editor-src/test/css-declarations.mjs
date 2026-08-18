@@ -86,11 +86,15 @@ function resolve(value, variables, depth = 0) {
   const inner = value.slice(start + 4, end);
   const comma = splitTopLevel(inner);
   const name = comma[0].trim();
-  const fallback = comma.length > 1 ? comma.slice(1).join(',').trim() : null;
 
+  // The doc comment above is the contract and the code now matches it: an
+  // UNKNOWN variable keeps its var() text even when a fallback exists. Taking
+  // the fallback here silently erased the variable's NAME from the value —
+  // which broke the twins pins the moment print.css grew the first
+  // fallback-form var() in these files, and would equally have hidden a typo'd
+  // name behind its fallback, the exact failure this resolver exists to show.
   let replacement;
   if (variables.has(name)) replacement = variables.get(name);
-  else if (fallback !== null) replacement = fallback;
   else return value.slice(0, end + 1) + resolve(value.slice(end + 1), variables, depth + 1);
 
   return resolve(value.slice(0, start) + replacement + value.slice(end + 1), variables, depth + 1);

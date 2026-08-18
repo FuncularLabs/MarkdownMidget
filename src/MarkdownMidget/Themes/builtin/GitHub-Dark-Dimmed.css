@@ -46,6 +46,12 @@
   --mdm-th-bg: #2d333b;
   --mdm-th-text: #adbac7;
   --mdm-row-alt-bg: #262c34;
+  /* On paper. The header keeps its screen look (its pair is contrast-tested,
+     and one dark row per table is not a toner problem); the stripe must be
+     LIGHT because printed body text is pinned black - see print.css. */
+  --mdm-print-th-bg: #2d333b;
+  --mdm-print-th-text: #adbac7;
+  --mdm-print-row-alt-bg: #f0f2f4;
 
   --mdm-mermaid-theme: dark;
 

@@ -66,6 +66,11 @@
   --mdm-th-bg: #35525c;
   --mdm-th-text: #f7f2e4;     /* reversed: 7.47:1 on the header */
   --mdm-row-alt-bg: #f2e9d3;
+  /* On paper - same as on screen; this theme's table colours are already
+     print-safe. See print.css for why these are separate variables. */
+  --mdm-print-th-bg: #35525c;
+  --mdm-print-th-text: #f7f2e4;
+  --mdm-print-row-alt-bg: #f2e9d3;
 
   --mdm-mermaid-theme: neutral;
 

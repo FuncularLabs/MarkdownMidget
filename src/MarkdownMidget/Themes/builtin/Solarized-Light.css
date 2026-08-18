@@ -48,6 +48,11 @@
   --mdm-th-bg: #eee8d5;
   --mdm-th-text: #586e75;
   --mdm-row-alt-bg: #f6efdc;
+  /* On paper - same as on screen; this theme's table colours are already
+     print-safe. See print.css for why these are separate variables. */
+  --mdm-print-th-bg: #eee8d5;
+  --mdm-print-th-text: #586e75;
+  --mdm-print-row-alt-bg: #f6efdc;
 
   --mdm-mermaid-theme: neutral;
 

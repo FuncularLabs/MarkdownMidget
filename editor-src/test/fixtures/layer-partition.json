@@ -213,6 +213,14 @@
   "@media print > .mdm-print-source-pre { color }",
   "@media print > body.mdm-print-source .mdm-print-source-pre { display }",
   "@media print > @page { margin }",
-  "@media print > .mdm-misspelled { text-decoration }"
+  "@media print > .mdm-misspelled { text-decoration }",
+  "@media print > .mdm-prosemirror th { background }",
+  "@media print > .mdm-prosemirror th { color }",
+  "@media print > .mdm-prosemirror th { -webkit-print-color-adjust }",
+  "@media print > .mdm-prosemirror th { print-color-adjust }",
+  "@media print > .mdm-prosemirror td { background }",
+  "@media print > .mdm-prosemirror tbody tr:nth-child(odd) td { background }",
+  "@media print > .mdm-prosemirror tbody tr:nth-child(odd) td { -webkit-print-color-adjust }",
+  "@media print > .mdm-prosemirror tbody tr:nth-child(odd) td { print-color-adjust }"
  ]
 }

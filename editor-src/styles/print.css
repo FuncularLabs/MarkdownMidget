@@ -13,7 +13,9 @@
  *
  * That last part is the point. A dark theme on paper is unreadable and empties a
  * toner cartridge, so print keeps its own literals rather than reading theme
- * variables, and keeps them out of a theme's reach.
+ * variables — with ONE bounded exception: the three --mdm-print-* table
+ * variables at the end of this file, where a theme states its PAPER look
+ * explicitly and a test holds the values to paper-safe contrast.
  *
  * The !important is new. These declarations used to win by being last in the file,
  * which stops being true the moment anything is layered: `height: auto`,
@@ -165,5 +167,37 @@
 
   .mdm-misspelled {
     text-decoration: none !important;
+  }
+
+  /* Tables follow the theme onto paper — the bounded exception named in the
+   * header. Browsers strip BACKGROUND colours on paper by default while still
+   * printing FOREGROUND text — so Midget Solarized's reversed header printed
+   * near-white text on white paper, and nothing here pinned table colours at
+   * all. `print-color-adjust: exact` forces these backgrounds onto paper
+   * per-element, regardless of the dialog's "background graphics" checkbox.
+   *
+   * PRINT-specific variables, not the screen ones, because printed body text
+   * is pinned #000 above: a dark theme's dark row-shade would be unreadable,
+   * so each theme declares a LIGHT print stripe (test-enforced) while the
+   * header may keep its screen look — one row per table, its pair
+   * contrast-tested. Fallbacks are the Default palette, so a custom theme
+   * that predates these variables still prints legibly. */
+  .mdm-prosemirror th {
+    background: var(--mdm-print-th-bg, #c4c9d1) !important;
+    color: var(--mdm-print-th-text, #1f2328) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Plain cells pin to white so a checked "background graphics" box cannot put
+   * a dark theme's dark cells behind the #000 body text. */
+  .mdm-prosemirror td {
+    background: #ffffff !important;
+  }
+
+  .mdm-prosemirror tbody tr:nth-child(odd) td {
+    background: var(--mdm-print-row-alt-bg, #f4f6f8) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

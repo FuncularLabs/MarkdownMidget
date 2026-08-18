@@ -195,6 +195,37 @@ public class BuiltInThemeTests
         Assert.InRange(alpha, 0.10, 0.50);
     }
 
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void ThePrintHeaderPairIsLegibleOnPaper(string resource)
+    {
+        // The printed header follows the theme (print.css forces its background onto
+        // paper with print-color-adjust: exact), so its fg/bg pair must carry its own
+        // contrast - there is no white page behind it to save an illegible pair.
+        var vars = Variables(Read(resource));
+        var ratio = Contrast(Rgb(vars["--mdm-print-th-text"]), Rgb(vars["--mdm-print-th-bg"]));
+        Assert.True(ratio >= 3.0,
+            $"{resource}: print header {vars["--mdm-print-th-text"]} on {vars["--mdm-print-th-bg"]} " +
+            $"is {ratio:0.00}:1, below the 3:1 floor");
+    }
+
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void ThePrintRowStripeStaysLightBecausePrintedTextIsBlack(string resource)
+    {
+        // print.css pins body text to #000 on paper, so the alternating stripe must
+        // stay LIGHT for every theme - including the dark ones, whose SCREEN stripe
+        // is dark and must not be reused. This is the constraint that made the print
+        // values separate variables in the first place; a mutation collapsing them
+        // back to the screen values fails here on Dracula and GitHub Dark Dimmed.
+        var vars = Variables(Read(resource));
+        var stripe = Rgb(vars["--mdm-print-row-alt-bg"]);
+        var vsBlackText = Contrast(stripe, (0, 0, 0));
+        Assert.True(vsBlackText >= 12.0,
+            $"{resource}: print stripe {vars["--mdm-print-row-alt-bg"]} gives only " +
+            $"{vsBlackText:0.00}:1 against the #000 print.css pins for body text");
+    }
+
     [Fact]
     public void TheDefaultPaletteMeetsItsOwnBar()
     {
@@ -206,6 +237,11 @@ public class BuiltInThemeTests
         AssertContrast(vars, "--mdm-squiggle", 3.0, "theme-default.css");
         AssertContrast(vars, "--mdm-resize-handle", 3.0, "theme-default.css");
         AssertContrast(vars, "--mdm-mark", 1.5, "theme-default.css");
+        // The print-table pair too — the theories above cover only the six embedded
+        // resources, and Default is the seventh theme. Without this line the
+        // "enforced for all seven" claim was enforced for six.
+        Assert.True(Contrast(Rgb(vars["--mdm-print-th-text"]), Rgb(vars["--mdm-print-th-bg"])) >= 3.0);
+        Assert.True(Contrast(Rgb(vars["--mdm-print-row-alt-bg"]), (0, 0, 0)) >= 12.0);
     }
 
     // ===== helpers =====

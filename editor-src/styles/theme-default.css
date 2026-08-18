@@ -16,9 +16,10 @@
  *    the point: a theme can give keywords and punctuation different colours
  *    without Nord's palette having done so first.
  *
- *  Print is deliberately absent. Paper stays light whatever theme is chosen —
- *  a dark theme reaching the printer produces unreadable pages and empties a
- *  toner cartridge — so `@media print` keeps its own literals.
+ *  Print is almost entirely absent. Paper stays light whatever theme is
+ *  chosen — `@media print` keeps its own literals — with one bounded
+ *  exception: the three --mdm-print-* table variables below, which let tables
+ *  keep their theme's look on paper (print.css explains the constraint).
  * ===================================================================== */
 :root {
   /* Surface. `color-scheme` is not a colour, and is the one every dark theme
@@ -64,6 +65,11 @@
   --mdm-th-bg: #c4c9d1;
   --mdm-th-text: #1f2328;
   --mdm-row-alt-bg: #f4f6f8;
+  /* On paper - same as on screen; this theme's table colours are already
+     print-safe. See print.css for why these are separate variables. */
+  --mdm-print-th-bg: #c4c9d1;
+  --mdm-print-th-text: #1f2328;
+  --mdm-print-row-alt-bg: #f4f6f8;
 
   /* Chrome — the app's own furniture. A theme may recolour these; it may not
      remove them (see the layer order in docs/plans/themes.md). */

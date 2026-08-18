@@ -29,7 +29,9 @@
  *      This refuses some harmless things too. That is the intended trade.
  *    - run script, in any of the spellings that ever worked.
  *
- *  Printing ignores the theme. Paper stays light whatever you pick.
+ *  Printing keeps paper light whatever you pick — except your tables: the
+ *  header row and the alternating stripe print the way the --mdm-print-*
+ *  variables below say.
  * ===================================================================== */
 
 :root {
@@ -79,6 +81,15 @@
   --mdm-th-bg: #c4c9d1;
   --mdm-th-text: #1f2328;
   --mdm-row-alt-bg: #f4f6f8;
+
+  /* How your tables PRINT. The page always prints white with dark text, but
+     the table header and the alternating row stripe keep the look you name
+     here. The stripe must stay LIGHT — printed body text is always dark, so
+     a dark stripe would swallow it. A dark header is fine (the text you set
+     in --mdm-print-th-text prints on it). */
+  --mdm-print-th-bg: #c4c9d1;
+  --mdm-print-th-text: #1f2328;
+  --mdm-print-row-alt-bg: #f4f6f8;
 
   /* ---- the app's own furniture -------------------------------------- */
 

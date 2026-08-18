@@ -27,8 +27,8 @@ non-`:root` rule** (a screen-only body font-size). If a second theme ever wants
 typography as well as colour, that is the point to decide whether size becomes part
 of the theme contract rather than an ordinary rule each theme repeats.
 
-**Second open tail — table headers print illegibly under Midget Solarized, and the
-fix is designed (raised 2026-08-18).** Not cosmetics: print.css pins page, text,
+**Second open tail — RESOLVED in 0.8.1 (raised 2026-08-18, shipped with the
+print-table variables).** Kept as the design record: Not cosmetics: print.css pins page, text,
 `pre` and `code` colours but never pinned table colours, and browsers strip
 *background* colours on paper by default while keeping *foreground* text colours.
 MS is the only built-in with a reversed header, so its `#35525c` header background

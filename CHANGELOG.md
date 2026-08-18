@@ -9,6 +9,26 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-18
+
+### Fixed
+- **Tables now print the way they look on screen.** Printing strips background
+  colours by default, and nothing pinned table colours on paper — so Midget
+  Solarized's dark header with reversed text printed as plain black-on-white (or
+  worse, near-invisible, depending on how the engine rescues light text), and no
+  theme's row shading survived at all. The header row and the alternating stripe
+  now print as the theme draws them, forced onto paper per-element with
+  `print-color-adjust: exact`. Three new theme variables carry it
+  (`--mdm-print-th-bg`, `--mdm-print-th-text`, `--mdm-print-row-alt-bg`), because
+  printed body text is always dark, so dark themes need a **light** row stripe on
+  paper even though their screen stripe is dark — their header keeps its dark
+  screen look, which is one row per table and prints legibly. Both constraints
+  are test-enforced, and the fix was verified against real PDF output under the
+  PDF-export path's settings, differentially against the 0.8.0 bundle (the print
+  dialog's checkbox path is covered by the same per-element rule). The rest
+  of the page still prints light whatever theme is active. Custom themes that
+  predate the new variables print with the Default palette's table colours.
+
 ## [0.8.0] - 2026-08-18
 
 First stable release on the 0.8 line — the beta's content with the prerelease

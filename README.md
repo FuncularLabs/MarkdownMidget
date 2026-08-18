@@ -221,6 +221,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v0.8.1** — **Tables print like they look.** The header row and alternating
+  row shading now survive onto paper in every theme (dark themes print a light
+  row shade so text stays readable); the rest of the page still prints light.
 - **v0.8.0** — **Updates keep your place**: the restart carries your document and
   view mode, stale windows get **Help ▸ Apply Update** for a one-click switch to a
   version another window already installed, and the About box shows installed vs

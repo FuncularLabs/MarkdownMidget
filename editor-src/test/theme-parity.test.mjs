@@ -64,7 +64,15 @@ test('the default theme resolves to the palette that shipped before it existed',
   // ELEMENT the same property, and then document order is the only thing deciding.
   // "No selector declares the same property twice" is a fact about selector strings
   // and says nothing about elements.
-  const now = byKey(declarations(editorCss, rootVariables(defaultTheme)));
+  // The theme's variables, plus the one JS-OWNED variable the stylesheet reads:
+  // --mdm-page-width is set at runtime by MDM.setPageWidth (main.js), never by a
+  // theme, and its baseline value is the 850px portrait default. Without this
+  // entry the resolver now honestly keeps the var() text (it no longer
+  // substitutes fallbacks for unknown names — see css-declarations.mjs), and the
+  // comparison would fail on text the browser never renders.
+  const vars = new Map(rootVariables(defaultTheme));
+  vars.set('--mdm-page-width', '850px');
+  const now = byKey(declarations(editorCss, vars));
   const was = byKey(baseline);
 
   assert.deepEqual([...now.keys()].sort(), [...was.keys()].sort(),
@@ -231,7 +239,11 @@ test('each site reads its own variable, not a twin that matches today', () => {
   // #ffffff, so every resolved declaration is identical and the whole refactor
   // still passes — right up until someone selects a dark theme and gets white
   // cells on a dark page. Only the unresolved text can tell the two apart.
-  const unresolved = declarations(editorCss).filter((d) => !d.where.includes('@media print'));
+  // Print is IN this set since 0.8.1 — the three --mdm-print-* table variables
+  // are the bounded exception to print-keeps-literals, and their pins below
+  // need to see them. The media-context guard in the matcher keeps bare
+  // (screen) markers from ever matching a print declaration.
+  const unresolved = declarations(editorCss);
 
   // Anchored on a distinguishing selector fragment rather than the whole sorted
   // list, so reordering a selector doesn't fail the test — but the fragment must
@@ -241,6 +253,12 @@ test('each site reads its own variable, not a twin that matches today', () => {
     ['.mdm-prosemirror td {', 'background', '--mdm-td-bg'],
     ['tr:nth-child(odd) td {', 'background', '--mdm-row-alt-bg'],
     ['.mdm-prosemirror th {', 'background', '--mdm-th-bg'],
+    // The screen th text pin, plus the three print-table variables — all newly
+    // twinned in 0.8.1, when each print var was seeded with its screen value.
+    ['.mdm-prosemirror th {', 'color', '--mdm-th-text'],
+    ['@media print > .mdm-prosemirror th {', 'background', '--mdm-print-th-bg'],
+    ['@media print > .mdm-prosemirror th {', 'color', '--mdm-print-th-text'],
+    ['@media print > .mdm-prosemirror tbody tr:nth-child(odd) td {', 'background', '--mdm-print-row-alt-bg'],
     ['.mdm-mermaid {', 'background', '--mdm-mermaid-bg'],
     ['.mdm-mermaid-error {', 'background', '--mdm-mermaid-error-bg'],
     ['.mdm-prosemirror table {', 'border', '--mdm-table-border'],
@@ -263,8 +281,14 @@ test('each site reads its own variable, not a twin that matches today', () => {
   ];
 
   for (const [marker, prop, expected] of wiring) {
+    // A marker names its media scope: bare markers are screen rules, and a
+    // marker that means the print variant says '@media print' itself. Without
+    // this, '.mdm-prosemirror th {' also matches the print-layer pin of the
+    // same element (its where is '@media print > .mdm-prosemirror th') and
+    // every dual-declared site would 'match 2'.
     const matches = unresolved.filter(
-      (d) => (d.where + ' {').includes(marker) && d.prop === prop);
+      (d) => (d.where + ' {').includes(marker) && d.prop === prop
+        && d.where.startsWith('@media print') === marker.startsWith('@media print'));
     assert.equal(matches.length, 1, `"${marker}" { ${prop} } should match one declaration, matched ${matches.length}`);
     assert.match(matches[0].value, new RegExp(`var\\(\\s*${expected}\\s*[,)]`),
       `${marker} { ${prop} } is wired to ${matches[0].value}, not var(${expected})`);
