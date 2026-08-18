@@ -27,6 +27,27 @@ non-`:root` rule** (a screen-only body font-size). If a second theme ever wants
 typography as well as colour, that is the point to decide whether size becomes part
 of the theme contract rather than an ordinary rule each theme repeats.
 
+**Second open tail — table headers print illegibly under Midget Solarized, and the
+fix is designed (raised 2026-08-18).** Not cosmetics: print.css pins page, text,
+`pre` and `code` colours but never pinned table colours, and browsers strip
+*background* colours on paper by default while keeping *foreground* text colours.
+MS is the only built-in with a reversed header, so its `#35525c` header background
+vanishes while its near-white `#f7f2e4` header text prints — nearly invisible on
+white. (This also means "printing ignores the theme entirely" has a hole today:
+header text colour reaches paper.) The fix that keeps every theme legible AND
+answers "tables should print more like their on-screen counterparts": in
+print.css, `th { background: var(--mdm-th-bg) !important; color:
+var(--mdm-th-text) !important; print-color-adjust: exact }` — the header follows
+the active theme (its bg/text pair is contrast-tested ≥3:1 for all seven, and
+Chromium honours per-element `print-color-adjust: exact` regardless of the
+"background graphics" checkbox), while the small ink area keeps the paper-stays-
+light principle intact. Row banding: pin a neutral printable stripe (e.g. #f4f4f4
+with `exact`) rather than following the theme — dark themes’ banding colours
+against print-pinned dark body text would be unreadable. Ship with the HELP.md/
+CHANGELOG claim softened to "paper stays light; table headers follow your theme."
+Verify against a real PrintToPdf, not reasoning — this diagnosis itself came from
+the pins being absent where reasoning said they existed.
+
 ### Updating while several windows are open
 
 **The failure itself is fixed in 0.6.4; the ergonomics are still open.** A window
