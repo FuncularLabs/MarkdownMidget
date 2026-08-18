@@ -69,7 +69,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-Beta (0.7.x), in daily use and signed on every release. Windows-only for now; the
+Beta (0.8.x), in daily use and signed on every release. Windows-only for now; the
 editor core is web-based, so a cross-platform shell (MAUI/Avalonia) is a realistic
 future step. A real installer that registers in Add/Remove Programs is on the
 [roadmap](ROADMAP.md) — the portable exe will stay available either way.
@@ -221,6 +221,12 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v0.8.0** — **Updates keep your place**: the restart carries your document and
+  view mode, stale windows get **Help ▸ Apply Update** for a one-click switch to a
+  version another window already installed, and the About box shows installed vs
+  running when they differ. Plus **Edit ▸ Settings ▸ Import words from Word's
+  custom dictionary** (one-way), and a fix for dictionary words vanishing when
+  another window wrote the file.
 - **v0.7.0** — **Themes.** Seven built in — Dracula, GitHub Dark Dimmed, GitHub
   Light, Midget Solarized, One Light, Solarized Light and the original Default —
   plus your own: drop a CSS file in the themes folder and it appears in the menu,

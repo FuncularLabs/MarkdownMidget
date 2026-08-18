@@ -9,6 +9,25 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-18
+
+First stable release on the 0.8 line — the beta's content with the prerelease
+flag dropped, after dogfooding. Everything new on this line:
+
+- **Updates keep your place** — the restart carries your document and view mode.
+- **Help ▸ Apply vX.Y.Z Update** in windows another window has already updated
+  past: a one-click switch, nothing downloaded.
+- **The About box shows installed vs running** whenever they differ.
+- **Import your Word vocabulary** (Edit ▸ Settings…), one-way from CUSTOM.DIC.
+- **Fixed:** dictionary words no longer vanish when another window writes the
+  dictionary file (a bug dating to 0.5.0).
+
+> Updating **from 0.7.0 or earlier** still uses the old updater, so that one
+> update won't carry your document — from then on they all do. Updating from
+> 0.8.0-beta1 exercises the new path for the first time.
+
+See the beta notes below for the full detail.
+
 ## [0.8.0-beta1] - 2026-08-14
 
 Quality-of-life around updates and spelling. A prerelease for the usual reason:
