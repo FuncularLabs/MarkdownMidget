@@ -368,6 +368,11 @@ you open the changelog from it.
 
 ## Updates
 
+**If something goes wrong:** unexpected errors are recorded in
+`%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll
+get a dialog pointing at that file instead. When reporting a problem, that file is
+the single most useful thing to include.
+
 **Help ▸ About Markdown Midget** shows the version you're running and the newest
 available versions — the newest **release** and, separately, a **prerelease** if
 one is genuinely ahead, so you can knowingly opt into early builds. A prerelease

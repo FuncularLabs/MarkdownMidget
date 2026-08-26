@@ -9,6 +9,34 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-08-26
+
+Two field reports from the same user, same day. One is fixed; the other is now
+diagnosable instead of silent.
+
+### Fixed
+- **Markdown Midget now appears in Windows' "Default apps" chooser.** Registering
+  as the .md editor wrote everything "Open with" needs — which is why that always
+  worked — but never the two registry entries the Windows 11 Default-apps page
+  builds its list from (`RegisteredApplications` plus a `Capabilities` key). So
+  the register flow would open that very page, tell you to pick Markdown Midget,
+  and the list wouldn't contain it. It does now; re-run **File ▸ Windows
+  Integration ▸ Register as .md editor…** once after updating to add the missing
+  entries. Unregister removes them.
+
+### Added
+- **Crashes now leave evidence, and many no longer kill the app.** There were no
+  global exception handlers at all: any unexpected error — including one queued up
+  behind the scenes and set off by the nested message pump a file dialog runs,
+  which is why a crash can appear "when the file explorer dialog comes up" — ended
+  the process silently. Unexpected UI-thread errors are now logged to
+  `%LocalAppData%\MarkdownMidget\crash.log` and, within limits, survived: you get
+  a dialog naming the log file, the document stays put, and the unsaved-work backup
+  keeps running. After three survived errors in one session the next one is allowed
+  to end the app (still logged) rather than limping forever. Background-thread and
+  un-awaited task failures are logged too. If the app has ever "just crashed" on
+  you: update, reproduce, and send crash.log with the report.
+
 ## [0.8.1] - 2026-08-18
 
 ### Fixed

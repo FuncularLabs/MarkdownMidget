@@ -23,6 +23,8 @@ internal static class RegistrationService
     private const string ExeCanonicalName = "MarkdownMidget.exe";
     private const string ShortcutLinkName = "Markdown Midget.lnk";
     private const string InstallInfoName = "install-info.json";
+    // Where the Windows "Default apps" page learns we exist — see Register().
+    private const string CapabilitiesKeyPath = @"Software\Funcular Labs\Markdown Midget\Capabilities";
 
     public static string CurrentExePath =>
         Environment.ProcessPath ?? throw new InvalidOperationException("Cannot determine current exe path.");
@@ -109,6 +111,26 @@ internal static class RegistrationService
             pids.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
         }
 
+        // The Windows 11 "Default apps" page builds its list of choosable apps from
+        // HKCU\Software\RegisteredApplications -> a Capabilities key. Everything
+        // above covers "Open with" (which is why that worked), but WITHOUT these two
+        // writes the app never appears in the Default-apps chooser — the very panel
+        // the register flow opens and tells the user to pick Markdown Midget from.
+        // Reported in the field as "it says to set the value, but it isn't there".
+        using (var caps = Registry.CurrentUser.CreateSubKey(CapabilitiesKeyPath)!)
+        {
+            caps.SetValue("ApplicationName", DisplayName);
+            caps.SetValue("ApplicationDescription",
+                "WYSIWYG markdown editor — WordPad-style editing with markdown as the native format.");
+            using var assoc = caps.CreateSubKey("FileAssociations")!;
+            assoc.SetValue(".md", ProgId);
+            assoc.SetValue(".markdown", ProgId);
+        }
+        using (var registered = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications")!)
+        {
+            registered.SetValue(DisplayName, CapabilitiesKeyPath);
+        }
+
         NotifyShellAssocChanged();
     }
 
@@ -121,6 +143,15 @@ internal static class RegistrationService
         // Remove our Applications\<exe> entry.
         try { Registry.CurrentUser.DeleteSubKeyTree(
             @"Software\Classes\Applications\" + ExeCanonicalName, throwOnMissingSubKey: false); } catch { }
+
+        // Remove the Default-apps listing (RegisteredApplications + Capabilities).
+        try
+        {
+            using var registered = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", writable: true);
+            registered?.DeleteValue(DisplayName, throwOnMissingValue: false);
+        }
+        catch { }
+        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Funcular Labs\Markdown Midget", throwOnMissingSubKey: false); } catch { }
 
         // Remove our ProgID from .md OpenWithProgids.
         try
@@ -147,85 +178,99 @@ internal static class RegistrationService
     /// </param>
     private static void DedupeStrays(bool keepOurProgId = false)
     {
-        // 1) Explorer-controlled per-user MRU of app EXE FILENAMES.
-        var mruListPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\OpenWithList";
-        try
+        // BOTH extensions the app can own a default for. Register advertises
+        // .markdown in the Default-apps Capabilities, so its per-user FileExts
+        // state needs exactly the cleanup .md gets - one loop, so the two can
+        // never drift apart again.
+        foreach (var ext in new[] { ".md", ".markdown" })
         {
-            using var mru = Registry.CurrentUser.OpenSubKey(mruListPath, writable: true);
-            if (mru is not null)
-            {
-                var order = (mru.GetValue("MRUList") as string) ?? string.Empty;
-                var toRemove = new List<char>();
-                foreach (var name in mru.GetValueNames())
-                {
-                    if (name == "MRUList" || name.Length != 1) continue;
-                    var val = mru.GetValue(name) as string ?? string.Empty;
-                    if (LooksLikeUs(val))
-                    {
-                        toRemove.Add(name[0]);
-                        try { mru.DeleteValue(name); } catch { }
-                    }
-                }
-                if (toRemove.Count > 0)
-                {
-                    foreach (var ch in toRemove) order = order.Replace(ch.ToString(), string.Empty);
-                    mru.SetValue("MRUList", order);
-                }
-            }
-        }
-        catch { /* best-effort */ }
 
-        // 2) Explorer-controlled per-user PROGID MRU. Windows tracks the user's
-        // manually-selected ProgIDs here separately from the Classes hive — this
-        // was the missing dedupe target that let stale "Markdown Midget" entries
-        // survive on re-registration.
-        var mruPidsPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\OpenWithProgids";
-        try
-        {
-            using var mruPids = Registry.CurrentUser.OpenSubKey(mruPidsPath, writable: true);
-            if (mruPids is not null)
+            // 1) Explorer-controlled per-user MRU of app EXE FILENAMES.
+            var mruListPath = @$"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\OpenWithList";
+            try
             {
-                foreach (var name in mruPids.GetValueNames())
+                using var mru = Registry.CurrentUser.OpenSubKey(mruListPath, writable: true);
+                if (mru is not null)
                 {
-                    // If it's our ProgID and we're registering, leave it alone (we'll add
-                    // it back below). If we're unregistering, drop it.
-                    if (string.Equals(name, ProgId, StringComparison.OrdinalIgnoreCase))
+                    var order = (mru.GetValue("MRUList") as string) ?? string.Empty;
+                    var toRemove = new List<char>();
+                    foreach (var name in mru.GetValueNames())
                     {
-                        if (!keepOurProgId) try { mruPids.DeleteValue(name); } catch { }
-                        continue;
+                        if (name == "MRUList" || name.Length != 1) continue;
+                        var val = mru.GetValue(name) as string ?? string.Empty;
+                        if (LooksLikeUs(val))
+                        {
+                            toRemove.Add(name[0]);
+                            try { mru.DeleteValue(name); } catch { }
+                        }
                     }
-                    if (LooksLikeUs(name)
-                        || name.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
-                        || name.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase))
+                    if (toRemove.Count > 0)
                     {
-                        try { mruPids.DeleteValue(name); } catch { }
+                        foreach (var ch in toRemove) order = order.Replace(ch.ToString(), string.Empty);
+                        mru.SetValue("MRUList", order);
                     }
                 }
             }
-        }
-        catch { /* best-effort */ }
+            catch { /* best-effort */ }
 
-        // 3) UserChoice — if it was pointing at a stale/old ProgID of ours, remove
-        // it so Windows falls back to prompting. (This is the only key we can
-        // safely delete but not write; write is hash-protected.)
-        try
-        {
-            using var uc = Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice", writable: true);
-            if (uc is not null)
+            // 2) Explorer-controlled per-user PROGID MRU. Windows tracks the user's
+            // manually-selected ProgIDs here separately from the Classes hive — this
+            // was the missing dedupe target that let stale "Markdown Midget" entries
+            // survive on re-registration.
+            var mruPidsPath = @$"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\OpenWithProgids";
+            try
             {
-                var pid = uc.GetValue("ProgId") as string ?? string.Empty;
-                if (pid.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
-                    || pid.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase)
-                    || (LooksLikeUs(pid) && !string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase)))
+                using var mruPids = Registry.CurrentUser.OpenSubKey(mruPidsPath, writable: true);
+                if (mruPids is not null)
                 {
-                    Registry.CurrentUser.DeleteSubKey(
-                        @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice",
-                        throwOnMissingSubKey: false);
+                    foreach (var name in mruPids.GetValueNames())
+                    {
+                        // If it's our ProgID and we're registering, leave it alone (we'll add
+                        // it back below). If we're unregistering, drop it.
+                        if (string.Equals(name, ProgId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!keepOurProgId) try { mruPids.DeleteValue(name); } catch { }
+                            continue;
+                        }
+                        if (LooksLikeUs(name)
+                            || name.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
+                            || name.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { mruPids.DeleteValue(name); } catch { }
+                        }
+                    }
                 }
             }
+            catch { /* best-effort */ }
+
+            // 3) UserChoice — if it was pointing at a stale/old ProgID of ours, remove
+            // it so Windows falls back to prompting. (This is the only key we can
+            // safely delete but not write; write is hash-protected.)
+            try
+            {
+                using var uc = Registry.CurrentUser.OpenSubKey(
+                    @$"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice", writable: true);
+                if (uc is not null)
+                {
+                    var pid = uc.GetValue("ProgId") as string ?? string.Empty;
+                    if (pid.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
+                        || pid.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase)
+                        || (LooksLikeUs(pid) && !string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase))
+                        // On UNregister the current ProgID is about to be deleted, so a
+                        // per-user default pointing at it must go too, or Explorer is
+                        // left resolving .md/.markdown through a ProgID that no longer
+                        // exists. On register it stays: it is a valid choice of us.
+                        || (!keepOurProgId && string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        Registry.CurrentUser.DeleteSubKey(
+                            @$"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice",
+                            throwOnMissingSubKey: false);
+                    }
+                }
+            }
+            catch { /* best-effort */ }
         }
-        catch { /* best-effort */ }
+
 
         // 4) Applications\ subkeys with different exe filenames pointing at our
         // tool via shortcuts (e.g. mkm.exe entries left over from earlier tests).
