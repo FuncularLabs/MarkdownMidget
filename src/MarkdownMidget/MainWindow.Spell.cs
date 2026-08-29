@@ -219,7 +219,10 @@ public partial class MainWindow
 
         (int Start, int Length)? hit = null;
         var text = SourceBox.Text;
-        if (idx >= 0 && _spellCheck && !_readOnly && _squiggles is not null)
+        // No _readOnly gate: read-only governs the document, not editor state, so
+        // the spell block still appears — with the document-mutating items disabled
+        // by BuildSpellItemsAsync and the dictionary actions kept live.
+        if (idx >= 0 && _spellCheck && _squiggles is not null)
         {
             // Take the range the ENGINE flagged, exactly as drawn. The previous
             // approach — re-tokenize with WordAt, then re-check that word alone —
@@ -354,10 +357,16 @@ public partial class MainWindow
         if (repeated)
         {
             items.Add(new MenuItem { Header = $"Repeated word: {Escape(click.Word)}", IsEnabled = false });
-            items.Add(new Separator());
-            var del = MakeItem("_Delete Repeated Word", () => replace(string.Empty, true));
-            del.FontWeight = FontWeights.SemiBold;
-            items.Add(del);
+            // Deleting the repeat edits the document, so read-only keeps only the
+            // diagnosis line. (Read-only is a property of the DOCUMENT; the
+            // dictionary actions below stay live in read-only for the same reason.)
+            if (!_readOnly)
+            {
+                items.Add(new Separator());
+                var del = MakeItem("_Delete Repeated Word", () => replace(string.Empty, true));
+                del.FontWeight = FontWeights.SemiBold;
+                items.Add(del);
+            }
             if (trailingSeparator) items.Add(new Separator());
             return items;
         }
@@ -381,7 +390,18 @@ public partial class MainWindow
             foreach (var s in suggestions)
             {
                 var item = new MenuItem { Header = Escape(s), FontWeight = FontWeights.SemiBold };
-                item.Click += (_, _) => replace(s, false);
+                if (_readOnly)
+                {
+                    // Applying a suggestion edits the document. Show the correct
+                    // spelling (that's useful while reading) but don't offer to
+                    // apply it — and say why, so the greyed item isn't a mystery.
+                    item.IsEnabled = false;
+                    item.ToolTip = "The document is read-only.";
+                }
+                else
+                {
+                    item.Click += (_, _) => replace(s, false);
+                }
                 items.Add(item);
             }
         }

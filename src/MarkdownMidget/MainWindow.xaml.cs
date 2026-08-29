@@ -387,9 +387,13 @@ public partial class MainWindow : Window
                     }
                     // A right-click on a misspelled word carries its range + text, on
                     // whatever menu the click warranted — spelling rides along, it
-                    // doesn't replace the structural menus.
+                    // doesn't replace the structural menus. Read-only does NOT gate
+                    // this: squiggles are drawn in read-only windows, and the
+                    // dictionary actions (Add to Dictionary, Ignore All) change
+                    // editor state, not the document. BuildSpellItemsAsync disables
+                    // the document-mutating items instead.
                     SpellClick? spell = null;
-                    if (!_readOnly && _spellCheck &&
+                    if (_spellCheck &&
                         d.RootElement.TryGetProperty("spell", out var sp) && sp.ValueKind == JsonValueKind.Object)
                     {
                         var w = sp.TryGetProperty("word", out var wv) ? wv.GetString() : null;

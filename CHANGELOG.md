@@ -9,6 +9,14 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Fixed
+- **"Add to Dictionary" and "Ignore All" now work in read-only windows.** Read-only
+  guards the document, but it was also suppressing the entire spelling section of
+  the right-click menu - in the Help viewer and any read-only file, a squiggled
+  word offered no spelling actions at all. The dictionary actions change editor
+  state, not the document, so they now stay live; suggestions still show (useful
+  while reading) but are greyed out, since applying one would edit the document.
+
 ## [0.8.2] - 2026-08-26
 
 Two field reports from the same user, same day. One is fixed; the other is now
