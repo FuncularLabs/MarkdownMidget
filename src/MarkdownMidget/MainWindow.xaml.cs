@@ -405,7 +405,12 @@ public partial class MainWindow : Window
                                 sp.TryGetProperty("before", out var bv) ? bv.GetString() ?? "" : "");
                     }
                     // Defer so showing the menu doesn't block the WebView2 message pump.
-                    if (spell is { } si && menu == "text")
+                    // Read-only routes EVERY spell click to the dynamic menu: a
+                    // read-only table/image click falls back to TextContextMenu,
+                    // which has no spellRoot placeholder to fold the block into —
+                    // and HELP.md keeps its squiggles inside tables, so that
+                    // fallback was exactly the reported repro.
+                    if (spell is { } si && (menu == "text" || _readOnly))
                         Dispatcher.BeginInvoke(async () => await ShowSpellContextMenuAsync(x, y, si));
                     else
                         Dispatcher.BeginInvoke(async () => await ShowEditorContextMenuAsync(menu, x, y, spell));

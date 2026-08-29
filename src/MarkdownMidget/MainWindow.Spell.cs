@@ -397,6 +397,9 @@ public partial class MainWindow
                     // apply it — and say why, so the greyed item isn't a mystery.
                     item.IsEnabled = false;
                     item.ToolTip = "The document is read-only.";
+                    // WPF suppresses tooltips on disabled elements by default, which
+                    // would make the line above a silent no-op.
+                    ToolTipService.SetShowOnDisabled(item, true);
                 }
                 else
                 {
