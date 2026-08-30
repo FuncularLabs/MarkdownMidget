@@ -384,8 +384,18 @@ Two layers, because neither suffices by itself:
      *handlers* are third-party code — the exact class that faults; we use static
      folder/file glyphs keyed by extension), shell context menus, Windows Search. These
      are the crash surface; excluding them is the point.
-   - A Settings opt-in: **"Always use the built-in file picker"** — for a user like Eric
-     whose shell is known-bad, skipping the native attempt entirely.
+   - A Settings toggle: **"Always use the built-in file picker"** — and the app turns it
+     ON automatically when it detects the out-of-process native dialog crashed (child
+     exited without a result), telling the user it did so and where to turn it back off.
+     A known-bad shell should not cost one failed dialog per session; one crash is the
+     detection, and from then on the picker just works. (Decided 2026-08-29.) Manual
+     opt-in remains for users who simply prefer it.
+   - Longer-term direction (decided 2026-08-29, stubbed in ROADMAP.md): model the picker
+     as a functional equivalent of Avalonia's MIT `ManagedFileChooser` for WPF, with the
+     navigation core kept framework-agnostic so it could be broken out into its own OSS
+     project and grown WinForms/other front ends later. Avalonia's feature decisions are
+     the base for what ships in Midget now; context-menu/icon/thumbnail questions are
+     deferred to the extraction, not blocking.
 
 3. **One chokepoint.** All five dialog call sites (Open, Save As ×3, CUSTOM.DIC import)
    route through a single `FilePickerService` that owns the try-native→fallback strategy —

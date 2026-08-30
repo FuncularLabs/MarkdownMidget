@@ -254,6 +254,28 @@ the last of the usability gaps raised in the 0.6.x review.
 
 ## Someday / Big
 
+### MidgetFilePicker as its own open-source project (decided direction 2026-08-29)
+
+The pure-managed WPF file dialog being built for the shell-extension-crash fix
+(see `docs/plans/secure-markdown.md`, Part B) is deliberately architected so it
+can later be broken out into a standalone OSS library:
+
+- **Model it as a fork-in-spirit / functional equivalent of Avalonia's
+  `ManagedFileChooser`** (MIT) — the one maintained precedent for a framework
+  shipping a managed dialog as the fallback when native pickers can't be
+  trusted. Start from Avalonia's feature decisions (quick-links rail, file
+  list, filename+filter row) as the base for what Midget's version includes.
+- Keep the picker's core (navigation model, filtering, sorting, path
+  resolution) UI-framework-agnostic so a WinForms (or other) front end can be
+  added later; the WPF window is one view over it.
+- Deferred questions, deliberately NOT blocking the Midget-internal version:
+  which context-menu features to offer, what icons to show (per-file shell
+  icons are third-party code — the exact crash surface — so the safe default
+  is static glyphs), thumbnails, search.
+
+Not worth doing right away — it would complicate the immediate goal. The
+in-app picker ships first; extraction happens if/when it proves itself.
+
 ### Real installer / uninstaller
 
 A proper signed installer that behaves like software users expect on Windows —
