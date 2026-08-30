@@ -40,9 +40,11 @@ real hands before the stable promote.
     decrypt to exactly what was meant, then swap atomically. A failed
     verification leaves the existing file untouched.
   - File ▸ Open lists only regular markdown by default; a Settings checkbox
-    adds *.mdenc to the filter. Encrypted files always open by double-click,
-    Open Recent, or a typed name — and a renamed encrypted file is recognised
-    by content, not extension.
+    adds *.mdenc to the filter. Encrypted files always open via Open Recent
+    or a typed name — and by double-click once you re-run **File ▸ Windows
+    Integration ▸ Register as .md editor…**, which now also registers the
+    .mdenc type. A renamed encrypted file is recognised by content, not
+    extension.
   - Honest limits, stated plainly: removing the original is deletion plus a
     best-effort scrub — on an SSD, forensic recovery of the OLD file's blocks
     can't be ruled out ("no accessible copy" is the promise, not forensic

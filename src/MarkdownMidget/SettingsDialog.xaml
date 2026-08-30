@@ -49,7 +49,7 @@
         <TextBlock Text="Secure Markdown" FontWeight="SemiBold" Margin="0,0,0,6" />
         <CheckBox x:Name="ShowEncryptedCheck" Content="Show encrypted documents (*.mdenc) in the Open dialog" />
         <TextBlock Style="{StaticResource Caption}"
-                   Text="Off by default: File ▸ Open lists only regular markdown. Encrypted documents always open via double-click, Open Recent, or by typing the name." />
+                   Text="Off by default: File ▸ Open lists only regular markdown. Encrypted documents always open via Open Recent, a typed name, or double-click once the app is registered." />
 
         <Separator Margin="0,14,0,12" />
 

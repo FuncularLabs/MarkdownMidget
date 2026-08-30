@@ -18,8 +18,10 @@ internal static class RegistrationService
     // Stable ProgID: re-registering overwrites the same key, so we can't
     // accidentally create duplicate "MarkdownMidget" entries in Open With.
     private const string ProgId = "MarkdownMidget.Document";
+    private const string SecureProgId = "MarkdownMidget.SecureDocument";
     private const string DisplayName = "Markdown Midget";
     private const string DocTypeName = "Markdown Document";
+    private const string SecureDocTypeName = "Markdown Midget Encrypted Document";
     private const string ExeCanonicalName = "MarkdownMidget.exe";
     private const string ShortcutLinkName = "Markdown Midget.lnk";
     private const string InstallInfoName = "install-info.json";
@@ -97,7 +99,10 @@ internal static class RegistrationService
         {
             appsKey.SetValue("FriendlyAppName", DisplayName);
             using (var supported = appsKey.CreateSubKey("SupportedTypes")!)
+            {
                 supported.SetValue(".md", string.Empty);
+                supported.SetValue(".mdenc", string.Empty);
+            }
             using (var cmd = appsKey.CreateSubKey(@"shell\open\command")!)
                 cmd.SetValue(string.Empty, $"\"{exePath}\" \"%1\"");
             using (var icon = appsKey.CreateSubKey("DefaultIcon")!)
@@ -109,6 +114,30 @@ internal static class RegistrationService
         using (var pids = mdKey.CreateSubKey("OpenWithProgids")!)
         {
             pids.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+        }
+
+        // Secure Markdown (.mdenc) rides the same registration: its own ProgID so
+        // Explorer names the type honestly, same open command. Registered here
+        // rather than opt-in because nothing else on the system can open one, and
+        // the docs promise double-click works.
+        using (var progKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\" + SecureProgId)!)
+        {
+            progKey.SetValue(string.Empty, SecureDocTypeName);
+            progKey.SetValue("FriendlyTypeName", SecureDocTypeName);
+            using (var icon = progKey.CreateSubKey("DefaultIcon")!)
+                icon.SetValue(string.Empty, $"\"{exePath}\",0");
+            using (var open = progKey.CreateSubKey(@"shell\open"))
+                open!.SetValue("FriendlyAppName", DisplayName);
+            using (var cmd = progKey.CreateSubKey(@"shell\open\command")!)
+                cmd.SetValue(string.Empty, $"\"{exePath}\" \"%1\"");
+        }
+        using (var encKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\.mdenc")!)
+        {
+            // .mdenc has no other claimants, so the ProgID can be the default
+            // handler outright - no Default-apps ceremony needed for double-click.
+            encKey.SetValue(string.Empty, SecureProgId);
+            using var pids = encKey.CreateSubKey("OpenWithProgids")!;
+            pids.SetValue(SecureProgId, Array.Empty<byte>(), RegistryValueKind.None);
         }
 
         // The Windows 11 "Default apps" page builds its list of choosable apps from
@@ -125,6 +154,7 @@ internal static class RegistrationService
             using var assoc = caps.CreateSubKey("FileAssociations")!;
             assoc.SetValue(".md", ProgId);
             assoc.SetValue(".markdown", ProgId);
+            assoc.SetValue(".mdenc", SecureProgId);
         }
         using (var registered = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications")!)
         {
@@ -152,6 +182,21 @@ internal static class RegistrationService
         }
         catch { }
         try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Funcular Labs\Markdown Midget", throwOnMissingSubKey: false); } catch { }
+
+        // Remove the Secure Markdown registration.
+        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\" + SecureProgId, throwOnMissingSubKey: false); } catch { }
+        try
+        {
+            using var encKey = Registry.CurrentUser.OpenSubKey(@"Software\Classes\.mdenc", writable: true);
+            if (encKey is not null)
+            {
+                if (encKey.GetValue(string.Empty) as string == SecureProgId)
+                    encKey.SetValue(string.Empty, string.Empty);
+                using var pids = encKey.OpenSubKey("OpenWithProgids", writable: true);
+                pids?.DeleteValue(SecureProgId, throwOnMissingValue: false);
+            }
+        }
+        catch { }
 
         // Remove our ProgID from .md OpenWithProgids.
         try
@@ -182,7 +227,7 @@ internal static class RegistrationService
         // .markdown in the Default-apps Capabilities, so its per-user FileExts
         // state needs exactly the cleanup .md gets - one loop, so the two can
         // never drift apart again.
-        foreach (var ext in new[] { ".md", ".markdown" })
+        foreach (var ext in new[] { ".md", ".markdown", ".mdenc" })
         {
 
             // 1) Explorer-controlled per-user MRU of app EXE FILENAMES.
@@ -227,7 +272,8 @@ internal static class RegistrationService
                     {
                         // If it's our ProgID and we're registering, leave it alone (we'll add
                         // it back below). If we're unregistering, drop it.
-                        if (string.Equals(name, ProgId, StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(name, ProgId, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(name, SecureProgId, StringComparison.OrdinalIgnoreCase))
                         {
                             if (!keepOurProgId) try { mruPids.DeleteValue(name); } catch { }
                             continue;
@@ -255,12 +301,14 @@ internal static class RegistrationService
                     var pid = uc.GetValue("ProgId") as string ?? string.Empty;
                     if (pid.StartsWith(@"Applications\MarkdownMidget", StringComparison.OrdinalIgnoreCase)
                         || pid.StartsWith(@"Applications\mkm", StringComparison.OrdinalIgnoreCase)
-                        || (LooksLikeUs(pid) && !string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase))
+                        || (LooksLikeUs(pid) && !string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase)
+                                          && !string.Equals(pid, SecureProgId, StringComparison.OrdinalIgnoreCase))
                         // On UNregister the current ProgID is about to be deleted, so a
                         // per-user default pointing at it must go too, or Explorer is
                         // left resolving .md/.markdown through a ProgID that no longer
                         // exists. On register it stays: it is a valid choice of us.
-                        || (!keepOurProgId && string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase)))
+                        || (!keepOurProgId && (string.Equals(pid, ProgId, StringComparison.OrdinalIgnoreCase)
+                                            || string.Equals(pid, SecureProgId, StringComparison.OrdinalIgnoreCase))))
                     {
                         Registry.CurrentUser.DeleteSubKey(
                             @$"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice",

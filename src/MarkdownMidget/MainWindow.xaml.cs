@@ -182,7 +182,15 @@ public partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(userData);
-            var env = await CoreWebView2Environment.CreateAsync(null, userData);
+            // The renderer holds decrypted Secure Markdown content; a renderer
+            // crash must not serialize it into a Crashpad minidump under the
+            // profile folder. (The per-launch profile is best-effort deleted on a
+            // LATER launch, so a dump could otherwise linger on disk.)
+            var envOptions = new CoreWebView2EnvironmentOptions
+            {
+                AdditionalBrowserArguments = "--disable-crash-reporter",
+            };
+            var env = await CoreWebView2Environment.CreateAsync(null, userData, envOptions);
             await Web.EnsureCoreWebView2Async(env);
         }
         catch (Exception ex)
@@ -1740,6 +1748,16 @@ public partial class MainWindow : Window
             // don't scan, or this window would race the parent for the others.
             if (_recoverSessionId is { } wanted)
             {
+                // Claim before recovering, exactly like the scan path: an encrypted
+                // orphan's password prompt can sit open indefinitely, and without
+                // the claim a later launch's scan would recover the same snapshot a
+                // second time. The parent that spawned us may still hold the claim
+                // for a moment - wait it out briefly rather than giving up.
+                IDisposable? idClaim = null;
+                for (var i = 0; i < 20 && (idClaim = _backup.BeginRecovery()) is null; i++)
+                    await Task.Delay(250);
+                if (idClaim is null) return;   // orphan stays on disk for a later launch
+                using var _ = idClaim;
                 if (_backup.FindOrphan(wanted) is { } target)
                     await LoadRecoveredAsync(target.Meta, target.Markdown);
                 else if (_backup.FindEncryptedOrphan(wanted) is { } encTarget)
@@ -1752,7 +1770,11 @@ public partial class MainWindow : Window
             if (claim is null) return;
 
             var orphans = _backup.FindOrphans();
-            if (orphans.Count == 0) return;
+            // NO early return on an empty plaintext list: encrypted orphans are
+            // enumerated separately below, and a crashed session holding ONLY an
+            // encrypted document - the headline scenario - produces exactly zero
+            // plaintext orphans. Returning here starved that pass entirely
+            // (taxonomy 14: the early return that starves a downstream sweep).
 
             // "Free" means this window holds nothing the user would miss — the splash,
             // or the empty document the blank-doc setting lands on. Recovery must
@@ -1765,6 +1787,9 @@ public partial class MainWindow : Window
             // it just waits for a launch that didn't ask to be guaranteed blank.
             var free = !_forceBlankDocument
                 && _currentPath is null && !_dirty && string.IsNullOrEmpty(_cleanMarkdown);
+            var hostFreeForEncrypted = free;
+            if (orphans.Count > 0)
+            {
             var plan = Backup.RecoveryPlan.Decide([.. orphans.Select(o => o.Meta)], free);
             var byId = orphans.ToDictionary(o => o.Meta.SessionId, o => o.Markdown);
 
@@ -1802,7 +1827,7 @@ public partial class MainWindow : Window
             var encOrphans = _backup.FindEncryptedOrphans();
             if (encOrphans.Count > 0)
             {
-                var hostHere = plan.Here is null && free;
+                var hostHere = hostFreeForEncrypted;
                 foreach (var (encMeta, container) in encOrphans)
                 {
                     if (hostHere)
@@ -1826,6 +1851,8 @@ public partial class MainWindow : Window
             // again — but the user should hear it now, not discover it never happened.
             ReportAbandoned(plan.GivenUp, plan.Elsewhere.Count - opened);
             foreach (var abandoned in plan.GivenUp) _backup.MarkGiveUpReported(abandoned);
+            hostFreeForEncrypted = plan.Here is null && free;
+            }
         }
         catch { /* recovery is a bonus; never let it stop the app starting */ }
     }
@@ -1869,10 +1896,27 @@ public partial class MainWindow : Window
         string? error = null;
         while (true)
         {
-            var pw = PasswordDialog.Enter(this, "Recover Encrypted Document",
+            var (pw, discard) = PasswordDialog.EnterForRecovery(this, "Recover Encrypted Document",
                 $"A previous session left unsaved changes to the encrypted document " +
                 $"{meta.Describe()}. Enter its password to recover them. " +
                 "Cancel keeps the copy for a later launch.", error);
+            if (discard)
+            {
+                // The exit for a password that is genuinely lost - without it the
+                // only escape from this prompt-on-every-launch is deleting files
+                // under %LocalAppData% by hand. Destruction stays a two-step,
+                // spelled-out choice.
+                if (MessageBox.Show(this,
+                        $"Permanently delete the unsaved encrypted copy of {meta.Describe()}? " +
+                        "Without its password it can never be read, and this cannot be undone.",
+                        "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                    == MessageBoxResult.Yes)
+                {
+                    _backup.Purge(meta.SessionId);
+                    return;
+                }
+                continue;
+            }
             if (pw is null) return;   // snapshot stays on disk, untouched
             string text;
             try
@@ -2168,7 +2212,16 @@ public partial class MainWindow : Window
             // our stable read (or a mid-pass save rewrote it), newContent is stale —
             // reload nothing, and let the recheck run against the current state.
             string? confirm;
-            try { confirm = await File.ReadAllTextAsync(path); }
+            try
+            {
+                // Same decode the ORIGINAL read used: an encrypted document
+                // compares decrypted text. Reading the container as text here
+                // compared ciphertext against plaintext - never equal - and spun
+                // reload/recheck (one full KDF per lap) forever.
+                confirm = _docEncrypted && _docPassword is { } confirmPw
+                    ? await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(File.ReadAllBytes(path), confirmPw))
+                    : await File.ReadAllTextAsync(path);
+            }
             catch { RecheckExternalChange(path); return; }
             if (!PassValid() || !string.Equals(confirm, newContent, StringComparison.Ordinal))
             {
@@ -2180,8 +2233,16 @@ public partial class MainWindow : Window
         }
 
         // Save the current (possibly unsaved) in-memory version as a timestamped backup.
+        // For an encrypted document the backup is SEALED with the same password -
+        // writing the decrypted text beside the file would be a silent plaintext
+        // leak of exactly the content the user protected (design 7b).
         string backupPath;
-        try { backupPath = WriteTimestampedBackup(path, inMemory); }
+        try
+        {
+            backupPath = _docEncrypted && _docPassword is { } bakPw
+                ? await Task.Run(() => WriteTimestampedEncryptedBackup(path, inMemory, bakPw))
+                : WriteTimestampedBackup(path, inMemory);
+        }
         catch (Exception ex)
         {
             MessageBox.Show($"Couldn't write a backup of your current version:\n{ex.Message}\n\nThe disk version was NOT reloaded.",
@@ -2196,7 +2257,8 @@ public partial class MainWindow : Window
         switch (dlg.Choice)
         {
             case ExternalChangeChoice.Reload:
-                await LoadDocumentAsync(newContent, path);
+                // Same password-preservation as ReloadPreservingPositionAsync.
+                await LoadDocumentAsync(newContent, path, _docEncrypted ? _docPassword : null);
                 break;
             case ExternalChangeChoice.SaveAs:
                 await HandleSaveAsAfterExternalChangeAsync(inMemory, newContent, backupPath);
@@ -2297,7 +2359,10 @@ public partial class MainWindow : Window
     {
         var anchor = await CaptureAnchorAsync();
         if (!stillValid()) { RecheckExternalChange(path); return; }
-        await LoadDocumentAsync(newContent, path);
+        // Keep the encryption state through the reload: dropping the password here
+        // demoted the window to plaintext while _currentPath stayed the .mdenc, and
+        // the next silent Ctrl+S would have written DECRYPTED text into it.
+        await LoadDocumentAsync(newContent, path, _docEncrypted ? _docPassword : null);
         await RestoreAnchorAsync(anchor);
         FlashStatus("Reloaded — file changed on disk");
     }
@@ -2352,7 +2417,7 @@ public partial class MainWindow : Window
         await RunEditorAsync($"window.MDM.restoreScrollAnchor({json})");
     }
 
-    private static string WriteTimestampedBackup(string originalPath, string content)
+    private static string TimestampedBakPath(string originalPath)
     {
         var dir = Path.GetDirectoryName(originalPath) ?? ".";
         var name = Path.GetFileNameWithoutExtension(originalPath);
@@ -2362,7 +2427,22 @@ public partial class MainWindow : Window
         // Highly unlikely collision (same second) — append milliseconds.
         if (File.Exists(path))
             path = Path.Combine(dir, $"{name}.{stamp}-{DateTime.Now.Millisecond:D3}{ext}.bak");
+        return path;
+    }
+
+    private static string WriteTimestampedBackup(string originalPath, string content)
+    {
+        var path = TimestampedBakPath(originalPath);
         File.WriteAllText(path, content);
+        return path;
+    }
+
+    /// <summary>The encrypted flavour: same naming, sealed contents (full KDF -
+    /// rare path, correctness over speed).</summary>
+    private static string WriteTimestampedEncryptedBackup(string originalPath, string content, string password)
+    {
+        var path = TimestampedBakPath(originalPath);
+        File.WriteAllBytes(path, Secure.SecureMarkdownFormat.Encrypt(content, password));
         return path;
     }
 
@@ -2376,7 +2456,9 @@ public partial class MainWindow : Window
         var dlg = new SaveFileDialog
         {
             Title = "Save your current version as…",
-            Filter = "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
+            Filter = _docEncrypted
+                ? "Secure Markdown (*.mdenc)|*.mdenc|All files (*.*)|*.*"
+                : "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
             DefaultExt = ext.Length > 0 ? ext : ".md",
             InitialDirectory = dir,
             FileName = suggested,
@@ -2389,7 +2471,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        try { await File.WriteAllTextAsync(dlg.FileName, inMemory); }
+        try
+        {
+            // An encrypted document's "your version" stays encrypted - a plaintext
+            // file wearing the .mdenc name would be both a leak and a lie.
+            if (_docEncrypted && _docPassword is { } savePw)
+                await Task.Run(() => Secure.SecureMarkdownFile.Save(dlg.FileName, inMemory, savePw));
+            else
+                await File.WriteAllTextAsync(dlg.FileName, inMemory);
+        }
         catch (Exception ex)
         {
             MessageBox.Show($"Couldn't save:\n{ex.Message}", "Markdown Midget",

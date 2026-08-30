@@ -383,11 +383,16 @@ the file's protection IS that nobody can open it without the password,
 including us. Write it down somewhere safe.
 
 Worth knowing: the unsaved-changes crash copy of an encrypted document is
-itself encrypted (recovery asks for the password); File ▸ Open shows `.mdenc`
-files only if you turn that on in Edit ▸ Settings (they always open by
-double-click or Open Recent); and on an SSD, "the original is removed" means
-no accessible copy remains — not that a forensic lab could never find old
-blocks.
+itself encrypted (recovery asks for the password, and offers a spelled-out
+Discard for a copy whose password is lost); File ▸ Open shows `.mdenc` files
+only if you turn that on in Edit ▸ Settings — they always open via Open
+Recent or a typed name, and by double-click once you've run **File ▸ Windows
+Integration ▸ Register as .md editor…** (it registers the encrypted type
+too). On an SSD, "the original is removed" means no accessible copy remains —
+not that a forensic lab could never find old blocks. The editor's browser
+engine keeps its working files in a per-run folder cleaned up on a later
+launch, with its crash reporting disabled so decrypted content can't end up
+in a crash dump.
 
 **If something goes wrong:** unexpected errors are recorded in
 `%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll

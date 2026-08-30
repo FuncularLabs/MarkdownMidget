@@ -32,8 +32,17 @@ plaintext.
   §6; it helps on HDDs and is near-useless on SSDs — documented as such.)
 
 **Trust boundary.** The password never touches disk, never rides a relaunch argument,
-never enters a log or a crash dump we write, and is held only in a `SecureString` for the
-life of the window.
+never enters a log or a crash dump we write, and is held only in this window's memory for
+the life of the document.
+
+> **Deviation, decided at implementation (2026-08-30):** the plan originally said
+> `SecureString`. On modern .NET, `SecureString` no longer encrypts its contents and
+> Microsoft explicitly discourages it (DE0001); using it would be exactly the kind of
+> false promise §1 bans. The password is held as an ordinary string with the same
+> never-persisted rules; the WebView2 renderer additionally runs with
+> `--disable-crash-reporter` so decrypted content can't land in a Crashpad minidump, and
+> the timestamped external-change backup of an encrypted document is written SEALED with
+> the same password, closing the one §7b gap review found.
 
 ---
 

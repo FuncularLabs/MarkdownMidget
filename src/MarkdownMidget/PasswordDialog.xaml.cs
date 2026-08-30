@@ -56,6 +56,37 @@ public partial class PasswordDialog : Window
         return dlg.ShowDialog() == true ? dlg.Password : null;
     }
 
+    /// <summary>True when the user chose the recovery prompt's Discard option.
+    /// The caller owns the are-you-sure confirmation and the actual deletion.</summary>
+    public bool DiscardChosen { get; private set; }
+
+    /// <summary>The recovery flavour of Enter: adds a Discard button, because a
+    /// snapshot whose password is genuinely lost needs a way OUT that isn't
+    /// hand-deleting files under %LocalAppData% - or being prompted on every
+    /// launch forever.</summary>
+    public static (string? Password, bool Discard) EnterForRecovery(
+        Window owner, string title, string intro, string? error = null)
+    {
+        var dlg = new PasswordDialog(setMode: false) { Owner = owner, Title = title };
+        dlg.Intro.Text = intro;
+        dlg.DiscardButton.Visibility = Visibility.Visible;
+        if (error is not null)
+        {
+            dlg.ErrorBlock.Text = error;
+            dlg.ErrorBlock.Visibility = Visibility.Visible;
+        }
+        var ok = dlg.ShowDialog() == true;
+        if (dlg.DiscardChosen) return (null, true);
+        return (ok ? dlg.Password : null, false);
+    }
+
+    private void Discard_Click(object sender, RoutedEventArgs e)
+    {
+        DiscardChosen = true;
+        DialogResult = false;
+        Close();
+    }
+
     private void Box_Changed(object sender, RoutedEventArgs e)
     {
         if (_setMode)

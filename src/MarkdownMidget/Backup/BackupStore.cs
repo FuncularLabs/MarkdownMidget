@@ -256,9 +256,9 @@ internal sealed class BackupStore : IDisposable
                 if (meta is null) continue;
                 if (meta.Encrypted)
                 {
-                    // An encrypted snapshot needs its password to be worth
-                    // anything, and the prompt belongs to the recovery UI stage
-                    // that doesn't exist yet. Held back, NOT purged: purging
+                    // An encrypted snapshot needs its password, so it goes
+                    // through FindEncryptedOrphans and the password prompt, not
+                    // this plaintext flow. Held back here, NOT purged: purging
                     // here would silently destroy a crashed encrypted
                     // document's only remaining copy. The existence check must
                     // look at the .mdenc, or the "metadata without content"
