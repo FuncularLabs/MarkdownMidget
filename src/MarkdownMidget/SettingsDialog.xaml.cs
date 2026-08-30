@@ -23,6 +23,9 @@ public partial class SettingsDialog : Window
     /// <summary>Keep a crash copy of unsaved work.</summary>
     public bool KeepBackup { get; private set; }
 
+    /// <summary>Include *.mdenc in the Open dialog's Markdown filter.</summary>
+    public bool ShowEncryptedInOpen { get; private set; }
+
     // The dictionary import, supplied by MainWindow (which owns the SpellService and
     // the file-picking). Returns a human-readable result, or null when cancelled.
     // Runs immediately rather than on OK: it is an action with its own result to
@@ -31,6 +34,7 @@ public partial class SettingsDialog : Window
     private readonly System.Func<Window, string?>? _importDictionary;
 
     public SettingsDialog(bool startWithBlankDocument, int recentLimit, bool keepBackup,
+                          bool showEncryptedInOpen = false,
                           System.Func<Window, string?>? importDictionary = null)
     {
         InitializeComponent();
@@ -38,6 +42,8 @@ public partial class SettingsDialog : Window
         RecentLimit = recentLimit;
         KeepBackup = keepBackup;
         KeepBackupCheck.IsChecked = keepBackup;
+        ShowEncryptedInOpen = showEncryptedInOpen;
+        ShowEncryptedCheck.IsChecked = showEncryptedInOpen;
         StartBlankRadio.IsChecked = startWithBlankDocument;
         StartSplashRadio.IsChecked = !startWithBlankDocument;
         RecentLimitBox.Text = recentLimit.ToString();
@@ -73,6 +79,7 @@ public partial class SettingsDialog : Window
         RecentLimit = limit;
         StartWithBlankDocument = StartBlankRadio.IsChecked == true;
         KeepBackup = KeepBackupCheck.IsChecked == true;
+        ShowEncryptedInOpen = ShowEncryptedCheck.IsChecked == true;
         DialogResult = true;
     }
 }

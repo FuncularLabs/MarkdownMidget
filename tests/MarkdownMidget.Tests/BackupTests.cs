@@ -169,6 +169,65 @@ public class BackupStoreTests : IDisposable
     }
 
     [Fact]
+    public void EncryptedOrphans_AreEnumerableWithTheirContainers()
+    {
+        // What the recovery flow consumes: metadata plus the SEALED bytes -
+        // never plaintext through this API.
+        var crashed = New("encenum");
+        crashed.Start();
+        crashed.SaveEncrypted(Sealed("locked work"), @"C:\docs\w.mdenc", null);
+        crashed.Dispose();
+
+        var next = New("next");
+        next.Start();
+        var (meta, container) = Assert.Single(next.FindEncryptedOrphans());
+        Assert.Equal("encenum", meta.SessionId);
+        Assert.True(meta.Encrypted);
+        Assert.Equal("locked work",
+            MarkdownMidget.Secure.SecureMarkdownFormat.Decrypt(container, "pw"));
+        // And by id, for a --recover child window.
+        Assert.NotNull(next.FindEncryptedOrphan("encenum"));
+        Assert.Null(next.FindEncryptedOrphan("nosuch"));
+    }
+
+    [Fact]
+    public void AdoptEncrypted_RehomesTheSealedBytesAndRemovesTheOrphan()
+    {
+        var crashed = New("encdonor");
+        crashed.Start();
+        crashed.SaveEncrypted(Sealed("adopt me"), @"C:\docs\w.mdenc", null);
+        crashed.Dispose();
+
+        var heir = New("heir");
+        heir.Start();
+        var (meta, container) = Assert.Single(heir.FindEncryptedOrphans());
+        Assert.True(heir.AdoptEncrypted(meta, container));
+
+        Assert.False(File.Exists(Path.Combine(_dir, "encdonor.mdenc")));   // donor gone
+        Assert.True(File.Exists(Path.Combine(_dir, "heir.mdenc")));        // re-homed sealed
+        Assert.Equal("adopt me", MarkdownMidget.Secure.SecureMarkdownFormat.Decrypt(
+            File.ReadAllBytes(Path.Combine(_dir, "heir.mdenc")), "pw"));
+        // A live adopted session is invisible to other scanners.
+        var other = New("other");
+        other.Start();
+        Assert.Empty(other.FindEncryptedOrphans());
+    }
+
+    [Fact]
+    public void ALiveEncryptedSession_IsInvisibleToTheEncryptedScan()
+    {
+        var live = New("enclive");
+        live.Start();
+        live.SaveEncrypted(Sealed("mine"), @"C:\docs\w.mdenc", null);
+
+        var other = New("other");
+        other.Start();
+        Assert.Empty(other.FindEncryptedOrphans());
+        live.Dispose();
+        Assert.Single(other.FindEncryptedOrphans());
+    }
+
+    [Fact]
     public void Discard_RemovesTheEncryptedSnapshotToo()
     {
         var store = New("disc");

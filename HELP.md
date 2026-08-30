@@ -368,6 +368,27 @@ you open the changelog from it.
 
 ## Updates
 
+## Secure Markdown (encrypted documents)
+
+**File ▸ Encrypt Document…** protects the open document with a password: it
+becomes a `.mdenc` file that nothing can read without the password, and the
+readable original is removed from disk (the encrypted file is written and
+verified first). Editing is unchanged afterwards — the title bar shows 🔒 and
+Save just works, no re-prompt. **Change Password…** and **Convert to
+Unencrypted…** live in the same menu. In Save As, picking the *Secure
+Markdown* type is the same as encrypting.
+
+**There is no password recovery.** Not a hidden one, not a support channel —
+the file's protection IS that nobody can open it without the password,
+including us. Write it down somewhere safe.
+
+Worth knowing: the unsaved-changes crash copy of an encrypted document is
+itself encrypted (recovery asks for the password); File ▸ Open shows `.mdenc`
+files only if you turn that on in Edit ▸ Settings (they always open by
+double-click or Open Recent); and on an SSD, "the original is removed" means
+no accessible copy remains — not that a forensic lab could never find old
+blocks.
+
 **If something goes wrong:** unexpected errors are recorded in
 `%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll
 get a dialog pointing at that file instead. When reporting a problem, that file is

@@ -47,6 +47,19 @@ public partial class MainWindow : Window
     private bool _suppressDirty;
     private string? _pendingOpenPath;
 
+    // ===== Secure Markdown document state =====
+    // The password lives only in this window's memory for the life of the
+    // document (design 7c/7e: never on disk, never on a relaunch command line).
+    // _docEncrypted implies _currentPath is a .mdenc the password opens.
+    private bool _docEncrypted;
+    private string? _docPassword;
+    // The crash-backup session key: the full KDF paid once per (window,password),
+    // then every 5-second snapshot is AES-only. Cleared whenever the password
+    // changes or the document stops being encrypted.
+    private byte[]? _backupKey;
+    private byte[]? _backupSalt;
+    private bool _showEncryptedInOpen;
+
     private readonly List<string> _recentFiles = new();
     private string _pageWidth = "landscape"; // portrait | landscape | full (persisted)
     private bool _startReadOnly;
@@ -698,7 +711,7 @@ public partial class MainWindow : Window
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit, _backupEnabled,
-                                     ImportCustomDic) { Owner = this };
+                                     _showEncryptedInOpen, ImportCustomDic) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         _startWithBlankDocument = dlg.StartWithBlankDocument;
         if (dlg.KeepBackup != _backupEnabled)
@@ -710,6 +723,7 @@ public partial class MainWindow : Window
             if (_backupEnabled) { StartBackup(); _backupDirty = true; }
             else EndBackup();
         }
+        _showEncryptedInOpen = dlg.ShowEncryptedInOpen;
         if (dlg.RecentLimit != _recentLimit)
         {
             // Only the menu length changes. Lowering the limit must not delete
@@ -949,7 +963,7 @@ public partial class MainWindow : Window
         if (!await ConfirmDiscardAsync()) return;
         var dlg = new OpenFileDialog
         {
-            Filter = "Markdown (*.md;*.markdown)|*.md;*.markdown|Text (*.txt)|*.txt|All files (*.*)|*.*",
+            Filter = Secure.SecureUi.OpenFilter(_showEncryptedInOpen),
             DefaultExt = ".md",
         };
         if (dlg.ShowDialog(this) != true) return;
@@ -961,8 +975,50 @@ public partial class MainWindow : Window
         ShowBusy($"Opening {Path.GetFileName(path)}…");
         try
         {
-            var text = await File.ReadAllTextAsync(path);
-            await LoadDocumentAsync(text, path);
+            // Bytes first, then sniff: encryption is detected by CONTENT, not
+            // extension, so a .mdenc renamed to .md still prompts instead of
+            // filling the editor with ciphertext. This method is the single
+            // chokepoint for the Open dialog, file association, command line,
+            // Open Recent and multi-file drops - the password prompt therefore
+            // covers every one of those entry points at once.
+            var bytes = await File.ReadAllBytesAsync(path);
+            if (Secure.SecureMarkdownFormat.LooksLikeContainer(bytes))
+            {
+                HideBusy();   // the prompt shouldn't sit under a busy overlay
+                string? error = null;
+                while (true)
+                {
+                    var pw = PasswordDialog.Enter(this, "Encrypted Document",
+                        $"{Path.GetFileName(path)} is password-protected. Enter its password to open it.",
+                        error);
+                    if (pw is null) return;   // cancelled: nothing opened, nothing changed
+                    try
+                    {
+                        // Task.Run: the KDF is deliberately ~half a second of work.
+                        var text = await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(bytes, pw));
+                        ShowBusy($"Opening {Path.GetFileName(path)}…");
+                        await LoadDocumentAsync(text, path, pw);
+                        break;
+                    }
+                    catch (Secure.SecureMarkdownException ex)
+                        when (ex.Error == Secure.SecureMarkdownError.WrongPasswordOrCorrupt)
+                    {
+                        error = "Incorrect password, or the file has been damaged.";
+                    }
+                    catch (Secure.SecureMarkdownException ex)
+                    {
+                        MessageBox.Show(this, ex.Message, "Markdown Midget",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                // Same BOM-detecting decode File.ReadAllTextAsync used before.
+                using var reader = new StreamReader(new MemoryStream(bytes));
+                await LoadDocumentAsync(await reader.ReadToEndAsync(), path);
+            }
             AddRecent(path);
             await FocusDocumentAsync();   // same reason as New: don't eat the first keystroke
         }
@@ -974,8 +1030,10 @@ public partial class MainWindow : Window
         finally { HideBusy(); }
     }
 
-    /// <summary>Loads markdown into the editor and resets the clean baseline + history.</summary>
-    private async Task LoadDocumentAsync(string markdown, string? path)
+    /// <summary>Loads markdown into the editor and resets the clean baseline + history.
+    /// <paramref name="password"/> is non-null exactly when the document came out of a
+    /// .mdenc container; every other load clears the window's encryption state.</summary>
+    private async Task LoadDocumentAsync(string markdown, string? path, string? password = null)
     {
         // try/finally, because the awaits below reach into the editor and throw
         // outright when the WebView2 has died. A _suppressDirty left stuck true stops
@@ -998,6 +1056,9 @@ public partial class MainWindow : Window
             await ApplyDocBaseAsync(path);            // resolve relative images first
             await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
             _currentPath = path;
+            _docEncrypted = password is not null;
+            _docPassword = password;
+            ClearBackupKey();   // the old document's cached backup key must not outlive it
             _displayName = null;
         }
         finally { _suppressDirty = false; }
@@ -1217,12 +1278,17 @@ public partial class MainWindow : Window
         if (_readOnly && !forcePrompt) return false;
 
         var path = _currentPath;
+        var wantEncrypted = _docEncrypted;
+        string? newPassword = null;   // set when THIS save establishes encryption
         if (forcePrompt || path is null)
         {
             var dlg = new SaveFileDialog
             {
-                Filter = "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
-                DefaultExt = ".md",
+                // Secure Markdown in the type dropdown is the design's second path
+                // to encryption - equivalent to File > Encrypt Document.
+                Filter = Secure.SecureUi.SaveFilter,
+                DefaultExt = _docEncrypted ? Secure.SecureMarkdownFormat.Extension : ".md",
+                FilterIndex = _docEncrypted ? Secure.SecureUi.SaveFilterEncryptedIndex : 1,
                 // Dropped content already has a sensible name; offer it rather than
                 // making the user retype it. Through GetFileName even so — it reaches
                 // us from the browser and, after a recovery, from a file on disk.
@@ -1231,6 +1297,22 @@ public partial class MainWindow : Window
             };
             if (dlg.ShowDialog(this) != true) return false;
             path = dlg.FileName;
+            wantEncrypted = Secure.SecureUi.IsEncryptedPath(path);
+            if (wantEncrypted && !_docEncrypted)
+            {
+                newPassword = PasswordDialog.Set(this, "Encrypt Document",
+                    $"Choose a password for {Path.GetFileName(path)}.");
+                if (newPassword is null) return false;
+            }
+            else if (!wantEncrypted && _docEncrypted)
+            {
+                // Design section 8: the user must not stumble into a readable copy.
+                if (MessageBox.Show(this,
+                        "This writes a readable copy with no password. Anyone with the " +
+                        "file can read it. The encrypted file stays where it is.\n\nContinue?",
+                        "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                    != MessageBoxResult.Yes) return false;
+            }
         }
 
         // TryGet, not Get. Get reports "the editor didn't answer" as an empty
@@ -1251,17 +1333,28 @@ public partial class MainWindow : Window
         _suppressWatcher = true;
         try
         {
-            // Flushed to the device, not just handed to the cache: the crash copy is
-            // deleted a few lines below on the strength of this write having happened.
-            // Losing power inside the write-back window would otherwise leave the
-            // classic zero-length file AND no backup — the exact case this feature is
-            // for. A few milliseconds per save is a fair price.
-            await using var file = new FileStream(path, FileMode.Create, FileAccess.Write,
-                FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);
-            await using var writer = new StreamWriter(file);
-            await writer.WriteAsync(markdown);
-            await writer.FlushAsync();
-            file.Flush(flushToDisk: true);
+            if (wantEncrypted)
+            {
+                var pw = newPassword ?? _docPassword
+                    ?? throw new InvalidOperationException("encrypted save without a password");
+                // Transactional with read-back decrypt-verify; the KDF makes this
+                // ~half a second of real work, so off the UI thread.
+                await Task.Run(() => Secure.SecureMarkdownFile.Save(path, markdown, pw));
+            }
+            else
+            {
+                // Flushed to the device, not just handed to the cache: the crash copy is
+                // deleted a few lines below on the strength of this write having happened.
+                // Losing power inside the write-back window would otherwise leave the
+                // classic zero-length file AND no backup — the exact case this feature is
+                // for. A few milliseconds per save is a fair price.
+                await using var file = new FileStream(path, FileMode.Create, FileAccess.Write,
+                    FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);
+                await using var writer = new StreamWriter(file);
+                await writer.WriteAsync(markdown);
+                await writer.FlushAsync();
+                file.Flush(flushToDisk: true);
+            }
         }
         catch (Exception ex)
         {
@@ -1274,6 +1367,12 @@ public partial class MainWindow : Window
         _ = Dispatcher.BeginInvoke(new Action(() => _suppressWatcher = false), DispatcherPriority.Background);
         var pathChanged = !string.Equals(_currentPath, path, StringComparison.OrdinalIgnoreCase);
         _currentPath = path;
+        // Format transition bookkeeping. Saving an encrypted doc as plaintext makes
+        // THIS WINDOW a plaintext editor of the new file (the .mdenc on disk keeps
+        // its own life); saving plaintext as .mdenc adopts the just-set password.
+        _docEncrypted = wantEncrypted;
+        if (newPassword is not null) { _docPassword = newPassword; ClearBackupKey(); }
+        else if (!wantEncrypted && _docPassword is not null) { _docPassword = null; ClearBackupKey(); }
         _cleanMarkdown = markdown; // new clean baseline; undo history is left intact
         _dirty = false;
         UpdateTitle();
@@ -1283,6 +1382,223 @@ public partial class MainWindow : Window
         DiscardBackup();   // it's on disk now; the crash copy has nothing left to protect
         return true;
     }
+
+    // ===== Secure Markdown operations =====
+
+    private void ClearBackupKey()
+    {
+        if (_backupKey is not null) System.Security.Cryptography.CryptographicOperations.ZeroMemory(_backupKey);
+        _backupKey = null;
+        _backupSalt = null;
+    }
+
+    private async void Encrypt_Click(object sender, RoutedEventArgs e)
+    {
+        if (_readOnly || _isHelpWindow || _closed || _docEncrypted) return;
+        var markdown = await TryGetDocumentMarkdownAsync();
+        if (markdown is null) { ReportEditorUnavailable(); return; }
+
+        // Where the encrypted file goes: beside the original for a saved document,
+        // or wherever the user picks for an untitled one.
+        string target;
+        var original = _currentPath;
+        if (original is not null)
+        {
+            target = Secure.SecureUi.EncryptedPathFor(original);
+            if (File.Exists(target) && MessageBox.Show(this,
+                    $"{Path.GetFileName(target)} already exists. Replace it?",
+                    "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                != MessageBoxResult.Yes) return;
+        }
+        else
+        {
+            var dlg = new SaveFileDialog
+            {
+                Filter = "Secure Markdown (*.mdenc)|*.mdenc",
+                DefaultExt = Secure.SecureMarkdownFormat.Extension,
+                FileName = _displayName is null ? "Untitled.mdenc"
+                         : Path.ChangeExtension(Path.GetFileName(_displayName), Secure.SecureMarkdownFormat.Extension),
+            };
+            if (dlg.ShowDialog(this) != true) return;
+            target = dlg.FileName;
+        }
+
+        var pw = PasswordDialog.Set(this, "Encrypt Document",
+            $"Choose a password for {Path.GetFileName(target)}.",
+            original is not null ? "The unencrypted copy will be removed from disk." : null);
+        if (pw is null) return;
+
+        StopWatching();
+        _suppressWatcher = true;
+        try
+        {
+            await Task.Run(() => Secure.SecureMarkdownFile.Save(target, markdown, pw));
+        }
+        catch (Exception ex)
+        {
+            _suppressWatcher = false;
+            if (original is not null) StartWatching(original);
+            MessageBox.Show(this, $"Couldn't encrypt the document:\n{ex.Message}",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        // The encrypted file is written AND verified — only now may the plaintext
+        // original go. Best-effort scrub first: helps on spinning disks, does
+        // little on SSDs, and the honest promise is only "no ACCESSIBLE copy".
+        if (original is not null && !string.Equals(original, target, StringComparison.OrdinalIgnoreCase))
+            RemovePlaintextOriginal(original);
+
+        _currentPath = target;
+        _docEncrypted = true;
+        _docPassword = pw;
+        ClearBackupKey();
+        _cleanMarkdown = markdown;
+        _dirty = false;
+        UpdateTitle();
+        StartWatching(target);
+        SetClosed(false);
+        AddRecent(target);
+        DiscardBackup();   // takes the pre-encryption plaintext snapshot with it
+        _ = Dispatcher.BeginInvoke(new Action(() => _suppressWatcher = false), DispatcherPriority.Background);
+        FlashStatus("Encrypted. There is no password recovery — keep it safe");
+    }
+
+    private async void ChangePassword_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_docEncrypted || _docPassword is null || _currentPath is null || _readOnly) return;
+        var markdown = await TryGetDocumentMarkdownAsync();
+        if (markdown is null) { ReportEditorUnavailable(); return; }
+        var pw = PasswordDialog.Set(this, "Change Password",
+            $"Choose a new password for {Path.GetFileName(_currentPath)}. " +
+            "The document is saved immediately with the new password.");
+        if (pw is null) return;
+        _suppressWatcher = true;
+        try
+        {
+            await Task.Run(() => Secure.SecureMarkdownFile.Save(_currentPath, markdown, pw));
+        }
+        catch (Exception ex)
+        {
+            _suppressWatcher = false;
+            MessageBox.Show(this, $"Couldn't change the password:\n{ex.Message}\n\nThe old password still applies.",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _docPassword = pw;
+        ClearBackupKey();
+        _cleanMarkdown = markdown;
+        _dirty = false;
+        UpdateTitle();
+        DiscardBackup();
+        _ = Dispatcher.BeginInvoke(new Action(() => _suppressWatcher = false), DispatcherPriority.Background);
+        FlashStatus("Password changed and document saved");
+    }
+
+    private async void ConvertPlain_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_docEncrypted || _currentPath is null || _readOnly) return;
+        if (MessageBox.Show(this,
+                "This writes a readable copy with no password. Anyone with the file can " +
+                "read it. The encrypted file is removed.\n\nContinue?",
+                "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+            != MessageBoxResult.Yes) return;
+        var markdown = await TryGetDocumentMarkdownAsync();
+        if (markdown is null) { ReportEditorUnavailable(); return; }
+
+        var encryptedOriginal = _currentPath;
+        var target = Secure.SecureUi.PlaintextPathFor(encryptedOriginal);
+        if (File.Exists(target) && MessageBox.Show(this,
+                $"{Path.GetFileName(target)} already exists. Replace it?",
+                "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+            != MessageBoxResult.Yes) return;
+
+        StopWatching();
+        _suppressWatcher = true;
+        try
+        {
+            await using var file = new FileStream(target, FileMode.Create, FileAccess.Write,
+                FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);
+            await using var writer = new StreamWriter(file);
+            await writer.WriteAsync(markdown);
+            await writer.FlushAsync();
+            file.Flush(flushToDisk: true);
+        }
+        catch (Exception ex)
+        {
+            _suppressWatcher = false;
+            StartWatching(encryptedOriginal);
+            MessageBox.Show(this, $"Couldn't convert the document:\n{ex.Message}",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        // Plaintext written and flushed; the ciphertext original can go (no scrub
+        // needed — it never held readable content).
+        try { File.Delete(encryptedOriginal); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"The readable copy was written, but the encrypted file couldn't be removed:\n" +
+                $"{encryptedOriginal}\n{ex.Message}",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        _currentPath = target;
+        _docEncrypted = false;
+        _docPassword = null;
+        ClearBackupKey();
+        _cleanMarkdown = markdown;
+        _dirty = false;
+        UpdateTitle();
+        StartWatching(target);
+        AddRecent(target);
+        DiscardBackup();
+        _ = Dispatcher.BeginInvoke(new Action(() => _suppressWatcher = false), DispatcherPriority.Background);
+        FlashStatus("Converted to a regular markdown file");
+    }
+
+    /// <summary>
+    /// Retire the plaintext original after File > Encrypt. One pass of random
+    /// bytes before the delete: genuinely useful on spinning disks, mostly
+    /// theatre on SSDs with wear-levelling — which is why the UI promises only
+    /// that no ACCESSIBLE copy remains (design section 1). Failures degrade to a
+    /// plain delete, and a failed delete is reported rather than swallowed: a
+    /// readable copy silently left behind is the one outcome that must not be
+    /// silent.
+    /// </summary>
+    private void RemovePlaintextOriginal(string path)
+    {
+        try
+        {
+            var length = new FileInfo(path).Length;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None))
+            {
+                var noise = System.Security.Cryptography.RandomNumberGenerator.GetBytes(
+                    (int)Math.Min(length, 4 * 1024 * 1024));
+                long written = 0;
+                while (written < length)
+                {
+                    var chunk = (int)Math.Min(noise.Length, length - written);
+                    fs.Write(noise, 0, chunk);
+                    written += chunk;
+                }
+                fs.Flush(flushToDisk: true);
+            }
+        }
+        catch { /* scrub is best-effort; the delete below is the real promise */ }
+        try { File.Delete(path); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"The document was encrypted, but the readable original couldn't be removed:\n" +
+                $"{path}\n{ex.Message}\n\nDelete it by hand when whatever holds it lets go.",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ReportEditorUnavailable() => MessageBox.Show(this,
+        "Couldn't read the document from the editor, so nothing was changed. " +
+        "Try again, or restart the app.",
+        "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
 
     /// <summary>
     /// What the window shows when the editor comes up, and only then any crash
@@ -1378,7 +1694,33 @@ public partial class MainWindow : Window
             // Only unsaved content is worth keeping. If it matches what's on disk,
             // the file itself is the backup.
             if (string.Equals(markdown, _cleanMarkdown, StringComparison.Ordinal)) { DiscardBackup(); return; }
-            _backup.Save(markdown, _currentPath, _displayName);
+            if (_docEncrypted && _docPassword is { } pw)
+            {
+                // The snapshot of an encrypted document is itself encrypted
+                // (design 7a) — this tick must never be the plaintext leak of
+                // exactly the content the user chose to protect. Session key:
+                // the KDF runs once per (window, password), snapshots are then
+                // AES-only.
+                if (_backupKey is null || _backupSalt is null)
+                {
+                    var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+                    var key = await Task.Run(() => Secure.SecureMarkdownFormat.DeriveSessionKey(
+                        pw, salt, Secure.SecureMarkdownFormat.KdfProfile.Default));
+                    // The document may have changed during the derivation; the
+                    // cached key is still right (it's about the password, not the
+                    // content) but re-check the password didn't move underneath.
+                    if (!ReferenceEquals(_docPassword, pw)) { System.Security.Cryptography.CryptographicOperations.ZeroMemory(key); _backupDirty = true; return; }
+                    _backupKey = key;
+                    _backupSalt = salt;
+                }
+                var container = Secure.SecureMarkdownFormat.EncryptWithKey(
+                    markdown, _backupKey, _backupSalt, Secure.SecureMarkdownFormat.KdfProfile.Default);
+                _backup.SaveEncrypted(container, _currentPath, _displayName);
+            }
+            else
+            {
+                _backup.Save(markdown, _currentPath, _displayName);
+            }
         }
         catch { _backupDirty = true; }   // try again on the next tick
     }
@@ -1400,6 +1742,8 @@ public partial class MainWindow : Window
             {
                 if (_backup.FindOrphan(wanted) is { } target)
                     await LoadRecoveredAsync(target.Meta, target.Markdown);
+                else if (_backup.FindEncryptedOrphan(wanted) is { } encTarget)
+                    await RecoverEncryptedAsync(encTarget.Meta, encTarget.Container);
                 return;
             }
 
@@ -1448,6 +1792,32 @@ public partial class MainWindow : Window
                 FlashStatus($"Restoring {opened} unsaved document(s) from a previous session");
             }
 
+            // Encrypted orphans, after the plaintext plan is settled. The first one
+            // is prompted for HERE only when this window is still free; the rest go
+            // to their own windows via the same --recover spawn the plaintext flow
+            // uses (the child prompts). Attempts are counted the same way; the
+            // give-up bookkeeping stays with the plaintext plan for now — an
+            // encrypted snapshot the user keeps cancelling simply keeps waiting,
+            // which for content they password-protected beats quietly retiring it.
+            var encOrphans = _backup.FindEncryptedOrphans();
+            if (encOrphans.Count > 0)
+            {
+                var hostHere = plan.Here is null && free;
+                foreach (var (encMeta, container) in encOrphans)
+                {
+                    if (hostHere)
+                    {
+                        hostHere = false;
+                        _backup.RecordAttempt(encMeta);
+                        await RecoverEncryptedAsync(encMeta, container);
+                    }
+                    else if (OpenRecovered(encMeta))
+                    {
+                        _backup.RecordAttempt(encMeta);
+                    }
+                }
+            }
+
             // Last, and not as a flash. These are documents we are giving up on, so
             // the one message the user must not miss is the one that would otherwise
             // be overwritten four seconds later by the recovery notice above — or by
@@ -1487,6 +1857,61 @@ public partial class MainWindow : Window
     private static async Task<string> ReadFileOrEmptyAsync(string path)
     {
         try { return await File.ReadAllTextAsync(path); } catch { return string.Empty; }
+    }
+
+    /// <summary>
+    /// The encrypted flavour of LoadRecoveredAsync: prompt for the password
+    /// (retry on a miss, Cancel keeps the snapshot for a later launch), then
+    /// hand the window an ENCRYPTED document whose unsaved changes these are.
+    /// </summary>
+    private async Task RecoverEncryptedAsync(Backup.BackupSnapshot meta, byte[] container)
+    {
+        string? error = null;
+        while (true)
+        {
+            var pw = PasswordDialog.Enter(this, "Recover Encrypted Document",
+                $"A previous session left unsaved changes to the encrypted document " +
+                $"{meta.Describe()}. Enter its password to recover them. " +
+                "Cancel keeps the copy for a later launch.", error);
+            if (pw is null) return;   // snapshot stays on disk, untouched
+            string text;
+            try
+            {
+                text = await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(container, pw));
+            }
+            catch (Secure.SecureMarkdownException ex)
+                when (ex.Error == Secure.SecureMarkdownError.WrongPasswordOrCorrupt)
+            {
+                error = "Incorrect password, or the copy is damaged.";
+                continue;
+            }
+            catch (Secure.SecureMarkdownException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Markdown Midget",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            await LoadDocumentAsync(text, meta.Path, pw);
+            // The clean baseline is what the FILE decrypts to — recovered content
+            // is unsaved work on top of it. A file that is missing or no longer
+            // opens with this password baselines to empty, so everything reads as
+            // unsaved, which errs toward protecting it.
+            _cleanMarkdown = await ReadEncryptedCleanAsync(meta.Path, pw);
+            _displayName = meta.Path is null ? meta.DisplayName : null;
+            _dirty = !string.Equals(text, _cleanMarkdown, StringComparison.Ordinal);
+            UpdateTitle();
+            if (_backup?.AdoptEncrypted(meta, container) == false) _backupDirty = true;
+            FlashStatus($"Recovered unsaved changes to {meta.Describe()} — not yet saved");
+            await FocusDocumentAsync();
+            return;
+        }
+    }
+
+    private static async Task<string> ReadEncryptedCleanAsync(string? path, string password)
+    {
+        if (path is null || !File.Exists(path)) return string.Empty;
+        try { return Secure.SecureMarkdownFormat.Decrypt(await File.ReadAllBytesAsync(path), password); }
+        catch { return string.Empty; }
     }
 
     /// <summary>
@@ -1695,7 +2120,28 @@ public partial class MainWindow : Window
         // Don't read until the writer has stopped changing the file: a program that
         // truncates then streams lets a plain read succeed on half a document, and
         // the reload would then make that half document the new baseline.
-        var newContent = await ReadWhenStableAsync(path);
+        string? newContent;
+        if (_docEncrypted && _docPassword is { } docPw)
+        {
+            // An encrypted document compares DECRYPTED content — text-reading the
+            // container would "differ" every time and reload garbage. A file that
+            // stops opening with our password (re-encrypted elsewhere, or damaged)
+            // is reported, not reloaded: never replace the user's buffer with
+            // content we can't verify.
+            var bytes = await ReadBytesWhenStableAsync(path);
+            if (bytes is null) return;
+            try { newContent = Secure.SecureMarkdownFormat.Decrypt(bytes, docPw); }
+            catch (Secure.SecureMarkdownException)
+            {
+                if (!PassValid()) { RecheckExternalChange(path); return; }
+                FlashStatus("This file changed on disk and no longer opens with the current password — your copy is untouched");
+                return;
+            }
+        }
+        else
+        {
+            newContent = await ReadWhenStableAsync(path);
+        }
         if (newContent is null) return;
         // Re-assert identity + freshness after EVERY await: if the user opened another
         // document or saved while we waited, acting now would clobber it — and the
@@ -1774,6 +2220,28 @@ public partial class MainWindow : Window
     /// next Save would write it over the good file. So sample size+timestamp until two
     /// consecutive looks agree, and only then read.
     /// </summary>
+    private static async Task<byte[]?> ReadBytesWhenStableAsync(string path)
+    {
+        long lastLen = -1;
+        var lastWrite = DateTime.MinValue;
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                if (!fi.Exists) return null;
+                if (fi.Length == lastLen && fi.LastWriteTimeUtc == lastWrite)
+                    return await File.ReadAllBytesAsync(path);
+                lastLen = fi.Length;
+                lastWrite = fi.LastWriteTimeUtc;
+            }
+            catch (IOException) { /* locked mid-write — keep sampling */ }
+            catch { return null; }
+            await Task.Delay(80);
+        }
+        return null;   // same refusal as the text flavour below
+    }
+
     private static async Task<string?> ReadWhenStableAsync(string path)
     {
         long lastLen = -1;
@@ -2319,7 +2787,16 @@ public partial class MainWindow : Window
         BuildRecentMenu();
     }
 
-    private void FileMenu_Opened(object sender, RoutedEventArgs e) => BuildRecentMenu();
+    private void FileMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        BuildRecentMenu();
+        // Guard at the operation as well (each handler re-checks) — the menu state
+        // is UX, not the enforcement.
+        var editableDoc = !_readOnly && !_isHelpWindow && !_closed;
+        EncryptMenu.IsEnabled = editableDoc && !_docEncrypted;
+        ChangePasswordMenu.IsEnabled = editableDoc && _docEncrypted;
+        ConvertPlainMenu.IsEnabled = editableDoc && _docEncrypted && _currentPath is not null;
+    }
 
     // Built eagerly (not just on submenu-open) so an empty submenu still shows and
     // the list updates the moment a file is opened or saved.
@@ -2387,6 +2864,7 @@ public partial class MainWindow : Window
         public int RecentLimit { get; set; } = 10;   // entries kept in Open Recent
         public bool StartWithBlankDocument { get; set; } // else the no-document placeholder
         public bool KeepBackup { get; set; } = true;     // crash copy of unsaved work
+        public bool ShowEncryptedInOpen { get; set; }    // *.mdenc in the Open filter (opt-in)
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
         public string Theme { get; set; } = "";
@@ -2459,6 +2937,7 @@ public partial class MainWindow : Window
             _skipCodeSpell = s.SkipCodeSpellCheck;
             _wordWrap = s.WordWrap;
             _autoReload = s.AutoReload;
+            _showEncryptedInOpen = s.ShowEncryptedInOpen;
             _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
@@ -2623,6 +3102,7 @@ public partial class MainWindow : Window
         SkipCodeSpellCheck = _skipCodeSpell,
         WordWrap = _wordWrap,
         AutoReload = _autoReload,
+        ShowEncryptedInOpen = _showEncryptedInOpen,
         RecentLimit = _recentLimit,
         StartWithBlankDocument = _startWithBlankDocument,
         KeepBackup = _backupEnabled,
@@ -3026,6 +3506,18 @@ public partial class MainWindow : Window
     /// </summary>
     private async void HandleDroppedContent(string name, string content)
     {
+        // The drop path reads files as TEXT in the browser, which mangles binary
+        // containers — and the sniff still works because the magic is ASCII. Refuse
+        // with directions rather than corrupt: every text-based route is unsafe
+        // for a .mdenc, so this isn't a prompt, it's a redirect.
+        if (Secure.SecureUi.IsEncryptedPath(name) || content.StartsWith("MDMSEC", StringComparison.Ordinal))
+        {
+            MessageBox.Show(this,
+                "Encrypted documents can't be opened by dropping them here — use " +
+                "File \u25b8 Open or double-click the file instead.",
+                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         if (!await ConfirmDiscardAsync()) return;
         ShowBusy($"Opening {name}…");
         try
@@ -3411,8 +3903,9 @@ public partial class MainWindow : Window
     {
         var name = _currentPath is not null ? Path.GetFileName(_currentPath)
                  : _displayName ?? "Untitled";
+        var encrypted = _docEncrypted ? "  \U0001F512 [Encrypted]" : "";
         var readOnly = _readOnly ? "  [Read Only]" : "";
-        Title = $"{(_dirty ? "*" : "")}{name}{readOnly}  |  {ProductDesc}";
+        Title = $"{(_dirty ? "*" : "")}{name}{encrypted}{readOnly}  |  {ProductDesc}";
         StatusFile.Text = name;
     }
 

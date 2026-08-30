@@ -82,6 +82,54 @@ internal sealed class BackupStore : IDisposable
         catch { return null; }
     }
 
+    /// <summary>
+    /// Abandoned ENCRYPTED snapshots, for the recovery flow's password prompts.
+    /// The sealed container is returned as-is - only the caller can open it, and
+    /// only with the user's password. Enumerated separately from FindOrphans so
+    /// the plaintext flow's contract (markdown in, markdown out) stays intact.
+    /// </summary>
+    public IReadOnlyList<(BackupSnapshot Meta, byte[] Container)> FindEncryptedOrphans()
+    {
+        var found = new List<(BackupSnapshot, byte[])>();
+        if (!Directory.Exists(_dir)) return found;
+        foreach (var metaFile in SafeEnumerate("*.json"))
+        {
+            var id = Path.GetFileNameWithoutExtension(metaFile);
+            if (id == _sessionId) continue;
+            if (!IsAbandoned(id)) continue;
+            try
+            {
+                var meta = JsonSerializer.Deserialize<BackupSnapshot>(File.ReadAllText(metaFile));
+                if (meta is null || !meta.Encrypted) continue;
+                var content = EncryptedContentPath(id);
+                if (!File.Exists(content)) continue;   // FindOrphans purges these
+                meta.SessionId = id;
+                found.Add((meta, File.ReadAllBytes(content)));
+            }
+            catch { /* unreadable snapshot: leave it alone */ }
+        }
+        return found.OrderBy(f => f.Item1.SavedUtc).ToList();
+    }
+
+    /// <summary>One specific encrypted orphan, for a --recover child window.</summary>
+    public (BackupSnapshot Meta, byte[] Container)? FindEncryptedOrphan(string sessionId) =>
+        FindEncryptedOrphans().FirstOrDefault(o => o.Meta.SessionId == sessionId) is { Meta: not null } hit
+            ? hit : null;
+
+    /// <summary>
+    /// Take over an encrypted orphan as our own session. The caller has already
+    /// opened the container with the user's password; we re-home the SEALED bytes
+    /// (never the plaintext) under our id. Copy before delete, like Adopt.
+    /// </summary>
+    public bool AdoptEncrypted(BackupSnapshot orphan, byte[] container)
+    {
+        var previous = _attempts;
+        _attempts = orphan.RecoveryAttempts;
+        if (!SaveEncrypted(container, orphan.Path, orphan.DisplayName)) { _attempts = previous; return false; }
+        Purge(orphan.SessionId);
+        return true;
+    }
+
     /// <summary>One specific orphan, for a window launched to recover it by name.</summary>
     public (BackupSnapshot Meta, string Markdown)? FindOrphan(string sessionId) =>
         FindOrphans().FirstOrDefault(o => o.Meta.SessionId == sessionId) is { Meta: not null } hit

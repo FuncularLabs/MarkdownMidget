@@ -9,6 +9,53 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.9.0-beta1] - 2026-08-30
+
+**Secure Markdown** — password-protected encrypted documents — plus the
+toolbar finally following the cursor. A prerelease for the usual reason: the
+crypto core is exhaustively tested, but the dialogs and day-two flows want
+real hands before the stable promote.
+
+### Added
+- **Secure Markdown (.mdenc): password-protected documents.** For passwords,
+  account numbers, anything you'd rather not leave readable on disk — in a
+  synced folder, a backup, or a lost laptop. AES-256-GCM under the hood, with
+  the key derived from your password by Argon2id (the current best practice
+  for resisting password-cracking hardware). Editing is unchanged: once open,
+  an encrypted document is ordinary markdown — themes, spell check, printing,
+  find all work; the title bar shows 🔒 [Encrypted]. The decrypted content
+  lives only in memory.
+  - **File ▸ Encrypt Document…** converts the open document: the encrypted
+    file is written and verified first, and only then is the readable
+    original removed. **File ▸ Convert to Unencrypted…** goes the other way,
+    with a warning. **File ▸ Change Password…** re-keys on the spot. Save As
+    offers *Secure Markdown* as a file type — picking it is the same as
+    encrypting.
+  - **There is no password recovery. None.** The dialog says so before you
+    set one; it's true; write the password down somewhere safe.
+  - **Crash protection keeps working — encrypted.** The unsaved-changes copy
+    of an encrypted document is itself encrypted; the app never writes its
+    plaintext anywhere. Recovery after a crash asks for the password.
+  - Every save is transactional: write beside the file, prove the bytes
+    decrypt to exactly what was meant, then swap atomically. A failed
+    verification leaves the existing file untouched.
+  - File ▸ Open lists only regular markdown by default; a Settings checkbox
+    adds *.mdenc to the filter. Encrypted files always open by double-click,
+    Open Recent, or a typed name — and a renamed encrypted file is recognised
+    by content, not extension.
+  - Honest limits, stated plainly: removing the original is deletion plus a
+    best-effort scrub — on an SSD, forensic recovery of the OLD file's blocks
+    can't be ruled out ("no accessible copy" is the promise, not forensic
+    erasure). And anything that can read this process's memory while the
+    document is open can see the text — that's inherent to editing it.
+- **Bold/Italic/Underline/Strikethrough buttons now follow the cursor**, the
+  way Word's do: click into bold text and B lights up; at a bare caret they
+  show what typing would produce, so Ctrl+B lights the button before any text
+  exists; across a selection they're on only when ALL of it carries the mark.
+  The Format menu shows checkmarks to match. (The Style dropdown always did
+  this; the mark buttons never had it.)
+
+
 ### Fixed
 - **"Add to Dictionary" and "Ignore All" now work in read-only windows.** Read-only
   guards the document, but it was also suppressing the entire spelling section of

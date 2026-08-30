@@ -84,6 +84,11 @@
                         <MenuItem x:Name="SaveMenu" Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click" />
                         <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click" />
                         <Separator />
+                        <MenuItem x:Name="EncryptMenu" Header="Encr_ypt Document…" Click="Encrypt_Click"
+                                  ToolTip="Protect this document with a password. The readable copy on disk is removed." />
+                        <MenuItem x:Name="ChangePasswordMenu" Header="Change Pass_word…" Click="ChangePassword_Click" />
+                        <MenuItem x:Name="ConvertPlainMenu" Header="Convert to _Unencrypted…" Click="ConvertPlain_Click" />
+                        <Separator />
                         <MenuItem x:Name="PrintMenuRoot" Header="_Print" SubmenuOpened="PrintSubmenu_Opened">
                             <MenuItem Header="_Print…" InputGestureText="Ctrl+P" Click="Print_Click" />
                             <MenuItem Header="Export to P_DF…" Click="ExportPdf_Click" />
