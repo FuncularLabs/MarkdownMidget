@@ -24,6 +24,95 @@ public class BackupStoreTests : IDisposable
         try { if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true); } catch { }
     }
 
+    // ---- encrypted snapshots (docs/plans/secure-markdown.md section 7a) ----
+
+    private static byte[] Sealed(string markdown) =>
+        MarkdownMidget.Secure.SecureMarkdownFormat.Encrypt(markdown, "pw",
+            MarkdownMidget.Secure.SecureMarkdownFormat.KdfProfile.FastForTests);
+
+    [Fact]
+    public void SaveEncrypted_ReplacesThePlaintextSnapshotAndLeaksNothing()
+    {
+        // The crux of section 7a: the moment a document is encrypted, its next
+        // snapshot is encrypted and the prior plaintext snapshot is gone - the
+        // 5-second backup tick must not be a plaintext leak of exactly the
+        // content the user chose to protect.
+        const string sentinel = "SENSITIVE-ACCOUNT-4417";
+        var store = New("enc");
+        Assert.True(store.Start());
+        store.Save($"before encryption {sentinel}", @"C:\docs.mdenc", null);
+        Assert.True(store.SaveEncrypted(Sealed($"after encryption {sentinel}"), @"C:\docs.mdenc", null));
+
+        Assert.False(File.Exists(Path.Combine(_dir, "enc.md")));
+        Assert.True(File.Exists(Path.Combine(_dir, "enc.mdenc")));
+        foreach (var f in Directory.GetFiles(_dir))
+        {
+            if (f.EndsWith(".lock")) continue;   // held exclusively and zero-byte by design
+            Assert.DoesNotContain(sentinel,
+                System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(f)));
+        }
+    }
+
+    [Fact]
+    public void APlaintextSaveAfterAnEncryptedOne_RemovesTheEncryptedSnapshot()
+    {
+        // Convert-to-unencrypted symmetry: whichever kind the document is now,
+        // exactly one snapshot represents it.
+        var store = New("conv");
+        store.Start();
+        store.SaveEncrypted(Sealed("secret era"), @"C:\docs.mdenc", null);
+        store.Save("public era", @"C:\docs.md", null);
+
+        Assert.False(File.Exists(Path.Combine(_dir, "conv.mdenc")));
+        Assert.True(File.Exists(Path.Combine(_dir, "conv.md")));
+    }
+
+    [Fact]
+    public void AnEncryptedOrphan_IsHeldBackFromRecovery_ButNeverPurged()
+    {
+        // The recovery UI stage (password prompt) doesn't exist yet, so
+        // FindOrphans holds encrypted snapshots back - but purging one would
+        // destroy a crashed encrypted document's only remaining copy. The
+        // "metadata without content" purge must therefore look at the .mdenc,
+        // not the .md it knows isn't there.
+        var crashed = New("crashedenc");
+        crashed.Start();
+        crashed.SaveEncrypted(Sealed("locked-away work"), @"C:\docs.mdenc", null);
+        crashed.Dispose();
+
+        var next = New("next");
+        next.Start();
+        Assert.Empty(next.FindOrphans());   // held back...
+        Assert.True(File.Exists(Path.Combine(_dir, "crashedenc.mdenc")));   // ...not destroyed
+        Assert.True(File.Exists(Path.Combine(_dir, "crashedenc.json")));
+        // And a second scan (every later launch) still doesn't eat it.
+        Assert.Empty(next.FindOrphans());
+        Assert.True(File.Exists(Path.Combine(_dir, "crashedenc.mdenc")));
+    }
+
+    [Fact]
+    public void Discard_RemovesTheEncryptedSnapshotToo()
+    {
+        var store = New("disc");
+        store.Start();
+        store.SaveEncrypted(Sealed("about to be saved for real"), @"C:\docs.mdenc", null);
+        store.Discard();
+        Assert.False(File.Exists(Path.Combine(_dir, "disc.mdenc")));
+        Assert.False(File.Exists(Path.Combine(_dir, "disc.json")));
+    }
+
+    [Fact]
+    public void AnEncryptedSnapshotRoundTripsThroughItsPassword()
+    {
+        // What the future recovery stage will actually do: read the orphan's
+        // .mdenc and open it with the password the user supplies.
+        var store = New("rt");
+        store.Start();
+        store.SaveEncrypted(Sealed("recover me"), null, "untitled");
+        var bytes = File.ReadAllBytes(Path.Combine(_dir, "rt.mdenc"));
+        Assert.Equal("recover me", MarkdownMidget.Secure.SecureMarkdownFormat.Decrypt(bytes, "pw"));
+    }
+
     [Fact]
     public void ASessionStillRunning_IsNotTreatedAsAbandoned()
     {

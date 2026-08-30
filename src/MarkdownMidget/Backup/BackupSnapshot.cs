@@ -32,6 +32,14 @@ internal sealed class BackupSnapshot
     public int RecoveryAttempts { get; set; }
 
     /// <summary>
+    /// True when the content file is an encrypted .mdenc container rather than
+    /// plain markdown — the snapshot of a password-protected document, readable
+    /// only with that document's password. Old metadata files lack the field
+    /// and deserialize to false, which is correct: they are all plaintext.
+    /// </summary>
+    public bool Encrypted { get; set; }
+
+    /// <summary>
     /// True once the user has been told we're giving up on this one. The snapshot
     /// stays on disk — it's their work — but telling them again on every launch for
     /// the rest of the install's life is nagging, not helping.

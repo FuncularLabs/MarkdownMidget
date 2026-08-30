@@ -15,6 +15,12 @@ namespace MarkdownMidget.Backup;
 ///   {id}.json  where it came from
 ///   {id}.lock  held open, exclusively, for as long as the window lives
 ///
+/// A password-protected document swaps the first for {id}.mdenc — the same
+/// encrypted container its file uses, because a crash-backup that leaked the
+/// plaintext of an encrypted document every five seconds would defeat the
+/// entire feature. Which kind a session holds is recorded in the metadata
+/// (BackupSnapshot.Encrypted).
+///
 /// The lock file is how a later launch tells a crashed session from a running one.
 /// Asking the OS whether a process id is alive is unreliable — ids get reused, and
 /// two instances of this app look identical — but a lock is released by the kernel
@@ -50,6 +56,7 @@ internal sealed class BackupStore : IDisposable
         "MarkdownMidget", "backup");
 
     private string ContentPath(string id) => Path.Combine(_dir, id + ".md");
+    private string EncryptedContentPath(string id) => Path.Combine(_dir, id + ".mdenc");
     private string MetaPath(string id) => Path.Combine(_dir, id + ".json");
     private string LockPath(string id) => Path.Combine(_dir, id + ".lock");
 
@@ -109,6 +116,43 @@ internal sealed class BackupStore : IDisposable
                 SavedUtc = DateTime.UtcNow,
                 RecoveryAttempts = _attempts,
             }));
+            // The document may have been converted back from encrypted: with the
+            // plaintext snapshot fully in place (content, then metadata saying
+            // plaintext), the old .mdenc is stale. Deleted LAST - a crash before
+            // this line leaves an extra encrypted file, never a missing snapshot.
+            TryDelete(EncryptedContentPath(_sessionId));
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Record the current unsaved content of an ENCRYPTED document. The caller
+    /// hands us the sealed .mdenc container (it owns the session key); this
+    /// store never sees the plaintext. Same content-first ordering as Save,
+    /// plus the leakage-critical step: the previous PLAINTEXT snapshot - from
+    /// before the document was encrypted - is deleted only after the encrypted
+    /// snapshot and its metadata are both fully in place. A crash anywhere in
+    /// between leaves either the old plaintext snapshot or both; run N+1's
+    /// next tick completes the swap. What it never leaves is no snapshot.
+    /// </summary>
+    public bool SaveEncrypted(byte[] container, string? path, string? displayName)
+    {
+        if (_lock is null) return false;
+        try
+        {
+            Directory.CreateDirectory(_dir);
+            WriteAtomic(EncryptedContentPath(_sessionId), container);
+            WriteAtomic(MetaPath(_sessionId), JsonSerializer.Serialize(new BackupSnapshot
+            {
+                SessionId = _sessionId,
+                Path = path,
+                DisplayName = displayName,
+                SavedUtc = DateTime.UtcNow,
+                RecoveryAttempts = _attempts,
+                Encrypted = true,
+            }));
+            TryDelete(ContentPath(_sessionId));
             return true;
         }
         catch { return false; }
@@ -121,6 +165,7 @@ internal sealed class BackupStore : IDisposable
     {
         TryDelete(MetaPath(_sessionId));
         TryDelete(ContentPath(_sessionId));
+        TryDelete(EncryptedContentPath(_sessionId));
         // The count belongs to the snapshot, not to this window. Every caller of
         // Discard means "that snapshot no longer exists", so anything written next is
         // new work and must start from zero — otherwise a window that recovered a
@@ -147,6 +192,18 @@ internal sealed class BackupStore : IDisposable
             {
                 var meta = JsonSerializer.Deserialize<BackupSnapshot>(File.ReadAllText(metaFile));
                 if (meta is null) continue;
+                if (meta.Encrypted)
+                {
+                    // An encrypted snapshot needs its password to be worth
+                    // anything, and the prompt belongs to the recovery UI stage
+                    // that doesn't exist yet. Held back, NOT purged: purging
+                    // here would silently destroy a crashed encrypted
+                    // document's only remaining copy. The existence check must
+                    // look at the .mdenc, or the "metadata without content"
+                    // purge below would eat every encrypted snapshot on sight.
+                    if (!File.Exists(EncryptedContentPath(id))) Purge(id);
+                    continue;
+                }
                 var content = ContentPath(id);
                 if (!File.Exists(content)) { Purge(id); continue; }   // metadata without content
                 meta.SessionId = id;                        // trust the filename, not the field
@@ -170,7 +227,8 @@ internal sealed class BackupStore : IDisposable
         {
             var id = Path.GetFileNameWithoutExtension(lockFile);
             if (id == _sessionId || id == "recovery") continue;
-            if (File.Exists(MetaPath(id)) || File.Exists(ContentPath(id))) continue;  // has content
+            if (File.Exists(MetaPath(id)) || File.Exists(ContentPath(id))
+                || File.Exists(EncryptedContentPath(id))) continue;  // has content
             if (IsAbandoned(id)) TryDelete(lockFile);
         }
     }
@@ -219,6 +277,7 @@ internal sealed class BackupStore : IDisposable
     {
         TryDelete(MetaPath(sessionId));
         TryDelete(ContentPath(sessionId));
+        TryDelete(EncryptedContentPath(sessionId));
         TryDelete(LockPath(sessionId));
     }
 
@@ -258,6 +317,17 @@ internal sealed class BackupStore : IDisposable
         try
         {
             File.WriteAllText(tmp, text);
+            File.Move(tmp, target, overwrite: true);
+        }
+        finally { TryDelete(tmp); }
+    }
+
+    private static void WriteAtomic(string target, byte[] bytes)
+    {
+        var tmp = $"{target}.{Environment.ProcessId}.tmp";
+        try
+        {
+            File.WriteAllBytes(tmp, bytes);
             File.Move(tmp, target, overwrite: true);
         }
         finally { TryDelete(tmp); }

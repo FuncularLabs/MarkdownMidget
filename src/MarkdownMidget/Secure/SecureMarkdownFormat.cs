@@ -90,15 +90,57 @@ internal static class SecureMarkdownFormat
 
     internal static byte[] Encrypt(string markdown, string password, KdfProfile profile)
     {
-        ArgumentNullException.ThrowIfNull(markdown);
+        ArgumentNullException.ThrowIfNull(markdown);   // before the KDF runs, not after
         ArgumentNullException.ThrowIfNull(password);
         // The same envelope Decrypt enforces. Without this, an out-of-range
         // profile encrypts successfully and produces a file this app can NEVER
         // read back - the producer-side half of the fail-closed contract.
         ValidateKdf(profile.KdfId, profile.ParamA, profile.ParamB);
 
-        var plaintext = Encoding.UTF8.GetBytes(markdown);
         var salt = RandomNumberGenerator.GetBytes(SaltLength);
+        var key = DeriveKey(password, salt, profile.KdfId, profile.ParamA, profile.ParamB);
+        try
+        {
+            return EncryptWithKey(markdown, key, salt, profile);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
+    /// <summary>
+    /// Derive the key once for a (password, salt, profile) a caller intends to
+    /// reuse across many encryptions - the crash-backup path snapshots every few
+    /// seconds while a document is dirty, and paying the full KDF (64 MiB of
+    /// Argon2) per tick would be a typing-time tax with no security gain: one
+    /// key with a fresh random 96-bit nonce per message is exactly GCM's
+    /// intended shape. The caller owns the returned key and should zero it when
+    /// the session ends.
+    /// </summary>
+    internal static byte[] DeriveSessionKey(string password, byte[] salt, KdfProfile profile)
+    {
+        ValidateKdf(profile.KdfId, profile.ParamA, profile.ParamB);
+        return DeriveKey(password, salt, profile.KdfId, profile.ParamA, profile.ParamB);
+    }
+
+    /// <summary>
+    /// Encrypt with an already-derived key. The header still records the salt
+    /// and profile the key came from, so the resulting container is
+    /// indistinguishable from a password-derived one and Decrypt needs nothing
+    /// special. The caller MUST pass the same salt/profile the key was derived
+    /// with - a mismatch produces a container whose password-derived key won't
+    /// match, i.e. a file that never decrypts (tested).
+    /// </summary>
+    internal static byte[] EncryptWithKey(string markdown, byte[] key, byte[] salt, KdfProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+        ArgumentNullException.ThrowIfNull(key);
+        ValidateKdf(profile.KdfId, profile.ParamA, profile.ParamB);
+        if (key.Length != KeyLength) throw new ArgumentOutOfRangeException(nameof(key));
+        if (salt.Length != SaltLength) throw new ArgumentOutOfRangeException(nameof(salt));
+
+        var plaintext = Encoding.UTF8.GetBytes(markdown);
         var nonce = RandomNumberGenerator.GetBytes(NonceLength);
 
         var header = new byte[HeaderLength];
@@ -110,7 +152,6 @@ internal static class SecureMarkdownFormat
         salt.CopyTo(header, 16);
         nonce.CopyTo(header, 32);
 
-        var key = DeriveKey(password, salt, profile.KdfId, profile.ParamA, profile.ParamB);
         try
         {
             var ciphertext = new byte[plaintext.Length];
@@ -126,7 +167,6 @@ internal static class SecureMarkdownFormat
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(key);
             CryptographicOperations.ZeroMemory(plaintext);
         }
     }
@@ -140,31 +180,60 @@ internal static class SecureMarkdownFormat
     {
         ArgumentNullException.ThrowIfNull(container);
         ArgumentNullException.ThrowIfNull(password);
+        ValidateStructure(container);
 
+        var kdfId = container[7];
+        var paramA = BitConverter.ToUInt32(container, 8);
+        var paramB = BitConverter.ToUInt32(container, 12);
+        var salt = container.AsSpan(16, SaltLength).ToArray();
+
+        var key = DeriveKey(password, salt, kdfId, paramA, paramB);
+        try
+        {
+            return DecryptCore(container, key);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
+    /// <summary>
+    /// Decrypt with an already-derived session key (the crash-backup path). The
+    /// caller keeps ownership of the key. Runs the same structural validation as
+    /// the password overload - a truncated or foreign file gets the same
+    /// answers either way.
+    /// </summary>
+    internal static string DecryptWithKey(byte[] container, byte[] key)
+    {
+        ArgumentNullException.ThrowIfNull(container);
+        ArgumentNullException.ThrowIfNull(key);
+        ValidateStructure(container);
+        return DecryptCore(container, key);
+    }
+
+    /// <summary>The shared checks that don't need a key: magic, length, version, KDF envelope.</summary>
+    private static void ValidateStructure(byte[] container)
+    {
         if (!LooksLikeContainer(container))
             throw new SecureMarkdownException(SecureMarkdownError.NotAContainer,
                 "This is not a Secure Markdown file.");
         if (container.Length < HeaderLength + TagLength)
             throw new SecureMarkdownException(SecureMarkdownError.NotAContainer,
                 "This is not a complete Secure Markdown file.");
-
         var version = container[6];
         if (version != FormatVersion)
             throw new SecureMarkdownException(SecureMarkdownError.Unsupported,
                 $"This file uses Secure Markdown format version {version}, which this version of the app doesn't support. Update Markdown Midget and try again.");
+        ValidateKdf(container[7], BitConverter.ToUInt32(container, 8), BitConverter.ToUInt32(container, 12));
+    }
 
-        var kdfId = container[7];
-        var paramA = BitConverter.ToUInt32(container, 8);
-        var paramB = BitConverter.ToUInt32(container, 12);
-        ValidateKdf(kdfId, paramA, paramB);
-
-        var salt = container.AsSpan(16, SaltLength).ToArray();
+    private static string DecryptCore(byte[] container, byte[] key)
+    {
         var nonce = container.AsSpan(32, NonceLength).ToArray();
         var header = container.AsSpan(0, HeaderLength).ToArray();
         var ciphertext = container.AsSpan(HeaderLength, container.Length - HeaderLength - TagLength).ToArray();
         var tag = container.AsSpan(container.Length - TagLength, TagLength).ToArray();
-
-        var key = DeriveKey(password, salt, kdfId, paramA, paramB);
         var plaintext = new byte[ciphertext.Length];
         try
         {
@@ -179,7 +248,6 @@ internal static class SecureMarkdownFormat
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(key);
             CryptographicOperations.ZeroMemory(plaintext);
         }
     }
@@ -241,6 +309,9 @@ internal enum SecureMarkdownError
     Unsupported,
     /// <summary>The tag check failed — wrong password and tampering are deliberately one condition.</summary>
     WrongPasswordOrCorrupt,
+    /// <summary>A just-written file did not read back and decrypt to what was meant
+    /// to be saved. The original file was left untouched.</summary>
+    WriteVerificationFailed,
 }
 
 internal sealed class SecureMarkdownException : Exception
