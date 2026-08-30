@@ -1761,7 +1761,12 @@ public partial class MainWindow : Window
                 if (_backup.FindOrphan(wanted) is { } target)
                     await LoadRecoveredAsync(target.Meta, target.Markdown);
                 else if (_backup.FindEncryptedOrphan(wanted) is { } encTarget)
+                {
+                    // The child counts the attempt, not the spawning parent: the
+                    // prompt is about to display, which is the event worth counting.
+                    _backup.RecordAttempt(encTarget.Meta);
                     await RecoverEncryptedAsync(encTarget.Meta, encTarget.Container);
+                }
                 return;
             }
 
@@ -1816,32 +1821,10 @@ public partial class MainWindow : Window
             {
                 FlashStatus($"Restoring {opened} unsaved document(s) from a previous session");
             }
-
-            // Encrypted orphans, after the plaintext plan is settled. The first one
-            // is prompted for HERE only when this window is still free; the rest go
-            // to their own windows via the same --recover spawn the plaintext flow
-            // uses (the child prompts). Attempts are counted the same way; the
-            // give-up bookkeeping stays with the plaintext plan for now — an
-            // encrypted snapshot the user keeps cancelling simply keeps waiting,
-            // which for content they password-protected beats quietly retiring it.
-            var encOrphans = _backup.FindEncryptedOrphans();
-            if (encOrphans.Count > 0)
-            {
-                var hostHere = hostFreeForEncrypted;
-                foreach (var (encMeta, container) in encOrphans)
-                {
-                    if (hostHere)
-                    {
-                        hostHere = false;
-                        _backup.RecordAttempt(encMeta);
-                        await RecoverEncryptedAsync(encMeta, container);
-                    }
-                    else if (OpenRecovered(encMeta))
-                    {
-                        _backup.RecordAttempt(encMeta);
-                    }
-                }
-            }
+            // Knowable only here, USED only below the plan block - assigning it
+            // any later is a dead write, and the encrypted pass would host into a
+            // window the plaintext plan already filled (round 2 finding N2).
+            hostFreeForEncrypted = plan.Here is null && free;
 
             // Last, and not as a flash. These are documents we are giving up on, so
             // the one message the user must not miss is the one that would otherwise
@@ -1851,7 +1834,38 @@ public partial class MainWindow : Window
             // again — but the user should hear it now, not discover it never happened.
             ReportAbandoned(plan.GivenUp, plan.Elsewhere.Count - opened);
             foreach (var abandoned in plan.GivenUp) _backup.MarkGiveUpReported(abandoned);
-            hostFreeForEncrypted = plan.Here is null && free;
+            }
+
+            // Encrypted orphans - OUTSIDE the plaintext-plan block, because a
+            // crashed session holding only an encrypted document produces ZERO
+            // plaintext orphans, and this pass must still run (review rounds 1 AND
+            // 2 both caught this exact starvation; taxonomy 14). The first orphan
+            // is prompted for HERE only when the plaintext plan left the window
+            // free; the rest go to their own windows via the same --recover spawn
+            // the plaintext flow uses. Attempts for spawned orphans are counted by
+            // the CHILD when its prompt actually shows - charging them at spawn
+            // would tick the counter for prompts never displayed. Give-up
+            // bookkeeping stays with the plaintext plan: an encrypted snapshot the
+            // user keeps cancelling simply keeps waiting (the prompt Discard
+            // button is the exit), which for content they password-protected
+            // beats quietly retiring it.
+            var encOrphans = _backup.FindEncryptedOrphans();
+            if (encOrphans.Count > 0)
+            {
+                var hostHere = hostFreeForEncrypted;
+                foreach (var (encMeta, container) in encOrphans)
+                {
+                    if (hostHere)
+                    {
+                        hostHere = false;
+                        _backup.RecordAttempt(encMeta);   // about to display right now
+                        await RecoverEncryptedAsync(encMeta, container);
+                    }
+                    else
+                    {
+                        OpenRecovered(encMeta);   // child claims + counts when it prompts
+                    }
+                }
             }
         }
         catch { /* recovery is a bonus; never let it stop the app starting */ }
@@ -1912,9 +1926,10 @@ public partial class MainWindow : Window
                         "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
                     == MessageBoxResult.Yes)
                 {
-                    _backup.Purge(meta.SessionId);
+                    _backup?.Purge(meta.SessionId);
                     return;
                 }
+                error = null;   // stale wrong-password text does not apply to a fresh prompt
                 continue;
             }
             if (pw is null) return;   // snapshot stays on disk, untouched
@@ -2494,14 +2509,17 @@ public partial class MainWindow : Window
         var pick = MessageBox.Show(
             $"Saved your version to:\n{dlg.FileName}\n\nKeep editing your saved version ({savedFileName})?\n\nYes = open '{savedFileName}'\nNo = continue with the externally-modified '{fileName}'",
             "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        // Both loads keep the encryption state (rounds 1 and 2 each found a
+        // password-dropping load; these are call sites 3 and 4 of 4 - every
+        // LoadDocumentAsync caller on an encrypted path now passes it through).
         if (pick == MessageBoxResult.Yes)
         {
             // Already on disk with inMemory content; load + retarget.
-            await LoadDocumentAsync(inMemory, dlg.FileName);
+            await LoadDocumentAsync(inMemory, dlg.FileName, _docEncrypted ? _docPassword : null);
         }
         else
         {
-            await LoadDocumentAsync(newDiskContent, _currentPath);
+            await LoadDocumentAsync(newDiskContent, _currentPath, _docEncrypted ? _docPassword : null);
         }
     }
 
