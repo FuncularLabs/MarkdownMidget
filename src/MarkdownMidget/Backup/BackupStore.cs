@@ -216,13 +216,26 @@ internal sealed class BackupStore : IDisposable
                     // look at the .mdenc, or the "metadata without content"
                     // purge below would eat every encrypted snapshot on sight.
                     if (!File.Exists(EncryptedContentPath(id))) { Purge(id); continue; }
-                    // A crash between SaveEncrypted's metadata write and its
-                    // plaintext delete leaves the pre-encryption .md behind -
-                    // and with the session dead, no later tick will finish the
-                    // job. The metadata says the document is encrypted, so the
-                    // plaintext here is by definition the stale leak the plan's
-                    // replay lens names: complete the interrupted swap.
-                    TryDelete(ContentPath(id));
+                    // A plaintext file beside an Encrypted-flagged session is a
+                    // crash mid-swap - but in WHICH direction decides everything.
+                    // Encrypt-side (SaveEncrypted died before its .md delete):
+                    // the .mdenc is newer, the .md is the stale pre-encryption
+                    // leak - complete the swap. Convert-back-side (Save wrote a
+                    // fresh .md and died before flipping the metadata): the .md
+                    // is NEWER and holds edits the .mdenc doesn't - deleting it
+                    // there would destroy the freshest copy on the word of
+                    // metadata the crash outran. The file times discriminate;
+                    // when they don't clearly say the .mdenc is newer, keep
+                    // both and let the recovery UI stage adjudicate - a held
+                    // extra file beats a guessed deletion.
+                    try
+                    {
+                        var md = ContentPath(id);
+                        if (File.Exists(md) &&
+                            File.GetLastWriteTimeUtc(EncryptedContentPath(id)) > File.GetLastWriteTimeUtc(md))
+                            TryDelete(md);
+                    }
+                    catch { /* timestamps unreadable: keep both */ }
                     continue;
                 }
                 var content = ContentPath(id);

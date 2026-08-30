@@ -125,15 +125,47 @@ public class BackupStoreTests : IDisposable
         crashed.Start();
         crashed.Save("stale plaintext", @"C:\docs.mdenc", null);
         crashed.SaveEncrypted(Sealed("current encrypted"), @"C:\docs.mdenc", null);
-        // Recreate the crash window: put the plaintext back beside the rest.
+        // Recreate the crash window: put the plaintext back beside the rest,
+        // with the timestamps the encrypt-side crash actually produces (the
+        // .md predates the .mdenc that superseded it).
         File.WriteAllText(Path.Combine(_dir, "half.md"), "stale plaintext");
+        File.SetLastWriteTimeUtc(Path.Combine(_dir, "half.md"), DateTime.UtcNow.AddMinutes(-5));
         crashed.Dispose();
 
         var next = New("next");
         next.Start();
         Assert.Empty(next.FindOrphans());
         Assert.False(File.Exists(Path.Combine(_dir, "half.md")));       // swap completed
-        Assert.True(File.Exists(Path.Combine(_dir, "half.mdenc")));     // held back, intact
+        // Held back AND intact - the content still decrypts, not merely exists.
+        Assert.Equal("current encrypted", MarkdownMidget.Secure.SecureMarkdownFormat.Decrypt(
+            File.ReadAllBytes(Path.Combine(_dir, "half.mdenc")), "pw"));
+    }
+
+    [Fact]
+    public void AConvertBackCrash_NeverCostsTheFresherPlaintext()
+    {
+        // The other direction: converting an encrypted document BACK to
+        // plaintext writes the fresh .md first and flips the metadata second.
+        // A crash between the two leaves metadata still saying Encrypted
+        // beside a .md that is NEWER than the .mdenc and holds edits the
+        // .mdenc does not. Deleting it on the metadata's word would destroy
+        // the freshest copy - the scan must keep both for the recovery UI to
+        // adjudicate.
+        var crashed = New("revert");
+        crashed.Start();
+        crashed.SaveEncrypted(Sealed("older encrypted content"), @"C:\docs.mdenc", null);
+        // Model Save() dying between its content write and its metadata write:
+        // a fresh plaintext file appears, metadata still says Encrypted.
+        File.WriteAllText(Path.Combine(_dir, "revert.md"), "newest edits, plaintext era");
+        File.SetLastWriteTimeUtc(Path.Combine(_dir, "revert.mdenc"), DateTime.UtcNow.AddMinutes(-5));
+        crashed.Dispose();
+
+        var next = New("next");
+        next.Start();
+        Assert.Empty(next.FindOrphans());
+        Assert.True(File.Exists(Path.Combine(_dir, "revert.md")));      // fresher copy kept
+        Assert.True(File.Exists(Path.Combine(_dir, "revert.mdenc")));   // and the encrypted one
+        Assert.Equal("newest edits, plaintext era", File.ReadAllText(Path.Combine(_dir, "revert.md")));
     }
 
     [Fact]
