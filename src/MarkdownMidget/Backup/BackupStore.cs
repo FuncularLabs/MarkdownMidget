@@ -45,6 +45,11 @@ internal sealed class BackupStore : IDisposable
     /// </summary>
     private int _attempts;
 
+    /// <summary>Test seam: runs after the encrypted snapshot's atomic write,
+    /// before the read-back verification - lets a test model disk/AV corruption
+    /// in the only window where it matters.</summary>
+    internal Action<string>? TestHookAfterEncryptedWrite;
+
     public BackupStore(string directory, string sessionId)
     {
         _dir = directory;
@@ -142,7 +147,16 @@ internal sealed class BackupStore : IDisposable
         try
         {
             Directory.CreateDirectory(_dir);
-            WriteAtomic(EncryptedContentPath(_sessionId), container);
+            var target = EncryptedContentPath(_sessionId);
+            WriteAtomicDurable(target, container);
+            TestHookAfterEncryptedWrite?.Invoke(target);
+            // Read back and compare before ANYTHING downstream trusts this write.
+            // The plaintext delete below is the step that makes this snapshot the
+            // only copy of an unsaved document - it must never run on the strength
+            // of bytes the disk hasn't proven it kept. (The caller already proved
+            // the container DECRYPTS - it built it; what's unproven is the disk.)
+            if (!container.AsSpan().SequenceEqual(File.ReadAllBytes(target)))
+                return false;
             WriteAtomic(MetaPath(_sessionId), JsonSerializer.Serialize(new BackupSnapshot
             {
                 SessionId = _sessionId,
@@ -201,7 +215,14 @@ internal sealed class BackupStore : IDisposable
                     // document's only remaining copy. The existence check must
                     // look at the .mdenc, or the "metadata without content"
                     // purge below would eat every encrypted snapshot on sight.
-                    if (!File.Exists(EncryptedContentPath(id))) Purge(id);
+                    if (!File.Exists(EncryptedContentPath(id))) { Purge(id); continue; }
+                    // A crash between SaveEncrypted's metadata write and its
+                    // plaintext delete leaves the pre-encryption .md behind -
+                    // and with the session dead, no later tick will finish the
+                    // job. The metadata says the document is encrypted, so the
+                    // plaintext here is by definition the stale leak the plan's
+                    // replay lens names: complete the interrupted swap.
+                    TryDelete(ContentPath(id));
                     continue;
                 }
                 var content = ContentPath(id);
@@ -322,12 +343,19 @@ internal sealed class BackupStore : IDisposable
         finally { TryDelete(tmp); }
     }
 
-    private static void WriteAtomic(string target, byte[] bytes)
+    /// <summary>Like WriteAtomic, plus a flush to physical disk before the
+    /// rename - for the encrypted snapshot, whose plaintext sibling is deleted
+    /// on the strength of this write having really happened.</summary>
+    private static void WriteAtomicDurable(string target, byte[] bytes)
     {
         var tmp = $"{target}.{Environment.ProcessId}.tmp";
         try
         {
-            File.WriteAllBytes(tmp, bytes);
+            using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(flushToDisk: true);
+            }
             File.Move(tmp, target, overwrite: true);
         }
         finally { TryDelete(tmp); }

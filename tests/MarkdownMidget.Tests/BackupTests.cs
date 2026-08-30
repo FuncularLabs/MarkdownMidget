@@ -91,6 +91,52 @@ public class BackupStoreTests : IDisposable
     }
 
     [Fact]
+    public void ACorruptedEncryptedWrite_NeverCostsThePlaintextSnapshot()
+    {
+        // The plaintext delete is what makes the encrypted snapshot the only
+        // copy - it must never run on the strength of bytes the disk didn't
+        // keep. Corrupt the .mdenc in the window between write and read-back
+        // verify: SaveEncrypted reports failure, the plaintext snapshot
+        // survives, and the metadata still says plaintext.
+        var store = New("corrupt");
+        store.Start();
+        store.Save("still here", @"C:\docs.mdenc", null);
+        store.TestHookAfterEncryptedWrite = target =>
+        {
+            var bytes = File.ReadAllBytes(target);
+            bytes[^1] ^= 0xFF;
+            File.WriteAllBytes(target, bytes);
+        };
+        Assert.False(store.SaveEncrypted(Sealed("doomed"), @"C:\docs.mdenc", null));
+        Assert.True(File.Exists(Path.Combine(_dir, "corrupt.md")));
+        var meta = System.Text.Json.JsonSerializer.Deserialize<BackupSnapshot>(
+            File.ReadAllText(Path.Combine(_dir, "corrupt.json")))!;
+        Assert.False(meta.Encrypted);
+    }
+
+    [Fact]
+    public void ACrashBetweenMetadataAndPlaintextDelete_IsFinishedByTheNextLaunch()
+    {
+        // Model SaveEncrypted dying after the metadata write: all three files
+        // exist, metadata says Encrypted. The session is dead, so no tick will
+        // finish the swap - FindOrphans must delete the stale plaintext (the
+        // replay lens in section 7a) while still holding the .mdenc back.
+        var crashed = New("half");
+        crashed.Start();
+        crashed.Save("stale plaintext", @"C:\docs.mdenc", null);
+        crashed.SaveEncrypted(Sealed("current encrypted"), @"C:\docs.mdenc", null);
+        // Recreate the crash window: put the plaintext back beside the rest.
+        File.WriteAllText(Path.Combine(_dir, "half.md"), "stale plaintext");
+        crashed.Dispose();
+
+        var next = New("next");
+        next.Start();
+        Assert.Empty(next.FindOrphans());
+        Assert.False(File.Exists(Path.Combine(_dir, "half.md")));       // swap completed
+        Assert.True(File.Exists(Path.Combine(_dir, "half.mdenc")));     // held back, intact
+    }
+
+    [Fact]
     public void Discard_RemovesTheEncryptedSnapshotToo()
     {
         var store = New("disc");

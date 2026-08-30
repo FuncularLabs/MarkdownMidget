@@ -136,6 +136,7 @@ internal static class SecureMarkdownFormat
     {
         ArgumentNullException.ThrowIfNull(markdown);
         ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(salt);
         ValidateKdf(profile.KdfId, profile.ParamA, profile.ParamB);
         if (key.Length != KeyLength) throw new ArgumentOutOfRangeException(nameof(key));
         if (salt.Length != SaltLength) throw new ArgumentOutOfRangeException(nameof(salt));
