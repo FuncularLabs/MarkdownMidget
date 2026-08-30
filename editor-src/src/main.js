@@ -310,6 +310,57 @@ function requestContextMenu(view, clientX, clientY, img) {
   postToHost({ type: 'contextmenu', menu: 'text', x: clientX, y: clientY, spell });
 }
 
+// Word-protocol test for "is this mark on at the current selection": a
+// collapsed caret answers from what TYPING would produce (storedMarks first,
+// so a just-pressed Ctrl+B lights the button before any text exists); a range
+// is on only when EVERY text node in it carries the mark - a half-bold
+// selection shows Bold off, exactly as Word does. A range containing no text
+// at all (an image alone) falls back to the marks at the caret side.
+function markActive(state, type) {
+  if (!type) return false;
+  const { empty, from, to, $head } = state.selection;
+  if (empty) return !!type.isInSet(state.storedMarks || $head.marks());
+  let sawText = false, all = true;
+  state.doc.nodesBetween(from, to, (n) => {
+    if (!all) return false;
+    if (!n.isText) return;
+    sawText = true;
+    if (!type.isInSet(n.marks)) all = false;
+  });
+  return sawText ? all : !!type.isInSet($head.marks());
+}
+
+// Formatting feedback for the host toolbar: block style for the Style combo,
+// mark states for the B/I/U/S toggles. Posts only when the answer can have
+// changed (selection moved, storedMarks flipped, or the doc changed under the
+// same selection - toggling bold over a range is a doc change, not a
+// selection change).
+const selectionState = $prose(() => new Plugin({
+  key: new PluginKey('MDM_SELECTION_STATE'),
+  view: () => ({
+    update(view, prev) {
+      const s = view.state;
+      if (s.selection.eq(prev.selection) && s.storedMarks === prev.storedMarks && s.doc === prev.doc) return;
+      const node = s.selection.$head.parent;
+      let style = 'paragraph';
+      if (node.type.name === 'heading') style = 'h' + (node.attrs.level || 1);
+      else if (node.type.name === 'code_block') style = 'codeblock:' + (node.attrs.language || '');
+      else style = node.type.name; // paragraph, blockquote, …
+      const m = s.schema.marks;
+      postToHost({
+        type: 'selection',
+        style,
+        marks: {
+          bold: markActive(s, m.strong),
+          italic: markActive(s, m.emphasis),
+          underline: markActive(s, m.underline),
+          strike: markActive(s, m.strike_through || m.strikethrough),
+        },
+      });
+    },
+  }),
+}));
+
 function installContextMenus(view) {
   view.dom.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -461,18 +512,11 @@ const MDM = {
           // Defer a tick so view.state reflects the just-applied history step.
           setTimeout(postHistory, 0);
         });
-        // Report the block type at the cursor so the host can reflect it in the
-        // Style dropdown/menu.
-        l.selectionUpdated((_ctx, selection) => {
-          const node = selection?.$head?.parent;
-          let style = 'paragraph';
-          if (node) {
-            if (node.type.name === 'heading') style = 'h' + (node.attrs.level || 1);
-            else if (node.type.name === 'code_block') style = 'codeblock:' + (node.attrs.language || '');
-            else style = node.type.name; // paragraph, blockquote, …
-          }
-          postToHost({ type: 'selection', style });
-        });
+        // Block style + active marks at the cursor are reported by the
+        // selectionState plugin below, NOT here: selectionUpdated never fires
+        // for a storedMarks-only transaction (Ctrl+B at a collapsed caret), so
+        // a listener-based report goes stale at exactly the moment Word lights
+        // the Bold button.
       })
       .config(nord)
       .config((ctx) => {
@@ -493,6 +537,7 @@ const MDM = {
       .use(tableCellEditing)
       .use(mermaidBlock)
       .use(spellDecorate)
+      .use(selectionState)
       .use(splitHeadingCommand)
       .use(headingEnterKeymap)
       .use(exitBlockCommand)

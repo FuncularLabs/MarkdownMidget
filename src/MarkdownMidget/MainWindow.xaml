@@ -123,10 +123,10 @@
                         <MenuItem Header="_Settings…" Click="Settings_Click" />
                     </MenuItem>
                     <MenuItem x:Name="FormatMenu" Header="F_ormat">
-                        <MenuItem Header="_Bold" InputGestureText="Ctrl+B" Click="Bold_Click" />
-                        <MenuItem Header="_Italic" InputGestureText="Ctrl+I" Click="Italic_Click" />
-                        <MenuItem Header="_Underline" InputGestureText="Ctrl+U" Click="Underline_Click" />
-                        <MenuItem Header="_Strikethrough" Click="Strike_Click" />
+                        <MenuItem x:Name="MenuBoldItem" Header="_Bold" InputGestureText="Ctrl+B" Click="Bold_Click" />
+                        <MenuItem x:Name="MenuItalicItem" Header="_Italic" InputGestureText="Ctrl+I" Click="Italic_Click" />
+                        <MenuItem x:Name="MenuUnderlineItem" Header="_Underline" InputGestureText="Ctrl+U" Click="Underline_Click" />
+                        <MenuItem x:Name="MenuStrikeItem" Header="_Strikethrough" Click="Strike_Click" />
                         <MenuItem Header="Inline _Code" Click="Code_Click" />
                         <Separator />
                         <MenuItem Header="Bulleted _List" Click="Bullet_Click" />
@@ -246,10 +246,14 @@
                             <ComboBoxItem Content="Code: CSS" Tag="codeblock:css" />
                         </ComboBox>
                         <Separator />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Bold (Ctrl+B)" Click="Bold_Click" Content="&#xE8DD;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Italic (Ctrl+I)" Click="Italic_Click" Content="&#xE8DB;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Underline (Ctrl+U)" Click="Underline_Click" Content="&#xE8DC;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Strikethrough" Click="Strike_Click" Content="&#xEDE0;" />
+                        <!-- ToggleButtons whose checked state FOLLOWS the caret (Word
+                             protocol) — the editor reports mark states and SyncMarkToggles
+                             applies them, so a click's visual flip is confirmed or reverted
+                             by the editor's answer rather than trusted. -->
+                        <ToggleButton x:Name="BoldToggle" Style="{StaticResource ToolGlyph}" ToolTip="Bold (Ctrl+B)" Click="Bold_Click" Content="&#xE8DD;" />
+                        <ToggleButton x:Name="ItalicToggle" Style="{StaticResource ToolGlyph}" ToolTip="Italic (Ctrl+I)" Click="Italic_Click" Content="&#xE8DB;" />
+                        <ToggleButton x:Name="UnderlineToggle" Style="{StaticResource ToolGlyph}" ToolTip="Underline (Ctrl+U)" Click="Underline_Click" Content="&#xE8DC;" />
+                        <ToggleButton x:Name="StrikeToggle" Style="{StaticResource ToolGlyph}" ToolTip="Strikethrough" Click="Strike_Click" Content="&#xEDE0;" />
                         <!-- Hybrid code button: main click = inline code, chevron = code block language. -->
                         <Button Style="{StaticResource ToolChar}" ToolTip="Inline code" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Code block…" Click="CodeBlockMenu_Click"

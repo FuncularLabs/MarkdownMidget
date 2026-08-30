@@ -357,12 +357,20 @@ public partial class MainWindow : Window
                 _lastFindFlags = "";
                 break;
             case "selection":
-                // Reflect the block type at the cursor in the Style dropdown.
+                // Reflect what's at the cursor: block type in the Style dropdown,
+                // mark states on the B/I/U/S toggles (Word protocol — the editor's
+                // answer is authoritative, so a user click is confirmed or reverted
+                // by the state the editor reports back).
                 if (!_sourceMode)
                 {
                     using var d = JsonDocument.Parse(e.WebMessageAsJson);
                     if (d.RootElement.TryGetProperty("style", out var s))
                         SyncStyleCombo(s.GetString() ?? "paragraph");
+                    if (d.RootElement.TryGetProperty("marks", out var m) && m.ValueKind == JsonValueKind.Object)
+                    {
+                        bool On(string k) => m.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
+                        SyncMarkToggles(On("bold"), On("italic"), On("underline"), On("strike"));
+                    }
                 }
                 break;
             case "history":
@@ -2807,6 +2815,19 @@ public partial class MainWindow : Window
                 _syncingStyle = false;
                 return;
             }
+    }
+
+    /// <summary>
+    /// Apply the editor-reported mark states to the toolbar toggles and the
+    /// Format menu checkmarks. Programmatic IsChecked changes don't raise Click,
+    /// so no guard flag is needed — the Click handlers only fire for user input.
+    /// </summary>
+    private void SyncMarkToggles(bool bold, bool italic, bool underline, bool strike)
+    {
+        BoldToggle.IsChecked = MenuBoldItem.IsChecked = bold;
+        ItalicToggle.IsChecked = MenuItalicItem.IsChecked = italic;
+        UnderlineToggle.IsChecked = MenuUnderlineItem.IsChecked = underline;
+        StrikeToggle.IsChecked = MenuStrikeItem.IsChecked = strike;
     }
 
     private void FocusStyle_Click(object sender, RoutedEventArgs e)
