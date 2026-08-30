@@ -335,28 +335,32 @@ function markActive(state, type) {
 // changed (selection moved, storedMarks flipped, or the doc changed under the
 // same selection - toggling bold over a range is a doc change, not a
 // selection change).
+function postSelectionState(state) {
+  const node = state.selection.$head.parent;
+  let style = 'paragraph';
+  if (node.type.name === 'heading') style = 'h' + (node.attrs.level || 1);
+  else if (node.type.name === 'code_block') style = 'codeblock:' + (node.attrs.language || '');
+  else style = node.type.name; // paragraph, blockquote, …
+  const m = state.schema.marks;
+  postToHost({
+    type: 'selection',
+    style,
+    marks: {
+      bold: markActive(state, m.strong),
+      italic: markActive(state, m.emphasis),
+      underline: markActive(state, m.underline),
+      strike: markActive(state, m.strike_through || m.strikethrough),
+    },
+  });
+}
+
 const selectionState = $prose(() => new Plugin({
   key: new PluginKey('MDM_SELECTION_STATE'),
   view: () => ({
     update(view, prev) {
       const s = view.state;
       if (s.selection.eq(prev.selection) && s.storedMarks === prev.storedMarks && s.doc === prev.doc) return;
-      const node = s.selection.$head.parent;
-      let style = 'paragraph';
-      if (node.type.name === 'heading') style = 'h' + (node.attrs.level || 1);
-      else if (node.type.name === 'code_block') style = 'codeblock:' + (node.attrs.language || '');
-      else style = node.type.name; // paragraph, blockquote, …
-      const m = s.schema.marks;
-      postToHost({
-        type: 'selection',
-        style,
-        marks: {
-          bold: markActive(s, m.strong),
-          italic: markActive(s, m.emphasis),
-          underline: markActive(s, m.underline),
-          strike: markActive(s, m.strike_through || m.strikethrough),
-        },
-      });
+      postSelectionState(s);
     },
   }),
 }));
@@ -749,6 +753,12 @@ const MDM = {
     const factory = COMMANDS[name];
     if (!factory) return false;
     editor.action(factory(...args));
+    // Repost formatting state even when the command was a no-op (marks are
+    // disallowed in a code block, say): a refused command produces no
+    // transaction, the selectionState plugin stays silent, and the host's
+    // speculative ToggleButton flip would otherwise stick until the caret
+    // moves. The unconditional answer confirms or reverts it either way.
+    if (editorView) postSelectionState(editorView.state);
     this.focus();
     return true;
   },

@@ -183,6 +183,29 @@ public class SecureMarkdownFormatTests
         Assert.Equal(SecureMarkdownError.Unsupported, ex.Error);
     }
 
+    [Fact]
+    public void EncryptRefusesAProfileDecryptWouldReject()
+    {
+        // Producer-side half of the fail-closed contract: a file we write is
+        // always a file we can read back. 2 GiB of Argon2 memory is beyond the
+        // decrypt-side cap, so encrypt must refuse it up front - not produce a
+        // container that fails forever.
+        var absurd = SecureMarkdownFormat.KdfProfile.Argon2id(memoryKib: 2 * 1024 * 1024, timeCost: 3, parallelism: 4);
+        var ex = Assert.Throws<SecureMarkdownException>(() => SecureMarkdownFormat.Encrypt("secret", "pw", absurd));
+        Assert.Equal(SecureMarkdownError.Unsupported, ex.Error);
+    }
+
+    [Fact]
+    public void TheProfileFactoryRefusesValuesThatDoNotFitTheirField()
+    {
+        // timeCost and parallelism share one 32-bit word; a value that doesn't
+        // fit must throw, never silently mask to something weaker.
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SecureMarkdownFormat.KdfProfile.Argon2id(memoryKib: 8192, timeCost: 65537, parallelism: 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            SecureMarkdownFormat.KdfProfile.Argon2id(memoryKib: 8192, timeCost: 1, parallelism: 65537));
+    }
+
     // ---- the dependency itself ----
 
     [Fact]

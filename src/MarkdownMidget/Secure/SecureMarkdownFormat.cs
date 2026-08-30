@@ -66,8 +66,14 @@ internal static class SecureMarkdownFormat
     {
         public static KdfProfile Default { get; } = Argon2id(memoryKib: 65536, timeCost: 3, parallelism: 4);
 
-        public static KdfProfile Argon2id(uint memoryKib, uint timeCost, uint parallelism) =>
-            new(KdfArgon2id, memoryKib, (timeCost << 16) | (parallelism & 0xFFFF));
+        public static KdfProfile Argon2id(uint memoryKib, uint timeCost, uint parallelism)
+        {
+            // Both values share one 32-bit word; a value that doesn't fit must
+            // throw, not silently mask to something weaker than was asked for.
+            if (timeCost > 0xFFFF) throw new ArgumentOutOfRangeException(nameof(timeCost));
+            if (parallelism > 0xFFFF) throw new ArgumentOutOfRangeException(nameof(parallelism));
+            return new(KdfArgon2id, memoryKib, (timeCost << 16) | parallelism);
+        }
 
         public static KdfProfile Pbkdf2(uint iterations) => new(KdfPbkdf2Sha256, iterations, 0);
 
@@ -86,6 +92,10 @@ internal static class SecureMarkdownFormat
     {
         ArgumentNullException.ThrowIfNull(markdown);
         ArgumentNullException.ThrowIfNull(password);
+        // The same envelope Decrypt enforces. Without this, an out-of-range
+        // profile encrypts successfully and produces a file this app can NEVER
+        // read back - the producer-side half of the fail-closed contract.
+        ValidateKdf(profile.KdfId, profile.ParamA, profile.ParamB);
 
         var plaintext = Encoding.UTF8.GetBytes(markdown);
         var salt = RandomNumberGenerator.GetBytes(SaltLength);
