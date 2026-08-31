@@ -350,6 +350,7 @@ function postSelectionState(state) {
       italic: markActive(state, m.emphasis),
       underline: markActive(state, m.underline),
       strike: markActive(state, m.strike_through || m.strikethrough),
+      code: markActive(state, m.inlineCode || m.inline_code),
     },
   });
 }

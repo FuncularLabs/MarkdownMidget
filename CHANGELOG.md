@@ -9,6 +9,22 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.9.0-beta2] - 2026-08-30
+
+Two beta-1 dogfooding reports, same day.
+
+### Fixed
+- **Cursor tracking now covers code.** The inline-code toolbar button lights
+  when the caret sits in an inline code span (and the Format menu item shows a
+  checkmark), like the other mark buttons. And the Style dropdown no longer
+  goes stale inside a code block whose language is not in its fixed list
+  (mermaid, python, ...) - it falls back to the generic code entry instead of
+  silently keeping the previous answer. That staleness predates beta 1; the
+  new cursor tracking just made it visible.
+- **Disabled toolbar buttons are unmistakably disabled.** WPF barely dims glyph
+  text, so enabled Undo and disabled Redo looked nearly identical; disabled
+  toolbar buttons now fade hard enough to read at a glance.
+
 ## [0.9.0-beta1] - 2026-08-30
 
 **Secure Markdown** — password-protected encrypted documents — plus the

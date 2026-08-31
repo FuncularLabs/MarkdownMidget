@@ -18,6 +18,14 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="IsTabStop" Value="False" />
+            <Style.Triggers>
+                <!-- WPF's default disabled look for glyph text barely dims; a user
+                     reading the toolbar could not tell Undo from Redo (dogfooding,
+                     0.9.0-beta1). Fade hard enough that state is legible at a glance. -->
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <!-- Buttons whose mark has no clean glyph; use a text symbol instead. -->
         <Style x:Key="ToolChar" TargetType="{x:Type ButtonBase}">
@@ -27,6 +35,11 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="IsTabStop" Value="False" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Native editor context menus (shown on right-click / Menu key in WYSIWYG). -->
@@ -132,7 +145,7 @@
                         <MenuItem x:Name="MenuItalicItem" Header="_Italic" InputGestureText="Ctrl+I" Click="Italic_Click" />
                         <MenuItem x:Name="MenuUnderlineItem" Header="_Underline" InputGestureText="Ctrl+U" Click="Underline_Click" />
                         <MenuItem x:Name="MenuStrikeItem" Header="_Strikethrough" Click="Strike_Click" />
-                        <MenuItem Header="Inline _Code" Click="Code_Click" />
+                        <MenuItem x:Name="MenuCodeItem" Header="Inline _Code" Click="Code_Click" />
                         <Separator />
                         <MenuItem Header="Bulleted _List" Click="Bullet_Click" />
                         <MenuItem Header="_Numbered List" Click="Ordered_Click" />
@@ -260,7 +273,7 @@
                         <ToggleButton x:Name="UnderlineToggle" Style="{StaticResource ToolGlyph}" ToolTip="Underline (Ctrl+U)" Click="Underline_Click" Content="&#xE8DC;" />
                         <ToggleButton x:Name="StrikeToggle" Style="{StaticResource ToolGlyph}" ToolTip="Strikethrough" Click="Strike_Click" Content="&#xEDE0;" />
                         <!-- Hybrid code button: main click = inline code, chevron = code block language. -->
-                        <Button Style="{StaticResource ToolChar}" ToolTip="Inline code" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
+                        <ToggleButton x:Name="CodeToggle" Style="{StaticResource ToolChar}" ToolTip="Inline code" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Code block…" Click="CodeBlockMenu_Click"
                                 MinWidth="16" FontSize="10" Content="&#xE70D;">
                             <Button.ContextMenu>

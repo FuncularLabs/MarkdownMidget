@@ -390,7 +390,7 @@ public partial class MainWindow : Window
                     if (d.RootElement.TryGetProperty("marks", out var m) && m.ValueKind == JsonValueKind.Object)
                     {
                         bool On(string k) => m.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
-                        SyncMarkToggles(On("bold"), On("italic"), On("underline"), On("strike"));
+                        SyncMarkToggles(On("bold"), On("italic"), On("underline"), On("strike"), On("code"));
                     }
                 }
                 break;
@@ -3395,14 +3395,31 @@ public partial class MainWindow : Window
 
     private void SyncStyleCombo(string tag)
     {
+        // Exact match first; then any code block whose language isn't in the
+        // fixed list (mermaid, python, ...) falls back to the generic code item.
+        // Without the fallback the combo silently kept its previous value, so a
+        // caret inside a mermaid block still said "Paragraph" (dogfooding,
+        // 0.9.0-beta1) - a wrong answer is worse than a generic one.
+        ComboBoxItem? fallback = null;
         foreach (var obj in StyleCombo.Items)
-            if (obj is ComboBoxItem ci && (string?)ci.Tag == tag)
+            if (obj is ComboBoxItem ci && ci.Tag is string t)
             {
-                _syncingStyle = true;
-                StyleCombo.SelectedItem = ci;
-                _syncingStyle = false;
-                return;
+                if (t == tag)
+                {
+                    _syncingStyle = true;
+                    StyleCombo.SelectedItem = ci;
+                    _syncingStyle = false;
+                    return;
+                }
+                if (t == "codeblock:" && tag.StartsWith("codeblock:", StringComparison.Ordinal))
+                    fallback = ci;
             }
+        if (fallback is not null)
+        {
+            _syncingStyle = true;
+            StyleCombo.SelectedItem = fallback;
+            _syncingStyle = false;
+        }
     }
 
     /// <summary>
@@ -3410,12 +3427,13 @@ public partial class MainWindow : Window
     /// Format menu checkmarks. Programmatic IsChecked changes don't raise Click,
     /// so no guard flag is needed — the Click handlers only fire for user input.
     /// </summary>
-    private void SyncMarkToggles(bool bold, bool italic, bool underline, bool strike)
+    private void SyncMarkToggles(bool bold, bool italic, bool underline, bool strike, bool code)
     {
         BoldToggle.IsChecked = MenuBoldItem.IsChecked = bold;
         ItalicToggle.IsChecked = MenuItalicItem.IsChecked = italic;
         UnderlineToggle.IsChecked = MenuUnderlineItem.IsChecked = underline;
         StrikeToggle.IsChecked = MenuStrikeItem.IsChecked = strike;
+        CodeToggle.IsChecked = MenuCodeItem.IsChecked = code;
     }
 
     private void FocusStyle_Click(object sender, RoutedEventArgs e)
