@@ -3290,7 +3290,18 @@ public partial class MainWindow : Window
                 // Asked and answered: they either saved it or chose to let it go, so
                 // there is nothing left for a crash copy to rescue.
                 EndBackup();
-                Close();
+                // NOT a direct Close(): on "Don't Save" the await above completed
+                // synchronously (a modal MessageBox returns on the same stack, and
+                // that branch awaits nothing else), so this continuation is still
+                // INSIDE the original Closing dispatch — and Close() while a window
+                // is closing throws. Latent since the MVP: the unhandled exception
+                // killed the process, which is indistinguishable from a successful
+                // close, until the crash handler started catching it (crash.log,
+                // 2026-08-30 — its first real-world catch). One dispatcher hop lets
+                // the first close fully unwind before the second begins; Normal
+                // priority (BeginInvoke never runs inline at any priority) keeps
+                // the open-window gap as small as it can be.
+                _ = Dispatcher.BeginInvoke(new Action(Close), DispatcherPriority.Normal);
             }
             return;
         }

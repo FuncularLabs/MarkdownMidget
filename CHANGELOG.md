@@ -9,6 +9,16 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.9.0-beta3] - 2026-08-30
+
+### Fixed
+- **Closing with "Don't Save" no longer trips an error dialog.** Latent since
+  the very first release: answering Don't Save re-closed the window while the first close
+  was still in progress, which throws. For years the resulting crash silently
+  killed the app - indistinguishable from a successful close - until 0.8.2's
+  crash handler caught it in the act (its first real-world catch) and beta
+  dogfooding read the log it wrote. The re-close now waits its turn.
+
 ## [0.9.0-beta2] - 2026-08-30
 
 Two beta-1 dogfooding reports, same day.
