@@ -98,13 +98,19 @@ internal static class PickerChild
             {
                 anchor = new Window
                 {
-                    Width = 1, Height = 1, WindowStyle = WindowStyle.None,
+                    WindowStyle = WindowStyle.None,
                     ShowInTaskbar = false, ShowActivated = false,
                     AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent,
                     Opacity = 0,
-                    // Where the anchor lands if the parent's rectangle is unusable
-                    // (minimised): the screen, not wherever WPF would default to.
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                    // The fallback shape, used when the parent's rectangle is
+                    // unusable (minimised): the whole work area. NOT a 1x1 window -
+                    // the dialog puts its top-left at its owner's top-left, so a
+                    // tiny anchor anywhere but the top-left corner clips the
+                    // dialog's buttons off the bottom-right.
+                    Left = SystemParameters.WorkArea.Left,
+                    Top = SystemParameters.WorkArea.Top,
+                    Width = SystemParameters.WorkArea.Width,
+                    Height = SystemParameters.WorkArea.Height,
                 };
                 var parent = new IntPtr(request.OwnerHandle);
                 new WindowInteropHelper(anchor).Owner = parent;
