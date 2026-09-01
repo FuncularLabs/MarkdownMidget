@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
@@ -93,13 +94,36 @@ internal static class PickerChild
         Window? anchor = null;
         if (request.OwnerHandle != 0)
         {
-            anchor = new Window
+            try
             {
-                Width = 1, Height = 1, Left = -32000, Top = -32000,
-                WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false,
-            };
-            new WindowInteropHelper(anchor).Owner = new IntPtr(request.OwnerHandle);
-            anchor.Show();
+                anchor = new Window
+                {
+                    Width = 1, Height = 1, WindowStyle = WindowStyle.None,
+                    ShowInTaskbar = false, ShowActivated = false,
+                    AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent,
+                    Opacity = 0,
+                };
+                var parent = new IntPtr(request.OwnerHandle);
+                new WindowInteropHelper(anchor).Owner = parent;
+                anchor.Show();
+                // Windows centres a file dialog on its OWNER, so park the anchor at
+                // the parent window's centre - in PHYSICAL pixels via SetWindowPos,
+                // which sidesteps WPF's DIP conversion on scaled displays. Left
+                // off-screen (as it first was) the dialog would centre off-screen
+                // too, which is worse than having no owner at all.
+                var anchorHandle = new WindowInteropHelper(anchor).Handle;
+                if (anchorHandle != IntPtr.Zero && GetWindowRect(parent, out var r))
+                    SetWindowPos(anchorHandle, IntPtr.Zero,
+                        r.Left + (r.Right - r.Left) / 2, r.Top + (r.Bottom - r.Top) / 2, 1, 1,
+                        SwpNoZOrder | SwpNoActivate);
+            }
+            catch
+            {
+                // A parent that died between spawn and here, or any interop
+                // refusal: fall back to an unowned dialog rather than no dialog.
+                try { anchor?.Close(); } catch { }
+                anchor = null;
+            }
         }
         try
         {
@@ -127,4 +151,16 @@ internal static class PickerChild
 
     private static bool Show(Microsoft.Win32.CommonDialog dlg, Window? anchor) =>
         (anchor is null ? dlg.ShowDialog() : dlg.ShowDialog(anchor)) == true;
+
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect { public int Left, Top, Right, Bottom; }
+
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter,
+        int x, int y, int cx, int cy, uint flags);
 }

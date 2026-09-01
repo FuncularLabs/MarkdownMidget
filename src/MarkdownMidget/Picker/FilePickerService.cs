@@ -57,6 +57,7 @@ internal static class FilePickerService
     public const int ManagedFailureExitCode = 3;
 
     [DllImport("user32.dll")] private static extern bool EnableWindow(IntPtr hWnd, bool enable);
+    [DllImport("user32.dll")] private static extern bool IsWindowEnabled(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
 
     /// <summary>
@@ -198,6 +199,11 @@ internal static class FilePickerService
     {
         var handle = new WindowInteropHelper(owner).Handle;
         var wasEnabled = owner.IsEnabled;
+        // Capture the HWND's ACTUAL state, not an assumption: a pick can nest
+        // (a timer tick inside this very frame can reach another dialog), and an
+        // inner finally that re-enabled unconditionally would un-disable a window
+        // the outer pick is still waiting on.
+        var wasHandleEnabled = handle != IntPtr.Zero && IsWindowEnabled(handle);
         owner.IsEnabled = false;
         if (handle != IntPtr.Zero) EnableWindow(handle, false);
         try
@@ -215,7 +221,7 @@ internal static class FilePickerService
         {
             // Re-enable the HWND before the WPF flag: the reverse order can leave
             // a window WPF thinks is enabled that Windows still refuses to click.
-            if (handle != IntPtr.Zero) EnableWindow(handle, true);
+            if (handle != IntPtr.Zero && wasHandleEnabled) EnableWindow(handle, true);
             owner.IsEnabled = wasEnabled;
         }
     }

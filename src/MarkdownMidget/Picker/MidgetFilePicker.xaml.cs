@@ -21,9 +21,10 @@ namespace MarkdownMidget.Picker;
 /// extension instead.
 ///
 /// The logic worth testing (filter parsing and matching, typed-path resolution,
-/// extension rules, sorting, type-ahead, breadcrumbs) lives in
+/// extension and retyping rules, sorting, type-ahead) lives in
 /// <see cref="FilePickerModel"/>; this class is the shell around it and the
-/// only part that touches the disk.
+/// only part that touches the disk. The address bar is a plain editable path
+/// box — clickable breadcrumb segments were designed but not built.
 /// </summary>
 public partial class MidgetFilePicker : Window
 {
@@ -74,7 +75,7 @@ public partial class MidgetFilePicker : Window
         BuildPlaces();
         Loaded += (_, _) =>
         {
-            Navigate(FirstDirectory(), addToHistory: true);
+            OpenFirstListableDirectory();
             NameBox.Focus();
             NameBox.SelectAll();
         };
@@ -82,16 +83,44 @@ public partial class MidgetFilePicker : Window
 
     private FilterGroup? SelectedFilter => FilterCombo.SelectedItem as FilterGroup;
 
-    /// <summary>Where the dialog opens: the caller's folder, else the requested
-    /// file's folder, else Documents — never a path that no longer exists.</summary>
-    private string FirstDirectory()
+    /// <summary>
+    /// Land on the first folder that actually LISTS. Existence is not enough:
+    /// a folder can exist and refuse enumeration (another user's profile, a
+    /// share that errors), and leaving the dialog with no current directory is
+    /// worse than any of these candidates — a save typed into that state would
+    /// resolve against the process working directory and write somewhere the
+    /// user never chose.
+    /// </summary>
+    private void OpenFirstListableDirectory()
     {
-        if (!string.IsNullOrEmpty(_request.InitialDirectory) && Directory.Exists(_request.InitialDirectory))
-            return _request.InitialDirectory;
-        foreach (var recent in _request.RecentFolders)
-            if (Directory.Exists(recent)) return recent;
-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        return Directory.Exists(docs) ? docs : Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
+        foreach (var candidate in StartCandidates())
+            if (!string.IsNullOrEmpty(candidate) && Navigate(candidate, addToHistory: true, quiet: true))
+                return;
+
+        // Nothing at all could be listed. Say so plainly and take the accept
+        // buttons away rather than leaving a dialog that looks usable.
+        MessageBox.Show(this,
+            "No folder could be opened — not the one asked for, and not Documents, " +
+            "your user folder or any drive. Something is wrong with this machine's " +
+            "file system or permissions.",
+            "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
+        AcceptButton.IsEnabled = false;
+        NewFolderButton.IsEnabled = false;
+    }
+
+    private IEnumerable<string> StartCandidates()
+    {
+        yield return _request.InitialDirectory ?? "";
+        foreach (var recent in _request.RecentFolders) yield return recent;
+        yield return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        yield return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        yield return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            string? root = null;
+            try { if (drive.IsReady) root = drive.RootDirectory.FullName; } catch { }
+            if (root is not null) yield return root;
+        }
     }
 
     // ===== places tree =====
@@ -183,8 +212,10 @@ public partial class MidgetFilePicker : Window
     /// listed, in which case NOTHING moves: a folder that exists but refuses to
     /// enumerate (another user's profile, a share that errors) must not become
     /// the current directory behind a view still showing the old one - a later
-    /// Save would then land somewhere the user never saw.</summary>
-    private bool Navigate(string path, bool addToHistory)
+    /// Save would then land somewhere the user never saw. <paramref name="quiet"/>
+    /// suppresses the error box while walking candidate start folders, where a
+    /// failure is expected and the next candidate is the answer.</summary>
+    private bool Navigate(string path, bool addToHistory, bool quiet = false)
     {
         if (!Directory.Exists(path)) return false;
         var target = Path.GetFullPath(path);
@@ -221,8 +252,9 @@ public partial class MidgetFilePicker : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Couldn't list that folder:\n{ex.Message}",
-                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!quiet)
+                MessageBox.Show(this, $"Couldn't list that folder:\n{ex.Message}",
+                    "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
             return false;
         }
 
@@ -256,7 +288,7 @@ public partial class MidgetFilePicker : Window
     {
         BackButton.IsEnabled = _historyIndex > 0;
         ForwardButton.IsEnabled = _historyIndex >= 0 && _historyIndex < _history.Count - 1;
-        UpButton.IsEnabled = Directory.GetParent(_currentDirectory) is not null;
+        UpButton.IsEnabled = _currentDirectory.Length > 0 && Directory.GetParent(_currentDirectory) is not null;
     }
 
     // ===== navigation commands =====
@@ -280,6 +312,9 @@ public partial class MidgetFilePicker : Window
 
     private void Up_Click(object sender, RoutedEventArgs e)
     {
+        // GetParent("") throws, and that is reachable from the Alt+Up accelerator
+        // when no folder could be opened at all.
+        if (_currentDirectory.Length == 0) return;
         if (Directory.GetParent(_currentDirectory) is { } parent) Navigate(parent.FullName, addToHistory: true);
     }
 
@@ -399,6 +434,10 @@ public partial class MidgetFilePicker : Window
 
     private void Accept_Click(object sender, RoutedEventArgs e)
     {
+        // With no folder open, a relative name would resolve against the PROCESS
+        // working directory - writing somewhere the user never saw, which is the
+        // whole harm the deferred-commit fix exists to prevent.
+        if (_currentDirectory.Length == 0) return;
         var typed = NameBox.Text.Trim();
         if (typed.Length == 0)
         {
@@ -466,6 +505,7 @@ public partial class MidgetFilePicker : Window
 
     private void NewFolder_Click(object sender, RoutedEventArgs e)
     {
+        if (_currentDirectory.Length == 0) return;   // same reason as Accept_Click
         var dlg = InputDialog.Single(this, "New Folder", "Folder name", "New folder");
         if (dlg.ShowDialog() != true) return;
         var name = dlg.Value1.Trim();

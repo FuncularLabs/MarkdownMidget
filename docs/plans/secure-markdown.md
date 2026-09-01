@@ -381,7 +381,10 @@ Two layers, because neither suffices by itself:
    zero shell code: navigation is pure `System.IO`.
 
    Feature bar (matching the request: same navigation abilities as the standard dialog):
-   - **Editable address bar** with breadcrumb segments (type a path, paste UNC, Enter).
+   - **Editable address bar** (type a path, paste UNC, Enter). *Built 2026-08-31
+     as a plain editable path box; clickable breadcrumb SEGMENTS were designed
+     but not implemented, and the helper written for them was removed as dead
+     code rather than left to rot.*
    - **Left rail**: Desktop, Documents, Downloads, this app's recent folders, all drives.
    - **Folder tree view** (expand-on-demand, no eager recursion).
    - **File list view**: Name / Date modified / Size columns, sortable, keyboard
