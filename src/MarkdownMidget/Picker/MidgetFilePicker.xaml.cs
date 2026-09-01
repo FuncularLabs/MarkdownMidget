@@ -261,6 +261,12 @@ public partial class MidgetFilePicker : Window
         entries.Sort((a, b) => FilePickerModel.CompareEntries(a.IsDirectory, a.Name, b.IsDirectory, b.Name));
 
         _currentDirectory = target;   // committed only now, with a view to match
+        // A successful listing clears the "nothing could be opened" verdict. That
+        // state is environmental (a downed share holding Documents, no ready
+        // drive), so leaving the buttons dead after the user navigated somewhere
+        // real would be a transient outage written as a permanent mark.
+        AcceptButton.IsEnabled = true;
+        NewFolderButton.IsEnabled = true;
         _navigating = true;
         FileList.ItemsSource = entries;
         AddressBox.Text = _currentDirectory;

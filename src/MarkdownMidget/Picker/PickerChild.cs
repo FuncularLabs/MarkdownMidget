@@ -102,19 +102,28 @@ internal static class PickerChild
                     ShowInTaskbar = false, ShowActivated = false,
                     AllowsTransparency = true, Background = System.Windows.Media.Brushes.Transparent,
                     Opacity = 0,
+                    // Where the anchor lands if the parent's rectangle is unusable
+                    // (minimised): the screen, not wherever WPF would default to.
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 };
                 var parent = new IntPtr(request.OwnerHandle);
                 new WindowInteropHelper(anchor).Owner = parent;
                 anchor.Show();
-                // Windows centres a file dialog on its OWNER, so park the anchor at
-                // the parent window's centre - in PHYSICAL pixels via SetWindowPos,
-                // which sidesteps WPF's DIP conversion on scaled displays. Left
-                // off-screen (as it first was) the dialog would centre off-screen
-                // too, which is worse than having no owner at all.
+                // MEASURED (not assumed): the dialog places its top-left at its
+                // OWNER's top-left, so the anchor is given the parent's whole
+                // rectangle and the dialog opens over the editor. A 1x1 anchor at
+                // the parent's centre - the obvious guess - put the dialog's
+                // CORNER there and pushed it down-right off the window. Physical
+                // pixels via SetWindowPos, which sidesteps WPF's DIP conversion on
+                // scaled displays.
                 var anchorHandle = new WindowInteropHelper(anchor).Handle;
-                if (anchorHandle != IntPtr.Zero && GetWindowRect(parent, out var r))
+                // A minimised parent reports a rectangle off in the -32000s, which
+                // is exactly the off-screen centring this fix exists to avoid, so
+                // leave the anchor screen-centred in that case.
+                if (anchorHandle != IntPtr.Zero && !IsIconic(parent) && GetWindowRect(parent, out var r)
+                    && r.Left > -30000 && r.Top > -30000)
                     SetWindowPos(anchorHandle, IntPtr.Zero,
-                        r.Left + (r.Right - r.Left) / 2, r.Top + (r.Bottom - r.Top) / 2, 1, 1,
+                        r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top,
                         SwpNoZOrder | SwpNoActivate);
             }
             catch
@@ -159,6 +168,8 @@ internal static class PickerChild
     private struct Rect { public int Left, Top, Right, Bottom; }
 
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
+
+    [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter,
