@@ -137,6 +137,19 @@ public class FilePickerModelTests
     public void AnExtensionWithoutItsDotStillWorks() =>
         Assert.Equal("notes.md", FilePickerModel.EnsureExtension("notes", null, "md"));
 
+    [Fact]
+    public void WorksOnTheFULLPATHTheDialogActuallyPassesIt()
+    {
+        // Accept_Click resolves the typed text to an absolute path FIRST and
+        // applies the extension to that — so this, not the bare name, is the
+        // production input shape.
+        var group = FilePickerModel.ParseFilter("Markdown (*.md)|*.md")[0];
+        Assert.Equal(@"C:\docs\notes.md", FilePickerModel.EnsureExtension(@"C:\docs\notes", group, null));
+        Assert.Equal(@"C:\docs\notes.txt", FilePickerModel.EnsureExtension(@"C:\docs\notes.txt", group, null));
+        // A dot in a DIRECTORY name must not read as the file having an extension.
+        Assert.Equal(@"C:\my.folder\notes.md", FilePickerModel.EnsureExtension(@"C:\my.folder\notes", group, null));
+    }
+
     // ---- presentation ----
 
     [Theory]
@@ -178,21 +191,38 @@ public class FilePickerModelTests
         Assert.Equal(-1, FilePickerModel.FindByPrefix([], "a", 0));
     }
 
-    // ---- breadcrumbs ----
+    // ---- retyping on a filter change ----
 
     [Fact]
-    public void BreadcrumbsPairEachSegmentWithItsPath()
+    public void ChangingTheFileTypeRetypesTheName()
     {
-        var crumbs = FilePickerModel.Breadcrumbs(@"C:\code\MarkdownMidget");
-        Assert.Equal(@"C:\", crumbs[0].Path);
-        Assert.Equal("code", crumbs[1].Label);
-        Assert.Equal(@"C:\code", crumbs[1].Path);
-        Assert.Equal(@"C:\code\MarkdownMidget", crumbs[^1].Path);
+        // Not cosmetic: the CALLER decides what to write from the returned
+        // path's extension, so a name left as .md after the user picked Secure
+        // Markdown would write plaintext into a file they believe is encrypted.
+        var mdenc = FilePickerModel.ParseFilter("Secure Markdown (*.mdenc)|*.mdenc")[0];
+        Assert.Equal("notes.mdenc", FilePickerModel.RetypeForFilter("notes.md", mdenc));
+        Assert.Equal("notes.mdenc", FilePickerModel.RetypeForFilter("notes", mdenc));
     }
 
     [Fact]
-    public void ARootPathHasOneBreadcrumb() =>
-        Assert.Single(FilePickerModel.Breadcrumbs(@"C:\"));
+    public void RetypingLeavesANameThatAlreadyFits()
+    {
+        var mdenc = FilePickerModel.ParseFilter("Secure Markdown (*.mdenc)|*.mdenc")[0];
+        Assert.Equal("notes.mdenc", FilePickerModel.RetypeForFilter("notes.mdenc", mdenc));
+    }
+
+    [Fact]
+    public void RetypingDoesNothingWithoutASingleExtensionToApply()
+    {
+        // "*.*" has no extension to impose, and "*.md;*.markdown" has no single
+        // right answer — in both cases the user's name is left alone.
+        var all = FilePickerModel.ParseFilter("All files (*.*)|*.*")[0];
+        var multi = FilePickerModel.ParseFilter("Markdown|*.md;*.markdown")[0];
+        Assert.Equal("notes.md", FilePickerModel.RetypeForFilter("notes.md", all));
+        Assert.Equal("notes.txt", FilePickerModel.RetypeForFilter("notes.txt", multi));
+        Assert.Equal("notes.md", FilePickerModel.RetypeForFilter("notes.md", null));
+        Assert.Equal("", FilePickerModel.RetypeForFilter("", all));
+    }
 }
 
 /// <summary>

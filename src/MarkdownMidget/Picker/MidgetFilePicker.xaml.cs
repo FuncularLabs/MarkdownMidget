@@ -179,15 +179,20 @@ public partial class MidgetFilePicker : Window
         catch { return false; }
     }
 
-    private void Navigate(string path, bool addToHistory)
+    /// <summary>Show <paramref name="path"/>. Returns false when it could not be
+    /// listed, in which case NOTHING moves: a folder that exists but refuses to
+    /// enumerate (another user's profile, a share that errors) must not become
+    /// the current directory behind a view still showing the old one - a later
+    /// Save would then land somewhere the user never saw.</summary>
+    private bool Navigate(string path, bool addToHistory)
     {
-        if (!Directory.Exists(path)) return;
-        _currentDirectory = Path.GetFullPath(path);
+        if (!Directory.Exists(path)) return false;
+        var target = Path.GetFullPath(path);
 
         var entries = new List<Entry>();
         try
         {
-            foreach (var dir in Directory.EnumerateDirectories(_currentDirectory).Where(Visible))
+            foreach (var dir in Directory.EnumerateDirectories(target).Where(Visible))
             {
                 entries.Add(new Entry
                 {
@@ -198,7 +203,7 @@ public partial class MidgetFilePicker : Window
                 });
             }
             var filter = SelectedFilter;
-            foreach (var file in Directory.EnumerateFiles(_currentDirectory).Where(Visible))
+            foreach (var file in Directory.EnumerateFiles(target).Where(Visible))
             {
                 var name = Path.GetFileName(file);
                 if (filter is not null && !FilePickerModel.MatchesFilter(name, filter)) continue;
@@ -218,11 +223,12 @@ public partial class MidgetFilePicker : Window
         {
             MessageBox.Show(this, $"Couldn't list that folder:\n{ex.Message}",
                 "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            return false;
         }
 
         entries.Sort((a, b) => FilePickerModel.CompareEntries(a.IsDirectory, a.Name, b.IsDirectory, b.Name));
 
+        _currentDirectory = target;   // committed only now, with a view to match
         _navigating = true;
         FileList.ItemsSource = entries;
         AddressBox.Text = _currentDirectory;
@@ -238,6 +244,7 @@ public partial class MidgetFilePicker : Window
             _historyIndex = _history.Count - 1;
         }
         UpdateNavButtons();
+        return true;
     }
 
     private static string SafeWriteTime(string path)
@@ -257,16 +264,17 @@ public partial class MidgetFilePicker : Window
     private void Back_Click(object sender, RoutedEventArgs e)
     {
         if (_historyIndex <= 0) return;
-        _historyIndex--;
-        Navigate(_history[_historyIndex], addToHistory: false);
+        // Move the cursor only if the step lands: a deleted folder in the history
+        // would otherwise consume the Back press and leave the index pointing at
+        // somewhere we are not.
+        if (Navigate(_history[_historyIndex - 1], addToHistory: false)) _historyIndex--;
         UpdateNavButtons();
     }
 
     private void Forward_Click(object sender, RoutedEventArgs e)
     {
         if (_historyIndex < 0 || _historyIndex >= _history.Count - 1) return;
-        _historyIndex++;
-        Navigate(_history[_historyIndex], addToHistory: false);
+        if (Navigate(_history[_historyIndex + 1], addToHistory: false)) _historyIndex++;
         UpdateNavButtons();
     }
 
@@ -282,6 +290,10 @@ public partial class MidgetFilePicker : Window
     private void FilterCombo_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_navigating || _currentDirectory.Length == 0) return;
+        // Save mode only, like Windows' own dialog: in Open mode the box holds a
+        // selection, and rewriting it would fight the user.
+        if (_request.Save)
+            NameBox.Text = FilePickerModel.RetypeForFilter(NameBox.Text.Trim(), SelectedFilter);
         Navigate(_currentDirectory, addToHistory: false);
     }
 
@@ -417,6 +429,15 @@ public partial class MidgetFilePicker : Window
 
     private void Choose(string path)
     {
+        // A folder is never an answer - including the case that only becomes a
+        // folder after the extension was applied ("notes" beside a directory
+        // called "notes.md"). Enter it instead, which is what the user meant.
+        if (Directory.Exists(path))
+        {
+            Navigate(path, addToHistory: true);
+            NameBox.Clear();
+            return;
+        }
         if (_request.Save)
         {
             var dir = Path.GetDirectoryName(path);

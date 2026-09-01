@@ -33,4 +33,9 @@ internal sealed record FilePickerRequest
 
     /// <summary>Folders offered in the built-in picker's shortcut rail, newest first.</summary>
     public IReadOnlyList<string> RecentFolders { get; init; } = [];
+
+    /// <summary>The parent window's HWND, passed to the child process so its
+    /// dialog can be owned by the window that is waiting for it. Zero when
+    /// unknown (the dialog is then unowned, as before).</summary>
+    public long OwnerHandle { get; init; }
 }

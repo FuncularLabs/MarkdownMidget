@@ -36,7 +36,8 @@ tried without owning a broken machine.
 
 ### Fixed
 - Open and Save now start in the current document's folder rather than
-  wherever Windows last left the dialog.
+  wherever Windows last left the dialog. The built-in picker also offers
+  recently used folders in its shortcut rail.
 
 ## [0.9.0-beta3] - 2026-08-30
 

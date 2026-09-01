@@ -125,7 +125,9 @@ public partial class MainWindow : Window
         _ = NotifyIfUpdateAvailableAsync();
         _externalChangeTimer.Tick += async (_, _) => await OnExternalChangeTimerAsync();
 
-        // The picker strategy is process-wide; every window agrees on it.
+        // The strategy is per PROCESS, and every window is its own process here,
+        // so this is simply "what this window does" — read from the shared
+        // settings file at launch and re-read by each new window.
         Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
         Picker.FilePickerService.AutoSwitchedToBuiltIn = OnPickerAutoSwitched;
 
@@ -723,14 +725,18 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// The native dialog crashed in its child process and the service switched
-    /// to the built-in picker. Persist that so the next launch - and every other
-    /// window - starts where this one ended up; the service has already told the
-    /// user what happened.
+    /// to the built-in picker. Persist that so LATER launches start where this
+    /// one ended up (windows already open are separate processes and keep their
+    /// own setting until they restart); the service has already told the user.
     /// </summary>
     private void OnPickerAutoSwitched()
     {
         _useBuiltInPicker = true;
-        SaveSettings();
+        // SavePersistentField, not SaveSettings: this fires from a background
+        // event while other WINDOWS (separate processes) may have written their
+        // own preferences since we launched, and SaveSettings would republish
+        // this instance's launch-time snapshot over them.
+        SavePersistentField(s => s.UseBuiltInPicker = true);
     }
 
     /// <summary>Folders worth offering in the built-in picker's rail: where the
@@ -1014,6 +1020,9 @@ public partial class MainWindow : Window
             Filter = Secure.SecureUi.OpenFilter(_showEncryptedInOpen),
             DefaultExt = ".md",
             CheckFileExists = true,
+            // RecentFolders only reaches the BUILT-IN picker's rail; the native
+            // dialog needs this to start anywhere in particular.
+            InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
             RecentFolders = PickerRecentFolders(),
         });
         if (picked is null) return;
@@ -1470,6 +1479,7 @@ public partial class MainWindow : Window
                 Save = true,
                 Filter = "Secure Markdown (*.mdenc)|*.mdenc",
                 DefaultExt = Secure.SecureMarkdownFormat.Extension,
+                InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
                 FileName = _displayName is null ? "Untitled.mdenc"
                          : Path.ChangeExtension(Path.GetFileName(_displayName), Secure.SecureMarkdownFormat.Extension),
                 RecentFolders = PickerRecentFolders(),

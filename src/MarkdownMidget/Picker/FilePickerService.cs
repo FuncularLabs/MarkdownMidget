@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace MarkdownMidget.Picker;
@@ -46,6 +48,18 @@ internal static class FilePickerService
     public const int CancelledExitCode = 2;
 
     /// <summary>
+    /// The child hit a MANAGED error (it caught and reported one). That is a
+    /// bug in us, not a faulty shell extension, so it falls back for this one
+    /// pick WITHOUT permanently switching the user or blaming their add-ons.
+    /// Deliberately not 1: Task Manager's "End task" exits with 1, and reading
+    /// that as "our own bug" would hide a real kill.
+    /// </summary>
+    public const int ManagedFailureExitCode = 3;
+
+    [DllImport("user32.dll")] private static extern bool EnableWindow(IntPtr hWnd, bool enable);
+    [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
+
+    /// <summary>
     /// Show a picker and return the chosen path, or null if the user cancelled.
     /// Synchronous, like the dialog it replaces.
     /// </summary>
@@ -59,17 +73,22 @@ internal static class FilePickerService
                 return r.Path;
             case { Outcome: NativeOutcome.Cancelled }:
                 return null;
+            case { Outcome: NativeOutcome.ManagedFailure }:
+                // Our own fault, so no accusation and no permanent switch — just
+                // finish the job in the picker that definitely works.
+                return ShowBuiltIn(owner, request);
             case { Outcome: NativeOutcome.Crashed }:
                 // The isolation worked: only the child died. Switch permanently,
                 // say so once, and finish the job the user actually asked for.
                 UseBuiltIn = true;
                 try { AutoSwitchedToBuiltIn?.Invoke(); } catch { /* never let the notice break the pick */ }
                 MessageBox.Show(owner,
-                    "Windows' file picker closed unexpectedly. That is almost always a faulty " +
-                    "Explorer add-on (a preview or thumbnail handler), not Markdown Midget — and " +
-                    "it can't crash the app from here.\n\n" +
-                    "Markdown Midget has switched to its own built-in file picker, which doesn't " +
-                    "load those add-ons. You can switch back in Edit ▸ Settings.",
+                    "Windows' file picker closed unexpectedly. The usual cause is an Explorer " +
+                    "add-on (a preview or thumbnail handler) failing inside it — Markdown Midget " +
+                    "runs that dialog in a separate process, so it couldn't take the app with it.\n\n" +
+                    "Markdown Midget has switched to its own built-in file picker, which loads no " +
+                    "add-ons. If that wasn't a crash — you closed the helper yourself, say — turn " +
+                    "it back off in Edit ▸ Settings.",
                     "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
                 return ShowBuiltIn(owner, request);
             default:
@@ -88,7 +107,7 @@ internal static class FilePickerService
         return dlg.ShowDialog() == true ? dlg.SelectedPath : null;
     }
 
-    private enum NativeOutcome { Chose, Cancelled, Crashed, CouldNotStart }
+    private enum NativeOutcome { Chose, Cancelled, Crashed, ManagedFailure, CouldNotStart }
 
     private readonly record struct NativeResult(NativeOutcome Outcome, string? Path);
 
@@ -117,11 +136,19 @@ internal static class FilePickerService
         Arg("--default-ext", request.DefaultExt);
         Arg("--title", request.Title);
         if (request.CheckFileExists) psi.ArgumentList.Add("--check-exists");
+        // The owner HWND travels so the child's dialog can OWN itself to this
+        // window: without it the dialog is a stray top-level of another process,
+        // which Windows may leave behind the (frozen-looking) editor.
+        var ownerHandle = new WindowInteropHelper(owner).Handle;
+        if (ownerHandle != IntPtr.Zero) Arg("--owner", ownerHandle.ToInt64().ToString());
 
         Process? child;
         try { child = Process.Start(psi); }
         catch { return new(NativeOutcome.CouldNotStart, null); }
         if (child is null) return new(NativeOutcome.CouldNotStart, null);
+        // Let the child come to the front: without this grant, foreground rules
+        // can keep another process's window behind ours.
+        try { AllowSetForegroundWindow(child.Id); } catch { }
 
         string output;
         using (child)
@@ -137,23 +164,42 @@ internal static class FilePickerService
             if (code == CancelledExitCode) return new(NativeOutcome.Cancelled, null);
             var path = output.Trim();
             if (code == 0 && path.Length > 0) return new(NativeOutcome.Chose, path);
+            if (code == ManagedFailureExitCode) return new(NativeOutcome.ManagedFailure, null);
+            // The app is going away (logoff, shutdown, Exit): the child dying is
+            // a consequence of that, not evidence about anyone's shell. Switching
+            // here would punish the user on their next launch for closing the app.
+            if (_shuttingDown) return new(NativeOutcome.ManagedFailure, null);
             // Exit 0 with nothing, or any other code: the dialog never gave us a
             // result. An access violation in a shell extension lands here.
             return new(NativeOutcome.Crashed, null);
         }
     }
 
+    /// <summary>True once this process is tearing down, so a child dying with it
+    /// is not read as evidence about the user's shell.</summary>
+    private static bool _shuttingDown;
+
+    /// <summary>Called from App as the application exits.</summary>
+    public static void NoteShuttingDown() => _shuttingDown = true;
+
     /// <summary>
     /// Wait for the child while keeping this window alive and repainting, and
-    /// disabled so the wait is genuinely modal — the same contract ShowDialog
-    /// has. A nested dispatcher frame is how WPF's own modal dialogs do it;
-    /// blocking the UI thread on WaitForExit instead would freeze and smear the
-    /// editor behind the picker.
+    /// genuinely modal — the same contract ShowDialog has. A nested dispatcher
+    /// frame is how WPF's own modal dialogs do it; blocking the UI thread on
+    /// WaitForExit instead would freeze and smear the editor behind the picker.
+    ///
+    /// Modality needs BOTH halves. Window.IsEnabled stops WPF input routing, but
+    /// it leaves the HWND itself enabled — verified — so the title bar, the X
+    /// button and Alt+F4 stay live, and a close landing inside this nested frame
+    /// would run the whole shutdown path underneath us. EnableWindow is what the
+    /// native dialog used to do on our behalf when it owned the window.
     /// </summary>
     private static void WaitWhilePumping(Window owner, Process child)
     {
+        var handle = new WindowInteropHelper(owner).Handle;
         var wasEnabled = owner.IsEnabled;
         owner.IsEnabled = false;
+        if (handle != IntPtr.Zero) EnableWindow(handle, false);
         try
         {
             var frame = new DispatcherFrame();
@@ -165,7 +211,13 @@ internal static class FilePickerService
             // no argument also flushes the async stdout readers to completion.
             child.WaitForExit();
         }
-        finally { owner.IsEnabled = wasEnabled; }
+        finally
+        {
+            // Re-enable the HWND before the WPF flag: the reverse order can leave
+            // a window WPF thinks is enabled that Windows still refuses to click.
+            if (handle != IntPtr.Zero) EnableWindow(handle, true);
+            owner.IsEnabled = wasEnabled;
+        }
     }
 
     private static string? ShowNativeInProcess(Window owner, FilePickerRequest request)

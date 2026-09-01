@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Interop;
 
 namespace MarkdownMidget.Picker;
 
@@ -39,6 +41,7 @@ internal static class PickerChild
         string? title = null, filter = null, dir = null, name = null, ext = null;
         var filterIndex = 1;
         var checkExists = false;
+        long owner = 0;
 
         for (var i = 0; i < args.Count; i++)
         {
@@ -56,6 +59,9 @@ internal static class PickerChild
                 case "--filter-index":
                     if (int.TryParse(Next(), out var parsed) && parsed > 0) filterIndex = parsed;
                     break;
+                case "--owner":
+                    if (long.TryParse(Next(), out var handle)) owner = handle;
+                    break;
             }
         }
 
@@ -69,6 +75,7 @@ internal static class PickerChild
             FileName = name,
             DefaultExt = ext,
             CheckFileExists = checkExists,
+            OwnerHandle = owner,
         };
     }
 
@@ -77,23 +84,47 @@ internal static class PickerChild
     public static int Run(IReadOnlyList<string> args)
     {
         var request = Parse(args);
-        string? path;
-        if (request.Save)
+        // An off-screen anchor window owned by the PARENT's HWND. The dialog is
+        // then shown owned by the anchor, which gives the cross-process owner
+        // chain a real modal dialog has: correct z-order over the editor, proper
+        // activation, and focus handed back on close. Without it the dialog is a
+        // stray top-level that Windows may leave behind the parent - which, with
+        // the parent disabled and waiting, looks exactly like a hang.
+        Window? anchor = null;
+        if (request.OwnerHandle != 0)
         {
-            var dlg = new Microsoft.Win32.SaveFileDialog();
-            FilePickerService.Apply(dlg, request);
-            path = dlg.ShowDialog() == true ? dlg.FileName : null;
+            anchor = new Window
+            {
+                Width = 1, Height = 1, Left = -32000, Top = -32000,
+                WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false,
+            };
+            new WindowInteropHelper(anchor).Owner = new IntPtr(request.OwnerHandle);
+            anchor.Show();
         }
-        else
+        try
         {
-            var dlg = new Microsoft.Win32.OpenFileDialog { CheckFileExists = request.CheckFileExists };
-            FilePickerService.Apply(dlg, request);
-            path = dlg.ShowDialog() == true ? dlg.FileName : null;
-        }
+            string? path;
+            if (request.Save)
+            {
+                var dlg = new Microsoft.Win32.SaveFileDialog();
+                FilePickerService.Apply(dlg, request);
+                path = Show(dlg, anchor) ? dlg.FileName : null;
+            }
+            else
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog { CheckFileExists = request.CheckFileExists };
+                FilePickerService.Apply(dlg, request);
+                path = Show(dlg, anchor) ? dlg.FileName : null;
+            }
 
-        if (path is null) return FilePickerService.CancelledExitCode;
-        Console.Out.Write(path);
-        Console.Out.Flush();
-        return 0;
+            if (path is null) return FilePickerService.CancelledExitCode;
+            Console.Out.Write(path);
+            Console.Out.Flush();
+            return 0;
+        }
+        finally { try { anchor?.Close(); } catch { } }
     }
+
+    private static bool Show(Microsoft.Win32.CommonDialog dlg, Window? anchor) =>
+        (anchor is null ? dlg.ShowDialog() : dlg.ShowDialog(anchor)) == true;
 }

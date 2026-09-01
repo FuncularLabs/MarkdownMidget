@@ -121,6 +121,24 @@ internal static class FilePickerModel
         return fileName + ext;
     }
 
+    /// <summary>
+    /// The name a save box should show after the file-type dropdown changes.
+    /// Windows' own dialog retypes the extension here, and matching it is not
+    /// cosmetic: the caller decides what to WRITE from the returned path's
+    /// extension, so leaving "notes.md" in the box after the user picked
+    /// "Secure Markdown" would save plaintext into a file they believe is
+    /// encrypted. Returns the unchanged name when there is nothing to do -
+    /// no name, no single extension to apply, or the name already fits.
+    /// </summary>
+    public static string RetypeForFilter(string fileName, FilterGroup? group)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || group is null) return fileName;
+        var ext = group.SoleExtension;
+        if (ext is null) return fileName;                       // "*.*" or several patterns
+        if (MatchesFilter(fileName, group)) return fileName;    // already the right type
+        try { return Path.ChangeExtension(fileName, ext); } catch { return fileName; }
+    }
+
     /// <summary>Explorer's size column: whole units, KB from 1 KB up.</summary>
     public static string FormatSize(long bytes)
     {
@@ -162,29 +180,4 @@ internal static class FilePickerModel
         return -1;
     }
 
-    /// <summary>
-    /// The breadcrumb segments of a path, each paired with the path that segment
-    /// navigates to: C:\a\b → [("C:\", "C:\"), ("a", "C:\a"), ("b", "C:\a\b")].
-    /// </summary>
-    public static IReadOnlyList<(string Label, string Path)> Breadcrumbs(string path)
-    {
-        var crumbs = new List<(string, string)>();
-        try
-        {
-            var full = Path.GetFullPath(path);
-            var root = Path.GetPathRoot(full);
-            if (string.IsNullOrEmpty(root)) return crumbs;
-            crumbs.Add((root, root));
-            var rest = full[root.Length..].Trim(Path.DirectorySeparatorChar);
-            if (rest.Length == 0) return crumbs;
-            var current = root;
-            foreach (var segment in rest.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
-            {
-                current = Path.Combine(current, segment);
-                crumbs.Add((segment, current));
-            }
-        }
-        catch { /* an unparseable path simply has no breadcrumbs */ }
-        return crumbs;
-    }
 }

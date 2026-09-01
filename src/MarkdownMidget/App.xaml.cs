@@ -43,7 +43,7 @@ public partial class App : Application
                 // A managed failure here is still "no result" to the parent, which
                 // will fall back to the built-in picker. Logged so it is not silent.
                 CrashLog.Write("PickerChild", ex);
-                code = 1;
+                code = Picker.FilePickerService.ManagedFailureExitCode;
             }
             Shutdown(code);
             return;
@@ -85,6 +85,11 @@ public partial class App : Application
             CrashLog.Write("UnobservedTaskException", taskArgs.Exception);
             taskArgs.SetObserved();
         };
+
+        // A child dying because the whole app is going away says nothing about
+        // the user's shell, so the picker must not read it as a crash.
+        Exit += (_, _) => Picker.FilePickerService.NoteShuttingDown();
+        SessionEnding += (_, _) => Picker.FilePickerService.NoteShuttingDown();
 
         // The editor window, created explicitly rather than by StartupUri (see
         // above). Everything it needs comes from the command line it reads itself.
