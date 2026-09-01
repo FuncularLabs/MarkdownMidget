@@ -59,6 +59,7 @@ public partial class MainWindow : Window
     private byte[]? _backupKey;
     private byte[]? _backupSalt;
     private bool _showEncryptedInOpen;
+    private bool _useBuiltInPicker;
 
     private readonly List<string> _recentFiles = new();
     private string _pageWidth = "landscape"; // portrait | landscape | full (persisted)
@@ -123,6 +124,10 @@ public partial class MainWindow : Window
         Updates.UpdateService.CleanupOldBinaries();
         _ = NotifyIfUpdateAvailableAsync();
         _externalChangeTimer.Tick += async (_, _) => await OnExternalChangeTimerAsync();
+
+        // The picker strategy is process-wide; every window agrees on it.
+        Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
+        Picker.FilePickerService.AutoSwitchedToBuiltIn = OnPickerAutoSwitched;
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         for (var i = 0; i < args.Length; i++)
@@ -716,10 +721,43 @@ public partial class MainWindow : Window
         await FocusDocumentAsync();
     }
 
+    /// <summary>
+    /// The native dialog crashed in its child process and the service switched
+    /// to the built-in picker. Persist that so the next launch - and every other
+    /// window - starts where this one ended up; the service has already told the
+    /// user what happened.
+    /// </summary>
+    private void OnPickerAutoSwitched()
+    {
+        _useBuiltInPicker = true;
+        SaveSettings();
+    }
+
+    /// <summary>Folders worth offering in the built-in picker's rail: where the
+    /// open document lives, then recently used files' folders.</summary>
+    private IReadOnlyList<string> PickerRecentFolders()
+    {
+        var folders = new List<string>();
+        void Add(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            try
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !folders.Contains(dir, StringComparer.OrdinalIgnoreCase))
+                    folders.Add(dir);
+            }
+            catch { /* an unparseable recent entry simply doesn't contribute */ }
+        }
+        Add(_currentPath);
+        foreach (var recent in _recentFiles) Add(recent);
+        return folders;
+    }
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit, _backupEnabled,
-                                     _showEncryptedInOpen, ImportCustomDic) { Owner = this };
+                                     _showEncryptedInOpen, _useBuiltInPicker, ImportCustomDic) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         _startWithBlankDocument = dlg.StartWithBlankDocument;
         if (dlg.KeepBackup != _backupEnabled)
@@ -732,6 +770,8 @@ public partial class MainWindow : Window
             else EndBackup();
         }
         _showEncryptedInOpen = dlg.ShowEncryptedInOpen;
+        _useBuiltInPicker = dlg.UseBuiltInPicker;
+        Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
         if (dlg.RecentLimit != _recentLimit)
         {
             // Only the menu length changes. Lowering the limit must not delete
@@ -969,13 +1009,15 @@ public partial class MainWindow : Window
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
         if (!await ConfirmDiscardAsync()) return;
-        var dlg = new OpenFileDialog
+        var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
         {
             Filter = Secure.SecureUi.OpenFilter(_showEncryptedInOpen),
             DefaultExt = ".md",
-        };
-        if (dlg.ShowDialog(this) != true) return;
-        await OpenPathAsync(dlg.FileName);
+            CheckFileExists = true,
+            RecentFolders = PickerRecentFolders(),
+        });
+        if (picked is null) return;
+        await OpenPathAsync(picked);
     }
 
     private async Task OpenPathAsync(string path)
@@ -1290,8 +1332,9 @@ public partial class MainWindow : Window
         string? newPassword = null;   // set when THIS save establishes encryption
         if (forcePrompt || path is null)
         {
-            var dlg = new SaveFileDialog
+            var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
             {
+                Save = true,
                 // Secure Markdown in the type dropdown is the design's second path
                 // to encryption - equivalent to File > Encrypt Document.
                 Filter = Secure.SecureUi.SaveFilter,
@@ -1302,9 +1345,11 @@ public partial class MainWindow : Window
                 // us from the browser and, after a recovery, from a file on disk.
                 FileName = _currentPath is not null ? Path.GetFileName(_currentPath)
                          : (_displayName is null ? "Untitled.md" : Path.GetFileName(_displayName)),
-            };
-            if (dlg.ShowDialog(this) != true) return false;
-            path = dlg.FileName;
+                InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
+                RecentFolders = PickerRecentFolders(),
+            });
+            if (picked is null) return false;
+            path = picked;
             wantEncrypted = Secure.SecureUi.IsEncryptedPath(path);
             if (wantEncrypted && !_docEncrypted)
             {
@@ -1420,15 +1465,17 @@ public partial class MainWindow : Window
         }
         else
         {
-            var dlg = new SaveFileDialog
+            var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
             {
+                Save = true,
                 Filter = "Secure Markdown (*.mdenc)|*.mdenc",
                 DefaultExt = Secure.SecureMarkdownFormat.Extension,
                 FileName = _displayName is null ? "Untitled.mdenc"
                          : Path.ChangeExtension(Path.GetFileName(_displayName), Secure.SecureMarkdownFormat.Extension),
-            };
-            if (dlg.ShowDialog(this) != true) return;
-            target = dlg.FileName;
+                RecentFolders = PickerRecentFolders(),
+            });
+            if (picked is null) return;
+            target = picked;
         }
 
         var pw = PasswordDialog.Set(this, "Encrypt Document",
@@ -2468,8 +2515,9 @@ public partial class MainWindow : Window
         var nameNoExt = Path.GetFileNameWithoutExtension(_currentPath);
         var ext = Path.GetExtension(_currentPath);
         var suggested = Path.GetFileName(backupPath).Replace(".bak", "");
-        var dlg = new SaveFileDialog
+        var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
         {
+            Save = true,
             Title = "Save your current version as…",
             Filter = _docEncrypted
                 ? "Secure Markdown (*.mdenc)|*.mdenc|All files (*.*)|*.*"
@@ -2477,8 +2525,9 @@ public partial class MainWindow : Window
             DefaultExt = ext.Length > 0 ? ext : ".md",
             InitialDirectory = dir,
             FileName = suggested,
-        };
-        if (dlg.ShowDialog(this) != true)
+            RecentFolders = PickerRecentFolders(),
+        });
+        if (picked is null)
         {
             // User backed out of save-as — treat like Keep Current.
             _cleanMarkdown = newDiskContent;
@@ -2491,9 +2540,9 @@ public partial class MainWindow : Window
             // An encrypted document's "your version" stays encrypted - a plaintext
             // file wearing the .mdenc name would be both a leak and a lie.
             if (_docEncrypted && _docPassword is { } savePw)
-                await Task.Run(() => Secure.SecureMarkdownFile.Save(dlg.FileName, inMemory, savePw));
+                await Task.Run(() => Secure.SecureMarkdownFile.Save(picked, inMemory, savePw));
             else
-                await File.WriteAllTextAsync(dlg.FileName, inMemory);
+                await File.WriteAllTextAsync(picked, inMemory);
         }
         catch (Exception ex)
         {
@@ -2501,13 +2550,13 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        AddRecent(dlg.FileName);
+        AddRecent(picked);
 
         // Now ask which to keep viewing.
         var fileName = Path.GetFileName(_currentPath);
-        var savedFileName = Path.GetFileName(dlg.FileName);
+        var savedFileName = Path.GetFileName(picked);
         var pick = MessageBox.Show(
-            $"Saved your version to:\n{dlg.FileName}\n\nKeep editing your saved version ({savedFileName})?\n\nYes = open '{savedFileName}'\nNo = continue with the externally-modified '{fileName}'",
+            $"Saved your version to:\n{picked}\n\nKeep editing your saved version ({savedFileName})?\n\nYes = open '{savedFileName}'\nNo = continue with the externally-modified '{fileName}'",
             "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Question);
         // Both loads keep the encryption state (rounds 1 and 2 each found a
         // password-dropping load; these are call sites 3 and 4 of 4 - every
@@ -2515,7 +2564,7 @@ public partial class MainWindow : Window
         if (pick == MessageBoxResult.Yes)
         {
             // Already on disk with inMemory content; load + retarget.
-            await LoadDocumentAsync(inMemory, dlg.FileName, _docEncrypted ? _docPassword : null);
+            await LoadDocumentAsync(inMemory, picked, _docEncrypted ? _docPassword : null);
         }
         else
         {
@@ -2821,14 +2870,17 @@ public partial class MainWindow : Window
             ? Path.GetFileNameWithoutExtension(_currentPath) + ".pdf"
             : (Path.GetFileNameWithoutExtension(_displayName) ?? "Untitled") + ".pdf";
 
-        var dlg = new SaveFileDialog
+        var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
         {
+            Save = true,
             Title = "Export to PDF",
             Filter = "PDF (*.pdf)|*.pdf|All files (*.*)|*.*",
             DefaultExt = ".pdf",
             FileName = defaultName,
-        };
-        if (dlg.ShowDialog(this) != true) return;
+            InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
+            RecentFolders = PickerRecentFolders(),
+        });
+        if (picked is null) return;
 
         try
         {
@@ -2844,7 +2896,7 @@ public partial class MainWindow : Window
                 ? CoreWebView2PrintOrientation.Landscape
                 : CoreWebView2PrintOrientation.Portrait;
 
-            var ok = await Web.CoreWebView2.PrintToPdfAsync(dlg.FileName, settings);
+            var ok = await Web.CoreWebView2.PrintToPdfAsync(picked, settings);
             if (!ok)
                 MessageBox.Show("PDF export did not complete.", "Markdown Midget",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -2973,6 +3025,7 @@ public partial class MainWindow : Window
         public bool StartWithBlankDocument { get; set; } // else the no-document placeholder
         public bool KeepBackup { get; set; } = true;     // crash copy of unsaved work
         public bool ShowEncryptedInOpen { get; set; }    // *.mdenc in the Open filter (opt-in)
+        public bool UseBuiltInPicker { get; set; }       // skip the native dialog entirely
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
         public string Theme { get; set; } = "";
@@ -3046,6 +3099,7 @@ public partial class MainWindow : Window
             _wordWrap = s.WordWrap;
             _autoReload = s.AutoReload;
             _showEncryptedInOpen = s.ShowEncryptedInOpen;
+            _useBuiltInPicker = s.UseBuiltInPicker;
             _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
@@ -3211,6 +3265,7 @@ public partial class MainWindow : Window
         WordWrap = _wordWrap,
         AutoReload = _autoReload,
         ShowEncryptedInOpen = _showEncryptedInOpen,
+        UseBuiltInPicker = _useBuiltInPicker,
         RecentLimit = _recentLimit,
         StartWithBlankDocument = _startWithBlankDocument,
         KeepBackup = _backupEnabled,
@@ -3469,22 +3524,25 @@ public partial class MainWindow : Window
 
     private async void Picture_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFileDialog
+        var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
         {
             Title = "Insert Picture",
             Filter = "Images (*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg)|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg|All files (*.*)|*.*",
-        };
-        if (dlg.ShowDialog(this) != true) return;
+            CheckFileExists = true,
+            InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
+            RecentFolders = PickerRecentFolders(),
+        });
+        if (picked is null) return;
 
-        var alt = Path.GetFileNameWithoutExtension(dlg.FileName);
+        var alt = Path.GetFileNameWithoutExtension(picked);
         string uri;
         try
         {
             // Embed the image as a base64 data URI so it renders inside the
             // sandboxed WebView (which can't load local file: paths) and travels
             // with the markdown. This bloats the document by design.
-            var bytes = await File.ReadAllBytesAsync(dlg.FileName);
-            uri = $"data:{MimeForImage(dlg.FileName)};base64,{Convert.ToBase64String(bytes)}";
+            var bytes = await File.ReadAllBytesAsync(picked);
+            uri = $"data:{MimeForImage(picked)};base64,{Convert.ToBase64String(bytes)}";
         }
         catch (Exception ex)
         {

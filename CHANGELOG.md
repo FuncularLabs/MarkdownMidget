@@ -9,6 +9,35 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.9.0-beta4] - 2026-08-31
+
+The file-dialog crash fix, in full — and a switch so the new picker can be
+tried without owning a broken machine.
+
+### Added
+- **Windows' file dialog now runs in a separate process.** That dialog loads
+  Explorer add-ons (preview and thumbnail handlers) into whatever program
+  shows it, and a faulty one crashes that program outright — the failure Eric
+  reported in 0.8.x, and the same one Markdown Monster has hit for years.
+  Open and Save now hand the job to a short-lived helper process, so a bad
+  add-on takes only the helper with it. The editor and your document don't
+  notice.
+- **A built-in file picker, for when that happens.** Isolation alone would
+  save the app but still leave you unable to open anything, so the helper
+  crashing hands straight over to Markdown Midget's own picker: address bar,
+  shortcuts to Desktop/Documents/Downloads/drives/recent folders, a folder
+  tree, a sortable file list, type-ahead, New Folder and overwrite
+  confirmation when saving. It loads no Explorer add-ons at all — that's the
+  whole point — so it deliberately has no thumbnails, preview pane or shell
+  context menus. After a crash it also switches itself on permanently, tells
+  you it did, and says where to switch back.
+- **Edit ▸ Settings ▸ "Always use the built-in file picker"** turns it on
+  whenever you like — which is how to try it without a broken shell.
+
+### Fixed
+- Open and Save now start in the current document's folder rather than
+  wherever Windows last left the dialog.
+
 ## [0.9.0-beta3] - 2026-08-30
 
 ### Fixed

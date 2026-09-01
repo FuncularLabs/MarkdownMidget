@@ -64,37 +64,40 @@ public partial class MainWindow
     /// </summary>
     private string? ImportCustomDic(Window owner)
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Import words from a Word custom dictionary",
-            Filter = "Word custom dictionary (*.dic)|*.dic|All files (*.*)|*.*",
-            CheckFileExists = true,
-        };
         // Land the picker on Word's default CUSTOM.DIC when it exists, so the
         // common case is picker → Open. A user with a differently-located or
         // renamed dictionary still has the full picker.
+        string? startDir = null, startName = null;
         try
         {
             if (File.Exists(CustomDicImport.DefaultPath))
             {
-                dlg.InitialDirectory = Path.GetDirectoryName(CustomDicImport.DefaultPath);
-                dlg.FileName = Path.GetFileName(CustomDicImport.DefaultPath);
+                startDir = Path.GetDirectoryName(CustomDicImport.DefaultPath);
+                startName = Path.GetFileName(CustomDicImport.DefaultPath);
             }
         }
         catch { /* picker just opens at its default location */ }
 
-        if (dlg.ShowDialog(owner) != true) return null;
+        var picked = Picker.FilePickerService.Show(owner, new Picker.FilePickerRequest
+        {
+            Title = "Import words from a Word custom dictionary",
+            Filter = "Word custom dictionary (*.dic)|*.dic|All files (*.*)|*.*",
+            CheckFileExists = true,
+            InitialDirectory = startDir,
+            FileName = startName,
+        });
+        if (picked is null) return null;
 
         try
         {
             // Refuse absurd files before reading them: parsing runs on the UI
             // thread, and the cap is generous (a real CUSTOM.DIC is kilobytes).
-            var size = new FileInfo(dlg.FileName).Length;
+            var size = new FileInfo(picked).Length;
             if (size > CustomDicImport.MaxFileBytes)
                 return $"That file is {size / 1048576} MB — a Word custom dictionary is a few " +
                        "kilobytes. Not imported; is it the right file?";
 
-            var words = CustomDicImport.ParseFile(dlg.FileName);
+            var words = CustomDicImport.ParseFile(picked);
             if (words.Count == 0)
                 return "No words found in that file — is it a Word custom dictionary?";
 

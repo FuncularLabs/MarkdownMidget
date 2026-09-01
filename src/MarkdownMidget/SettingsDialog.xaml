@@ -46,6 +46,13 @@
 
         <Separator Margin="0,14,0,12" />
 
+        <TextBlock Text="File dialogs" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <CheckBox x:Name="BuiltInPickerCheck" Content="Always use the built-in file picker" />
+        <TextBlock Style="{StaticResource Caption}"
+                   Text="Off by default: Open and Save use the standard Windows dialog. That dialog loads Explorer add-ons (preview and thumbnail handlers), and a faulty one can crash it — Markdown Midget runs it in a separate process so only that process dies, then switches this on for you and carries on with the built-in picker. Turn it on yourself to use the built-in picker all the time." />
+
+        <Separator Margin="0,14,0,12" />
+
         <TextBlock Text="Secure Markdown" FontWeight="SemiBold" Margin="0,0,0,6" />
         <CheckBox x:Name="ShowEncryptedCheck" Content="Show encrypted documents (*.mdenc) in the Open dialog" />
         <TextBlock Style="{StaticResource Caption}"

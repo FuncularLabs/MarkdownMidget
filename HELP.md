@@ -394,6 +394,23 @@ engine keeps its working files in a per-run folder cleaned up on a later
 launch, with its crash reporting disabled so decrypted content can't end up
 in a crash dump.
 
+## File dialogs
+
+Open and Save use the standard Windows dialog, but Markdown Midget runs it in a
+**separate helper process**. That dialog loads Explorer add-ons (preview and
+thumbnail handlers), and a faulty one can crash whatever program is showing it —
+if that happens here, only the helper dies. Markdown Midget switches to its own
+**built-in picker**, tells you, and carries on.
+
+The built-in picker has an address bar, shortcuts (Desktop, Documents,
+Downloads, drives, recent folders), a folder tree, a sortable file list,
+type-ahead, and New Folder plus overwrite confirmation when saving. It has no
+thumbnails, preview pane or right-click shell menus — those are the add-ons that
+crash, so leaving them out is what makes it safe.
+
+Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
+file picker**.
+
 **If something goes wrong:** unexpected errors are recorded in
 `%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll
 get a dialog pointing at that file instead. When reporting a problem, that file is

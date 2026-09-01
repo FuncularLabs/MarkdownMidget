@@ -1,0 +1,106 @@
+<Window x:Class="MarkdownMidget.Picker.MidgetFilePicker"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Open" Height="520" Width="820" MinHeight="360" MinWidth="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Icon="/Assets/midget-256.png">
+    <Window.Resources>
+        <Style x:Key="NavGlyph" TargetType="{x:Type ButtonBase}">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,3,0" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Navigation + address bar -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <Button x:Name="BackButton" Style="{StaticResource NavGlyph}" Content="&#xE72B;"
+                    ToolTip="Back (Alt+Left)" Click="Back_Click" DockPanel.Dock="Left" />
+            <Button x:Name="ForwardButton" Style="{StaticResource NavGlyph}" Content="&#xE72A;"
+                    ToolTip="Forward (Alt+Right)" Click="Forward_Click" DockPanel.Dock="Left" />
+            <Button x:Name="UpButton" Style="{StaticResource NavGlyph}" Content="&#xE74A;"
+                    ToolTip="Up one folder (Alt+Up)" Click="Up_Click" DockPanel.Dock="Left" />
+            <Button Style="{StaticResource NavGlyph}" Content="&#xE72C;" Margin="0,0,6,0"
+                    ToolTip="Refresh (F5)" Click="Refresh_Click" DockPanel.Dock="Right" />
+            <TextBox x:Name="AddressBox" VerticalContentAlignment="Center" Padding="4,2"
+                     KeyDown="AddressBox_KeyDown" ToolTip="Type or paste a folder path, then press Enter" />
+        </DockPanel>
+
+        <!-- Places tree + file list -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" MinWidth="120" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="240" />
+            </Grid.ColumnDefinitions>
+
+            <TreeView x:Name="PlacesTree" Grid.Column="0"
+                      SelectedItemChanged="PlacesTree_SelectedItemChanged"
+                      TreeViewItem.Expanded="PlacesTree_Expanded">
+            </TreeView>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch" Background="Transparent" />
+
+            <ListView x:Name="FileList" Grid.Column="2"
+                      MouseDoubleClick="FileList_MouseDoubleClick"
+                      SelectionChanged="FileList_SelectionChanged"
+                      KeyDown="FileList_KeyDown" TextInput="FileList_TextInput">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Name" Width="320" DisplayMemberBinding="{Binding Display}" />
+                        <GridViewColumn Header="Date modified" Width="140" DisplayMemberBinding="{Binding Modified}" />
+                        <GridViewColumn Header="Size" Width="90" DisplayMemberBinding="{Binding Size}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
+
+        <!-- File name, filter, actions -->
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Content="File _name:" Target="{Binding ElementName=NameBox}"
+                   VerticalAlignment="Center" Padding="0" Margin="0,0,8,0" />
+            <TextBox x:Name="NameBox" Grid.Row="0" Grid.Column="1" Padding="4,2"
+                     VerticalContentAlignment="Center" KeyDown="NameBox_KeyDown" />
+            <ComboBox x:Name="FilterCombo" Grid.Row="0" Grid.Column="2" Width="220" Margin="8,0,0,0"
+                      SelectionChanged="FilterCombo_Changed" />
+
+            <CheckBox x:Name="HiddenCheck" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                      Margin="0,10,0,0" VerticalAlignment="Center"
+                      Content="Show _hidden and system files" Click="Hidden_Click" />
+
+            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,10,0,0">
+                <Button x:Name="NewFolderButton" Content="Ne_w Folder" Padding="10,3" Margin="0,0,8,0"
+                        Click="NewFolder_Click" Visibility="Collapsed" />
+                <Button x:Name="AcceptButton" Content="_Open" IsDefault="True" Width="86" Margin="0,0,8,0"
+                        Click="Accept_Click" />
+                <Button Content="Cancel" IsCancel="True" Width="86" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

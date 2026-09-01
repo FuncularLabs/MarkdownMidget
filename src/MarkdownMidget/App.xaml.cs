@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -21,6 +22,32 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // File-picker child process: show the NATIVE dialog, print the path,
+        // exit. Nothing else starts - no editor, no WebView2, no document - so a
+        // shell extension that faults inside the dialog takes only this
+        // throwaway process with it.
+        //
+        // This is why App.xaml has no StartupUri and the editor window is created
+        // by hand below: StartupUri would have WPF build a MainWindow the moment
+        // this method returns, and clearing it here is not an option (the setter
+        // rejects null - verified: it threw, killing the child before the dialog
+        // ever appeared, which made every native pick look like a crash).
+        var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (Picker.PickerChild.IsPickerInvocation(args))
+        {
+            int code;
+            try { code = Picker.PickerChild.Run(args); }
+            catch (Exception ex)
+            {
+                // A managed failure here is still "no result" to the parent, which
+                // will fall back to the built-in picker. Logged so it is not silent.
+                CrashLog.Write("PickerChild", ex);
+                code = 1;
+            }
+            Shutdown(code);
+            return;
+        }
 
         // UI-thread exceptions. The important, non-obvious case: a native file
         // dialog (Open, Save As, the dictionary import) runs a NESTED message
@@ -53,10 +80,14 @@ public partial class App : Application
             CrashLog.Write("AppDomain.UnhandledException", args.ExceptionObject as Exception);
 
         // Faulted tasks nobody awaited. Observed so they don't escalate.
-        TaskScheduler.UnobservedTaskException += (_, args) =>
+        TaskScheduler.UnobservedTaskException += (_, taskArgs) =>
         {
-            CrashLog.Write("UnobservedTaskException", args.Exception);
-            args.SetObserved();
+            CrashLog.Write("UnobservedTaskException", taskArgs.Exception);
+            taskArgs.SetObserved();
         };
+
+        // The editor window, created explicitly rather than by StartupUri (see
+        // above). Everything it needs comes from the command line it reads itself.
+        new MainWindow().Show();
     }
 }
