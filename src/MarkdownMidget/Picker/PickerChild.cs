@@ -85,12 +85,13 @@ internal static class PickerChild
     public static int Run(IReadOnlyList<string> args)
     {
         var request = Parse(args);
-        // An off-screen anchor window owned by the PARENT's HWND. The dialog is
-        // then shown owned by the anchor, which gives the cross-process owner
-        // chain a real modal dialog has: correct z-order over the editor, proper
-        // activation, and focus handed back on close. Without it the dialog is a
-        // stray top-level that Windows may leave behind the parent - which, with
-        // the parent disabled and waiting, looks exactly like a hang.
+        // An invisible anchor window (fully transparent, never off-screen) owned
+        // by the PARENT's HWND. The dialog is then shown owned by the anchor,
+        // which gives the cross-process owner chain a real modal dialog has:
+        // correct z-order over the editor, proper activation, and focus handed
+        // back on close. Without it the dialog is a stray top-level that Windows
+        // may leave behind the parent - which, with the parent disabled and
+        // waiting, looks exactly like a hang.
         Window? anchor = null;
         if (request.OwnerHandle != 0)
         {
@@ -124,8 +125,8 @@ internal static class PickerChild
                 // scaled displays.
                 var anchorHandle = new WindowInteropHelper(anchor).Handle;
                 // A minimised parent reports a rectangle off in the -32000s, which
-                // is exactly the off-screen centring this fix exists to avoid, so
-                // leave the anchor screen-centred in that case.
+                // is exactly the off-screen placement this exists to avoid, so
+                // leave the anchor where it was created: over the work area.
                 if (anchorHandle != IntPtr.Zero && !IsIconic(parent) && GetWindowRect(parent, out var r)
                     && r.Left > -30000 && r.Top > -30000)
                     SetWindowPos(anchorHandle, IntPtr.Zero,
