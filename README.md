@@ -58,6 +58,11 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Recent files**, drag-and-drop to open, **read-only** mode, and a bundled Help
   document and changelog (**Help ▸ What's New**, or click the mascot — it flags
   unread entries with a small gold asterisk).
+- **Secure Markdown** — password-protected encrypted documents (`.mdenc`,
+  AES-256-GCM with an Argon2id-derived key) that edit exactly like any other;
+  the decrypted text never touches disk, crash-protection copies included.
+- Windows' file dialogs run **in a separate process**, with a **built-in file
+  picker** standing by, so a faulty Explorer add-on can't take the editor down.
 - Ships as a **single `.exe`**.
 
 ## Requirements
@@ -69,7 +74,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-Beta (0.8.x), in daily use and signed on every release. Windows-only for now; the
+Beta (0.9.x), in daily use and signed on every release. Windows-only for now; the
 editor core is web-based, so a cross-platform shell (MAUI/Avalonia) is a realistic
 future step. A real installer that registers in Add/Remove Programs is on the
 [roadmap](ROADMAP.md) — the portable exe will stay available either way.
@@ -221,6 +226,11 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v0.9.0** — **Secure Markdown**: password-protected encrypted documents
+  (`.mdenc`) that edit like any other, with encrypted crash protection and no
+  password recovery, ever. The **file-dialog crash** is fixed: Windows' dialogs
+  run in a separate process, and a **built-in file picker** takes over if that
+  process crashes. The **toolbar follows the cursor** the way Word's does.
 - **v0.8.1** — **Tables print like they look.** The header row and alternating
   row shading now survive onto paper in every theme (dark themes print a light
   row shade so text stays readable); the rest of the page still prints light.

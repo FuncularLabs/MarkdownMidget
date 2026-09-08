@@ -9,6 +9,41 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-08
+
+First stable release on the 0.9 line — the betas' content with the prerelease
+flag dropped, after dogfooding. Everything new on this line:
+
+- **Secure Markdown (.mdenc): password-protected encrypted documents.**
+  AES-256-GCM, with the key derived from your password by Argon2id. Once open,
+  an encrypted document edits like any other; the decrypted text lives only in
+  memory, and the crash-protection copy is encrypted too. **File ▸ Encrypt
+  Document…**, **Convert to Unencrypted…** and **Change Password…**; Save As
+  offers *Secure Markdown* as a file type. **There is no password recovery** —
+  the dialog says so before you set one. A Settings checkbox adds .mdenc to
+  the File ▸ Open filter (off by default).
+- **The file-dialog crash is fixed, and covered if it recurs.** Windows' Open
+  and Save dialogs now run in a throwaway helper process, so a faulty Explorer
+  add-on can no longer take the editor down. If the helper itself crashes, a
+  **built-in file picker** (address bar, places, folder tree, sortable list,
+  New Folder) takes over on the spot and stays on; **Edit ▸ Settings ▸ Always
+  use the built-in file picker** switches it either way.
+- **The toolbar follows the cursor**, the way Word's does: Bold, Italic,
+  Underline, Strikethrough and Code light up for the text under the caret, the
+  Format menu shows matching checkmarks, and the Style dropdown no longer goes
+  stale in code blocks of unlisted languages.
+- **Fixed:** "Add to Dictionary" and "Ignore All" work in read-only windows;
+  closing with "Don't Save" no longer trips an error dialog (latent since the
+  first release); disabled toolbar buttons are unmistakably disabled; Open and
+  Save start in the current document's folder.
+
+> **Updating from 0.8.2 or earlier:** re-run **File ▸ Windows Integration ▸
+> Register as .md editor…** once if you want .mdenc files to open by
+> double-click. Encrypted files always open via File ▸ Open (with the filter
+> checkbox on), Open Recent, or a typed name.
+
+See the beta notes below for the full detail.
+
 ## [0.9.0-beta4] - 2026-08-31
 
 The file-dialog crash fix, in full — and a switch so the new picker can be
