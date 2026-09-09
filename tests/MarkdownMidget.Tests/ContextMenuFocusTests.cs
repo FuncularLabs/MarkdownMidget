@@ -54,8 +54,12 @@ public class ContextMenuFocusTests
     /// assertion with the chosen item loaded, visible, enabled and attached to a
     /// PresentationSource, but with <c>Keyboard.FocusedElement</c> still null — no
     /// element anywhere had keyboard focus yet, so <c>Focus()</c> returned false and
-    /// the test read that as "this item cannot be focused". Waiting for the menu to
-    /// actually hold focus removes the race without touching what is asserted.
+    /// the test read that as "this item cannot be focused".
+    ///
+    /// So the wait is for SOMETHING to hold keyboard focus, which is deliberately
+    /// weaker than "the item holds it" — in practice the holder is the ContextMenu,
+    /// and requiring the item itself would be waiting for the assertion's own answer.
+    /// It removes the race without touching what is asserted.
     /// </param>
     private static T OnStaWindow<T>(Func<ContextMenu, T> build, Action<ContextMenu> fill,
                                     bool needsKeyboardFocus = false)
@@ -126,12 +130,13 @@ public class ContextMenuFocusTests
     /// ContextMenu is the original bug; landing nowhere is a different problem and
     /// deserves a different message.
     /// </summary>
-    private sealed record FocusOutcome(bool Accepted, bool ItemHasKeyboardFocus, string Landed);
+    /// <param name="Landed">Where focus ended up, or null when no item was chosen at all.</param>
+    private sealed record FocusOutcome(bool Accepted, bool ItemHasKeyboardFocus, string? Landed);
 
     private static FocusOutcome TryFocusFirstActivatable(ContextMenu menu)
     {
         var item = ContextMenuFocus.FirstActivatableItem(menu);
-        if (item is null) return new FocusOutcome(false, false, "no item was chosen at all");
+        if (item is null) return new FocusOutcome(false, false, null);
         var accepted = item.Focus();
         return new FocusOutcome(accepted, item.IsKeyboardFocused,
             Keyboard.FocusedElement?.GetType().Name ?? "nothing");
@@ -146,7 +151,9 @@ public class ContextMenuFocusTests
     /// </summary>
     private static void AssertTookFocus(FocusOutcome outcome) =>
         Assert.True(outcome.Accepted && outcome.ItemHasKeyboardFocus,
-            $"the picked item must take keyboard focus — it went to {outcome.Landed} instead");
+            outcome.Landed is null
+                ? "no item was chosen at all, so nothing could take focus"
+                : $"the picked item must take keyboard focus — it went to {outcome.Landed} instead");
 
     [Fact]
     public void NoSuggestions_SkipsDisabledPlaceholder_AndReachesAddToDictionary()
