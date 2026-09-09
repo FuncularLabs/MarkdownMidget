@@ -1,7 +1,10 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Threading;
 using MarkdownMidget;
 using Xunit;
@@ -17,7 +20,45 @@ namespace MarkdownMidget.Tests;
 /// </summary>
 public class ContextMenuFocusTests
 {
-    private static T OnStaWindow<T>(Func<ContextMenu, T> build, Action<ContextMenu> fill)
+    /// <summary>
+    /// How long to wait for the menu to finish setting itself up. Generous, because
+    /// it is only ever reached on a machine under load, and it costs nothing on one
+    /// that isn't: the wait returns the moment the menu is ready.
+    /// </summary>
+    private static readonly TimeSpan ReadyBudget = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Pump the dispatcher until <paramref name="ready"/> or the budget runs out.
+    ///
+    /// This waits for a PRECONDITION of the test, never for the assertion — nothing
+    /// here re-tries <c>Focus()</c> and nothing here can turn a real failure into a
+    /// pass. See <see cref="OnStaWindow"/> for why the wait is needed at all.
+    /// </summary>
+    private static bool PumpUntil(Func<bool> ready)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed < ReadyBudget)
+        {
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            if (ready()) return true;
+            Thread.Sleep(5);
+        }
+        return ready();
+    }
+
+    /// <param name="needsKeyboardFocus">
+    /// True for the cases that assert on focus. Opening a menu realizes its item
+    /// containers and hands the popup keyboard focus, and BOTH happen asynchronously.
+    /// One Background-priority pump is enough on an idle machine and measurably not
+    /// enough on a busy one: 6 of 40 cold starts under CPU contention reached the
+    /// assertion with the chosen item loaded, visible, enabled and attached to a
+    /// PresentationSource, but with <c>Keyboard.FocusedElement</c> still null — no
+    /// element anywhere had keyboard focus yet, so <c>Focus()</c> returned false and
+    /// the test read that as "this item cannot be focused". Waiting for the menu to
+    /// actually hold focus removes the race without touching what is asserted.
+    /// </param>
+    private static T OnStaWindow<T>(Func<ContextMenu, T> build, Action<ContextMenu> fill,
+                                    bool needsKeyboardFocus = false)
     {
         var result = default(T)!;
         Exception? error = null;
@@ -36,7 +77,21 @@ public class ContextMenuFocusTests
                 menu = new ContextMenu { PlacementTarget = host };
                 fill(menu);
                 menu.IsOpen = true;   // realize the item containers
-                Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+
+                ContextMenu opened = menu;   // the closures below must not see a nullable local
+                if (!PumpUntil(() => opened.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated
+                                     && (!needsKeyboardFocus || Keyboard.FocusedElement is not null)))
+                {
+                    // Say which half was missing. A container-generation timeout is a
+                    // broken menu; no keyboard focus at all is the machine refusing to
+                    // give the popup focus, which is not a claim about the code under
+                    // test and must not be reported as one.
+                    throw new InvalidOperationException(
+                        opened.ItemContainerGenerator.Status != GeneratorStatus.ContainersGenerated
+                            ? $"the menu never generated its item containers within {ReadyBudget.TotalSeconds:0}s."
+                            : $"the menu never received keyboard focus within {ReadyBudget.TotalSeconds:0}s, so the "
+                              + "focus assertion could not run. This is the environment, not the code under test.");
+                }
 
                 result = build(menu);
             }
@@ -65,6 +120,34 @@ public class ContextMenuFocusTests
         return result;
     }
 
+    /// <summary>
+    /// What happened when the chosen item was asked to take focus, captured as data
+    /// so a failure can say WHICH way it went wrong. Focus landing back on the
+    /// ContextMenu is the original bug; landing nowhere is a different problem and
+    /// deserves a different message.
+    /// </summary>
+    private sealed record FocusOutcome(bool Accepted, bool ItemHasKeyboardFocus, string Landed);
+
+    private static FocusOutcome TryFocusFirstActivatable(ContextMenu menu)
+    {
+        var item = ContextMenuFocus.FirstActivatableItem(menu);
+        if (item is null) return new FocusOutcome(false, false, "no item was chosen at all");
+        var accepted = item.Focus();
+        return new FocusOutcome(accepted, item.IsKeyboardFocused,
+            Keyboard.FocusedElement?.GetType().Name ?? "nothing");
+    }
+
+    /// <summary>
+    /// Keyboard focus, deliberately, and not the logical kind. A COLLAPSED item is
+    /// granted LOGICAL focus by WPF — measured — so asserting on
+    /// <c>FocusManager.GetFocusedElement</c> or <c>IsFocused</c> would quietly stop
+    /// catching the collapsed-placeholder regression that
+    /// <see cref="CollapsedFirstItem_TheChosenItemCanTakeFocus"/> exists for.
+    /// </summary>
+    private static void AssertTookFocus(FocusOutcome outcome) =>
+        Assert.True(outcome.Accepted && outcome.ItemHasKeyboardFocus,
+            $"the picked item must take keyboard focus — it went to {outcome.Landed} instead");
+
     [Fact]
     public void NoSuggestions_SkipsDisabledPlaceholder_AndReachesAddToDictionary()
     {
@@ -83,15 +166,16 @@ public class ContextMenuFocusTests
     [Fact]
     public void NoSuggestions_TheChosenItemCanActuallyTakeFocus()
     {
-        var focused = OnStaWindow(
-            menu => ContextMenuFocus.FirstActivatableItem(menu)?.Focus() ?? false,
+        var outcome = OnStaWindow(
+            TryFocusFirstActivatable,
             menu =>
             {
                 menu.Items.Add(new MenuItem { Header = "(no suggestions)", IsEnabled = false });
                 menu.Items.Add(new Separator());
                 menu.Items.Add(new MenuItem { Header = "Add to Dictionary" });
-            });
-        Assert.True(focused, "the picked item must be focusable — that's the whole point");
+            },
+            needsKeyboardFocus: true);
+        AssertTookFocus(outcome);
     }
 
     [Fact]
@@ -129,14 +213,15 @@ public class ContextMenuFocusTests
     [Fact]
     public void CollapsedFirstItem_TheChosenItemCanTakeFocus()
     {
-        var focused = OnStaWindow(
-            menu => ContextMenuFocus.FirstActivatableItem(menu)?.Focus() ?? false,
+        var outcome = OnStaWindow(
+            TryFocusFirstActivatable,
             menu =>
             {
                 menu.Items.Add(new MenuItem { Header = "Spelling", Visibility = Visibility.Collapsed });
                 menu.Items.Add(new MenuItem { Header = "Insert" });
-            });
-        Assert.True(focused, "a collapsed placeholder must not be chosen — it cannot take focus");
+            },
+            needsKeyboardFocus: true);
+        AssertTookFocus(outcome);
     }
 
     [Fact]
