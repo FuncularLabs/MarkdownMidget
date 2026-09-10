@@ -28,6 +28,12 @@ changes between alpha tags.
   link back on snaps the source view to the document's theme. The second theme is
   resolved without ever being applied to the page.
 
+### Fixed
+- **Alt menu shortcuts work once a document is open.** Alt+F (and the rest) and an
+  Alt tap worked on the empty splash and went dead as soon as a file was open,
+  because the editor surface swallowed them. They now reach the menu from the editor
+  too. AltGr on international keyboards still types its character.
+
 ## [0.9.0] - 2026-09-08
 
 First stable release on the 0.9 line — the betas' content with the prerelease

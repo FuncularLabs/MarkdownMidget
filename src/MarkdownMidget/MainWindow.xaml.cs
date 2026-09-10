@@ -90,6 +90,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         RegisterShortcuts();
+        InitAccessKeys();
         SourceToggle.Content = GlyphSource; // start in WYSIWYG; button offers source view
         _dirtyTimer.Tick += async (_, _) => { _dirtyTimer.Stop(); await UpdateDirtyAsync(); };
 
