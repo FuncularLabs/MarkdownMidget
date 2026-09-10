@@ -1,0 +1,256 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Document;
+using ICSharpCode.AvalonEdit.Editing;
+using ICSharpCode.AvalonEdit.Rendering;
+
+namespace MarkdownMidget.Source;
+
+/// <summary>
+/// The raw-markdown source view (Ctrl+E), backed by AvalonEdit.
+///
+/// It exists so the rest of the app does not have to learn AvalonEdit. The source
+/// view began life as a WPF <see cref="TextBox"/>, and roughly seventy call sites
+/// across MainWindow and SourceFormat speak its dialect: 0-based line indices,
+/// character indices rather than document offsets, <c>CaretIndex</c>,
+/// <c>TextWrapping</c>, <c>CaretBrush</c>, and geometry that is relative to the
+/// control. A <see cref="TextBox"/> cannot colour a run of text, which is the whole
+/// reason for the move — but nothing else about how those call sites work needed to
+/// change, so every AvalonEdit-ism is confined here and translated back to the
+/// TextBox-shaped surface they already expect.
+///
+/// Line-number convention, stated once because it is the easy thing to get wrong:
+/// AvalonEdit counts document lines from 1; the TextBox API this replaces counts
+/// display lines from 0. Every method here takes and returns the 0-based form and
+/// converts at the boundary.
+/// </summary>
+public class SourceEditor : TextEditor
+{
+    public SourceEditor()
+    {
+        // The app runs its own spell engine and draws its own squiggles; AvalonEdit
+        // has no native checker, so there is nothing to turn off, but the caret and
+        // wrapping defaults are set to match the old TextBox.
+        WordWrap = false;
+        Options.EnableHyperlinks = false;          // a URL in the markdown is text, not a link
+        Options.EnableEmailHyperlinks = false;
+        Options.CutCopyWholeLine = false;          // TextBox copies the selection, nothing more
+
+        // Document.Changed carries real offsets (Offset / InsertionLength /
+        // RemovalLength), which is exactly what the squiggle tracker needs and what
+        // WPF's TextChangedEventArgs.Changes used to supply. Raised as TextEdited so
+        // the host can keep shifting squiggle ranges through edits.
+        TextChanged += (_, _) => { /* handled per-change below */ };
+        Document.Changed += OnDocumentChanged;
+        // A fresh Document can be swapped in when Text is reassigned wholesale; keep
+        // the handler attached to whatever document is current.
+        DocumentChanged += (_, _) => { if (Document is not null) Document.Changed += OnDocumentChanged; };
+    }
+
+    /// <summary>
+    /// Raised for each document edit with TextBox-style offsets: where the change
+    /// started, how many characters went in, how many came out. The squiggle adorner
+    /// consumes this to keep underlines glued to their words between spell passes.
+    /// </summary>
+    public event Action<int, int, int>? TextEdited;
+
+    private void OnDocumentChanged(object? sender, DocumentChangeEventArgs e) =>
+        TextEdited?.Invoke(e.Offset, e.InsertionLength, e.RemovalLength);
+
+    // ===== TextBox property shims =====
+
+    /// <summary>The caret position as a character index — TextBox's <c>CaretIndex</c>,
+    /// which AvalonEdit spells <see cref="TextEditor.CaretOffset"/>.</summary>
+    public int CaretIndex
+    {
+        get => CaretOffset;
+        set => CaretOffset = Math.Clamp(value, 0, Document?.TextLength ?? 0);
+    }
+
+    /// <summary>
+    /// TextBox's <c>TextWrapping</c>, mapped to AvalonEdit's boolean <c>WordWrap</c>.
+    /// Only Wrap vs. NoWrap is meaningful here (the source view has never used
+    /// WrapWithOverflow), so anything that is not <see cref="TextWrapping.NoWrap"/>
+    /// counts as wrapping — the same two-way switch the toolbar button drives.
+    /// </summary>
+    public TextWrapping TextWrapping
+    {
+        get => WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        set => WordWrap = value != TextWrapping.NoWrap;
+    }
+
+    /// <summary>
+    /// Selection start, with TextBox semantics: setting it places the caret there and
+    /// clears any existing selection. AvalonEdit's own setter keeps the current
+    /// selection length, so after <c>SelectedText = "…"</c> — which leaves the
+    /// inserted text selected — assigning a new start with the stale length in place
+    /// throws "start + length past the end". Collapsing to a caret is what
+    /// <see cref="SourceFormat"/> means every time it assigns this, and a following
+    /// <see cref="SelectionLength"/> assignment re-selects from here.
+    /// </summary>
+    public new int SelectionStart
+    {
+        get => base.SelectionStart;
+        set => Select(Math.Clamp(value, 0, Document?.TextLength ?? 0), 0);
+    }
+
+    /// <summary>Selection length, clamped to what remains from the current start so it
+    /// can never name a range past the end (TextBox clamps; AvalonEdit throws).</summary>
+    public new int SelectionLength
+    {
+        get => base.SelectionLength;
+        set
+        {
+            var start = base.SelectionStart;
+            var max = (Document?.TextLength ?? 0) - start;
+            Select(start, Math.Clamp(value, 0, Math.Max(0, max)));
+        }
+    }
+
+    /// <summary>The caret brush — TextBox exposes it directly; AvalonEdit parks it on
+    /// the <see cref="TextArea"/>'s caret. Without setting it, a dark theme leaves the
+    /// caret WPF-default black and it vanishes.</summary>
+    public Brush CaretBrush
+    {
+        get => TextArea.Caret.CaretBrush;
+        set => TextArea.Caret.CaretBrush = value;
+    }
+
+    // ===== line / offset mapping (0-based, TextBox semantics) =====
+
+    /// <summary>Number of document lines, or 0 when there is no document. TextBox
+    /// returns -1 before layout; AvalonEdit always knows its line count, so callers
+    /// that guarded <c>&lt;= 0</c> simply never trip that guard now.</summary>
+    public new int LineCount => Document?.LineCount ?? 0;
+
+    /// <summary>The 0-based line a character index sits on.</summary>
+    public int GetLineIndexFromCharacterIndex(int charIndex)
+    {
+        var doc = Document;
+        if (doc is null) return -1;
+        if (charIndex < 0 || charIndex > doc.TextLength) return -1;
+        return doc.GetLineByOffset(charIndex).LineNumber - 1;
+    }
+
+    /// <summary>The character index at the start of a 0-based line.</summary>
+    public int GetCharacterIndexFromLineIndex(int lineIndex)
+    {
+        var doc = Document;
+        if (doc is null) return -1;
+        if (lineIndex < 0 || lineIndex >= doc.LineCount) return -1;
+        return doc.GetLineByNumber(lineIndex + 1).Offset;
+    }
+
+    /// <summary>The text of a 0-based line, without its terminator. Empty string for a
+    /// line index out of range, matching TextBox's forgiving <c>GetLineText</c>.</summary>
+    public string GetLineText(int lineIndex)
+    {
+        var doc = Document;
+        if (doc is null || lineIndex < 0 || lineIndex >= doc.LineCount) return string.Empty;
+        var line = doc.GetLineByNumber(lineIndex + 1);
+        return doc.GetText(line.Offset, line.Length);
+    }
+
+    /// <summary>The first 0-based DOCUMENT line currently visible, or -1 before layout.
+    /// This is a document line, not a display line: with word wrap on the two differ,
+    /// and the scroll-anchor logic wants the document line.</summary>
+    public int GetFirstVisibleLineIndex()
+    {
+        var tv = TextArea.TextView;
+        tv.EnsureVisualLines();
+        var lines = tv.VisualLines;
+        if (lines.Count == 0) return -1;
+        return lines[0].FirstDocumentLine.LineNumber - 1;
+    }
+
+    /// <summary>The last 0-based document line currently visible, or -1 before layout.</summary>
+    public int GetLastVisibleLineIndex()
+    {
+        var tv = TextArea.TextView;
+        tv.EnsureVisualLines();
+        var lines = tv.VisualLines;
+        if (lines.Count == 0) return -1;
+        return lines[^1].LastDocumentLine.LineNumber - 1;
+    }
+
+    /// <summary>
+    /// Scroll a 0-based line into view. TextBox's <c>ScrollToLine</c> takes a display
+    /// index and no-ops out of range; AvalonEdit's takes a 1-based line, so convert
+    /// and clamp.
+    /// </summary>
+    public new void ScrollToLine(int lineIndex)
+    {
+        var count = LineCount;
+        if (count <= 0) return;
+        base.ScrollToLine(Math.Clamp(lineIndex, 0, count - 1) + 1);
+    }
+
+    // ===== hit-testing and glyph geometry =====
+
+    /// <summary>
+    /// The character index nearest a point, in control coordinates.
+    ///
+    /// TextBox with <paramref name="snapToText"/> true always returns an index; a
+    /// click in the empty area below the last line snaps to the end. AvalonEdit's
+    /// <see cref="TextEditor.GetPositionFromPoint"/> returns null there instead, and
+    /// the spell context menu relies on getting an index — so a null with snapping
+    /// requested falls back to the end offset. Without snapping, null passes through
+    /// as -1 (nothing was under the pointer).
+    /// </summary>
+    public int GetCharacterIndexFromPoint(Point point, bool snapToText)
+    {
+        var doc = Document;
+        if (doc is null) return -1;
+        // GetPositionFromPoint expects a point relative to the text view, which sits
+        // inside the control at the scroll offset.
+        var tv = TextArea.TextView;
+        tv.EnsureVisualLines();
+        var docPoint = new Point(point.X + tv.HorizontalOffset, point.Y + tv.VerticalOffset);
+        var pos = TextArea.TextView.GetPosition(docPoint);
+        if (pos is { } p) return doc.GetOffset(p.Location);
+        return snapToText ? doc.TextLength : -1;
+    }
+
+    /// <summary>
+    /// The bounding rectangle of the character at an index, in CONTROL coordinates —
+    /// the same frame TextBox reports, which is what the squiggle adorner draws in.
+    /// AvalonEdit works in document coordinates, so the text view's scroll offset is
+    /// subtracted. <see cref="Rect.Empty"/> before layout or for an out-of-range
+    /// index, exactly as TextBox returns an empty rect when it cannot place a char.
+    /// </summary>
+    public Rect GetRectFromCharacterIndex(int charIndex, bool trailingEdge = false)
+    {
+        var doc = Document;
+        if (doc is null || charIndex < 0 || charIndex > doc.TextLength) return Rect.Empty;
+        // Not arranged yet: TextBox returns an empty rect here, and the squiggle
+        // adorner already refuses to draw when ActualWidth is 0, so match that rather
+        // than hand back a position AvalonEdit is willing to compute lazily off-screen.
+        if (ActualWidth <= 0) return Rect.Empty;
+        var tv = TextArea.TextView;
+        tv.EnsureVisualLines();
+        var location = doc.GetLocation(charIndex);
+        var vpos = new TextViewPosition(location);
+        // VisualPosition is top-left of the caret at that spot, in document space.
+        var top = tv.GetVisualPosition(vpos, VisualYPosition.LineTop);
+        var bottom = tv.GetVisualPosition(vpos, VisualYPosition.LineBottom);
+        var x = top.X - tv.HorizontalOffset;
+        var y = top.Y - tv.VerticalOffset;
+        var height = bottom.Y - top.Y;
+        if (double.IsNaN(x) || double.IsNaN(y) || height <= 0) return Rect.Empty;
+        _ = trailingEdge; // TextBox uses it to bias to the trailing edge; the caret
+                          // position is already the leading edge of the next glyph,
+                          // which is what the adorner's fallback path wants.
+        return new Rect(x, y, 0, height);
+    }
+
+    // ===== a background-renderer hook the adorner does not need, kept for Stage 2 =====
+
+    /// <summary>Add a background renderer to the text view — the AvalonEdit-native
+    /// way to draw under the text, used by highlighting. Exposed so callers need not
+    /// reach through <see cref="TextArea"/>.</summary>
+    public void AddBackgroundRenderer(IBackgroundRenderer renderer) =>
+        TextArea.TextView.BackgroundRenderers.Add(renderer);
+}

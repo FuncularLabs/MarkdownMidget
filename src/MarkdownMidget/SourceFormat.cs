@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using System.Windows.Controls;
+using MarkdownMidget.Source;
 
 namespace MarkdownMidget;
 
@@ -12,7 +12,7 @@ internal static partial class SourceFormat
     [GeneratedRegex(@"^(#{1,6}\s+|>\s+|[-*+]\s+|\d+\.\s+)")]
     private static partial Regex BlockPrefix();
 
-    public static void Apply(TextBox tb, string name)
+    public static void Apply(SourceEditor tb, string name)
     {
         switch (name)
         {
@@ -36,7 +36,7 @@ internal static partial class SourceFormat
         }
     }
 
-    public static void InsertCodeBlock(TextBox tb, string language)
+    public static void InsertCodeBlock(SourceEditor tb, string language)
     {
         var body = tb.SelectedText;
         var fence = "```" + language;
@@ -47,7 +47,7 @@ internal static partial class SourceFormat
     }
 
     /// <summary>Wraps the selection (or the caret) with markers.</summary>
-    private static void Wrap(TextBox tb, string left, string right)
+    private static void Wrap(SourceEditor tb, string left, string right)
     {
         var start = tb.SelectionStart;
         var sel = tb.SelectedText;
@@ -63,7 +63,7 @@ internal static partial class SourceFormat
     }
 
     /// <summary>Replaces any block marker on the caret's line with <paramref name="prefix"/>.</summary>
-    private static void Prefix(TextBox tb, string prefix)
+    private static void Prefix(SourceEditor tb, string prefix)
     {
         var caret = tb.SelectionStart;
         var line = tb.GetLineIndexFromCharacterIndex(caret);
@@ -79,7 +79,7 @@ internal static partial class SourceFormat
         tb.Focus();
     }
 
-    private static void InsertAtCaret(TextBox tb, string text)
+    private static void InsertAtCaret(SourceEditor tb, string text)
     {
         tb.SelectedText = text;
         tb.SelectionStart += text.Length;

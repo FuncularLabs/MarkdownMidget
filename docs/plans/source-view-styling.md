@@ -1,0 +1,110 @@
+# Source-view styling — test-first implementation plan
+
+Companion to `source-view-editor.md` (the verification + migration scope). That doc
+proved AvalonEdit runs on .NET 10 and mapped every `TextBox` member. This one is the
+actionable plan: acceptance criteria, the AC→test matrix, and the staged tasks.
+
+Written 2026-09-09 against master at `7de499a`.
+
+## The feature, in one line
+
+The raw-markdown source view (Ctrl+E) gains **syntax highlighting that follows the
+document theme** — headings, links, emphasis, code, quotes and list markers coloured
+with the same palette the WYSIWYG view uses, on the same page background. Today the
+pane is a plain `TextBox`: it already tracks the theme's background/foreground/caret,
+but it cannot colour a run of text, so nothing else is possible until the control can.
+
+The user's steer, verbatim: capture the *general vibe of the corresponding WYSIWYG
+themes, not the code-block theme, since e.g. we can have dark code blocks in light
+themes*. So source tokens map to the theme's **page-level** semantic variables
+(`--mdm-heading`, `--mdm-link`, `--mdm-quote-*`, `--mdm-text`), which are tuned for
+the page and measured legible on it — never to `--mdm-token-*`, which are tuned for
+the dark code panel and fail on a light page (measured: 8–9 of 9 tokens under 4.5:1).
+
+## Stages
+
+- **Stage 1 — control swap (like-for-like).** Replace the `TextBox` with an
+  AvalonEdit-backed `SourceEditor` adapter that exposes the exact TextBox-shaped API
+  the app already calls, so the 69 call sites barely move and every AvalonEdit-ism
+  lives in one tested file. No colouring yet; the pane looks and behaves as today.
+- **Stage 2 — themed markdown highlighting.** A `Markdown.xshd` definition whose
+  named colours are set at runtime from the theme's page-level palette, read back the
+  same way the source background already is. This is the visible feature.
+- **Stage 3 — independent code-view theme (deferred).** "VS Dark for code, Solarized
+  for prose." A separable enhancement: linked-by-default with an opt-out, standalone
+  palette files, a menu and persistence. Tracked in ROADMAP.md; not in this pass.
+
+## Design decisions
+
+1. **Adapter, not a scattered rewrite.** `SourceEditor : ICSharpCode.AvalonEdit.TextEditor`
+   re-exposes `CaretIndex`, `TextWrapping`, `CaretBrush`, `LineCount`, `GetLineText`,
+   `GetLineIndexFromCharacterIndex`, `GetCharacterIndexFromLineIndex`,
+   `GetFirstVisibleLineIndex`, `GetLastVisibleLineIndex`, `GetCharacterIndexFromPoint`
+   and `GetRectFromCharacterIndex` with **TextBox semantics** (0-based display lines,
+   control-relative rects). The seam is one file with its own tests; the call sites in
+   `MainWindow.*.cs` and `SourceFormat.cs` change by type name and little else.
+2. **Squiggle adorner is kept, not rewritten.** It already draws against
+   `GetRectFromCharacterIndex` + the visible-line methods; the adapter provides those,
+   so the highest-risk file (spell squiggles) changes only its field type. The
+   `ShiftForEdit` offset-tracking is preserved but now fed by `Document.Changed`
+   (real offsets) instead of WPF's `TextChangedEventArgs.Changes`.
+3. **`GetCharacterIndexFromPoint` gets an explicit nearest-offset fallback.** The one
+   measured behavioural gap: AvalonEdit returns null for a point below the text where
+   `TextBox` snapped to the last character. The spell context menu depends on an index,
+   so the adapter falls back to the end offset when the hit is past the document.
+4. **Highlighting is host-driven colour, not a themed .xshd file.** The `.xshd` names
+   its colours (`Heading`, `Emphasis`, `Strong`, `InlineCode`, `Link`, `BlockQuote`,
+   `ListMarker`, `Rule`, `FenceMarker`, `FenceLang`); the host sets each named colour's
+   brush from the theme read-back after every theme change. One resolution engine (the
+   browser) stays the source of truth for colour, matching the existing model.
+5. **Print is untouched.** Printing already ignores the theme and renders via the
+   WYSIWYG surface; the source pane is a screen-only control.
+
+## Acceptance criteria → test matrix
+
+Tests live in `tests/MarkdownMidget.Tests` unless noted. WPF surface tests use the
+established STA-thread harness (see `ContextMenuFocusTests`). `coverlet.collector` is
+added to the test project (Rule 2); touched files target ≥85% line coverage.
+
+### Stage 1 — control swap
+
+| # | Acceptance criterion | Test | Project |
+|---|---|---|---|
+| 1.1 | Line↔offset mapping is 0-based and round-trips at first line, last line, empty doc | `SourceEditorTests.LineAndOffsetRoundTrip` | Tests |
+| 1.2 | `GetFirstVisibleLineIndex`/`GetLastVisibleLineIndex` return document lines, and diverge from display lines under wrap | `SourceEditorTests.VisibleLineIndicesAreDocumentLines` | Tests |
+| 1.3 | `GetCharacterIndexFromPoint` past the end of text returns the end offset, not -1 | `SourceEditorTests.HitTestBelowTextFallsBackToEnd` | Tests |
+| 1.4 | `GetRectFromCharacterIndex` returns a control-relative rect for a laid-out char, `Empty` before layout | `SourceEditorTests.RectIsControlRelative` | Tests |
+| 1.5 | `CaretIndex`, `TextWrapping`, `CaretBrush` behave as the TextBox members they replace | `SourceEditorTests.TextBoxShimsBehave` | Tests |
+| 1.6 | Each `SourceFormat` op is a single undo unit and lands the caret where the old code did | `SourceFormatTests.*` (Wrap/Prefix/CodeBlock/undo) | Tests |
+| 1.7 | Squiggle ranges produce one rect per word and clip to the viewport | `SquiggleGeometryTests.RectsMatchWordBounds` | Tests |
+| 1.8 | `ShiftForEdit` keeps ranges glued through inserts before/inside/after | `SquiggleAdornerShiftTests.*` (exists; re-point to adapter) | Tests |
+| 1.9 | Mutation guard: a `SourceEditor` whose `GetLineText` returns "" makes `SourceFormat.Prefix` a no-op — proves the tests exercise real text | mutation run, recorded in handoff | — |
+
+### Stage 2 — themed highlighting
+
+| # | Acceptance criterion | Test | Project |
+|---|---|---|---|
+| 2.1 | The `.xshd` colours two bold spans on one line separately (no greedy merge) | `MarkdownHighlightingTests.TwoStrongSpansDoNotMerge` | Tests |
+| 2.2 | Headings, emphasis, strong, inline code, links, quotes, list markers, rules, fences each get their named colour | `MarkdownHighlightingTests.EachConstructGetsItsColour` | Tests |
+| 2.3 | The theme read-back parses the page-level syntax palette; a missing/!shaped field yields no palette, not a half one | `SourcePaletteTests.*` (mirrors `ThemeReadBackTests`) | Tests |
+| 2.4 | Applying a palette sets every named colour's brush; a null palette leaves the definition's defaults | `SourcePaletteTests.AppliesToNamedColours` | Tests |
+| 2.5 | Every mapped colour clears 4.5:1 on the theme's own page background, all 6 built-ins | `SourcePaletteContrastTests.MappedColoursAreLegibleOnThePage` | Tests |
+| 2.6 | Read-back JS returns the new keys for a known stylesheet (parity guard) | `source-palette.test.mjs` | editor-src |
+
+Mutations to kill (Rule 1): 2.1 — revert the fence/emphasis regex to greedy `.*` and
+the test must go red; 2.4 — skip the brush assignment and the palette test must fail;
+2.5 — swap one mapped role to a `--mdm-token-*` value and the contrast test must fail.
+
+## Interface coverage (Stage 1 adapter — Rule 2)
+
+Every public member of `SourceEditor` is called by a test: the shim properties (1.5),
+the line/offset/visible/rect/hit-test methods (1.1–1.4, 1.7), and the `TextEdited`
+event (1.8). `GetLineText` is covered through `SourceFormatTests` (1.6).
+
+## Out of scope (stated, per house rule)
+
+- Font/size control and zoom in the source pane (arrives with the control but is a
+  separate feature; the pane stays Consolas 14 for now).
+- Line numbers and folding (AvalonEdit offers them; not enabled here).
+- Stage 3 independent theme selection (deferred, ROADMAP).
+- Any change to WYSIWYG code-block colouring (Prism/CSS, already themed).

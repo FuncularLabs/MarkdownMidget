@@ -110,6 +110,7 @@ public partial class MainWindow : Window
         MenuSpellCheck.IsChecked = _spellCheck;
         MenuSkipCodeSpell.IsChecked = _skipCodeSpell;
         InitSpell();
+        InitSource();
 
         // Apply the persisted source-view word-wrap state (starts in WYSIWYG, so the
         // toolbar button starts disabled/off).
@@ -4021,15 +4022,6 @@ public partial class MainWindow : Window
     {
         _dirtyTimer.Stop();
         _dirtyTimer.Start();
-    }
-
-    private void Source_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (!_sourceMode) return;
-        _ = UpdateDirtyAsync();
-        foreach (var c in e.Changes)
-            _squiggles?.ShiftForEdit(c.Offset, c.AddedLength, c.RemovedLength);
-        RequestSpellCheckSoon();
     }
 
     private async Task UpdateDirtyAsync()

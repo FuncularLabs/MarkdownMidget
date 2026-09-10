@@ -6,9 +6,9 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Threading;
+using MarkdownMidget.Source;
 using MarkdownMidget.Spelling;
 
 namespace MarkdownMidget;
@@ -30,7 +30,7 @@ public partial class MainWindow
     // in-flight check that started against generation N must not deliver results
     // to generation N+1 — that's how squiggles from one file land on another.
     private int _spellGeneration;
-    private SquiggleAdorner? _squiggles;
+    private SquiggleRenderer? _squiggles;
 
     private sealed class SpellTextPayload
     {
@@ -48,11 +48,31 @@ public partial class MainWindow
     private void InitSpell()
     {
         _spellTimer.Tick += async (_, _) => { _spellTimer.Stop(); await RunSpellCheckAsync(); };
-        SourceBox.AddHandler(System.Windows.Controls.ScrollViewer.ScrollChangedEvent,
-            new RoutedEventHandler((_, _) => _squiggles?.InvalidateVisual()));
         SourceBox.ContextMenuOpening += SourceBox_ContextMenuOpening;
-        // Our stack replaces WPF's native checking entirely.
-        SourceBox.SpellCheck.IsEnabled = false;
+        // No native spell check to disable — AvalonEdit has none — and no scroll
+        // handler to wire: the squiggle renderer repaints as part of the text view's
+        // own render pass, so scrolling redraws it without a separate hook.
+    }
+
+    /// <summary>
+    /// Source-view change wiring, done in code because AvalonEdit's TextChanged is a
+    /// bare event with no per-edit offsets. The dirty/spell trigger listens on it; the
+    /// squiggle tracker listens on the document, which carries where and how much
+    /// changed. Both act only in source mode — setting the box's text while the
+    /// WYSIWYG view is showing must not drive the source-view machinery.
+    /// </summary>
+    private void InitSource()
+    {
+        SourceBox.TextChanged += (_, _) =>
+        {
+            if (!_sourceMode) return;
+            _ = UpdateDirtyAsync();
+            RequestSpellCheckSoon();
+        };
+        SourceBox.TextEdited += (offset, added, removed) =>
+        {
+            if (_sourceMode) _squiggles?.ShiftForEdit(offset, added, removed);
+        };
     }
 
     /// <summary>
@@ -204,10 +224,8 @@ public partial class MainWindow
     private void EnsureSquiggleAdorner()
     {
         if (_squiggles is not null) return;
-        var layer = AdornerLayer.GetAdornerLayer(SourceBox);
-        if (layer is null) return;
-        _squiggles = new SquiggleAdorner(SourceBox);
-        layer.Add(_squiggles);
+        _squiggles = new SquiggleRenderer(SourceBox);
+        SourceBox.AddBackgroundRenderer(_squiggles);
     }
 
     // ---- suggestion menus ----

@@ -18,6 +18,7 @@ namespace MarkdownMidget.Tests;
 /// used to strand keyboard focus on the ContextMenu and put Add to Dictionary out
 /// of reach. WPF menus need a real window + STA thread, so each case runs one.
 /// </summary>
+[Collection("WpfSta")]
 public class ContextMenuFocusTests
 {
     /// <summary>
