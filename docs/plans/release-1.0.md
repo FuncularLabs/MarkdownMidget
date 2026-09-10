@@ -18,10 +18,10 @@ the audit's one measured finding is that this is true in content and false in fo
 | # | Finding | Status |
 |---|---|---|
 | 1 | Saving rewrites the user's markdown conventions, invisibly | **Confirmed, measured** (below) |
-| 2 | CRLF becomes LF; a UTF-8 BOM is dropped | Confirmed by reading the load/save path |
+| 2 | Line endings are mangled; a UTF-8 BOM is dropped | **Measured, and worse than first stated:** structural line endings become LF, but endings *inside* code and HTML blocks stay as written, so a CRLF file with one code block saves with mixed endings. The BOM loss is by reading the save path (a default `StreamWriter`) |
 | 3 | Find has no Replace | Confirmed |
-| 4a | Pasting an image into the formatted view does nothing | **Wrong.** It works, via the browser's own paste; there was no handler to grep for |
-| 4b | Dropping an image *file* on the editor opens it as text | Confirmed: `HandleDroppedContent` opens any dropped file as a document, after the discard prompt |
+| 4a | Pasting an image into the formatted view does nothing | **Wrong.** It works. Dogfood-verified, not code-verified: our code has no paste handler; ProseMirror's native paste capture turns the bitmap Chromium pastes into an image node |
+| 4b | Dropping an image *file* on the editor opens it as text | Confirmed: `HandleDroppedContent` opens any dropped file as a document, after the discard prompt when there are unsaved changes |
 | 4c | Pasting an image into the *source* view does nothing | Confirmed (AvalonEdit is text-only); see decision below |
 | 5 | The same file open in two windows silently overwrites | Confirmed (roadmap already describes it) |
 | 6 | No installer / Add-Remove entry | Confirmed; decision point below |
@@ -41,11 +41,19 @@ Thirty lines changed with no edit made. Hard-wrapped paragraphs, `__bold__`,
 | Indented code block | fenced |
 | Two trailing spaces (hard break) | `\` |
 | `snake_case_word` | `snake\_case\_word` |
-| `\|:-----\|------:\|` | `\| :--- \| ----: \|` |
+| `\|:-----\|------:\|` | reformatted; padding follows the widest cell |
+| Tight list (`- one` / `- two`) | loose: a blank line between the items |
+| CRLF line endings | LF outside code and HTML blocks, CRLF kept inside them |
 
-Why it is invisible: `SetCleanBaselineAsync` takes the clean baseline from the
-editor's re-serialisation, not the file, so a freshly opened document shows no
-asterisk. The rewrite lands on the first save after any edit. A second consequence:
+The sample is committed as `editor-src/test/fixtures/roundtrip-audit.md` so the
+figure is reproducible.
+
+Why it is invisible: in the formatted view, `SetCleanBaselineAsync` takes the clean
+baseline from the editor's re-serialisation, not the file, so a freshly opened
+document shows no asterisk. The rewrite lands on the first save after any edit. (A
+document opened and saved entirely in the source view is written back as typed: the
+source view holds the raw text and never passes through the serialiser.) A second
+consequence:
 `HandleExternalChangeAsync` compares the disk text to that normalised baseline, so a
 tool that rewrites the file with identical bytes reads as an external change.
 
@@ -65,16 +73,17 @@ unpinnable without it.
 
 | AC | Test |
 |---|---|
-| R1. A round-trip harness exists: markdown in, editor, markdown out, in Node with the real bundle's parser and serialiser | `editor-src/test/roundtrip.test.mjs` with a fixture corpus (the audit sample plus README.md and HELP.md themselves) |
-| R2. The serialiser's conventions are pinned: `-` bullets, `1.` ordered, ATX headings, fenced code, `*`/`**` emphasis, and a chosen hard-break form — and the harness fails if any drifts | `roundtrip.test.mjs: ConventionsArePinned` (each convention one case) |
+| R1. A round-trip harness exists: markdown in, editor, markdown out, in Node with the real bundle's parser and serialiser | `editor-src/test/roundtrip.test.mjs` with a fixture corpus: `editor-src/test/fixtures/roundtrip-audit.md` (committed with this plan) plus README.md and HELP.md themselves |
+| R2. The serialiser's conventions are pinned: `-` bullets, `1.` ordered, ATX headings, fenced code, `*`/`**` emphasis, a chosen hard-break form, and tight lists stay tight (today `- one` / `- two` comes back loose) — and the harness fails if any drifts | `roundtrip.test.mjs: ConventionsArePinned` (each convention one case) |
 | R3. Intraword underscores are not escaped (`snake_case_word` survives) | `roundtrip.test.mjs: IntrawordUnderscoreSurvives` — investigate `mdast-util-to-markdown` `unsafe` overrides; if it cannot be done safely, this AC moves to "documented limit" |
-| R4. Line endings are preserved: a CRLF file saves CRLF, an LF file LF, a mixed file takes the majority | `DocumentTextTests.LineEndingsRoundTrip` (host, pure: detect on load, re-apply on save) |
+| R4. Line endings are preserved end to end: a CRLF file saves CRLF throughout, an LF file LF, a mixed file takes the majority — including inside code and HTML blocks, where the serialiser today keeps the original endings while normalising everything else | `DocumentTextTests.LineEndingsRoundTrip` (host, pure): detect on load; on save FOLD every `\r\n`, `\r` and `\n` to `\n` first, then re-apply the detected ending. A naive `Replace("\n", "\r\n")` would produce `\r\r\n` inside every code block. The corpus must include a CRLF file with a fenced block, an indented block and an HTML block |
 | R5. A UTF-8 BOM is preserved when present and not added when absent | `DocumentTextTests.BomRoundTrip` |
 | R6. A file rewritten on disk with identical bytes is NOT reported as an external change | `ExternalChangeTests.IdenticalBytesAreNotAChange` — keep the raw loaded text beside the normalised baseline and compare against the raw one |
-| R7. HELP documents the conventions and states plainly that saving normalises to them, listing what is converted (reference links inlined, setext to ATX, …) | reviewed against R2's list; `EmbeddedReaderDocsTests` already pins HELP loads |
+| R7. HELP documents the conventions and states plainly that a document which passes through the formatted view is saved in them, listing what is converted (reference links inlined, setext to ATX, tight lists loosened unless R2 fixes it, …) | reviewed against R2's list; `EmbeddedReaderDocsTests` already pins HELP loads |
 
 Mutations to kill: R2 — flip one serialiser option and the pin must go red;
-R4 — write with `\n` unconditionally and the CRLF case must go red; R6 — compare
+R4 — write with `\n` unconditionally and the CRLF case must go red, and skip the
+fold step and the CRLF-with-code-block case must go red on `\r\r\n`; R6 — compare
 against the normalised baseline and the identical-bytes case must go red.
 
 Decided against for 1.0: preserving reference-style links (the parser consumes the
@@ -115,7 +124,7 @@ enough for "already open", and the Window menu can be built on the same piece la
 
 | AC | Test |
 |---|---|
-| L1. ROADMAP's "Won't unless asked" and HELP's limits section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads |
+| L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads |
 | L2. README's promise paragraph is true as written after 0.11 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed |
 | L3. README Status, Recent changes and the badge reflect 1.0; CHANGELOG has the promotion section | same shape as the 0.9.0 promote |
 

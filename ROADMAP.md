@@ -22,19 +22,22 @@ order of risk:
   bundle: a 39-line README-style file came back with 30 lines changed and no edit
   made — setext headings to `#`, `+` bullets to `*`, `1)` to `1.`, reference links
   inlined with their definition deleted, indented code fenced, two-space hard breaks
-  to `\`, `snake_case_word` to `snake\_case\_word`. It is invisible because the
-  clean baseline after Open is the editor's re-serialisation, not the file. The
+  to `\`, `snake_case_word` to `snake\_case\_word`, tight lists loosened. It is
+  invisible because, in the formatted view, the clean baseline after Open is the
+  editor's re-serialisation, not the file; the source view saves as typed. The
   README's "not a lossy import/export" is true in content and false in form. 1.0
   pins and documents the conventions, builds the round-trip harness that keeps them
   pinned, and stops escaping intraword underscores if that can be done safely.
-- **Line endings and the BOM are normalised.** CRLF saves as LF; a UTF-8 BOM is
-  dropped. Preserve both.
+- **Line endings are mangled and the BOM is dropped.** Measured: structural line
+  endings become LF but endings inside code and HTML blocks stay as written, so a
+  CRLF file with one code block saves with mixed endings. A UTF-8 BOM is dropped.
+  Preserve both, end to end (fold every ending before re-applying the detected one).
 - **A file rewritten with identical bytes reads as an external change**, because the
   watcher compares against that normalised baseline. Compare against the raw text.
 - **Find has no Replace.** Replace / Replace All, both views, all four modes, scoped
   to the selection.
 - **Dropping an image file on the editor opens it as text** (after the discard
-  prompt). Insert it as a picture instead; refuse other non-markdown drops with a
+  prompt, when there are unsaved changes). Insert it as a picture instead; refuse other non-markdown drops with a
   message. Pasting an image into the *source* view does nothing today; it should
   insert the same data-URI markdown the formatted view produces (Markdown Monster
   accepts pasted images in its text editor too, though it saves them as files — our
