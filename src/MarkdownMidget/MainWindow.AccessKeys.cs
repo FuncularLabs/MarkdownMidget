@@ -21,10 +21,19 @@ public partial class MainWindow
         // branch and is handled by WPF natively, so nothing is processed twice.
         Web.KeyDown += Web_KeyDown;
         Web.KeyUp += Web_KeyUp;
-        // A press that was in progress when focus left the editor (Alt+F opened the
-        // menu; Alt+Tab; a dialog) must not be completed by whatever Alt key-up later
-        // wanders back in. Same rule as WPF's KeyboardNavigation on focus loss.
-        Web.LostKeyboardFocus += (_, _) => _altPress.Reset();
+        // A press that was in progress when focus left the editor (an Alt+Tab that
+        // began here; a dialog) must not be completed by whatever Alt key-up later
+        // wanders back in.
+        //
+        // Not LostKeyboardFocus: the Web element never HOLDS WPF keyboard focus while
+        // the editor is active — WPF nulls it the moment the editor's own Win32 window
+        // takes focus — so that event has nothing to fire for. The WebView2 control
+        // raises the plain LostFocus event from its controller's LostFocus, i.e. when
+        // Win32 focus genuinely leaves the editor; and the window deactivating covers
+        // Alt+Tab and an owned dialog regardless. Both reset. Neither is reachable
+        // from a unit test; the hookup is verified by dogfooding.
+        Web.LostFocus += (_, _) => _altPress.Reset();
+        Deactivated += (_, _) => _altPress.Reset();
     }
 
     private void Web_KeyDown(object sender, KeyEventArgs e)

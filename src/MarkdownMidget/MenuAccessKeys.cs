@@ -109,13 +109,17 @@ internal static class MenuAccessKeys
 /// </summary>
 internal sealed class AltPressTracker
 {
-    /// <summary>An Alt key-down was seen and its key-up has not been: a press is in
-    /// progress. Only a press that started here can end as a tap.</summary>
-    private bool _pressed;
+    /// <summary>The Alt key whose key-down began the press in progress, or
+    /// <see cref="Key.None"/> when none is. A tap must end with THAT key's key-up:
+    /// left-Alt down, right-Alt up is not a tap, as WPF's KeyboardNavigation compares
+    /// the real key too.</summary>
+    private Key _altDown = Key.None;
 
     /// <summary>Something happened under Alt since it went down — the press is spent
     /// and releasing Alt must not also read as a tap.</summary>
     private bool _used;
+
+    private bool Pressed => _altDown != Key.None;
 
     public MenuAccessKeys.Down KeyDown(bool isSystem, Key realKey, ModifierKeys modifiers,
                                        Func<string, bool> isRegistered, out string? accessKey)
@@ -123,9 +127,13 @@ internal sealed class AltPressTracker
         var decision = MenuAccessKeys.DecideKeyDown(isSystem, realKey, modifiers, isRegistered, out accessKey);
         if (MenuAccessKeys.IsAltKey(realKey))
         {
+            // A repeated Alt key-down (typematic, or the other Alt key) while a press
+            // is already in progress changes nothing: in particular it must not
+            // un-spend it — Alt, X, Alt again, release is not a tap.
+            if (Pressed) return decision;
             // The Alt key itself: a press begins. Clean (ResetAlt) or already spent
             // (Used — it came down under Ctrl/Shift/Win).
-            _pressed = true;
+            _altDown = realKey;
             _used = decision == MenuAccessKeys.Down.Used;
             return decision;
         }
@@ -133,23 +141,30 @@ internal sealed class AltPressTracker
         return decision;
     }
 
-    /// <summary>True when this key-up completes an Alt tap: a press that began here
-    /// and was not spent. Any Alt key-up ends the press either way.</summary>
+    /// <summary>True when this key-up completes an Alt tap: the same Alt key that
+    /// began a press here, released with nothing used in between. Any Alt key-up ends
+    /// the press either way. A non-Alt key-up during a press spends it (a letter that
+    /// was down before Alt and released under it), as native WPF does.</summary>
     public bool KeyUp(Key realKey)
     {
-        if (!MenuAccessKeys.IsAltKey(realKey)) return false;
-        var tap = _pressed && MenuAccessKeys.IsAltTap(realKey, _used);
-        _pressed = false;
+        if (!MenuAccessKeys.IsAltKey(realKey))
+        {
+            if (Pressed) _used = true;
+            return false;
+        }
+        var tap = Pressed && realKey == _altDown && MenuAccessKeys.IsAltTap(realKey, _used);
+        _altDown = Key.None;
         _used = false;
         return tap;
     }
 
-    /// <summary>Forget any press in progress — the editor lost keyboard focus, so the
+    /// <summary>Forget any press in progress — focus left the editor, so the Alt
     /// key-up, if it ever arrives here, belongs to whatever had focus in between (an
-    /// Alt+Tab back into the window, say). WPF does the same on focus loss.</summary>
+    /// Alt+Tab excursion that began here, say). WPF's KeyboardNavigation likewise
+    /// drops the key it was tracking when focus goes to null.</summary>
     public void Reset()
     {
-        _pressed = false;
+        _altDown = Key.None;
         _used = false;
     }
 }

@@ -236,11 +236,58 @@ public class MenuAccessKeysTests
     public void LosingFocusForgetsThePressInProgress()
     {
         // Alt down here, then Alt+Tab away (the OS eats the Tab) and back: the Alt
-        // key-up that finally arrives belongs to that excursion, not to a tap.
+        // key-up that finally arrives belongs to that excursion, not to a tap. This
+        // proves Reset() does its job; the window calls it from the WebView2's
+        // LostFocus and the window's Deactivated, which no unit test can raise — that
+        // hookup is verified by dogfooding.
         var t = new AltPressTracker();
         t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
         t.Reset();
         Assert.False(t.KeyUp(Key.LeftAlt));
+    }
+
+    [Fact]
+    public void TheOtherAltKeyComingUpIsNotATap()
+    {
+        // Left Alt down, right Alt up: two keys, not one press. Native compares the
+        // real key; so does this.
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.False(t.KeyUp(Key.RightAlt));
+    }
+
+    [Fact]
+    public void ARepeatedAltDownDoesNotUnspendThePress()
+    {
+        // Alt, X (spent), Alt again (typematic repeat or the other Alt key), release:
+        // still spent, still not a tap.
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        t.KeyDown(false, Key.X, A, Registered, out _);
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.False(t.KeyUp(Key.LeftAlt));
+    }
+
+    [Fact]
+    public void ALetterReleasedUnderAltSpendsThePress()
+    {
+        // Rollover typing: X was down before Alt and comes up under it. Native WPF
+        // cancels the tap on any key-up; so does this.
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.X, ModifierKeys.None, Registered, out _);   // Ignore: no Alt yet
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.False(t.KeyUp(Key.X));
+        Assert.False(t.KeyUp(Key.LeftAlt));
+    }
+
+    [Fact]
+    public void ALetterReleasedWithNoPressInProgressChangesNothing()
+    {
+        // No Alt down: a letter key-up must not poison the next press.
+        var t = new AltPressTracker();
+        Assert.False(t.KeyUp(Key.X));
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.True(t.KeyUp(Key.LeftAlt));
     }
 
     // ===== the WPF side, against a real menu =====
