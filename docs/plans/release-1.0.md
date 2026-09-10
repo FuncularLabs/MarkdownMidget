@@ -149,7 +149,7 @@ at the formatted view, which is still better than today's silent nothing.
 | AC | Test |
 |---|---|
 | L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads |
-| L2. README's promise paragraph is true as written after 0.11 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed |
+| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed |
 | L3. README Status, Recent changes and the badge reflect 1.0; CHANGELOG has the promotion section | same shape as the 0.9.0 promote |
 
 ## The installer decision
@@ -176,7 +176,7 @@ Pick before 0.14 starts.
 - PDF is the only export.
 - One document per window, no tabs, no Window menu (a deliberate SDI choice).
 - Reference-style links are converted to inline links on save; setext headings to
-  ATX; indented code to fenced (all from 0.11's conventions list).
+  ATX; indented code to fenced (all from 0.12's conventions list).
 - Mermaid ships in the bundle whether or not a document uses it.
 
 ## Tracking
