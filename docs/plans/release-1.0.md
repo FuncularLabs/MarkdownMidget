@@ -181,6 +181,16 @@ Pick before 0.14 starts.
 
 ## Tracking
 
-Each stage's ACs become GitHub issues under a `v1.0` milestone (decision pending —
-see the audit conversation), referenced from commits and the CHANGELOG, so the
-discovery and the fix are both public.
+Filed 2026-09-10 as GitHub issues under the
+[v1.0 milestone](https://github.com/FuncularLabs/MarkdownMidget/milestone/1), one per
+gap, so the discovery and the fix are both public. Commits and CHANGELOG entries
+reference them.
+
+| Stage | Issues |
+|---|---|
+| 0.11.0 already-open guard | #1 (enhancement — single-instance-per-file was never promised) |
+| 0.12.0 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change |
+| 0.13.0 Find & Replace | #5 |
+| 0.14.0 images | #6 dropped image file opens as text, #7 source-view image paste |
+| installer decision | #8 |
+| 1.0.0 limits written down | #9 |
