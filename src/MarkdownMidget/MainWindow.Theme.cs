@@ -48,7 +48,9 @@ public partial class MainWindow
     private bool _linkThemes = true;
 
     /// <summary>The source view's own theme, meaningful only when unlinked. Persisted
-    /// separately so unlinking and relinking round-trip without losing it.</summary>
+    /// separately so it survives a restart while unlinked. Relinking snaps it to the
+    /// document theme — deliberately simple, and what HELP says; a later unlink starts
+    /// again from whatever the document is showing.</summary>
     private string _sourceThemeKey = ThemeStore.DefaultKey;
 
     /// <summary>What the source view is actually showing — what the menu ticks when

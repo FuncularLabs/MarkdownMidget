@@ -3041,7 +3041,7 @@ public partial class MainWindow : Window
         // a file is added or removed, and an index would then select a different one.
         public string Theme { get; set; } = "";
         // The source view's own theme when the two views are unlinked — same list, same
-        // filename rule. Ignored while linked; kept so relink/unlink round-trips.
+        // filename rule. Ignored while linked; relinking resets it to the document theme.
         public string? SourceTheme { get; set; }
         // View ▸ Theme ▸ "Same Theme for Both Views". Default on.
         public bool LinkThemes { get; set; } = true;
