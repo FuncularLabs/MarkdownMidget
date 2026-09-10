@@ -16,11 +16,9 @@
     <Authors>Funcular Labs</Authors>
     <Copyright>Copyright © Funcular Labs 2026. Licensed under the MIT License.</Copyright>
     <Description>A WYSIWYG markdown editor for Windows, modeled on WordPad's behaviors but with markdown as the native format.</Description>
-    <!-- Local/dev builds only: CI derives both from the git tag at release time. The
-         -dev suffix is what makes a locally built copy unmistakable in the title bar
-         next to an installed release. -->
-    <Version>0.10.0</Version>
-    <InformationalVersion>0.10.0-dev</InformationalVersion>
+    <!-- What a local build reports; CI derives both from the git tag at release time. -->
+    <Version>0.10.0-beta1</Version>
+    <InformationalVersion>0.10.0-beta1</InformationalVersion>
     <!-- Don't append the +git-sha suffix to InformationalVersion — it clutters the
          file-properties dialog and doesn't help users. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>

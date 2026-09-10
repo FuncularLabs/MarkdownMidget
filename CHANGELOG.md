@@ -9,6 +9,14 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [0.10.0-beta1] - 2026-09-10
+
+The source view gets colour — and, if you want it, a theme of its own — plus the
+Alt menu shortcuts working with a document open. A prerelease for the usual
+reason: the control underneath the source view changed (an AvalonEdit editor
+replaces the plain text box), and that wants real hands on real documents before
+the stable promote.
+
 ### Added
 - **The Markdown source view is syntax-highlighted, and it follows the theme.**
   Ctrl+E now shows coloured markdown — headings, bold/italic, inline and fenced
