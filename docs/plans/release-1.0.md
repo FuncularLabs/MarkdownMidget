@@ -61,14 +61,41 @@ tool that rewrites the file with identical bytes reads as an external change.
 
 ## Stages
 
-One user-visible change per release, in the order the risk deserves. Versions are
-the house cadence; the numbers are suggestions.
+One user-visible change per release, in the order the risk deserves — except the
+already-open guard, pulled to the front because it is felt daily, stands alone, and
+is the first piece of the cross-instance registry the roadmap wants anyway.
+Versions are the house cadence; the numbers are suggestions.
 
 ### 0.10.0 — promote the current beta
 
 After dogfooding. Same shape as the 0.9.0 promote. Nothing new.
 
-### 0.11.0 — round-trip honesty
+### 0.11.0 — the already-open guard
+
+Today every open — File ▸ Open, Open Recent, a drop, a double-click in Explorer —
+lands in `OpenPathAsync`, and a double-click or File ▸ New is a fresh process. If the
+file is already open in another window, nothing notices: two windows, two sets of
+unsaved edits, each saving over the other, and the external-change watcher only
+speaks up afterwards.
+
+| AC | Test |
+|---|---|
+| W1. Opening a file already open in another window focuses that window instead of opening a second copy; the launching process hands over foreground | `OpenGuardTests` (pure: the per-path lock decision; the focus hand-off is dogfood-verified) |
+| W2. If the other window cannot be focused (it is gone, or refuses), the file opens read-only with a message saying where it is open | `OpenGuardTests.FocusFailureOpensReadOnly` |
+| W3. The guard is an exclusively opened lock file per normalised path, the backup store's proven pattern: a dead holder's lock opens, and is ignored | `OpenGuardTests.StaleLockIsIgnored` |
+| W4. Paths are normalised before comparison: casing, relative segments, 8.3 short names and a trailing separator all identify the same file | `OpenGuardTests.PathsNormalise` |
+| W5. A window re-opening its own file (reload, external-change Keep) is never blocked by its own lock | `OpenGuardTests.OwnLockIsNotABlock` |
+| W6. The lock is released on close, Save As to a different path re-keys it, and Convert to Unencrypted / Encrypt (which change the path) re-key it | `OpenGuardTests.RekeysOnPathChange` |
+
+Where it lives: a new `Instances/OpenGuard.cs`, called from `OpenPathAsync` before
+anything is read, plus an early check in `App.OnStartup` so a double-click on an
+already-open file focuses the existing window without ever flashing a new one.
+The lock directory is `%LocalAppData%\MarkdownMidget\open\`, one file per path
+hash, holding the owner's process id and window handle. This is the minimal form
+of the roadmap's cross-instance registry: the same file, read by a Window menu
+later, lists every open document.
+
+### 0.12.0 — round-trip honesty
 
 The core promise, made true or stated. Infrastructure first because the rest is
 unpinnable without it.
@@ -93,7 +120,7 @@ definition; keeping it needs a schema change) and preserving the user's *existin
 bullet/heading style per document (a per-document style sniff is possible but it is
 a second serialiser configuration to test). Both go in the documented list.
 
-### 0.12.0 — Find & Replace
+### 0.13.0 — Find & Replace
 
 | AC | Test |
 |---|---|
@@ -103,14 +130,12 @@ a second serialiser configuration to test). Both go in the documented list.
 | F4. Replace All is one undo step in both views | source: `SourceEditorTests.ReplaceAllIsOneUndoUnit`; formatted: `find.test.mjs` |
 | F5. A regex replacement with `$1` groups substitutes correctly and a malformed pattern is refused with the existing message, never applied | `FindEngineTests.ReplaceGroups`, `MalformedPatternIsRefused` |
 
-### 0.13.0 — images and the second-window guard
+### 0.14.0 — images
 
 | AC | Test |
 |---|---|
 | I1. Dropping an image file on either view inserts it as a picture (data URI, like Insert ▸ Picture); dropping any other non-markdown file is refused with a message and does NOT replace the document | `DropRoutingTests` (pure routing on name + sniffed content) |
 | I2. Pasting a clipboard image into the source view inserts the same markdown the formatted view would (`![](data:image/png;base64,…)`) at the caret | `SourceEditorTests.ImagePasteInsertsDataUri` (STA, clipboard stubbed at the seam) |
-| W1. Opening a file already open in another window focuses that window instead of opening a second copy; if focusing fails, the second window opens read-only with a message | `OpenGuardTests` (pure: per-path named-mutex/lock decision; the focus call is dogfood-verified) |
-| W2. The guard releases on close and on crash (a stale lock from a dead process is not honoured) | `OpenGuardTests.StaleLockIsIgnored` |
 
 On I2, Markdown Monster's cue: it *does* accept pasted images in its text editor,
 but saves them as files beside the document and links them. Our model embeds as a
@@ -118,9 +143,6 @@ data URI in both views already, so the consistent behaviour is the data URI, not
 file. It is small (clipboard image to PNG to base64 to insert at caret). If it turns
 out to fight AvalonEdit's paste pipeline, the fallback is a status message pointing
 at the formatted view, which is still better than today's silent nothing.
-
-W1 is the minimal form of the roadmap's cross-instance registry: a per-path lock is
-enough for "already open", and the Window menu can be built on the same piece later.
 
 ### 1.0.0 — the limits, written down; no new features
 
@@ -143,7 +165,7 @@ MSIX spike, WebView2 packaging, updater hand-off). Two honest options:
   uninstall; the in-app updater no-ops when it detects the MSI install. A spike
   first; if the spike is clean, it can ride 1.0 without moving the other stages.
 
-Pick before 0.13 starts.
+Pick before 0.14 starts.
 
 ## Stated limits (what "Won't unless asked" should say)
 

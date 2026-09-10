@@ -46,7 +46,8 @@ order of risk:
   works.
 - **The same file open in two windows silently overwrites.** A per-path lock: focus
   the window that has it, else open read-only with a message. The minimal form of
-  the cross-instance registry below.
+  the cross-instance registry below — and the first release after the 0.10 promote,
+  because it is felt daily and stands alone.
 - **No installer.** Decision pending: portable-only 1.0 with the installer as the
   1.1 headline (recommended), or a minimal per-user MSI after a spike.
 
