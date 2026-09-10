@@ -448,13 +448,21 @@ function flattenColor(value, base) {
   return { r, g, b };
 }
 
-function readThemeBack() {
+/**
+ * Read what a theme resolved to, in a given document.
+ *
+ * Pure: no side effects beyond a probe element that is removed before returning.
+ * Used against the live page (the document theme) and against the isolated frame
+ * (a source-view theme that must NOT touch the page) — same code, so the two views
+ * can never disagree about how a colour is read.
+ */
+function probeTheme(doc, win) {
   // Inside the editing surface when there is one. A theme is free to set its
   // variables on `.mdm-prosemirror` rather than on `:root`, and a probe parked on
   // <body> would not inherit those.
-  const host = document.querySelector('.mdm-prosemirror') || document.body || document.documentElement;
+  const host = doc.querySelector('.mdm-prosemirror') || doc.body || doc.documentElement;
 
-  const probe = document.createElement('div');
+  const probe = doc.createElement('div');
   probe.setAttribute('aria-hidden', 'true');
   // The extra colour properties are carriers: the source view's markdown highlighting
   // is coloured from the theme's page-level palette (heading/link/quote), and reading
@@ -470,7 +478,7 @@ function readThemeBack() {
 
   let result = { background: null, foreground: null, mermaid: '', source: null };
   try {
-    const cs = getComputedStyle(probe);
+    const cs = win.getComputedStyle(probe);
     // Layered the way the window is: app background over white, page over that,
     // text over the page.
     const app = flattenColor(cs.borderTopColor, '#ffffff');
@@ -498,25 +506,85 @@ function readThemeBack() {
       source,
     };
   } catch {
-    // Something in the flattening step threw. The WYSIWYG page's <style> was
-    // already installed before this function ran — half a theme is on screen
-    // regardless of what happens here — so an uncaught throw would additionally
-    // skip setMermaidTheme below and leave mermaid on whatever theme it had
-    // before, which is the exact half-themed gap this function exists to close.
-    // Falling through with the empty result declared above: the host's
-    // ThemeReadBack.Parse rejects a null colour pair and reverts the source view
-    // with a status message, which is the honest answer for that half.
+    // Something in the flattening step threw. Fall through with the empty result
+    // declared above: the host's ThemeReadBack.Parse rejects a null colour pair and
+    // reverts the source view with a status message, which is the honest answer.
+    // (For the live page the caller still runs the mermaid side effect below, so a
+    // throw here cannot leave mermaid on a theme two switches out of date.)
   } finally {
     probe.remove();
   }
+  return result;
+}
 
-  // Mermaid follows the theme too — a dark editor around a bright white diagram
-  // reads as broken. It redraws itself if the name changed, and runs even when
-  // the colour read-back above failed: an empty name isn't one of mermaid's own
-  // themes, so setMermaidTheme falls back to 'default' rather than leaving
-  // mermaid on a theme two switches out of date.
+/** The live page's theme, plus the mermaid side effect that belongs with it. */
+function readThemeBack() {
+  const result = probeTheme(document, window);
+  // Mermaid follows the DOCUMENT theme — a dark editor around a bright white diagram
+  // reads as broken. It redraws itself if the name changed, and runs even when the
+  // colour read-back failed: an empty name isn't one of mermaid's own themes, so
+  // setMermaidTheme falls back to 'default' rather than leaving mermaid stale.
   setMermaidTheme(editorView, result.mermaid);
   return result;
+}
+
+// ===== resolving a theme WITHOUT applying it to the page =====
+//
+// The source view may run a different theme from the document (View ▸ Theme with
+// "Same theme for both views" off). Its colours still have to be resolved by the
+// engine — a theme is free to write oklch() or color-mix() — but installing that
+// theme into the page would recolour the document. So it is resolved in a hidden,
+// same-origin iframe that carries a copy of the bundle's stylesheets (the layer
+// order and the default palette) but NOT the document's own theme element; the
+// source theme is installed there, into the same top layer it would occupy on the
+// page, and probed with the same code. The page never changes.
+//
+// about:blank inherits the page's origin and CSP; the CSP's frame-src 'none' does
+// not block a srcless frame (verified in Chromium). Created once, on first use.
+let isolatedFrame = null;
+
+function ensureIsolatedFrame() {
+  if (isolatedFrame && isolatedFrame.contentDocument) return isolatedFrame;
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.setAttribute('tabindex', '-1');
+  frame.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;border:0;';
+  document.body.appendChild(frame);
+  const doc = frame.contentDocument;
+
+  // The bundle's own rules — every sheet except the theme element. Serialising via
+  // cssRules keeps @layer statements and blocks intact, so the copied defaults sit
+  // in mdm-base and a theme installed into mdm-theme outranks them exactly as on
+  // the page.
+  let base = '';
+  for (const sheet of document.styleSheets) {
+    if (sheet.ownerNode && sheet.ownerNode.id === 'mdm-theme') continue;
+    try { for (const rule of sheet.cssRules) base += rule.cssText + '\n'; } catch { /* cross-origin: none of ours */ }
+  }
+  const baseStyle = doc.createElement('style');
+  baseStyle.textContent = base;
+  doc.head.appendChild(baseStyle);
+
+  const host = doc.createElement('div');
+  host.className = 'mdm-prosemirror';
+  doc.body.appendChild(host);
+
+  const theme = doc.createElement('style');
+  theme.id = 'mdm-theme';
+  doc.head.appendChild(theme);
+
+  isolatedFrame = frame;
+  return frame;
+}
+
+/** Resolve a theme's colours as they would apply, without touching the page. */
+function resolveThemeIsolated(css) {
+  const frame = ensureIsolatedFrame();
+  const doc = frame.contentDocument;
+  const el = doc.getElementById('mdm-theme');
+  // textContent, never innerHTML — same reason as setTheme.
+  el.textContent = css ? '@layer mdm-theme {\n' + css + '\n}\n' : '';
+  return probeTheme(doc, frame.contentWindow);
 }
 
 const MDM = {
@@ -734,6 +802,13 @@ const MDM = {
   //
   // textContent, never innerHTML: a <style> element's text is handed to the CSS
   // parser, so a `</style>` in the middle of it is a parse error and not a way out.
+  // Resolve a theme's colours for the SOURCE view without applying it to the page.
+  // Same shape as setTheme's return, minus the mermaid side effect (mermaid follows
+  // the document theme, not the source view's).
+  resolveTheme(css) {
+    return resolveThemeIsolated(css);
+  },
+
   setTheme(css) {
     let el = document.getElementById('mdm-theme');
     if (!el) {

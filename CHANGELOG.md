@@ -20,6 +20,13 @@ changes between alpha tags.
   than the theme's own prose. Under the hood the source view moved from a plain text
   box to an AvalonEdit editor; editing, spell check, find, word-wrap and the caret
   behave as before.
+- **The source view can have its own theme.** **View ▸ Theme ▸ Same Theme for Both
+  Views** is on by default and works as before. Turn it off and View ▸ Theme changes
+  only the view you're in: pick Dracula while in the source view and the formatted
+  document stays on Midget Solarized. One list of themes, one menu; it ticks the
+  theme of whichever view is showing, both choices are remembered, and turning the
+  link back on snaps the source view to the document's theme. The second theme is
+  resolved without ever being applied to the page.
 
 ## [0.9.0] - 2026-09-08
 

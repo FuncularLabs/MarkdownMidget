@@ -192,6 +192,12 @@ same palette the formatted view uses, on the same page background. Where a theme
 accent would be too faint to read as small text, that token falls back to the body
 text colour, so the source view is never less legible than the theme's own prose.
 
+**A different theme for the source view.** **View ▸ Theme ▸ Same Theme for Both
+Views** is on by default. Turn it off and View ▸ Theme changes only the view you're
+in — pick a dark theme while in the source view and the formatted document keeps its
+own. The menu ticks the theme of whichever view is showing. Both choices are
+remembered; turning it back on snaps the source view to the document's theme.
+
 **Printing keeps paper light** — the page prints white with dark text whatever you
 pick, because a dark page on paper is unreadable and empties a toner cartridge.
 Your **tables** are the exception: the header row and the alternating row shading

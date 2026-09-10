@@ -370,7 +370,7 @@ public partial class MainWindow : Window
                 // A theme that has gone missing between launches says so and falls
                 // back WITHOUT forgetting the choice — reverting silently is the thing
                 // that reads as the app losing a setting.
-                _ = ApplyThemeAsync(_themeKey);
+                _ = ApplyStartupThemesAsync();
                 RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
                 _ = ApplyLandingStateAsync();
@@ -3040,6 +3040,11 @@ public partial class MainWindow : Window
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
         public string Theme { get; set; } = "";
+        // The source view's own theme when the two views are unlinked — same list, same
+        // filename rule. Ignored while linked; kept so relink/unlink round-trips.
+        public string? SourceTheme { get; set; }
+        // View ▸ Theme ▸ "Same Theme for Both Views". Default on.
+        public bool LinkThemes { get; set; } = true;
         // The newest version whose changelog the user has actually opened — compared
         // with WhatsNewState, not equality, so an older value after an update is the
         // ordinary case rather than something to migrate.
@@ -3115,6 +3120,8 @@ public partial class MainWindow : Window
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
             _themeKey = s.Theme ?? Themes.ThemeStore.DefaultKey;
+            _linkThemes = s.LinkThemes;
+            _sourceThemeKey = s.SourceTheme ?? _themeKey;
             _lastSeenChangelogVersion = s.LastSeenChangelogVersion;
             _savedBounds = s.WindowWidth is > 0 && s.WindowHeight is > 0
                 ? new Rect(s.WindowLeft ?? 0, s.WindowTop ?? 0, s.WindowWidth.Value, s.WindowHeight.Value)
@@ -3234,6 +3241,8 @@ public partial class MainWindow : Window
             s.WindowHeight = existing?.WindowHeight;
             s.WindowMaximized = existing?.WindowMaximized ?? false;
             s.Theme = existing?.Theme ?? s.Theme;
+            s.SourceTheme = existing?.SourceTheme ?? s.SourceTheme;
+            s.LinkThemes = existing?.LinkThemes ?? s.LinkThemes;
             s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
             WriteSettings(s);
         }
@@ -3281,6 +3290,8 @@ public partial class MainWindow : Window
         StartWithBlankDocument = _startWithBlankDocument,
         KeepBackup = _backupEnabled,
         Theme = _themeKey,
+        SourceTheme = _sourceThemeKey,
+        LinkThemes = _linkThemes,
         LastSeenChangelogVersion = _lastSeenChangelogVersion,
     };
 

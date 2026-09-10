@@ -42,6 +42,20 @@ public partial class MainWindow
     /// it back exactly rather than to something that looks about right.</summary>
     private (Brush Background, Brush Foreground, Brush? Caret)? _sourceOriginal;
 
+    /// <summary>View ▸ Theme ▸ "Same Theme for Both Views". On (the default) the
+    /// source view follows the document theme; off, it keeps its own, chosen from the
+    /// same list, and View ▸ Theme changes only the view the user is in.</summary>
+    private bool _linkThemes = true;
+
+    /// <summary>The source view's own theme, meaningful only when unlinked. Persisted
+    /// separately so unlinking and relinking round-trip without losing it.</summary>
+    private string _sourceThemeKey = ThemeStore.DefaultKey;
+
+    /// <summary>What the source view is actually showing — what the menu ticks when
+    /// the source view is active and unlinked. See <see cref="_appliedKey"/> for why
+    /// "showing" and "remembered" are kept apart.</summary>
+    private string _sourceAppliedKey = ThemeStore.DefaultKey;
+
     private void InitializeThemes()
     {
         var (root, fellBack) = ThemeStore.ResolveRoot();
@@ -86,7 +100,9 @@ public partial class MainWindow
                 // Ticks what is ON SCREEN, not what is remembered. When a chosen theme
                 // is missing this launch the two differ, and ticking the preference
                 // would claim a palette the user is not looking at.
-                IsChecked = string.Equals(theme.Key, _appliedKey, StringComparison.OrdinalIgnoreCase),
+                IsChecked = string.Equals(theme.Key,
+                    Source.ThemeLinking.TickedKey(_linkThemes, _sourceMode, _appliedKey, _sourceAppliedKey),
+                    StringComparison.OrdinalIgnoreCase),
                 IsEnabled = theme.IsUsable,
             };
 
@@ -99,6 +115,19 @@ public partial class MainWindow
             item.Click += ThemeItem_Click;
             ThemeMenu.Items.Add(item);
         }
+
+        ThemeMenu.Items.Add(new Separator());
+        var link = new MenuItem
+        {
+            Header = "_Same Theme for Both Views",
+            IsCheckable = true,
+            IsChecked = _linkThemes,
+            ToolTip = "On: one theme for the formatted and source views. Off: View ▸ Theme " +
+                      "changes only the view you're in, so the markdown source view can " +
+                      "have its own theme — a dark one under a light document, say.",
+        };
+        link.Click += LinkThemes_Click;
+        ThemeMenu.Items.Add(link);
 
         ThemeMenu.Items.Add(new Separator());
         var open = new MenuItem
@@ -134,7 +163,20 @@ public partial class MainWindow
     // ===== applying =====
 
     /// <summary>
-    /// Install a theme by name, and remember it if it worked.
+    /// View ▸ Theme: apply <paramref name="key"/> to the view(s) the selection is for.
+    /// Linked, both; unlinked, only the view the user is in (<see cref="Source.ThemeLinking"/>).
+    /// </summary>
+    private async Task ApplyThemeAsync(string? key)
+    {
+        var (toDocument, toSource) = Source.ThemeLinking.TargetsFor(_linkThemes, _sourceMode);
+        if (toDocument) await ApplyDocumentThemeAsync(key, alsoSource: toSource);
+        else if (toSource) await ApplySourceThemeAsync(key);
+    }
+
+    /// <summary>
+    /// Install a theme on the document by name, and remember it if it worked. With
+    /// <paramref name="alsoSource"/> the source view follows the same read-back (the
+    /// linked case); without it the source view is left exactly as it is.
     ///
     /// Two failures, and they are answered differently on purpose:
     ///
@@ -148,7 +190,7 @@ public partial class MainWindow
     /// Both say so. Silence would leave someone looking at a palette they didn't pick
     /// with no idea why, which is the complaint this whole path exists to avoid.
     /// </summary>
-    private async Task ApplyThemeAsync(string? key)
+    private async Task ApplyDocumentThemeAsync(string? key, bool alsoSource)
     {
         if (_themeStore is null) return;
 
@@ -170,8 +212,9 @@ public partial class MainWindow
             // ever replaced by a theme that actually applied.
             if (!string.IsNullOrEmpty(key))
                 FlashStatus($"Theme \"{key}\" isn't in the themes folder — using Default for now.");
-            await InstallThemeAsync(string.Empty);
+            await InstallThemeAsync(string.Empty, alsoSource);
             _appliedKey = ThemeStore.DefaultKey;
+            if (alsoSource) _sourceAppliedKey = ThemeStore.DefaultKey;
             BuildThemeMenu();
             return;
         }
@@ -187,7 +230,8 @@ public partial class MainWindow
             return;
         }
 
-        await InstallThemeAsync(css);
+        await InstallThemeAsync(css, alsoSource);
+        if (alsoSource) _sourceAppliedKey = theme.Key;
         SetThemeKey(theme.Key);
     }
 
@@ -214,7 +258,7 @@ public partial class MainWindow
     /// it as the raw JSON that fell out of a failed string cast would work by
     /// accident rather than on purpose.
     /// </summary>
-    private async Task InstallThemeAsync(string css)
+    private async Task InstallThemeAsync(string css, bool alsoSource)
     {
         // Nothing to install into yet, and nothing to report either: the menu is live
         // from the moment the window opens but the editor takes a moment, so an early
@@ -226,7 +270,9 @@ public partial class MainWindow
         try
         {
             var raw = await Web.CoreWebView2.ExecuteScriptAsync($"window.MDM.setTheme({JsLiteral(css)})");
-            ApplySourceColors(raw);
+            // Unlinked and applying to the document only: the source view keeps its own
+            // theme, so the read-back must not be pushed onto it.
+            if (alsoSource) ApplySourceColors(raw);
         }
         catch (Exception ex)
         {
@@ -292,5 +338,103 @@ public partial class MainWindow
         if (_sourceHighlighting is null) return;
         if (Source.SourcePalette.Parse(json) is not { } palette) return;
         _sourceHighlighting.SetPalette(SourceBox, palette);
+    }
+
+    // ===== the source view's own theme (unlinked) =====
+
+    /// <summary>
+    /// Give the source view a theme of its own, resolved WITHOUT applying it to the
+    /// document: <c>MDM.resolveTheme</c> installs it in a hidden frame that carries
+    /// the bundle's layers but not the page's theme, and probes it with the same code
+    /// the document read-back uses. Same fallbacks as the document: a missing file
+    /// falls back to Default and keeps the preference; an unreadable one changes
+    /// nothing.
+    /// </summary>
+    private async Task ApplySourceThemeAsync(string? key)
+    {
+        if (_themeStore is null) return;
+
+        var theme = _themeStore.Find(key);
+        if (theme is null)
+        {
+            if (!string.IsNullOrEmpty(key))
+                FlashStatus($"Theme \"{key}\" isn't in the themes folder — the source view is using Default for now.");
+            await ResolveSourceThemeAsync(string.Empty);
+            _sourceAppliedKey = ThemeStore.DefaultKey;
+            BuildThemeMenu();
+            return;
+        }
+
+        var css = _themeStore.Read(theme, out var failure);
+        if (css is null)
+        {
+            FlashStatus($"Can't use {theme.Name}: {failure}");
+            BuildThemeMenu();
+            return;
+        }
+
+        await ResolveSourceThemeAsync(css);
+        SetSourceThemeKey(theme.Key);
+    }
+
+    private async Task ResolveSourceThemeAsync(string css)
+    {
+        // Same early-out as InstallThemeAsync: no page yet means the 'ready' handler
+        // will apply the remembered choice the moment there is one.
+        if (!_editorReady || Web.CoreWebView2 is null) return;
+        try
+        {
+            var raw = await Web.CoreWebView2.ExecuteScriptAsync($"window.MDM.resolveTheme({JsLiteral(css)})");
+            ApplySourceColors(raw);
+        }
+        catch (Exception ex)
+        {
+            FlashStatus("The source view's theme couldn't be applied: " + ex.Message);
+        }
+    }
+
+    /// <summary>Record a source theme that actually applied — the only writer of the
+    /// persisted SourceTheme, via SavePersistentField for the same reason SetThemeKey
+    /// uses it.</summary>
+    private void SetSourceThemeKey(string key)
+    {
+        _sourceAppliedKey = key;
+        if (!string.Equals(_sourceThemeKey, key, StringComparison.OrdinalIgnoreCase))
+        {
+            _sourceThemeKey = key;
+            SavePersistentField(s => s.SourceTheme = key);
+        }
+        BuildThemeMenu();
+    }
+
+    private async void LinkThemes_Click(object sender, RoutedEventArgs e)
+    {
+        _linkThemes = !_linkThemes;
+        SavePersistentField(s => s.LinkThemes = _linkThemes);
+        if (_linkThemes)
+        {
+            // Relinking: the source view snaps to the document theme. Re-installing the
+            // document's REMEMBERED theme (not what happens to be on screen) is what
+            // re-derives the source colours, and it keeps the preference intact when
+            // the remembered file is missing this launch.
+            await ApplyDocumentThemeAsync(_themeKey, alsoSource: true);
+            SetSourceThemeKey(_appliedKey);
+        }
+        else
+        {
+            // Unlinking changes nothing on screen. From here View ▸ Theme is per-view,
+            // and the source view starts from what it is already showing.
+            SetSourceThemeKey(_appliedKey);
+        }
+        RefocusEditor();
+    }
+
+    /// <summary>At editor-ready: the document theme, then the source view's own theme
+    /// when the two are unlinked. Linked, the document read-back already dressed the
+    /// source view.</summary>
+    private async Task ApplyStartupThemesAsync()
+    {
+        await ApplyDocumentThemeAsync(_themeKey, alsoSource: _linkThemes);
+        if (!_linkThemes) await ApplySourceThemeAsync(_sourceThemeKey);
     }
 }

@@ -30,9 +30,15 @@ the dark code panel and fail on a light page (measured: 8–9 of 9 tokens under 
 - **Stage 2 — themed markdown highlighting.** A `Markdown.xshd` definition whose
   named colours are set at runtime from the theme's page-level palette, read back the
   same way the source background already is. This is the visible feature.
-- **Stage 3 — independent code-view theme (deferred).** "VS Dark for code, Solarized
-  for prose." A separable enhancement: linked-by-default with an opt-out, standalone
-  palette files, a menu and persistence. Tracked in ROADMAP.md; not in this pass.
+- **Stage 3 — the source view's own theme.** Shipped in a simpler shape than first
+  scoped: no second palette format, no second list. One list of themes; **View ▸
+  Theme ▸ Same Theme for Both Views** (on by default) and, when off, View ▸ Theme
+  changes only the view the user is in, with the menu ticking that view's theme.
+  The source theme is resolved in a hidden same-origin iframe carrying the bundle's
+  layers but not the page's theme element (`MDM.resolveTheme`), so the document is
+  never repainted — verified on the shipped bundle under the real CSP. The rule
+  (which views a selection targets; which key the menu ticks) is pure and tested in
+  `ThemeLinking` / `ThemeLinkingTests`.
 
 ## Design decisions
 
@@ -123,5 +129,6 @@ event (1.8). `GetLineText` is covered through `SourceFormatTests` (1.6).
 - Font/size control and zoom in the source pane (arrives with the control but is a
   separate feature; the pane stays Consolas 14 for now).
 - Line numbers and folding (AvalonEdit offers them; not enabled here).
-- Stage 3 independent theme selection (deferred, ROADMAP).
+- A separate palette format or a second theme list for the source view — retired;
+  Stage 3 reuses the one list.
 - Any change to WYSIWYG code-block colouring (Prism/CSS, already themed).
