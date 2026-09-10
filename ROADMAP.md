@@ -11,6 +11,44 @@ deliberately parked).
 
 ---
 
+## 1.0 (after 0.10 is promoted)
+
+The 2026-09-10 readiness audit, planned in detail in
+[docs/plans/release-1.0.md](docs/plans/release-1.0.md). The verdict was "close on
+breadth, one hole that would embarrass a 1.0, a few that read as unfinished". In
+order of risk:
+
+- **Saving rewrites your markdown conventions, invisibly.** Measured on the shipped
+  bundle: a 39-line README-style file came back with 30 lines changed and no edit
+  made — setext headings to `#`, `+` bullets to `*`, `1)` to `1.`, reference links
+  inlined with their definition deleted, indented code fenced, two-space hard breaks
+  to `\`, `snake_case_word` to `snake\_case\_word`. It is invisible because the
+  clean baseline after Open is the editor's re-serialisation, not the file. The
+  README's "not a lossy import/export" is true in content and false in form. 1.0
+  pins and documents the conventions, builds the round-trip harness that keeps them
+  pinned, and stops escaping intraword underscores if that can be done safely.
+- **Line endings and the BOM are normalised.** CRLF saves as LF; a UTF-8 BOM is
+  dropped. Preserve both.
+- **A file rewritten with identical bytes reads as an external change**, because the
+  watcher compares against that normalised baseline. Compare against the raw text.
+- **Find has no Replace.** Replace / Replace All, both views, all four modes, scoped
+  to the selection.
+- **Dropping an image file on the editor opens it as text** (after the discard
+  prompt). Insert it as a picture instead; refuse other non-markdown drops with a
+  message. Pasting an image into the *source* view does nothing today; it should
+  insert the same data-URI markdown the formatted view produces (Markdown Monster
+  accepts pasted images in its text editor too, though it saves them as files — our
+  embed model is the consistent answer). Pasting into the formatted view already
+  works.
+- **The same file open in two windows silently overwrites.** A per-path lock: focus
+  the window that has it, else open read-only with a message. The minimal form of
+  the cross-instance registry below.
+- **No installer.** Decision pending: portable-only 1.0 with the installer as the
+  1.1 headline (recommended), or a minimal per-user MSI after a spike.
+
+Then 1.0 itself adds no features: it writes every deliberate limit down (see the
+last section) and makes the README's promise true as written.
+
 ## Next
 
 ### Themes — shipped in 0.7.0
@@ -391,4 +429,24 @@ release, with infrastructure riding along with whatever needs it.
 ---
 
 ## Won't unless asked (known limits, parked deliberately)
+
+Filled from the 2026-09-10 audit. These are stated, not hidden; each is a choice.
+
+- **Spell check is en-US only, and the UI is English only.** Language selection
+  is under Later; localisation is not planned.
+- **Task-list checkboxes render but cannot be inserted from the UI.** The GFM
+  preset supports `- [ ]`; there is no menu or toolbar item for it. Cheap to add
+  if asked.
+- **The source view is Consolas 14, no font, size or zoom control.** Zoom is the
+  formatted view's. Now that the source view is coloured this will be asked for.
+- **PDF is the only export.** No HTML or Word export; the markdown file *is* the
+  portable form.
+- **One document per window, no tabs, no Window menu.** Deliberate SDI; see the
+  cross-instance registry under Someday.
+- **Saving normalises to the app's markdown conventions.** After 1.0 those are
+  pinned and documented; reference-style links become inline, setext headings
+  become ATX, indented code becomes fenced. Preserving each document's own style
+  would be a second serialiser to test and is not planned.
+- **Mermaid ships in the bundle** whether or not a document uses it (lazy-load is
+  under Later).
 
