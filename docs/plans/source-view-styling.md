@@ -70,15 +70,18 @@ added to the test project (Rule 2); touched files target ≥85% line coverage.
 
 | # | Acceptance criterion | Test | Project |
 |---|---|---|---|
-| 1.1 | Line↔offset mapping is 0-based and round-trips at first line, last line, empty doc | `SourceEditorTests.LineAndOffsetRoundTrip` | Tests |
-| 1.2 | `GetFirstVisibleLineIndex`/`GetLastVisibleLineIndex` return document lines, and diverge from display lines under wrap | `SourceEditorTests.VisibleLineIndicesAreDocumentLines` | Tests |
-| 1.3 | `GetCharacterIndexFromPoint` past the end of text returns the end offset, not -1 | `SourceEditorTests.HitTestBelowTextFallsBackToEnd` | Tests |
-| 1.4 | `GetRectFromCharacterIndex` returns a control-relative rect for a laid-out char, `Empty` before layout | `SourceEditorTests.RectIsControlRelative` | Tests |
-| 1.5 | `CaretIndex`, `TextWrapping`, `CaretBrush` behave as the TextBox members they replace | `SourceEditorTests.TextBoxShimsBehave` | Tests |
-| 1.6 | Each `SourceFormat` op is a single undo unit and lands the caret where the old code did | `SourceFormatTests.*` (Wrap/Prefix/CodeBlock/undo) | Tests |
-| 1.7 | Squiggle ranges produce one rect per word and clip to the viewport | `SquiggleGeometryTests.RectsMatchWordBounds` | Tests |
-| 1.8 | `ShiftForEdit` keeps ranges glued through inserts before/inside/after | `SquiggleAdornerShiftTests.*` (exists; re-point to adapter) | Tests |
-| 1.9 | Mutation guard: a `SourceEditor` whose `GetLineText` returns "" makes `SourceFormat.Prefix` a no-op — proves the tests exercise real text | mutation run, recorded in handoff | — |
+| 1.1 | Line↔offset mapping is 0-based and round-trips at first line, last line, empty doc; out-of-range → -1 | `SourceEditorTests.LineAndOffsetRoundTrip`, `OutOfRangeMappingReturnsMinusOne` | Tests |
+| 1.2 | Visible-line indices are DOCUMENT lines, diverging from display rows under wrap | `SourceEditorTests.VisibleLineIndicesAreDocumentLines`, `WrapMakesOneLongLineSpanTheViewport` | Tests |
+| 1.3 | `GetCharacterIndexFromPoint` past the end of text returns the end offset with snap, -1 without | `SourceEditorTests.HitTestBelowTextFallsBackToEnd`, `HitTestOverTextReturnsAnOffsetInThatLine` | Tests |
+| 1.4 | `CaretIndex`/`TextWrapping`/`CaretBrush` behave as the TextBox members they replace; `GetLineText`; `TextEdited` offsets | `SourceEditorTests.CaretIndexClampsAndRoundTrips`, `TextWrappingMapsToWordWrap`, `CaretBrushRoundTrips`, `GetLineTextReturnsTheLineWithoutTerminator`, `TextEditedReportsOffsetInsertionAndRemoval` | Tests |
+| 1.5 | Each `SourceFormat` op lands the caret where the old code did and is a single undo unit | `SourceFormatTests.*` | Tests |
+| 1.6 | Squiggle geometry: one underline per visible word-run, nothing off-screen, stale ranges clamped | `SquiggleRendererTests.*` | Tests |
+| 1.7 | `ShiftForEdit` keeps ranges glued through inserts/deletes before/inside/after/at-boundaries | `SquiggleRangesTests.*` | Tests |
+| 1.8 | Mutation guard (killed): the greedy built-in definition merges two bolds; ours keeps them apart | `MarkdownHighlightingTests.TwoStrongSpansOnOneLineDoNotMerge` | Tests |
+
+(`GetRectFromCharacterIndex` from an earlier draft was dropped: the squiggle renderer
+draws via AvalonEdit's `GetRectsForSegment`, so a control-relative rect shim had no
+production caller.)
 
 ### Stage 2 — themed highlighting
 
@@ -86,8 +89,8 @@ added to the test project (Rule 2); touched files target ≥85% line coverage.
 |---|---|---|---|
 | 2.1 | The `.xshd` colours two bold spans on one line separately (no greedy merge) | `MarkdownHighlightingTests.TwoStrongSpansDoNotMerge` | Tests |
 | 2.2 | Headings, emphasis, strong, inline code, links, quotes, list markers, rules, fences each get their named colour | `MarkdownHighlightingTests.EachConstructGetsItsColour` | Tests |
-| 2.3 | The theme read-back parses the page-level syntax palette; a missing/!shaped field yields no palette, not a half one | `SourcePaletteTests.*` (mirrors `ThemeReadBackTests`) | Tests |
-| 2.4 | Applying a palette sets every named colour's brush; a null palette leaves the definition's defaults | `SourcePaletteTests.AppliesToNamedColours` | Tests |
+| 2.3 | The theme read-back parses the page-level syntax palette; a missing/mis-shaped field yields no palette, not a half one | `SourcePaletteTests.*` (mirrors `ThemeReadBackTests`) | Tests |
+| 2.4 | Applying a palette sets every named colour's brush, floored to legible | `SourcePaletteContrastTests.EveryNamedColourAppliedToTheDefinitionIsLegible` | Tests |
 | 2.5 | Every applied colour is ≥4.5:1 on the page OR the body-text colour, all 6 built-ins | `SourcePaletteContrastTests.*` | Tests |
 | 2.6 | The carrier-property read-back resolves oklch()/color-mix() to rgb in Chromium | manual browser probe (recorded below) | — |
 

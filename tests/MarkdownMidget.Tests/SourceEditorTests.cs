@@ -176,44 +176,6 @@ public class SourceEditorTests
         Assert.True(idx is >= 0 and <= 11, $"offset {idx} should land within the single line");
     }
 
-    // ===== 1.4 glyph geometry is control-relative =====
-
-    [Fact]
-    public void RectIsControlRelativeAndEmptyBeforeLayout()
-    {
-        var beforeLayout = On(ed => ed.GetRectFromCharacterIndex(0), "abc", laidOut: false);
-        Assert.True(beforeLayout.IsEmpty, "no layout yet: no rect");
-
-        var rect = On(ed => ed.GetRectFromCharacterIndex(0), "abc", laidOut: true);
-        Assert.False(rect.IsEmpty);
-        // Control-relative: the first character sits near the top-left of the control,
-        // not out at a document coordinate. A generous bound catches a missing
-        // scroll-offset subtraction (which would push it hundreds of px down when
-        // scrolled) without pinning exact padding.
-        Assert.InRange(rect.Y, -2, 40);
-        Assert.True(rect.Height > 4, "a 14pt line should be taller than 4px");
-    }
-
-    [Fact]
-    public void RectOfAScrolledLineStaysInTheViewport()
-    {
-        var text = string.Join("\n", System.Linq.Enumerable.Range(0, 300));
-        var rect = On(ed =>
-        {
-            ed.ScrollToLine(250);                 // 0-based
-            ed.UpdateLayout();
-            ed.TextArea.TextView.EnsureVisualLines();
-            var offset = ed.GetCharacterIndexFromLineIndex(ed.GetFirstVisibleLineIndex());
-            return ed.GetRectFromCharacterIndex(offset);
-        }, text, laidOut: true);
-
-        Assert.False(rect.IsEmpty);
-        // The first visible line's rect must be near the top of the CONTROL, not at
-        // the ~250*lineHeight document coordinate. Without subtracting the scroll
-        // offset this Y would be in the thousands.
-        Assert.InRange(rect.Y, -2, 40);
-    }
-
     // ===== 1.5 the TextBox property shims =====
 
     [Fact]

@@ -43,11 +43,12 @@ public class SourceEditor : TextEditor
         // RemovalLength), which is exactly what the squiggle tracker needs and what
         // WPF's TextChangedEventArgs.Changes used to supply. Raised as TextEdited so
         // the host can keep shifting squiggle ranges through edits.
-        TextChanged += (_, _) => { /* handled per-change below */ };
+        //
+        // Subscribed once, to the document that exists now. AvalonEdit's Text setter
+        // mutates this document in place rather than replacing it, and the app never
+        // assigns a new Document, so this subscription follows every edit. (If a future
+        // change does reassign Document, it must re-wire this.)
         Document.Changed += OnDocumentChanged;
-        // A fresh Document can be swapped in when Text is reassigned wholesale; keep
-        // the handler attached to whatever document is current.
-        DocumentChanged += (_, _) => { if (Document is not null) Document.Changed += OnDocumentChanged; };
     }
 
     /// <summary>
@@ -214,39 +215,7 @@ public class SourceEditor : TextEditor
         return snapToText ? doc.TextLength : -1;
     }
 
-    /// <summary>
-    /// The bounding rectangle of the character at an index, in CONTROL coordinates —
-    /// the same frame TextBox reports, which is what the squiggle adorner draws in.
-    /// AvalonEdit works in document coordinates, so the text view's scroll offset is
-    /// subtracted. <see cref="Rect.Empty"/> before layout or for an out-of-range
-    /// index, exactly as TextBox returns an empty rect when it cannot place a char.
-    /// </summary>
-    public Rect GetRectFromCharacterIndex(int charIndex, bool trailingEdge = false)
-    {
-        var doc = Document;
-        if (doc is null || charIndex < 0 || charIndex > doc.TextLength) return Rect.Empty;
-        // Not arranged yet: TextBox returns an empty rect here, and the squiggle
-        // adorner already refuses to draw when ActualWidth is 0, so match that rather
-        // than hand back a position AvalonEdit is willing to compute lazily off-screen.
-        if (ActualWidth <= 0) return Rect.Empty;
-        var tv = TextArea.TextView;
-        tv.EnsureVisualLines();
-        var location = doc.GetLocation(charIndex);
-        var vpos = new TextViewPosition(location);
-        // VisualPosition is top-left of the caret at that spot, in document space.
-        var top = tv.GetVisualPosition(vpos, VisualYPosition.LineTop);
-        var bottom = tv.GetVisualPosition(vpos, VisualYPosition.LineBottom);
-        var x = top.X - tv.HorizontalOffset;
-        var y = top.Y - tv.VerticalOffset;
-        var height = bottom.Y - top.Y;
-        if (double.IsNaN(x) || double.IsNaN(y) || height <= 0) return Rect.Empty;
-        _ = trailingEdge; // TextBox uses it to bias to the trailing edge; the caret
-                          // position is already the leading edge of the next glyph,
-                          // which is what the adorner's fallback path wants.
-        return new Rect(x, y, 0, height);
-    }
-
-    // ===== a background-renderer hook the adorner does not need, kept for Stage 2 =====
+    // ===== the background-renderer hook the squiggles draw through =====
 
     /// <summary>Add a background renderer to the text view — the AvalonEdit-native
     /// way to draw under the text, used by highlighting. Exposed so callers need not

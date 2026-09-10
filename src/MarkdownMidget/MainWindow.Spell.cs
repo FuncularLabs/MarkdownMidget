@@ -200,7 +200,7 @@ public partial class MainWindow
                     results = results.Where(r => !code.Any(c => r.Start >= c.Start && r.Start < c.End)).ToList();
             }
             if (gen != _spellGeneration) return;   // a different document loaded meanwhile
-            EnsureSquiggleAdorner();
+            EnsureSquiggleRenderer();
             _squiggles?.SetRanges(results);
             return;
         }
@@ -233,7 +233,7 @@ public partial class MainWindow
         if (_editorReady) _ = RunEditorAsync("window.MDM.setSpellRanges([])");
     }
 
-    private void EnsureSquiggleAdorner()
+    private void EnsureSquiggleRenderer()
     {
         if (_squiggles is not null) return;
         _squiggles = new SquiggleRenderer(SourceBox);
