@@ -10,9 +10,7 @@ namespace MarkdownMidget;
 /// </summary>
 public partial class MainWindow
 {
-    /// <summary>Set when a key was pressed under Alt since Alt went down, so releasing
-    /// Alt after Alt+F does not ALSO read as an Alt tap and re-enter the menu.</summary>
-    private bool _altUsedSincePress;
+    private readonly AltPressTracker _altPress = new();
 
     private void InitAccessKeys()
     {
@@ -30,50 +28,41 @@ public partial class MainWindow
         var scope = PresentationSource.FromVisual(this);
         if (scope is null) return;
 
-        var decision = MenuAccessKeys.DecideKeyDown(
+        var decision = _altPress.KeyDown(
             isSystem: e.Key == Key.System,
             realKey: MenuAccessKeys.RealKey(e),
             modifiers: e.KeyboardDevice.Modifiers,
             isRegistered: k => AccessKeyManager.IsKeyRegistered(scope, k),
             out var accessKey);
 
-        switch (decision)
-        {
-            case MenuAccessKeys.Down.ResetAlt:
-                _altUsedSincePress = false;
-                break;
-            case MenuAccessKeys.Down.Used:
-                _altUsedSincePress = true;
-                break;
-            case MenuAccessKeys.Down.Invoke:
-                _altUsedSincePress = true;
-                // Swallow it so the browser does not also see Alt+F, then do what
-                // AccessKeyManager would have done had the press reached it: open the
-                // menu labelled with that letter. The menu takes focus; when it closes
-                // WPF hands focus back to the editor, as it does for any control.
-                //
-                // Both AccessKeyManager calls are gated by WPF itself: GetTargetsForScope
-                // yields no top-level targets unless the Alt key is physically held
-                // (Keyboard.Modifiers, read live from the OS). Here it is — the user is
-                // holding it — so the letter resolves; and it is why this can never
-                // open a menu on a synthetic or stale key event.
-                e.Handled = true;
-                AccessKeyManager.ProcessKey(scope, accessKey!, false);
-                break;
-        }
+        if (decision != MenuAccessKeys.Down.Invoke) return;
+
+        // Swallow it so the browser does not also see Alt+F, then do what
+        // AccessKeyManager would have done had the press reached it: open the menu
+        // labelled with that letter, in keyboard mode. When the menu closes WPF puts
+        // focus back on the window's focused element, which is the editor.
+        //
+        // WPF gates this on Alt being physically down, in Menu.OnAccessKeyPressed:
+        // unless Keyboard.IsKeyDown(LeftAlt/RightAlt) — read live from the OS — the
+        // Menu claims the access key's scope as itself, so a top-level item never
+        // matches the window scope that IsKeyRegistered/ProcessKey are asked about.
+        // That is why a bare F in a text box never opens File, and why this can never
+        // open a menu from a synthetic or stale key event. Here the user is holding
+        // Alt, so the letter resolves.
+        e.Handled = true;
+        AccessKeyManager.ProcessKey(scope, accessKey!, false);
     }
 
     private void Web_KeyUp(object sender, KeyEventArgs e)
     {
-        var real = MenuAccessKeys.RealKey(e);
-        if (!MenuAccessKeys.IsAltKey(real)) return;
-        var tap = MenuAccessKeys.IsAltTap(real, _altUsedSincePress);
-        _altUsedSincePress = false;
-        if (!tap) return;
+        if (!_altPress.KeyUp(MenuAccessKeys.RealKey(e))) return;
 
         // An Alt tap enters the menu, the way WPF does from any other control: focus
         // the first top-level item, which puts the menu in keyboard mode with that
-        // item highlighted. Escape leaves it and focus returns to the editor.
+        // item highlighted. Escape leaves it and focus returns to the editor. Native
+        // WPF refuses while something holds mouse capture (a drag in progress); so
+        // does this.
+        if (Mouse.Captured is not null) return;
         e.Handled = true;
         foreach (var item in MainMenu.Items)
         {

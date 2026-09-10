@@ -24,12 +24,13 @@ internal static class MenuAccessKeys
     /// <summary>What an Alt-related key-down from the editor should do.</summary>
     public enum Down
     {
-        /// <summary>Not an Alt combination, or one that must reach the editor (AltGr).</summary>
+        /// <summary>Not an Alt combination: not ours at all.</summary>
         Ignore,
-        /// <summary>The Alt key itself went down: start a fresh press.</summary>
+        /// <summary>The Alt key itself went down cleanly: start a fresh press.</summary>
         ResetAlt,
-        /// <summary>Alt+something that is not a menu key: the press is spent, but the
-        /// key still goes to the editor.</summary>
+        /// <summary>The press is spent — Alt+something that is not a menu key, or an
+        /// Alt press that began with Ctrl/Shift/Win held (AltGr) — but the key still
+        /// goes to the editor untouched.</summary>
         Used,
         /// <summary>Alt+letter that names a menu: invoke it and swallow the key.</summary>
         Invoke,
@@ -50,6 +51,8 @@ internal static class MenuAccessKeys
 
     public static bool IsAltKey(Key key) => key is Key.LeftAlt or Key.RightAlt;
 
+    private const ModifierKeys NotAMenuGesture = ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Windows;
+
     /// <param name="isSystem">True when WPF reported the event as <see cref="Key.System"/>.
     /// Only WPF's own input path marks system keys; the WebView2 control re-raises
     /// Alt+F as a plain <see cref="Key.F"/> with the Alt modifier set, so Alt being
@@ -62,12 +65,22 @@ internal static class MenuAccessKeys
                                      Func<string, bool> isRegistered, out string? accessKey)
     {
         accessKey = null;
-        if (IsAltKey(realKey)) return Down.ResetAlt;           // the Alt key itself
         var altHeld = isSystem || (modifiers & ModifierKeys.Alt) != 0;
-        if (!altHeld) return Down.Ignore;                     // Alt not held: not ours
-        // AltGr on international layouts arrives as Ctrl+Alt: that is a character
-        // being typed (€, ß, …), never a menu request. It must reach the editor.
-        if ((modifiers & ModifierKeys.Control) != 0) return Down.Ignore;
+
+        if (IsAltKey(realKey))
+        {
+            // Alt going down with Ctrl, Shift or Win already held is not the start of
+            // a menu gesture — AltGr on international layouts is exactly Ctrl+Alt, and
+            // WPF's own KeyboardNavigation refuses to track such a press. Spend it, so
+            // the release that follows can never read as an Alt tap.
+            return (modifiers & NotAMenuGesture) != 0 ? Down.Used : Down.ResetAlt;
+        }
+        if (!altHeld) return Down.Ignore;                      // Alt not held: not ours
+
+        // Ctrl+Alt+key is a character being typed (AltGr: €, ß, …) or one of the
+        // editor's own Ctrl+Alt bindings, never a menu request. It reaches the editor,
+        // and it spends the press.
+        if ((modifiers & ModifierKeys.Control) != 0) return Down.Used;
 
         var key = AccessKeyFor(realKey);
         if (key is null || !isRegistered(key)) return Down.Used;
@@ -79,4 +92,40 @@ internal static class MenuAccessKeys
     /// gesture that enters the menu. Alt+F then release is not a tap.</summary>
     public static bool IsAltTap(Key realKey, bool altUsedSincePress) =>
         IsAltKey(realKey) && !altUsedSincePress;
+}
+
+/// <summary>
+/// One Alt press followed from key-down to key-up, so the window can tell an Alt TAP
+/// (enter the menu) from Alt+letter, AltGr typing, or an Alt that began with another
+/// modifier held. Pure state over <see cref="MenuAccessKeys"/>; the window feeds it
+/// every key event that reaches the editor.
+/// </summary>
+internal sealed class AltPressTracker
+{
+    /// <summary>Something happened under Alt since it went down — the press is spent
+    /// and releasing Alt must not also read as a tap.</summary>
+    private bool _used;
+
+    public MenuAccessKeys.Down KeyDown(bool isSystem, Key realKey, ModifierKeys modifiers,
+                                       Func<string, bool> isRegistered, out string? accessKey)
+    {
+        var decision = MenuAccessKeys.DecideKeyDown(isSystem, realKey, modifiers, isRegistered, out accessKey);
+        switch (decision)
+        {
+            case MenuAccessKeys.Down.ResetAlt: _used = false; break;
+            case MenuAccessKeys.Down.Used:
+            case MenuAccessKeys.Down.Invoke: _used = true; break;
+        }
+        return decision;
+    }
+
+    /// <summary>True when this key-up completes an Alt tap. Any Alt key-up ends the
+    /// press either way.</summary>
+    public bool KeyUp(Key realKey)
+    {
+        if (!MenuAccessKeys.IsAltKey(realKey)) return false;
+        var tap = MenuAccessKeys.IsAltTap(realKey, _used);
+        _used = false;
+        return tap;
+    }
 }

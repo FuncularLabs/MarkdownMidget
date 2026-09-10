@@ -32,7 +32,8 @@ changes between alpha tags.
 - **Alt menu shortcuts work once a document is open.** Alt+F (and the rest) and an
   Alt tap worked on the empty splash and went dead as soon as a file was open,
   because the editor surface swallowed them. They now reach the menu from the editor
-  too. AltGr on international keyboards still types its character.
+  too. AltGr on international keyboards still types its character, and releasing it
+  does not open the menu.
 
 ## [0.9.0] - 2026-09-08
 

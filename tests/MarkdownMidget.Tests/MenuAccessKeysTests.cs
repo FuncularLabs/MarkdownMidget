@@ -11,10 +11,11 @@ namespace MarkdownMidget.Tests;
 
 /// <summary>
 /// Alt mnemonics while the editor has focus. The decision logic is pure and covered
-/// exhaustively; the two WPF calls the window then makes — hand a letter to
-/// AccessKeyManager, and focus the first menu item for an Alt tap — are proved
-/// against a real window with a real menu, since that is where "it opened the File
-/// menu" is actually decided.
+/// exhaustively, including whole press sequences (down … up) through the tracker,
+/// since the bug that review found lived between the two halves: a key-down that was
+/// rightly ignored left the press unspent, and the Alt key-up then read as a tap.
+/// The one WPF call that can be proved on a real menu — focusing the first item for
+/// an Alt tap — is.
 /// </summary>
 public class MenuAccessKeysTests
 {
@@ -93,14 +94,31 @@ public class MenuAccessKeysTests
             MenuAccessKeys.DecideKeyDown(true, Key.F4, ModifierKeys.Alt, Registered, out _));
 
     [Fact]
-    public void AltGrIsTypingNotAMenuRequest()
+    public void AltGrTypingIsSpentAndNeverSwallowed()
     {
         // AltGr+E on a European layout arrives as Ctrl+Alt+E. "E" IS a registered
-        // access key (_Edit), and it must still reach the editor as a character.
+        // access key (_Edit), and it must still reach the editor as a character — and
+        // the press must count as spent, or the AltGr key-up would read as an Alt tap.
         var d = MenuAccessKeys.DecideKeyDown(true, Key.E, ModifierKeys.Control | ModifierKeys.Alt, Registered, out var key);
-        Assert.Equal(MenuAccessKeys.Down.Ignore, d);
+        Assert.Equal(MenuAccessKeys.Down.Used, d);
         Assert.Null(key);
     }
+
+    [Theory]
+    [InlineData(ModifierKeys.Control | ModifierKeys.Alt)]   // AltGr: Windows holds Ctrl before Alt goes down
+    [InlineData(ModifierKeys.Shift | ModifierKeys.Alt)]
+    [InlineData(ModifierKeys.Windows | ModifierKeys.Alt)]
+    public void AltGoingDownUnderAnotherModifierIsNotAMenuGesture(ModifierKeys mods)
+        // Mirrors WPF's KeyboardNavigation, which refuses to track such a press: it is
+        // spent from the start, so its release can never enter the menu.
+        => Assert.Equal(MenuAccessKeys.Down.Used,
+            MenuAccessKeys.DecideKeyDown(false, Key.RightAlt, mods, Registered, out _));
+
+    [Fact]
+    public void AltShiftPlusARegisteredLetterStillInvokes()
+        // Alt+Shift+F opens File in native WPF (the key is normalised to upper case).
+        => Assert.Equal(MenuAccessKeys.Down.Invoke,
+            MenuAccessKeys.DecideKeyDown(true, Key.F, ModifierKeys.Shift | ModifierKeys.Alt, Registered, out _));
 
     [Theory]
     [InlineData(Key.LeftAlt, false, true)]    // Alt down, Alt up, nothing between: a tap
@@ -109,6 +127,88 @@ public class MenuAccessKeysTests
     [InlineData(Key.F, false, false)]         // releasing a letter is never a tap
     public void AnAltTapIsAltUpWithNothingUsed(Key realKey, bool used, bool expected)
         => Assert.Equal(expected, MenuAccessKeys.IsAltTap(realKey, used));
+
+    // ===== whole presses, down to up, through the tracker =====
+
+    private static bool Tap(params (bool down, bool isSystem, Key key, ModifierKeys mods)[] events)
+    {
+        var t = new AltPressTracker();
+        var tapped = false;
+        foreach (var (down, isSystem, key, mods) in events)
+        {
+            if (down) t.KeyDown(isSystem, key, mods, Registered, out _);
+            else tapped |= t.KeyUp(key);
+        }
+        return tapped;
+    }
+
+    private const ModifierKeys A = ModifierKeys.Alt;
+    private const ModifierKeys CA = ModifierKeys.Control | ModifierKeys.Alt;
+
+    [Fact]
+    public void AltDownAltUpIsATap()
+        => Assert.True(Tap((true, false, Key.LeftAlt, A), (false, false, Key.LeftAlt, ModifierKeys.None)));
+
+    [Fact]
+    public void AltFThenAltUpIsNotATap()
+        => Assert.False(Tap((true, false, Key.LeftAlt, A), (true, false, Key.F, A), (false, false, Key.LeftAlt, ModifierKeys.None)));
+
+    [Fact]
+    public void AltXThenAltUpIsNotATap()
+        => Assert.False(Tap((true, false, Key.LeftAlt, A), (true, false, Key.X, A), (false, false, Key.LeftAlt, ModifierKeys.None)));
+
+    [Fact]
+    public void AltGrLetterThenAltGrUpIsNotATap()
+    {
+        // The review finding: LCtrl down (synthesised by Windows), RAlt down, E down,
+        // RAlt up. The old logic ignored the E and then read the RAlt release as a
+        // tap — menu mode after every accented character.
+        var seq = new (bool, bool, Key, ModifierKeys)[]
+        {
+            (true, false, Key.LeftCtrl, ModifierKeys.Control),
+            (true, false, Key.RightAlt, CA),
+            (true, false, Key.E, CA),
+            (false, false, Key.RightAlt, ModifierKeys.Control),
+        };
+        Assert.False(Tap(seq));
+    }
+
+    [Fact]
+    public void ABareAltGrTapIsNotATap()
+    {
+        var seq = new (bool, bool, Key, ModifierKeys)[]
+        {
+            (true, false, Key.LeftCtrl, ModifierKeys.Control),
+            (true, false, Key.RightAlt, CA),
+            (false, false, Key.RightAlt, ModifierKeys.Control),
+        };
+        Assert.False(Tap(seq));
+    }
+
+    [Fact]
+    public void AShiftAltTapIsNotATap()
+        => Assert.False(Tap((true, false, Key.LeftAlt, ModifierKeys.Shift | A), (false, false, Key.LeftAlt, ModifierKeys.Shift)));
+
+    [Fact]
+    public void ANewAltPressAfterASpentOneStartsClean()
+    {
+        // Alt+F (spent), Alt released (not a tap), then a clean Alt tap: the second
+        // press must not inherit the first's spent state.
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        t.KeyDown(false, Key.F, A, Registered, out _);
+        Assert.False(t.KeyUp(Key.LeftAlt));
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.True(t.KeyUp(Key.LeftAlt));
+    }
+
+    [Fact]
+    public void ALetterKeyUpNeverEndsThePressAsATap()
+    {
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.False(t.KeyUp(Key.F));
+    }
 
     // ===== the WPF side, against a real menu =====
 
@@ -155,15 +255,16 @@ public class MenuAccessKeysTests
     /// <summary>
     /// What is NOT here, and why. The Alt+letter half of the fix is two WPF calls —
     /// <c>AccessKeyManager.IsKeyRegistered</c> then <c>ProcessKey</c> — and WPF gates
-    /// both: <c>GetTargetsForScope</c> returns no top-level targets unless the Alt key
-    /// is PHYSICALLY held (<c>Keyboard.Modifiers</c>, read live from the OS) whenever
-    /// the scope is a PresentationSource. That is what stops a bare "F" in a text box
-    /// opening File, and it is why the handler can never open a menu unless Alt is
-    /// truly down. It also means no unit test can exercise the positive path: a test
-    /// cannot hold Alt, and injecting a real Alt press into the desktop from a test
-    /// run is not acceptable. Measured: with the access keys registered and the menu
-    /// even in menu mode, IsKeyRegistered("F") is false without Alt. The positive
-    /// path is verified by dogfooding with a document open.
+    /// both on the Alt key being PHYSICALLY held, in <c>Menu.OnAccessKeyPressed</c>:
+    /// unless <c>Keyboard.IsKeyDown(LeftAlt/RightAlt)</c> (read live from the OS), the
+    /// Menu claims the key's scope as itself, so a top-level item never matches the
+    /// window scope those calls are asked about. That is what stops a bare "F" in a
+    /// text box opening File, and why the handler can never open a menu unless Alt
+    /// is truly down. It also means no unit test can exercise the positive path: a
+    /// test cannot hold Alt, and injecting a real Alt press into the desktop from a
+    /// test run is not acceptable. Measured: with the access keys registered and the
+    /// menu even in menu mode, IsKeyRegistered("F") is false without Alt. The
+    /// positive path is verified by dogfooding with a document open.
     /// </summary>
     [Collection("WpfSta")]
     public class OnARealMenu
