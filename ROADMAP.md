@@ -369,6 +369,16 @@ release, with infrastructure riding along with whatever needs it.
 
 - **Find & Replace.** Find is done (4 modes, F3/Shift+F3); add the Replace tab —
   Replace / Replace All, scoped to selection, honoring the current search mode.
+- **Independent code-view theme (decided direction 2026-09-09).** The source view is
+  now syntax-highlighted and follows the document theme (see the source-view-styling
+  plan). The remaining half is letting the code view be themed *independently* — the
+  motivating case was "Visual Studio Dark for the source view while the document stays
+  Midget Solarized." Design settled: linked-to-the-document-theme by default with an
+  opt-out, standalone declaration-only palette files (no selectors, host-scoped), a
+  code-view theme menu, and its own persisted setting. Deferred because it is a whole
+  UI + persistence + palette-format surface, separable from the themed-highlighting
+  that shipped; the AvalonEdit control and SourceHighlighting.SetPalette it needs are
+  already in place, so this is additive.
 - **.NET 8 build + portable self-contained build.** The multi-target plan (net8 /
   net10 / portable ~63 MB) is scoped and the code already compiles for net8; just
   needs the csproj multi-target + extra publish profiles + release-workflow matrix.
