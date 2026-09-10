@@ -46,7 +46,9 @@ Thirty lines changed with no edit made. Hard-wrapped paragraphs, `__bold__`,
 | CRLF line endings | LF outside code and HTML blocks, CRLF kept inside them |
 
 The sample is committed as `editor-src/test/fixtures/roundtrip-audit.md` so the
-figure is reproducible.
+figure is reproducible. "Thirty" is a positional count: 30 of the 39 lines from a
+`split('\n')` of input and output differ at the same index. An alignment-aware
+diff counts 18 lines altered and 4 inserted; either way it is most of the file.
 
 Why it is invisible: in the formatted view, `SetCleanBaselineAsync` takes the clean
 baseline from the editor's re-serialisation, not the file, so a freshly opened
@@ -74,12 +76,12 @@ unpinnable without it.
 | AC | Test |
 |---|---|
 | R1. A round-trip harness exists: markdown in, editor, markdown out, in Node with the real bundle's parser and serialiser | `editor-src/test/roundtrip.test.mjs` with a fixture corpus: `editor-src/test/fixtures/roundtrip-audit.md` (committed with this plan) plus README.md and HELP.md themselves |
-| R2. The serialiser's conventions are pinned: `-` bullets, `1.` ordered, ATX headings, fenced code, `*`/`**` emphasis, a chosen hard-break form, and tight lists stay tight (today `- one` / `- two` comes back loose) — and the harness fails if any drifts | `roundtrip.test.mjs: ConventionsArePinned` (each convention one case) |
+| R2. The serialiser's conventions are pinned: `-` bullets, `1.` ordered, ATX headings, fenced code, `*`/`**` emphasis, a chosen hard-break form, and tight bullet lists stay tight (today `- one` / `- two` comes back loose; ordered lists already stay tight) — and the harness fails if any drifts | `roundtrip.test.mjs: ConventionsArePinned` (each convention one case) |
 | R3. Intraword underscores are not escaped (`snake_case_word` survives) | `roundtrip.test.mjs: IntrawordUnderscoreSurvives` — investigate `mdast-util-to-markdown` `unsafe` overrides; if it cannot be done safely, this AC moves to "documented limit" |
 | R4. Line endings are preserved end to end: a CRLF file saves CRLF throughout, an LF file LF, a mixed file takes the majority — including inside code and HTML blocks, where the serialiser today keeps the original endings while normalising everything else | `DocumentTextTests.LineEndingsRoundTrip` (host, pure): detect on load; on save FOLD every `\r\n`, `\r` and `\n` to `\n` first, then re-apply the detected ending. A naive `Replace("\n", "\r\n")` would produce `\r\r\n` inside every code block. The corpus must include a CRLF file with a fenced block, an indented block and an HTML block |
 | R5. A UTF-8 BOM is preserved when present and not added when absent | `DocumentTextTests.BomRoundTrip` |
 | R6. A file rewritten on disk with identical bytes is NOT reported as an external change | `ExternalChangeTests.IdenticalBytesAreNotAChange` — keep the raw loaded text beside the normalised baseline and compare against the raw one |
-| R7. HELP documents the conventions and states plainly that a document which passes through the formatted view is saved in them, listing what is converted (reference links inlined, setext to ATX, tight lists loosened unless R2 fixes it, …) | reviewed against R2's list; `EmbeddedReaderDocsTests` already pins HELP loads |
+| R7. HELP documents the conventions and states plainly that a document which passes through the formatted view is saved in them, listing what is converted (reference links inlined, setext to ATX, tight bullet lists loosened unless R2 fixes it, …) | reviewed against R2's list; `EmbeddedReaderDocsTests` already pins HELP loads |
 
 Mutations to kill: R2 — flip one serialiser option and the pin must go red;
 R4 — write with `\n` unconditionally and the CRLF case must go red, and skip the

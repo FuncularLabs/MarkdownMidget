@@ -22,7 +22,7 @@ order of risk:
   bundle: a 39-line README-style file came back with 30 lines changed and no edit
   made — setext headings to `#`, `+` bullets to `*`, `1)` to `1.`, reference links
   inlined with their definition deleted, indented code fenced, two-space hard breaks
-  to `\`, `snake_case_word` to `snake\_case\_word`, tight lists loosened. It is
+  to `\`, `snake_case_word` to `snake\_case\_word`, tight bullet lists loosened. It is
   invisible because, in the formatted view, the clean baseline after Open is the
   editor's re-serialisation, not the file; the source view saves as typed. The
   README's "not a lossy import/export" is true in content and false in form. 1.0
@@ -37,7 +37,8 @@ order of risk:
 - **Find has no Replace.** Replace / Replace All, both views, all four modes, scoped
   to the selection.
 - **Dropping an image file on the editor opens it as text** (after the discard
-  prompt, when there are unsaved changes). Insert it as a picture instead; refuse other non-markdown drops with a
+  prompt, when there are unsaved changes).
+  Insert it as a picture instead; refuse other non-markdown drops with a
   message. Pasting an image into the *source* view does nothing today; it should
   insert the same data-URI markdown the formatted view produces (Markdown Monster
   accepts pasted images in its text editor too, though it saves them as files — our
@@ -446,10 +447,13 @@ Filled from the 2026-09-10 audit. These are stated, not hidden; each is a choice
   portable form.
 - **One document per window, no tabs, no Window menu.** Deliberate SDI; see the
   cross-instance registry under Someday.
-- **Saving normalises to the app's markdown conventions.** After 1.0 those are
-  pinned and documented; reference-style links become inline, setext headings
-  become ATX, indented code becomes fenced. Preserving each document's own style
-  would be a second serialiser to test and is not planned.
+- **A document that passes through the formatted view is saved in the app's
+  markdown conventions.** After 1.0 those are pinned and documented;
+  reference-style links become inline, setext headings become ATX, indented code
+  becomes fenced, tight bullet lists become loose unless 1.0 pins them tight. A
+  document opened and saved entirely in the source view is written back as typed.
+  Preserving each document's own style would be a second serialiser to test and
+  is not planned.
 - **Mermaid ships in the bundle** whether or not a document uses it (lazy-load is
   under Later).
 
