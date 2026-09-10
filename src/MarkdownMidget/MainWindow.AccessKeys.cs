@@ -21,6 +21,10 @@ public partial class MainWindow
         // branch and is handled by WPF natively, so nothing is processed twice.
         Web.KeyDown += Web_KeyDown;
         Web.KeyUp += Web_KeyUp;
+        // A press that was in progress when focus left the editor (Alt+F opened the
+        // menu; Alt+Tab; a dialog) must not be completed by whatever Alt key-up later
+        // wanders back in. Same rule as WPF's KeyboardNavigation on focus loss.
+        Web.LostKeyboardFocus += (_, _) => _altPress.Reset();
     }
 
     private void Web_KeyDown(object sender, KeyEventArgs e)

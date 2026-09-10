@@ -96,12 +96,23 @@ internal static class MenuAccessKeys
 
 /// <summary>
 /// One Alt press followed from key-down to key-up, so the window can tell an Alt TAP
-/// (enter the menu) from Alt+letter, AltGr typing, or an Alt that began with another
-/// modifier held. Pure state over <see cref="MenuAccessKeys"/>; the window feeds it
-/// every key event that reaches the editor.
+/// (enter the menu) from Alt+letter, AltGr typing, an Alt that began with another
+/// modifier held — or an Alt key-up the editor never saw the key-down for. Pure
+/// state over <see cref="MenuAccessKeys"/>; the window feeds it every key event that
+/// reaches the editor, and tells it when the editor loses focus.
+///
+/// A tap needs BOTH halves to arrive here, like WPF's own KeyboardNavigation, which
+/// enters menu mode only when the Alt key-up matches the last key-down it saw. A
+/// stray key-up is real: dismiss a dialog with Alt+F4 or an Alt mnemonic and the
+/// dialog closes on the key-DOWN, focus returns to the editor, and the Alt release
+/// lands here a moment later. Without the down half it is not a tap.
 /// </summary>
 internal sealed class AltPressTracker
 {
+    /// <summary>An Alt key-down was seen and its key-up has not been: a press is in
+    /// progress. Only a press that started here can end as a tap.</summary>
+    private bool _pressed;
+
     /// <summary>Something happened under Alt since it went down — the press is spent
     /// and releasing Alt must not also read as a tap.</summary>
     private bool _used;
@@ -110,22 +121,35 @@ internal sealed class AltPressTracker
                                        Func<string, bool> isRegistered, out string? accessKey)
     {
         var decision = MenuAccessKeys.DecideKeyDown(isSystem, realKey, modifiers, isRegistered, out accessKey);
-        switch (decision)
+        if (MenuAccessKeys.IsAltKey(realKey))
         {
-            case MenuAccessKeys.Down.ResetAlt: _used = false; break;
-            case MenuAccessKeys.Down.Used:
-            case MenuAccessKeys.Down.Invoke: _used = true; break;
+            // The Alt key itself: a press begins. Clean (ResetAlt) or already spent
+            // (Used — it came down under Ctrl/Shift/Win).
+            _pressed = true;
+            _used = decision == MenuAccessKeys.Down.Used;
+            return decision;
         }
+        if (decision is MenuAccessKeys.Down.Used or MenuAccessKeys.Down.Invoke) _used = true;
         return decision;
     }
 
-    /// <summary>True when this key-up completes an Alt tap. Any Alt key-up ends the
-    /// press either way.</summary>
+    /// <summary>True when this key-up completes an Alt tap: a press that began here
+    /// and was not spent. Any Alt key-up ends the press either way.</summary>
     public bool KeyUp(Key realKey)
     {
         if (!MenuAccessKeys.IsAltKey(realKey)) return false;
-        var tap = MenuAccessKeys.IsAltTap(realKey, _used);
+        var tap = _pressed && MenuAccessKeys.IsAltTap(realKey, _used);
+        _pressed = false;
         _used = false;
         return tap;
+    }
+
+    /// <summary>Forget any press in progress — the editor lost keyboard focus, so the
+    /// key-up, if it ever arrives here, belongs to whatever had focus in between (an
+    /// Alt+Tab back into the window, say). WPF does the same on focus loss.</summary>
+    public void Reset()
+    {
+        _pressed = false;
+        _used = false;
     }
 }

@@ -97,8 +97,10 @@ public class MenuAccessKeysTests
     public void AltGrTypingIsSpentAndNeverSwallowed()
     {
         // AltGr+E on a European layout arrives as Ctrl+Alt+E. "E" IS a registered
-        // access key (_Edit), and it must still reach the editor as a character — and
-        // the press must count as spent, or the AltGr key-up would read as an Alt tap.
+        // access key (_Edit), and it must still reach the editor as a character: the
+        // Control check is what stops this being an Invoke that swallows the key. (The
+        // press is normally already spent by the Alt-under-Ctrl branch; `Used` here
+        // keeps that true even when Alt came down before Ctrl.)
         var d = MenuAccessKeys.DecideKeyDown(true, Key.E, ModifierKeys.Control | ModifierKeys.Alt, Registered, out var key);
         Assert.Equal(MenuAccessKeys.Down.Used, d);
         Assert.Null(key);
@@ -208,6 +210,37 @@ public class MenuAccessKeysTests
         var t = new AltPressTracker();
         t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
         Assert.False(t.KeyUp(Key.F));
+    }
+
+    [Fact]
+    public void AnAltUpTheEditorNeverSawTheDownForIsNotATap()
+    {
+        // Dismiss a dialog with Alt+F4: it closes on the key-DOWN, focus returns to
+        // the editor, and the Alt release lands here alone. Not a tap.
+        var t = new AltPressTracker();
+        Assert.False(t.KeyUp(Key.LeftAlt));
+    }
+
+    [Fact]
+    public void ASecondAltUpAfterATapIsNotATap()
+    {
+        // The press ended with the first key-up; a stray second key-up (focus bounced
+        // through another window and back) has no down half.
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        Assert.True(t.KeyUp(Key.LeftAlt));
+        Assert.False(t.KeyUp(Key.LeftAlt));
+    }
+
+    [Fact]
+    public void LosingFocusForgetsThePressInProgress()
+    {
+        // Alt down here, then Alt+Tab away (the OS eats the Tab) and back: the Alt
+        // key-up that finally arrives belongs to that excursion, not to a tap.
+        var t = new AltPressTracker();
+        t.KeyDown(false, Key.LeftAlt, A, Registered, out _);
+        t.Reset();
+        Assert.False(t.KeyUp(Key.LeftAlt));
     }
 
     // ===== the WPF side, against a real menu =====
