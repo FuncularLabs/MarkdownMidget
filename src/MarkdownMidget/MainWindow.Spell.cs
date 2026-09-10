@@ -31,6 +31,7 @@ public partial class MainWindow
     // to generation N+1 — that's how squiggles from one file land on another.
     private int _spellGeneration;
     private SquiggleRenderer? _squiggles;
+    private SourceHighlighting? _sourceHighlighting;
 
     private sealed class SpellTextPayload
     {
@@ -63,6 +64,17 @@ public partial class MainWindow
     /// </summary>
     private void InitSource()
     {
+        // Markdown syntax highlighting for the source view. Loading the definition can
+        // fail only if the embedded .xshd is missing or malformed (a build problem, not
+        // a runtime one); if it does, the source view simply shows uncoloured text
+        // rather than taking the window down.
+        try
+        {
+            _sourceHighlighting = new SourceHighlighting();
+            _sourceHighlighting.Attach(SourceBox);
+        }
+        catch (Exception ex) { CrashLog.Write("SourceHighlighting", ex); }
+
         SourceBox.TextChanged += (_, _) =>
         {
             if (!_sourceMode) return;

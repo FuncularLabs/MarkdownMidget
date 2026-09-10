@@ -456,12 +456,19 @@ function readThemeBack() {
 
   const probe = document.createElement('div');
   probe.setAttribute('aria-hidden', 'true');
+  // The extra colour properties are carriers: the source view's markdown highlighting
+  // is coloured from the theme's page-level palette (heading/link/quote), and reading
+  // each through an unrelated colour property that the engine resolves to rgb is the
+  // same trick as background/color above — it sidesteps oklch()/color-mix() that WPF
+  // cannot parse. See SourcePalette on the host, which consumes the `source` block.
   probe.style.cssText =
     'position:absolute;left:-9999px;top:0;width:0;height:0;pointer-events:none;' +
-    'background:var(--mdm-page-bg);color:var(--mdm-text);border-color:var(--mdm-app-bg)';
+    'background:var(--mdm-page-bg);color:var(--mdm-text);border-color:var(--mdm-app-bg);' +
+    'outline-color:var(--mdm-heading);text-decoration-color:var(--mdm-link);' +
+    'column-rule-color:var(--mdm-quote-bar);caret-color:var(--mdm-quote-text)';
   host.appendChild(probe);
 
-  let result = { background: null, foreground: null, mermaid: '' };
+  let result = { background: null, foreground: null, mermaid: '', source: null };
   try {
     const cs = getComputedStyle(probe);
     // Layered the way the window is: app background over white, page over that,
@@ -472,10 +479,23 @@ function readThemeBack() {
     const bgCss = bg ? `rgb(${bg.r},${bg.g},${bg.b})` : appCss;
     const fg = flattenColor(cs.color, bgCss);
 
+    // Source-view palette: each role flattened over the page background so a
+    // translucent accent resolves to what it actually looks like on the page. All
+    // four must resolve or `source` stays null — the host fail-closes on a partial
+    // palette exactly as it does for background/foreground.
+    const heading = flattenColor(cs.outlineColor, bgCss);
+    const link = flattenColor(cs.textDecorationColor, bgCss);
+    const accent = flattenColor(cs.columnRuleColor, bgCss);
+    const quote = flattenColor(cs.caretColor, bgCss);
+    const source = (heading && link && accent && quote)
+      ? { heading, link, accent, quote }
+      : null;
+
     result = {
       background: bg,
       foreground: fg,
       mermaid: (cs.getPropertyValue('--mdm-mermaid-theme') || '').trim().toLowerCase(),
+      source,
     };
   } catch {
     // Something in the flattening step threw. The WYSIWYG page's <style> was

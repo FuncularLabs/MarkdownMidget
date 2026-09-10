@@ -273,5 +273,24 @@ public partial class MainWindow
         // Without this the caret keeps WPF's default black and disappears entirely on
         // a dark theme — the pane looks right and typing looks broken.
         SourceBox.CaretBrush = new SolidColorBrush(read.Foreground);
+
+        ApplySourceSyntax(json);
+    }
+
+    /// <summary>
+    /// Recolour the markdown syntax highlighting from the same read-back.
+    ///
+    /// Separate from the background/foreground above and deliberately quiet when it
+    /// can't proceed: the page-level palette (heading/link/quote) is an ADDITION to
+    /// the read-back, so an older bundle that doesn't send it, or a theme that resolves
+    /// the base colours but not these, leaves the highlighting on its previous palette
+    /// rather than flashing a warning. The base pane is already themed by the time we
+    /// get here, so there is no half-themed state to announce.
+    /// </summary>
+    private void ApplySourceSyntax(string? json)
+    {
+        if (_sourceHighlighting is null) return;
+        if (Source.SourcePalette.Parse(json) is not { } palette) return;
+        _sourceHighlighting.SetPalette(SourceBox, palette);
     }
 }

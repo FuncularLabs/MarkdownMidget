@@ -88,12 +88,26 @@ added to the test project (Rule 2); touched files target ≥85% line coverage.
 | 2.2 | Headings, emphasis, strong, inline code, links, quotes, list markers, rules, fences each get their named colour | `MarkdownHighlightingTests.EachConstructGetsItsColour` | Tests |
 | 2.3 | The theme read-back parses the page-level syntax palette; a missing/!shaped field yields no palette, not a half one | `SourcePaletteTests.*` (mirrors `ThemeReadBackTests`) | Tests |
 | 2.4 | Applying a palette sets every named colour's brush; a null palette leaves the definition's defaults | `SourcePaletteTests.AppliesToNamedColours` | Tests |
-| 2.5 | Every mapped colour clears 4.5:1 on the theme's own page background, all 6 built-ins | `SourcePaletteContrastTests.MappedColoursAreLegibleOnThePage` | Tests |
-| 2.6 | Read-back JS returns the new keys for a known stylesheet (parity guard) | `source-palette.test.mjs` | editor-src |
+| 2.5 | Every applied colour is ≥4.5:1 on the page OR the body-text colour, all 6 built-ins | `SourcePaletteContrastTests.*` | Tests |
+| 2.6 | The carrier-property read-back resolves oklch()/color-mix() to rgb in Chromium | manual browser probe (recorded below) | — |
 
-Mutations to kill (Rule 1): 2.1 — revert the fence/emphasis regex to greedy `.*` and
-the test must go red; 2.4 — skip the brush assignment and the palette test must fail;
-2.5 — swap one mapped role to a `--mdm-token-*` value and the contrast test must fail.
+Mutations killed (Rule 1): 2.1 — the greedy AvalonEdit built-in definition merges two
+bolds; ours keeps them separate (`TwoStrongSpansOnOneLineDoNotMerge`). 2.4/2.5 — a role
+applied without the legibility floor fails `EveryNamedColourAppliedToTheDefinitionIsLegible`.
+
+Two findings during implementation, recorded so the next reader does not relearn them:
+
+- **The .xshd namespace is `syntaxdefinition/2008`, not `highlighting/2008`.** With the
+  wrong one the loader silently parses zero rules (no error) and Spans throw "Token is
+  not valid". Both symptoms vanish with the right namespace.
+- **The read-back must flatten, not read.** In Chromium, `getComputedStyle` returns an
+  `outline-color` set to `oklch(...)` as the literal `oklch(...)` string, and a
+  `color-mix()` as `color(srgb …)` — neither is rgb. The canvas-flatten step resolves
+  all of them to 8-bit RGB (verified in the Browser pane, same engine as WebView2), which
+  is why the carrier-property trick works and why SourcePalette receives clean bytes.
+
+Fenced code uses a multiline `<Span>` (working once the namespace was fixed), colouring
+the whole block including its body.
 
 ## Interface coverage (Stage 1 adapter — Rule 2)
 

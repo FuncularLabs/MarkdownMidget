@@ -77,4 +77,12 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- Markdown syntax highlighting for the source view, loaded by SourceHighlighting.
+       Named colours only; the theme sets the brushes at runtime. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Themes\Markdown.xshd">
+      <LogicalName>Markdown.xshd</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

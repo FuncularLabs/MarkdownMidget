@@ -9,6 +9,18 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **The Markdown source view is syntax-highlighted, and it follows the theme.**
+  Ctrl+E now shows coloured markdown — headings, bold/italic, inline and fenced
+  code, links, block quotes, list markers and rules — drawn from the same
+  palette the formatted view uses, on the same page background. The point is to
+  match the theme's vibe, not the code-block colours: a light theme keeps a light
+  source view. Where a theme's accent would be too faint to read as small text, that
+  token falls back to the body text colour, so the source view is never less legible
+  than the theme's own prose. Under the hood the source view moved from a plain text
+  box to an AvalonEdit editor; editing, spell check, find, word-wrap and the caret
+  behave as before.
+
 ## [0.9.0] - 2026-09-08
 
 First stable release on the 0.9 line — the betas' content with the prerelease

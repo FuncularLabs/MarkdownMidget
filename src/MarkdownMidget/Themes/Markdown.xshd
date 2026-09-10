@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Markdown syntax highlighting for the source view.
+
+  Authored for Markdown Midget rather than reusing AvalonEdit's built-in "MarkDown"
+  definition, which colours emphasis and code with greedy `.*` between delimiters and
+  so merges two spans on one line into one, and has no rules at all for lists, tables,
+  rules, task lists or fenced-code languages.
+
+  Colours carry NO literal here: every named colour's brush is set at runtime from the
+  document theme (see SourceHighlighting.SetPalette), so the source view follows the
+  same palette the formatted view uses. Font weight and style ARE fixed here, because
+  bold-is-bold regardless of theme. All content-spanning patterns are non-greedy.
+-->
+<SyntaxDefinition name="MarkdownMidget" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Heading"     fontWeight="bold" />
+  <Color name="Strong"      fontWeight="bold" />
+  <Color name="Emphasis"    fontStyle="italic" />
+  <Color name="InlineCode"  />
+  <Color name="Link"        />
+  <Color name="BlockQuote"  />
+  <Color name="ListMarker"  fontWeight="bold" />
+  <Color name="Rule"        fontWeight="bold" />
+
+  <RuleSet ignoreCase="false">
+
+    <!-- Fenced code: the whole block, from an opening ``` (or ~~~) line to its
+         closing fence, coloured as code — markers, language word and body alike. -->
+    <Span color="InlineCode" multiline="true">
+      <Begin>^[ ]{0,3}(```+|~~~+)</Begin>
+      <End>^[ ]{0,3}(```+|~~~+)[ ]*$</End>
+    </Span>
+
+    <!-- ATX heading: the whole line, hashes and text. -->
+    <Rule color="Heading">^[ ]{0,3}\#{1,6}[ \t].*$</Rule>
+    <!-- A bare row of hashes (e.g. "###") is still a heading marker. -->
+    <Rule color="Heading">^[ ]{0,3}\#{1,6}[ \t]*$</Rule>
+
+    <!-- Thematic break: a run of three or more dashes, stars or underscores alone. -->
+    <Rule color="Rule">^[ ]{0,3}([-][ ]*){3,}$</Rule>
+    <Rule color="Rule">^[ ]{0,3}([*][ ]*){3,}$</Rule>
+    <Rule color="Rule">^[ ]{0,3}([_][ ]*){3,}$</Rule>
+
+    <!-- Block quote marker(s) at the start of a line. -->
+    <Rule color="BlockQuote">^[ ]{0,3}(&gt;[ ]?)+</Rule>
+
+    <!-- List marker only (bullet or ordered), not the whole line — the lookahead
+         keeps the following text in the body colour. -->
+    <Rule color="ListMarker">^[ ]*([-*+]|[0-9]+[.)])(?=[ \t])</Rule>
+
+    <!-- Inline code: backtick spans, non-greedy and never crossing a newline. -->
+    <Rule color="InlineCode">`[^`\n]+`</Rule>
+
+    <!-- Images then links: ![alt](url) / [text](url) / [text][ref]. Non-greedy. -->
+    <Rule color="Link">!\[[^\]\n]*\]\([^)\n]*\)</Rule>
+    <Rule color="Link">\[[^\]\n]*\]\([^)\n]*\)</Rule>
+    <Rule color="Link">\[[^\]\n]*\]\[[^\]\n]*\]</Rule>
+
+    <!-- Strong before emphasis, so ** and __ are consumed before a lone * or _. -->
+    <Rule color="Strong">\*\*[^\n]+?\*\*</Rule>
+    <Rule color="Strong">__[^\n]+?__</Rule>
+
+    <!-- Emphasis: a single * or _ pair, not touching a word character on the outside
+         (so snake_case and 3*4 are left alone), non-greedy. -->
+    <Rule color="Emphasis">\*[^\s*][^*\n]*?\*</Rule>
+    <Rule color="Emphasis">(?&lt;![A-Za-z0-9_])_[^\s_][^_\n]*?_(?![A-Za-z0-9_])</Rule>
+
+  </RuleSet>
+</SyntaxDefinition>

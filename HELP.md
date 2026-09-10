@@ -186,6 +186,12 @@ Switching is instant, applies to the source view as well as the formatted one, a
 is remembered between sessions. Diagrams follow along; the menu bar, toolbar and
 status bar do not — those are Windows' own furniture and stay in the system theme.
 
+The **Markdown source view** (Ctrl+E) is syntax-highlighted, and its colours follow
+the theme too: headings, links, emphasis, code, quotes and list markers take the
+same palette the formatted view uses, on the same page background. Where a theme's
+accent would be too faint to read as small text, that token falls back to the body
+text colour, so the source view is never less legible than the theme's own prose.
+
 **Printing keeps paper light** — the page prints white with dark text whatever you
 pick, because a dark page on paper is unreadable and empties a toner cartridge.
 Your **tables** are the exception: the header row and the alternating row shading
