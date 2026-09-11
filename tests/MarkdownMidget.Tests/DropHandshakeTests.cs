@@ -662,6 +662,16 @@ public class DropHandshakeTests
             currentAtEntry: true, picturesWanted: 1, readFailed: false,
             currentAfterRead: false, stillApplies: true));
         Assert.False(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.Superseded));
+
+        // N-1. And when BOTH post-fetch gates are shut — the drop was replaced and the
+        // document moved — it is this one that answers, because a drop that is no
+        // longer the current one has no business reporting on a document it was never
+        // going to touch. Nothing above pinned the relative order of the two, so
+        // swapping the `if`s would have gone green on DocumentChanged: the wrong
+        // notice, and CallerFinishesTheDrop false for the wrong reason.
+        Assert.Equal(DropInsertOutcome.Superseded, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 1, readFailed: false,
+            currentAfterRead: false, stillApplies: false));
     }
 
     [Fact]

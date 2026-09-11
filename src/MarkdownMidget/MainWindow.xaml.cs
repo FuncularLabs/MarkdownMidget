@@ -45,9 +45,20 @@ public partial class MainWindow : Window
     /// switch that is half-done counts as a movement even though the flag has not
     /// turned over yet.
     ///
-    /// Only drops read it (<see cref="DropHandshake.StillApplies"/>). Everything
-    /// else in the window reads <see cref="_sourceMode"/> synchronously, where
-    /// there is no gap to see.
+    /// Only drops read it (<see cref="DropHandshake.StillApplies"/>): a drop decides
+    /// at drop time and inserts after a read it does not control. Everything else
+    /// reads <see cref="_sourceMode"/> where it acts on it — <c>FocusDocumentAsync</c>
+    /// and <c>ApplyUpdate_Click</c> come back from an await and read it THERE, not to
+    /// apply a decision taken earlier — so a stale value cannot outlive its decision.
+    ///
+    /// One exception, and it routes CONTENT: <c>Picture_Click</c> awaits
+    /// <c>File.ReadAllBytesAsync</c> and then calls <c>InsertMarkdownFragment</c>,
+    /// which routes on <see cref="_sourceMode"/>. A Ctrl+E during that read can land
+    /// the picture in the half being discarded, because the flag does not turn over
+    /// until the bottom of <see cref="SetSourceModeAsync"/>. Left untracked on
+    /// purpose — the file is one the user picked a moment ago and the window is far
+    /// shorter than a drop's — but it IS a window, not the "no gap to see" this
+    /// comment used to claim of everything but drops.
     /// </summary>
     private long _viewGeneration;
 
