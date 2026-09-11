@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 using MarkdownMidget;
 using Xunit;
 
@@ -448,6 +450,40 @@ public class DropHandshakeTests
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", then, now,
             DropTarget.Editable, DropTarget.Editable, false, false));
+    }
+
+    [Fact]
+    public void TheInsertionChokepointSaysWhetherTheDropStillOwnsTheWindow()
+    {
+        // NF-3. The two routes disagreed about what a STALE drop tells the user.
+        //
+        // The content route's stale check is an early return in HandleDroppedFiles,
+        // so DocumentChangedNotice is the last thing flashed and it stays.
+        //
+        // The path route's is inside InsertDroppedPicturesAsync, which returned void
+        // — so Window_Drop carried on regardless: it flashed DocumentChangedNotice
+        // and then, one statement later, flashed plan.Notice() over the top of it.
+        // FlashStatus ASSIGNS, so the user of a stale drop of photo.png + a.zip was
+        // told "Not a picture or a markdown file: a.zip" and never saw that the
+        // pictures had been abandoned. It also went on to open documents and
+        // Activate() against the same stale plan.
+        //
+        // So the chokepoint reports, and both callers return on false. This pins the
+        // reporting half — the signature, which was Task before the fix — and the
+        // exact pair of strings that collided. What it cannot pin is that the
+        // callers honour it: Window_Drop and HandleDroppedFiles are UI members with
+        // no seam, and that half is stated by reading.
+        var insertion = typeof(MainWindow).GetMethod(
+            "InsertDroppedPicturesAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(insertion);
+        Assert.Equal(typeof(Task<bool>), insertion!.ReturnType);
+
+        var plan = DropRouting.Plan(
+            [new DroppedFile("photo.png", Png, 4), new DroppedFile("a.zip", [0x50, 0x4B, 0x03, 0x04], 4)],
+            DropTarget.Editable, oneDocument: false);
+        Assert.Equal([0], plan.Insert.Select(p => p.Index));
+        Assert.Equal("Not a picture or a markdown file: a.zip", plan.Notice());
+        Assert.NotEqual(DropHandshake.DocumentChangedNotice, plan.Notice());
     }
 
     // ===== what the user is told =====

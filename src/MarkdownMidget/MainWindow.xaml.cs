@@ -4020,7 +4020,13 @@ public partial class MainWindow : Window
         var then = DropPin();
         var plan = DropRouting.Plan(files, then.Target, oneDocument: false);
 
-        await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]), then);
+        // False means the drop is no longer the window's to act on, and it has said
+        // so. Everything below is about the same stale plan — the opens would put a
+        // document the user never asked for into a window that has moved on, and
+        // FlashStatus ASSIGNS, so plan.Notice() would replace the abandonment notice
+        // with a line about files that were never going in. The content route has
+        // always returned here; this is that route's answer, not a new policy.
+        if (!await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]), then)) return;
 
         // Documents open as a drop here always opened them: the first in this window
         // only if it holds an untitled, unmodified document; otherwise (a file is
@@ -4076,10 +4082,21 @@ public partial class MainWindow : Window
     /// can move between the plan and the insertion here too; this is the chokepoint
     /// both routes' insertions go through, so the last word on whether the insertion
     /// still applies is taken here.</param>
-    private async Task InsertDroppedPicturesAsync(
+    /// <returns>
+    /// Whether the drop is still the window's to act on. False means the plan went
+    /// stale while the bytes were being fetched and the status line already says so
+    /// — so the CALLER must stop too. This used to be void, and Window_Drop carried
+    /// on: it opened documents against the stale plan and then flashed
+    /// <c>plan.Notice()</c>, which ASSIGNS, straight over the abandonment notice.
+    /// The content route returns on the same condition, so both routes now tell the
+    /// user the same thing about the same failure. A failed READ is not this: the
+    /// modal has spoken, the drop is still live, and the caller carries on as it
+    /// always has.
+    /// </returns>
+    private async Task<bool> InsertDroppedPicturesAsync(
         DropPlan plan, Func<int, Task<byte[]>> bytesOf, (string? Path, string Clean, DropTarget Target, bool Source) then)
     {
-        if (plan.Insert.Count == 0) return;
+        if (plan.Insert.Count == 0) return true;
         var fragments = new List<string>(plan.Insert.Count);
         try
         {
@@ -4107,14 +4124,17 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, $"Couldn't read the image:\n{ex.Message}", "Markdown Midget",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            // The drop itself is still live — this is one file that could not be
+            // read, not a document that moved — so the caller finishes it.
+            return true;
         }
         // Last thing before the document is touched: the bytes took an await to
         // fetch, and the window was live throughout it. A plan made against a
         // different document — or against one that has since closed, which nothing
         // downstream tests for — must not reach InsertMarkdownFragment.
-        if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return; }
+        if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return false; }
         InsertMarkdownFragment(DropRouting.Markdown(fragments));
+        return true;
     }
 
     /// <summary>
@@ -4196,9 +4216,12 @@ public partial class MainWindow : Window
             // Every index asked for has bytes here (that is what Apply means); the
             // TryGetValue is the belt-and-braces that keeps the all-or-nothing a
             // failed path read has always had.
-            await InsertDroppedPicturesAsync(plan, i => reply.Bytes.TryGetValue(i, out var b)
+            // Same answer as Window_Drop's: false means the document moved under the
+            // insertion and the notice is already on screen, so neither the open
+            // below nor plan.Notice() may speak over it.
+            if (!await InsertDroppedPicturesAsync(plan, i => reply.Bytes.TryGetValue(i, out var b)
                 ? Task.FromResult(b)
-                : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")), then);
+                : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")), then)) return;
 
             if (plan.Open.Count > 0 && reply.Bytes.TryGetValue(plan.Open[0], out var content))
                 await HandleDroppedContentAsync(files[plan.Open[0]].Name, content);
