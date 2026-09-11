@@ -4097,7 +4097,7 @@ public partial class MainWindow : Window
         // path, so the document's bytes have to come from the editor too.
         var wanted = plan.Insert.Select(p => p.Index).Concat(plan.Open.Take(1)).ToList();
 
-        var reply = await RequestDroppedBytesAsync(message.Drop, wanted);
+        var reply = await RequestDroppedBytesAsync(message.Drop, files, wanted);
         // A newer drop landed while this one was reading; that drop owns the window,
         // and it has already said so.
         if (reply.Outcome == DropReply.Discard) return;
@@ -4117,9 +4117,11 @@ public partial class MainWindow : Window
 
         if (plan.Notice() is { } notice) FlashStatus(notice);
         // Last, so it is what stays on screen: the notice is about files that were
-        // never going to be taken, this is about ones that should have been.
+        // never going to be taken, these are about ones that should have been.
         if (reply.Outcome == DropReply.Refuse)
             FlashStatus(DropHandshake.UnreadableNotice([.. reply.Missing.Select(i => files[i].Name)]));
+        else if (reply.Outcome == DropReply.TimedOut)
+            FlashStatus(DropHandshake.TimedOutNotice);
     }
 
     // Phase two of a formatted-view drop. One read is in flight at a time — a drop
@@ -4160,9 +4162,11 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Ask the editor for the full bytes of <paramref name="indices"/> from drop
-    /// <paramref name="drop"/>, and wait for the answer.
+    /// <paramref name="drop"/>, and wait — for at most
+    /// <see cref="DropHandshake.ReadTimeout"/> — for the answer.
     /// </summary>
-    private async Task<DropReplyDecision> RequestDroppedBytesAsync(long drop, IReadOnlyList<int> indices)
+    private async Task<DropReplyDecision> RequestDroppedBytesAsync(
+        long drop, IReadOnlyList<DroppedFile> files, IReadOnlyList<int> indices)
     {
         // Nothing to fetch: don't round-trip, and don't leave a waiter behind for an
         // answer that will never come. (The previous read is already over — the
@@ -4182,7 +4186,23 @@ public partial class MainWindow : Window
         // Set before the request goes out, so an answer that comes back faster than
         // ExecuteScriptAsync returns still finds its waiter.
         await RunEditorAsync($"window.MDM.readDroppedFiles({drop}, {JsonSerializer.Serialize(indices)})");
-        return await pending.Task;
+
+        // Bounded. The editor answers on every path it can see, and posts a small
+        // failure message when its own post of the bytes is refused — but if the
+        // bridge itself is gone, neither post arrives and there is nothing on the
+        // editor side left to tell us. This is the only thing that ends that wait.
+        var timeout = DropHandshake.ReadTimeout(DropHandshake.BytesRequested(files, indices));
+        if (await Task.WhenAny(pending.Task, Task.Delay(timeout)) == pending.Task) return await pending.Task;
+        // The delay won the race; if the answer landed in the same turn anyway, take
+        // it rather than throw away a good read over a tie.
+        if (pending.Task.IsCompleted) return await pending.Task;
+
+        // Give the window back. The read is abandoned so a late answer finds no
+        // waiter and is discarded, rather than inserted into whatever is on screen by
+        // then. (Only if it is still OURS: a newer drop would already have ended it,
+        // and that path completes pending.Task above rather than reaching here.)
+        if (ReferenceEquals(_droppedBytes, pending)) AbandonDroppedRead();
+        return DropHandshake.TimedOut(indices);
     }
 
     /// <summary>The editor's answer to <see cref="RequestDroppedBytesAsync"/>. What

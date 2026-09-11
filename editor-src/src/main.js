@@ -26,7 +26,7 @@ import { SEPARATOR } from './spell-separator.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
-import { readHeads, readFull, planDroppedRead } from './file-drop.js';
+import { readHeads, readFull, planDroppedRead, postAnswer } from './file-drop.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 
 import {
@@ -221,14 +221,22 @@ let editor = null;
 let editorView = null;
 let suppressChange = false;
 
+// Returns whether the message actually went. Almost every caller ignores that —
+// a 'change' or 'contextmenu' the host missed is not worth a second thought — but
+// the drop handshake does not: the host BLOCKS on the droppedFileBytes message,
+// and an oversized payload (about 85 MB of base64 at the 64 MB picture ceiling) is
+// exactly the kind the bridge refuses. Swallowing that failure left the host
+// waiting with nothing on screen to say why. See postAnswer in file-drop.js.
 function postToHost(message) {
   try {
     if (window.chrome && window.chrome.webview) {
       window.chrome.webview.postMessage(message);
+      return true;
     }
   } catch (_) {
-    /* host bridge not present (e.g. running in a plain browser) */
+    /* the bridge refused the message — an oversized payload, or a dead WebView */
   }
+  return false;   // also the plain-browser case: there is no host to hear it
 }
 
 // Apply / remove print-only body classes precisely during print rendering.
@@ -697,13 +705,15 @@ const MDM = {
    * ExecuteScriptAsync does not await a promise — it would serialise this one as
    * {} and the host would be handed nothing.
    *
-   * It ALWAYS posts exactly once, whatever happens: a stale drop, an index that
-   * isn't in the drop, a read that fails, or a throw on the way. The host is
-   * waiting on this message, so a silent return would leave the drop hanging with
-   * nothing on screen to say why.
+   * It always ANSWERS, whatever happens: a stale drop, an index that isn't in the
+   * drop, a read that fails, or a throw on the way. What it cannot promise is that
+   * the answer arrives — the bridge can refuse a message, and an answer carrying a
+   * picture at the host's ceiling is about 85 MB of base64. postAnswer follows a
+   * refused payload with a small message saying so; if that is refused too the
+   * bridge is gone, and the host's own timeout is what ends the wait.
    */
   readDroppedFiles(drop, indices) {
-    const answer = (files) => postToHost({ type: 'droppedFileBytes', drop, files });
+    const answer = (files) => postAnswer(postToHost, drop, files);
     // Which drop this is about, and what it really asks for: planDroppedRead, which
     // is where that decision is tested (file-drop.js). A stale request — the user
     // dropped again while the host was routing — answers null for every index it

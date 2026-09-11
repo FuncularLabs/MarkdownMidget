@@ -36,7 +36,10 @@ changes between alpha tags.
   naming it — the document you have open is never replaced. Several pictures
   are inserted in the order dropped; a markdown file dropped with them is not
   opened. A markdown file dropped on the formatted view now also keeps its
-  byte-order mark, as one opened with File ▸ Open does. **Note:** a *text* file
+  byte-order mark, as one opened with File ▸ Open does. Dropping again before a
+  drop has finished replaces it rather than mixing the two, and a drop on the
+  formatted view that gets no answer back from the editor within a few seconds
+  says so in the status bar instead of waiting. **Note:** a *text* file
   without a markdown or `.txt` extension — `notes.json`, `app.log`, `Program.cs`
   — used to open when dropped and is now refused; the drop route is the only one
   that insists on a markdown or text extension, so those files still open

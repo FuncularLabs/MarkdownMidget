@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -230,6 +231,67 @@ public class DropHandshakeTests
         var decision = DropHandshake.Unreadable([0, 2]);
         Assert.Equal(DropReply.Refuse, decision.Outcome);
         Assert.Equal([0, 2], decision.Missing);
+    }
+
+    // ===== NF-3: the wait is bounded =====
+
+    [Fact]
+    public void TheWaitIsTenSecondsPlusASecondForEveryEightMegabytesAskedFor()
+    {
+        // The editor claims to answer always, and cannot quite promise it: the answer
+        // crosses the bridge as ONE message — about 85 MB of base64 at the 64 MB
+        // ceiling — and a post that fails there is a post the host never hears about.
+        // So the wait is bounded, and the bound scales with what was asked for: long
+        // enough that a big picture off a slow disk is not cut off, short enough to be
+        // a pause rather than a hang.
+        Assert.Equal(TimeSpan.FromSeconds(10), DropHandshake.ReadTimeout(0));
+        Assert.Equal(TimeSpan.FromSeconds(11), DropHandshake.ReadTimeout(8 * 1024 * 1024));
+        Assert.Equal(TimeSpan.FromSeconds(18), DropHandshake.ReadTimeout(64 * 1024 * 1024));
+        // At the ceiling the wait is 18 s, and that is the longest it can be for one
+        // picture — the ceiling is what stops it growing without limit.
+        Assert.Equal(TimeSpan.FromSeconds(18), DropHandshake.ReadTimeout(DropRouting.MaxPictureBytes));
+        // A nonsense total does not shorten it below the floor.
+        Assert.Equal(TimeSpan.FromSeconds(10), DropHandshake.ReadTimeout(-500));
+    }
+
+    [Fact]
+    public void TheWaitIsSizedFromTheFilesActuallyAskedFor()
+    {
+        var files = new List<DroppedFile>
+        {
+            new("small.png", Png, 8 * 1024 * 1024),
+            new("skip.png", Png, 64 * 1024 * 1024),
+            new("also.png", Png, 8 * 1024 * 1024),
+        };
+        // Only the chosen indices count, and a duplicate counts once.
+        Assert.Equal(16L * 1024 * 1024, DropHandshake.BytesRequested(files, [0, 2, 2]));
+        // An index that is not in the drop contributes nothing rather than throwing.
+        Assert.Equal(8L * 1024 * 1024, DropHandshake.BytesRequested(files, [0, 9, -1]));
+        Assert.Equal(0, DropHandshake.BytesRequested(files, []));
+    }
+
+    [Fact]
+    public void AFileWhoseSizeTheDropNeverStatedIsAssumedToBeTheLargestAllowed()
+    {
+        // -1 is "the message did not say". The editor always sends File.size, so this
+        // is the malformed case — and a missing field must not SHORTEN the wait for a
+        // file that could be anything up to the ceiling.
+        var files = new List<DroppedFile> { new("mystery.png", Png) };
+        Assert.Equal(DropRouting.MaxPictureBytes, DropHandshake.BytesRequested(files, [0]));
+    }
+
+    [Fact]
+    public void AReadThatNeverAnswersEndsInAVisibleOutcome()
+    {
+        // The finding: `await pending.Task` was unbounded, and main.js's claim that
+        // readDroppedFiles "ALWAYS posts exactly once" was not one postToHost could
+        // keep — it swallowed every failure in a bare catch. A drop that ends this way
+        // says so and gives the user the way round it.
+        var decision = DropHandshake.TimedOut([0, 1, 1]);
+        Assert.Equal(DropReply.TimedOut, decision.Outcome);
+        Assert.Equal([0, 1], decision.Missing);
+        Assert.Empty(decision.Bytes);
+        Assert.Equal("Couldn't read the dropped file(s) — try Insert ▸ Picture.", DropHandshake.TimedOutNotice);
     }
 
     // ===== what the user is told =====

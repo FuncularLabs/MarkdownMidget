@@ -121,6 +121,36 @@ export function planDroppedRead(dropSeq, drop, indices) {
 }
 
 /**
+ * Post one phase-two answer to the host, and say whether it got there.
+ *
+ * The host blocks on this exact message, so "posted nothing" is the one outcome
+ * that must not happen quietly — and it can: an answer carrying a picture at the
+ * host's 64 MB ceiling is about 85 MB of base64, which the bridge may simply
+ * refuse. `post` is postToHost, which reports false rather than throwing when the
+ * bridge rejects the message or isn't there at all.
+ *
+ * So a refused payload is followed by a SMALL one — same type, same drop, no files
+ * — which the host reads as "none of these could be had" and refuses rather than
+ * waits for. If that one is refused too the bridge itself is gone, nothing here can
+ * reach the host, and the host's own timeout is what ends the wait; this returns
+ * false to say so.
+ */
+export function postAnswer(post, drop, files) {
+  const send = (message) => {
+    try {
+      return post(message) !== false;
+    } catch (_) {
+      // A post that throws instead of reporting is still a post that did not go —
+      // and an exception escaping here would leave readDroppedFiles' promise
+      // rejected with the host hearing nothing at all.
+      return false;
+    }
+  };
+  return send({ type: 'droppedFileBytes', drop, files })
+    || send({ type: 'droppedFileBytes', drop, files: null, error: 'post-failed' });
+}
+
+/**
  * Phase two: the full bytes of the files the host chose, by their index in the
  * phase-one array.
  *

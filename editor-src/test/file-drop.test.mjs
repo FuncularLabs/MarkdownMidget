@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readBase64, readHeads, readFull, planDroppedRead, HEAD_BYTES } from '../src/file-drop.js';
+import { readBase64, readHeads, readFull, planDroppedRead, postAnswer, HEAD_BYTES } from '../src/file-drop.js';
 
 // A FileReader stand-in that takes the outcome it should produce. Real readers are
 // asynchronous, so these are too: a reader that called back synchronously would
@@ -231,4 +231,45 @@ test('planDroppedRead leaves an index that is not in the drop to readFull', asyn
   // the answer must carry an entry for every index the host asked about — including
   // the ones that name nothing — so it can tell "could not read" from "no answer".
   assert.deepEqual(planDroppedRead(1, 1, [0, 9, -1]), { stale: false, indices: [0, 9, -1] });
+});
+
+// ===== posting the answer (review finding NF-3)
+//
+// readDroppedFiles' comment claimed it "ALWAYS posts exactly once". postToHost
+// could not keep that promise: it wrapped chrome.webview.postMessage in a bare
+// catch, so a payload the bridge refuses — about 85 MB of base64 at the 64 MB
+// ceiling — meant no post at all, and the host waited forever. It now says whether
+// the post went, and a refused payload is followed by a small message that can.
+
+test('postAnswer posts the bytes once when the bridge takes them', async () => {
+  const sent = [];
+  assert.equal(postAnswer((m) => { sent.push(m); return true; }, 4, [{ index: 0, base64: 'AAA' }]), true);
+  assert.deepEqual(sent, [{ type: 'droppedFileBytes', drop: 4, files: [{ index: 0, base64: 'AAA' }] }]);
+});
+
+test('postAnswer follows a refused payload with a small failure message', async () => {
+  // The message the host has to hear: same type, same drop — so it matches the read
+  // being waited on — with no files, which the host reads as "none of these could be
+  // had" and refuses rather than waits for.
+  const sent = [];
+  // A bridge that refuses the payload carrying bytes and takes the small one.
+  const post = (m) => { sent.push(m); return m.files === null; };
+
+  assert.equal(postAnswer(post, 4, [{ index: 0, base64: 'x'.repeat(8) }]), true);
+
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent[1], { type: 'droppedFileBytes', drop: 4, files: null, error: 'post-failed' });
+});
+
+test('postAnswer reports that nothing got through when even the small message fails', async () => {
+  // The bridge itself is gone. Nothing here can help and nothing pretends to: the
+  // host's timeout is what ends that wait.
+  assert.equal(postAnswer(() => false, 4, [{ index: 0, base64: 'AAA' }]), false);
+});
+
+test('postAnswer does not retry a post that threw rather than returned', async () => {
+  // postToHost catches its own throw and reports false; a post function that throws
+  // outright must not escape into readDroppedFiles' promise, where the host would
+  // hear nothing at all.
+  assert.equal(postAnswer(() => { throw new Error('bridge gone'); }, 4, []), false);
 });

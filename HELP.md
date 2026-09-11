@@ -392,6 +392,14 @@ line with `--readonly`.
   - Drop pictures and a markdown file **together** and the pictures are inserted;
     the markdown file is not opened (the status bar says so) — drop it on its own
     to open it.
+  - **If a dropped file can't be read**, the status bar names it and *none* of the
+    drop's pictures go in — the same all-or-nothing you get if a file goes away
+    mid-drop. On the **formatted editing area** the bytes have to come back from
+    the editor, so a drop that gets no answer within a few seconds (a page that has
+    stopped responding, or a picture too large for one message) ends with
+    "Couldn't read the dropped file(s) — try Insert ▸ Picture" rather than waiting.
+  - **Drop again before a drop has finished** and the newer drop wins: the status
+    bar says the earlier one was replaced, and nothing from it is inserted.
 
   You can also pass a file path (and optional `--readonly`) on the command line.
 - **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,
