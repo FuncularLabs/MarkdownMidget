@@ -3847,14 +3847,13 @@ public partial class MainWindow : Window
         if (picked is null) return;
 
         var alt = Path.GetFileNameWithoutExtension(picked);
-        string uri;
+        string md;
         try
         {
-            // Embed the image as a base64 data URI so it renders inside the
-            // sandboxed WebView (which can't load local file: paths) and travels
-            // with the markdown. This bloats the document by design.
+            // Embedded as a base64 data URI — ImageMarkdown says why, and a picture
+            // pasted into the source view takes the same shape from the same place.
             var bytes = await File.ReadAllBytesAsync(picked);
-            uri = $"data:{MimeForImage(picked)};base64,{Convert.ToBase64String(bytes)}";
+            md = ImageMarkdown.Fragment(alt, MimeForImage(picked), bytes);
         }
         catch (Exception ex)
         {
@@ -3862,7 +3861,7 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        InsertMarkdownFragment($"![{alt}]({uri})");
+        InsertMarkdownFragment(md);
     }
 
     private static string MimeForImage(string path) => Path.GetExtension(path).ToLowerInvariant() switch

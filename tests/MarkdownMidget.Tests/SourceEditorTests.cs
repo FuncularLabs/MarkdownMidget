@@ -1,7 +1,9 @@
 using System;
 using System.Threading;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MarkdownMidget.Source;
 using Xunit;
@@ -254,5 +256,161 @@ public class SourceEditorTests
         Assert.Equal("first", l0);
         Assert.Equal("second", l1);
         Assert.Equal("", outOfRange);
+    }
+
+    // ===== 2. pasting a picture (#7) =====
+    //
+    // AvalonEdit's paste is text-only, so an image on the clipboard used to insert
+    // nothing. The editor's TryPasteImage is the seam: it takes an IDataObject, so
+    // these build one in memory and never touch the real clipboard. The last case
+    // drives the actual Paste command through the injected clipboard read, which is
+    // what proves the command is enabled at all for an image-only clipboard —
+    // AvalonEdit's own CanPaste says no to anything without text.
+
+    private const string PngPrefix = "![](data:image/png;base64,";
+
+    /// <summary>A 2×2 opaque bitmap: the smallest thing the PNG encoder will take.
+    /// Built on the calling (STA) thread, as a DispatcherObject must be.</summary>
+    private static BitmapSource TinyBitmap()
+    {
+        var wb = new WriteableBitmap(2, 2, 96, 96, PixelFormats.Bgra32, null);
+        var pixels = new byte[16];
+        for (var i = 0; i < pixels.Length; i += 4) { pixels[i] = 0x10; pixels[i + 1] = 0x80; pixels[i + 2] = 0xF0; pixels[i + 3] = 0xFF; }
+        wb.WritePixels(new Int32Rect(0, 0, 2, 2), pixels, 8, 0);
+        return wb;
+    }
+
+    /// <summary>A data object carrying only an image — what a screenshot leaves on
+    /// the clipboard.</summary>
+    private static DataObject ImageOnly()
+    {
+        var d = new DataObject();
+        d.SetImage(TinyBitmap());
+        return d;
+    }
+
+    [Fact]
+    public void ImagePasteInsertsDataUri()
+    {
+        var (handled, after, caret, restored) = On(ed =>
+        {
+            ed.Select(4, 3);                                  // "def"
+            var h = ed.TryPasteImage(ImageOnly());
+            var text = ed.Text;
+            var c = ed.CaretOffset;
+            ed.Undo();
+            return (h, text, c, ed.Text);
+        }, "abc def", laidOut: false);
+
+        Assert.True(handled);
+        Assert.StartsWith("abc " + PngPrefix, after);
+        Assert.EndsWith(")", after);
+        Assert.DoesNotContain("def", after);                 // the selection was replaced
+        // The payload is a real PNG, not the bitmap's bytes: check the signature.
+        var payload = Convert.FromBase64String(after[("abc " + PngPrefix).Length..^1]);
+        Assert.Equal(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G' }, payload[..4]);
+        Assert.Equal(after.Length, caret);                   // caret after the picture, like a text paste
+        Assert.Equal("abc def", restored);                   // ONE undo takes the whole paste back
+    }
+
+    [Fact]
+    public void TextPasteIsUntouched()
+    {
+        var (textOnly, textAndImage, after) = On(ed =>
+        {
+            var text = new DataObject(DataFormats.UnicodeText, "plain");
+            var both = ImageOnly();
+            both.SetText("caption");                          // a browser copy: picture AND text
+            return (ed.TryPasteImage(text), ed.TryPasteImage(both), ed.Text);
+        }, "abc", laidOut: false);
+
+        Assert.False(textOnly);
+        Assert.False(textAndImage);
+        Assert.Equal("abc", after);
+    }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, false)]
+    public void ShouldHandleOnlyAnImageWithoutText(bool hasText, bool hasImage, bool expected) =>
+        Assert.Equal(expected, ImagePaste.ShouldHandle(hasText, hasImage));
+
+    [Fact]
+    public void MarkdownForIsTheSameShapeAsInsertPicture()
+    {
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var md = ImagePaste.MarkdownFor(png);
+
+        // Insert ▸ Picture builds its fragment through the same helper; a pasted
+        // image is that fragment with no name to put in the alt text...
+        Assert.Equal(ImageMarkdown.Fragment("", "image/png", png), md);
+        // ...and the helper's shape is the one documents have always carried.
+        Assert.Equal($"![](data:image/png;base64,{Convert.ToBase64String(png)})", md);
+    }
+
+    [Fact]
+    public void EncodePngProducesAPng()
+    {
+        var bytes = On(_ => ImagePaste.EncodePng(TinyBitmap()), "", laidOut: false);
+        Assert.True(bytes.Length > 8, "an encoded PNG has a signature and chunks");
+        Assert.Equal(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G' }, bytes[..4]);
+    }
+
+    [Fact]
+    public void ReadOnlyIgnoresImagePaste()
+    {
+        var (handled, after) = On(ed =>
+        {
+            ed.IsReadOnly = true;
+            return (ed.TryPasteImage(ImageOnly()), ed.Text);
+        }, "abc", laidOut: false);
+
+        Assert.False(handled);
+        Assert.Equal("abc", after);
+    }
+
+    [Fact]
+    public void PasteCommandRoutesAnImageIntoTheEditor()
+    {
+        // The real route: TextEditor.Paste() executes the Paste command against the
+        // TextArea (no CanExecute first - the menu route runs straight to Executed,
+        // which tunnels down through the editor on its way there). This test proves
+        // the PreviewExecuted hook; the PreviewCanExecute hook, which only the key
+        // gestures consult, is PasteCommandIsEnabledForAnImageOnlyClipboard's job.
+        // Laid out, so the TextArea sits inside the editor's template as it does in
+        // the app. Only the clipboard read is substituted.
+        var after = On(ed =>
+        {
+            ed.ClipboardSource = () => ImageOnly();
+            ed.CaretOffset = 3;
+            ed.Paste();
+            return ed.Text;
+        }, "abc", laidOut: true);
+
+        Assert.StartsWith("abc" + PngPrefix, after);
+        Assert.EndsWith(")", after);
+    }
+
+    [Fact]
+    public void PasteCommandIsEnabledForAnImageOnlyClipboard()
+    {
+        // AvalonEdit enables Paste only when the clipboard has text, so this is the
+        // assertion that the editor's own CanExecute hook is wired and load-bearing.
+        // Asked of the editor (not the TextArea), the route never reaches AvalonEdit's
+        // binding, which keeps the answer independent of the real clipboard — so
+        // the text-only case must come back false from OUR hook declining, too.
+        var (image, text) = On(ed =>
+        {
+            ed.ClipboardSource = () => ImageOnly();
+            var forImage = ApplicationCommands.Paste.CanExecute(null, ed);
+            ed.ClipboardSource = () => new DataObject(DataFormats.UnicodeText, "plain");
+            var forText = ApplicationCommands.Paste.CanExecute(null, ed);
+            return (forImage, forText);
+        }, "abc", laidOut: false);
+
+        Assert.True(image);
+        Assert.False(text);
     }
 }
