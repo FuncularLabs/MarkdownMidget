@@ -505,23 +505,75 @@ public class SourceEditorTests
         Assert.Equal(opaque, pasted);
     }
 
+    /// <summary>Paste <paramref name="bgra"/>, a 3×2 picture, the way a screenshot
+    /// arrives (a 32-bit DIB that WPF reads back), and return the pasted PNG's
+    /// pixels.</summary>
+    private static byte[] PasteDib(byte[] bgra) => On(ed =>
+    {
+        var data = new DataObject();
+        data.SetImage(ClipboardFixtures.Dib(3, 2, bgra));
+        Assert.True(ed.TryPasteImage(data));
+        return DecodeToBgra(PastedBytes(ed.Text, ""));
+    }, "", laidOut: false);
+
+    /// <summary><paramref name="bgra"/> with full alpha on every pixel and the colour
+    /// untouched: what a picture made opaque decodes to.</summary>
+    private static byte[] Opaque(byte[] bgra)
+    {
+        var opaque = (byte[])bgra.Clone();
+        for (var i = 3; i < opaque.Length; i += 4) opaque[i] = 0xFF;
+        return opaque;
+    }
+
     [Fact]
     public void PastedPictureWithRealTransparencyKeepsItsAlpha()
     {
-        // Alpha that is not zero everywhere is real alpha, and it survives exactly,
-        // the zero pixels included (a rule of "any zero means padding" would have
-        // made those opaque).
-        byte[] alphas = [0x00, 0x40, 0x80, 0xC0, 0xFF, 0x00];
-        var picture = Bgra(6, i => alphas[i]);
-        var pasted = On(ed =>
-        {
-            var data = new DataObject();
-            data.SetImage(ClipboardFixtures.Dib(3, 2, picture));
-            Assert.True(ed.TryPasteImage(data));
-            return DecodeToBgra(PastedBytes(ed.Text, ""));
-        }, "", laidOut: false);
+        // Real alpha survives exactly: every colour byte at or below its pixel's
+        // alpha (valid premultiplied, which Chromium keeps too), the transparent
+        // pixels black, alpha from 0 to 255, and several colour bytes equal to their
+        // alpha, where "above" and "at or above" part company.
+        byte[] picture =
+        [
+            0x00, 0x00, 0x00, 0x00,   0x10, 0x40, 0x20, 0x40,   0x80, 0x00, 0x7F, 0x80,
+            0x30, 0xC0, 0x60, 0xC0,   0xFF, 0x80, 0x10, 0xFF,   0x00, 0x00, 0x00, 0x00,
+        ];
+        Assert.Equal(picture, PasteDib(picture));
+    }
 
-        Assert.Equal(picture, pasted);
+    [Fact]
+    public void PastedScreenshotWithAStrayAlphaByteIsOpaque()
+    {
+        // A screenshot whose padding byte is 0 on every pixel but one, which holds 1.
+        // One stray byte is not transparency: Chromium makes the picture opaque (colour
+        // above an alpha of 0 shows the fourth byte is not alpha), so the source view
+        // must too, or the formatted view shows the screenshot and this one a blank.
+        var shot = Bgra(6, i => i == 5 ? (byte)0x01 : (byte)0x00);
+        Assert.Equal(Opaque(shot), PasteDib(shot));
+    }
+
+    [Fact]
+    public void PastedPictureBlackAndTransparentEverywhereStaysTransparent()
+    {
+        // Black and alpha 0 on every pixel: no colour is above its alpha, so Chromium
+        // keeps the transparency (its own comment names this as the case its test gets
+        // wrong), and the source view does the same, so both views paste the same
+        // picture rather than one of them showing a black box.
+        var black = new byte[6 * 4];
+        Assert.Equal(black, PasteDib(black));
+    }
+
+    [Fact]
+    public void PastedStraightAlphaPictureWithColourAboveItsAlphaIsFlattened()
+    {
+        // A straight-alpha picture at half opacity, its colour well above its alpha.
+        // WPF labels it Bgra32, straight alpha, but the clipboard route cannot tell
+        // straight from premultiplied (a 32-bit DIB carries no flag saying which), and
+        // Chromium reads the bytes as premultiplied, finds colour above alpha, and makes
+        // the picture opaque. I2 asks for the formatted view's result, so this view
+        // flattens it too, the colour kept exactly, rather than keep a transparency the
+        // other view throws away.
+        var halfOpaque = Bgra(6, _ => 0x80);
+        Assert.Equal(Opaque(halfOpaque), PasteDib(halfOpaque));
     }
 
     [Theory]
@@ -791,9 +843,11 @@ public class SourceEditorTests
     [InlineData("Prgba128Float")]
     public void ForEncodingMakesAllZeroAlphaOpaqueAndKeepsTheColour(string name)
     {
-        // Alpha zero on every pixel is a padding byte, not transparency (Chromium's
-        // rule), in every format with an alpha channel: the colour channels come out
-        // exactly as they went in, the alpha is full, and the format is unchanged.
+        // Alpha zero on every pixel and colour on every pixel: opaque in every format
+        // with an alpha channel, the colour channels exactly as they went in, the
+        // alpha full, the format unchanged. In Bgra32 and Pbgra32 that is Chromium's
+        // test at work (colour above an alpha of 0); in the four wide formats it is
+        // the all-zero rule ForEncoding keeps for them.
         var (format, size, _, width) = AlphaFormat(name);
         var source = AlphaPixels(name, _ => 0);
         var (same, outFormat, result) = On(_ =>
@@ -810,20 +864,101 @@ public class SourceEditorTests
         Assert.Equal(AlphaPixels(name, _ => FullAlpha(width)), result);
     }
 
+    /// <summary>ForEncoding of a 2×2 bitmap in <paramref name="format"/>, whose pixels
+    /// are <paramref name="size"/> bytes each: whether it came back as the same
+    /// instance, its format, and its pixels.</summary>
+    private static (bool Same, PixelFormat Format, byte[] Pixels) Prepared(PixelFormat format, int size, byte[] pixels) =>
+        On(_ =>
+        {
+            var image = BitmapSource.Create(2, 2, 96, 96, format, null, pixels, 2 * size);
+            var prepared = ImagePaste.ForEncoding(image);
+            var bytes = new byte[4 * size];
+            prepared.CopyPixels(bytes, 2 * size, 0);
+            return (ReferenceEquals(prepared, image), prepared.Format, bytes);
+        }, "", laidOut: false);
+
     [Theory]
-    [InlineData("Bgra32", 0x01u)]
-    [InlineData("Bgra32", 0x80u)]
-    [InlineData("Pbgra32", 0x01u)]
+    [InlineData("Bgra32", 0x01)]
+    [InlineData("Bgra32", 0x80)]
+    [InlineData("Pbgra32", 0x01)]
+    public void ForEncodingMakesAStrayAlphaByteOpaque(string name, byte stray)
+    {
+        // Bgra32 and Pbgra32 are judged by Chromium's test: colour above an alpha of 0
+        // on the first three pixels shows the fourth byte is not alpha, whatever the
+        // last pixel's holds. Opaque, the colour kept, the format unchanged.
+        var (format, size, _, _) = AlphaFormat(name);
+        var (same, outFormat, result) = Prepared(format, size, AlphaPixels(name, p => p == 3 ? stray : 0u));
+
+        Assert.False(same);
+        Assert.Equal(format, outFormat);
+        Assert.Equal(AlphaPixels(name, _ => 0xFFu), result);
+    }
+
+    [Theory]
+    [InlineData("Bgra32", 0)]
+    [InlineData("Bgra32", 1)]
+    [InlineData("Bgra32", 2)]
+    [InlineData("Pbgra32", 0)]
+    [InlineData("Pbgra32", 1)]
+    [InlineData("Pbgra32", 2)]
+    public void ForEncodingMakesOpaqueWhenAnyOneColourByteIsAboveItsAlpha(string name, int channel)
+    {
+        // Blue, green or red: one byte one above its alpha, on the last pixel, after
+        // three pixels whose colour never exceeds their alpha (one transparent black,
+        // one with every colour byte equal to its alpha). That one byte is enough,
+        // whichever channel it is in, and the scan has to reach the last pixel to
+        // find it.
+        byte[] pixels = [0x00, 0x00, 0x00, 0x00, 0x40, 0x50, 0x60, 0x80, 0x80, 0x80, 0x80, 0x80, 0x40, 0x50, 0x60, 0x80];
+        pixels[12 + channel] = 0x81;
+        var (format, size, _, _) = AlphaFormat(name);
+        var (same, outFormat, result) = Prepared(format, size, pixels);
+
+        Assert.False(same);
+        Assert.Equal(format, outFormat);
+        Assert.Equal(Opaque(pixels), result);
+    }
+
+    [Theory]
+    [InlineData("Pbgra32")]
+    [InlineData("Bgra32")]
+    public void ForEncodingLeavesValidPremultipliedAlphaAlone(string name)
+    {
+        // Every colour byte at or below its alpha, alpha 0, 0x40, 0x80 and 0xFE: valid
+        // premultiplied, as Chromium reads the bytes, so Chromium keeps it and the
+        // bitmap comes back as it is, the same instance. Several colour bytes equal
+        // their alpha, where "above" and "at or above" part company.
+        byte[] pixels = [0x00, 0x00, 0x00, 0x00, 0x40, 0x20, 0x10, 0x40, 0x7F, 0x80, 0x01, 0x80, 0xFE, 0x01, 0xFE, 0xFE];
+        var (format, size, _, _) = AlphaFormat(name);
+        Assert.True(Prepared(format, size, pixels).Same);
+    }
+
+    [Theory]
+    [InlineData("Bgra32")]
+    [InlineData("Pbgra32")]
+    public void ForEncodingLeavesABitmapBlackAndTransparentEverywhereAlone(string name)
+    {
+        // Every byte zero: no colour above its alpha, so Chromium's test keeps the
+        // transparency, and so does ForEncoding. (The all-zero rule, which the wide
+        // formats keep, would make it opaque black.)
+        var (format, size, _, _) = AlphaFormat(name);
+        Assert.True(Prepared(format, size, new byte[4 * size]).Same);
+    }
+
+    [Theory]
     [InlineData("Rgba64", 0x0001u)]           // only the low byte of the 16-bit alpha
     [InlineData("Rgba64", 0x0100u)]           // only the high byte
     [InlineData("Prgba64", 0x0001u)]
     [InlineData("Rgba128Float", 0x00000001u)] // the smallest float above zero
     [InlineData("Rgba128Float", 0x3F800000u)] // 1.0: only the top two bytes set
     [InlineData("Prgba128Float", 0x00000001u)]
-    public void ForEncodingLeavesAnyNonZeroAlphaAlone(string name, uint alphaBits)
+    public void ForEncodingLeavesAnyNonZeroAlphaAloneInTheWideFormats(string name, uint alphaBits)
     {
-        // Real alpha on one pixel, however faint, and on the last pixel so the whole
-        // bitmap is scanned first: it is left exactly as it is, the same instance.
+        // The wide formats (16 bits or a float a channel), which no clipboard DIB
+        // arrives in, keep the conservative all-zero rule. Real alpha on one pixel,
+        // however faint, and on the last pixel so the whole bitmap is scanned first:
+        // the bitmap is left exactly as it is, the same instance, although the other
+        // three pixels have colour above an alpha of 0. (Chromium's test, which is not
+        // applied to these formats, would flatten it.)
         var (format, size, _, _) = AlphaFormat(name);
         var same = On(_ =>
         {
@@ -866,8 +1001,9 @@ public class SourceEditorTests
     [InlineData("Prgba128Float")]
     public void EncodePngOfAnAllZeroAlphaBitmapIsOpaque(string name)
     {
-        // EncodePng applies the rule itself, whatever the format: every pixel of the
-        // PNG it writes reads back fully opaque.
+        // EncodePng applies ForEncoding itself, whatever the format: from a bitmap
+        // with colour and alpha 0 on every pixel, every pixel of the PNG it writes
+        // reads back fully opaque.
         var (format, size, _, _) = AlphaFormat(name);
         var decoded = On(_ => DecodeToBgra(ImagePaste.EncodePng(
             BitmapSource.Create(2, 2, 96, 96, format, null, AlphaPixels(name, _ => 0), 2 * size))),
@@ -893,32 +1029,51 @@ public class SourceEditorTests
     }
 
     [Fact]
-    public void AlphaIsAllZeroReadsOnlyTheAlphaChannel()
+    public void MustBeMadeOpaqueComparesEachColourByteWithItsAlphaInBgra32AndPbgra32()
     {
-        // Colour does not count; one alpha byte anywhere does, first pixel or last.
-        byte[] colourOnly = [0x10, 0x20, 0x30, 0x00, 0xFF, 0xFF, 0xFF, 0x00];
-        byte[] firstHasAlpha = [0x10, 0x20, 0x30, 0x01, 0xFF, 0xFF, 0xFF, 0x00];
-        byte[] lastHasAlpha = [0x10, 0x20, 0x30, 0x00, 0xFF, 0xFF, 0xFF, 0x01];
-
-        Assert.True(ImagePaste.AlphaIsAllZero(colourOnly, PixelFormats.Bgra32));
-        Assert.True(ImagePaste.AlphaIsAllZero(colourOnly, PixelFormats.Pbgra32));
-        Assert.False(ImagePaste.AlphaIsAllZero(firstHasAlpha, PixelFormats.Bgra32));
-        Assert.False(ImagePaste.AlphaIsAllZero(lastHasAlpha, PixelFormats.Bgra32));
-        // A format without alpha has none to be zero: Bgr32's fourth byte is padding.
-        Assert.False(ImagePaste.AlphaIsAllZero(colourOnly, PixelFormats.Bgr32));
+        // Chromium's test, byte for byte: a blue, green or red byte above its pixel's
+        // alpha, on any pixel, first or last, and the answer is opaque; a colour byte
+        // equal to its alpha is not above it.
+        byte[] screenshot = [0x10, 0x20, 0x30, 0x00, 0xFF, 0xFF, 0xFF, 0x00];   // alpha zero everywhere
+        byte[] strayByte = [0x10, 0x20, 0x30, 0x01, 0xFF, 0xFF, 0xFF, 0x00];    // one alpha byte of 1
+        byte[] lastRed = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x81, 0x80];      // one red byte one above, last pixel
+        byte[] black = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];        // black and transparent
+        byte[] atAlpha = [0x40, 0x40, 0x40, 0x40, 0xFF, 0xFF, 0xFF, 0xFF];      // every colour byte equal to its alpha
+        foreach (var format in new[] { PixelFormats.Bgra32, PixelFormats.Pbgra32 })
+        {
+            Assert.True(ImagePaste.MustBeMadeOpaque(screenshot, format));
+            Assert.True(ImagePaste.MustBeMadeOpaque(strayByte, format));
+            Assert.True(ImagePaste.MustBeMadeOpaque(lastRed, format));
+            Assert.False(ImagePaste.MustBeMadeOpaque(black, format));
+            Assert.False(ImagePaste.MustBeMadeOpaque(atAlpha, format));
+        }
+        // A format without alpha has none to judge: Bgr32's fourth byte is padding.
+        Assert.False(ImagePaste.MustBeMadeOpaque(screenshot, PixelFormats.Bgr32));
     }
 
     [Fact]
-    public void AlphaIsAllZeroCountsNegativeZeroAsZero()
+    public void MustBeMadeOpaqueReadsOnlyTheAlphaInTheWideFormats()
+    {
+        // The all-zero rule: colour above an alpha of 0 does not count; one alpha
+        // anywhere, on the last pixel here, does.
+        var allZero = AlphaPixels("Rgba64", _ => 0u);
+        var lastHasAlpha = AlphaPixels("Rgba64", p => p == 3 ? 1u : 0u);
+
+        Assert.True(ImagePaste.MustBeMadeOpaque(allZero, PixelFormats.Rgba64));
+        Assert.False(ImagePaste.MustBeMadeOpaque(lastHasAlpha, PixelFormats.Rgba64));
+    }
+
+    [Fact]
+    public void MustBeMadeOpaqueCountsNegativeZeroAsZero()
     {
         // -0 is a zero alpha in the float formats although its sign bit is set; the
         // smallest negative float is not.
         var negativeZero = AlphaPixels("Rgba128Float", _ => 0x80000000u);
         var negativeTiny = AlphaPixels("Rgba128Float", p => p == 3 ? 0x80000001u : 0x80000000u);
 
-        Assert.True(ImagePaste.AlphaIsAllZero(negativeZero, PixelFormats.Rgba128Float));
-        Assert.True(ImagePaste.AlphaIsAllZero(negativeZero, PixelFormats.Prgba128Float));
-        Assert.False(ImagePaste.AlphaIsAllZero(negativeTiny, PixelFormats.Rgba128Float));
+        Assert.True(ImagePaste.MustBeMadeOpaque(negativeZero, PixelFormats.Rgba128Float));
+        Assert.True(ImagePaste.MustBeMadeOpaque(negativeZero, PixelFormats.Prgba128Float));
+        Assert.False(ImagePaste.MustBeMadeOpaque(negativeTiny, PixelFormats.Rgba128Float));
     }
 
     [Fact]

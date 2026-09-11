@@ -81,16 +81,20 @@ internal static class ImagePaste
     }
 
     /// <summary>
-    /// The bitmap to encode for <paramref name="image"/>. In a format with an alpha
-    /// channel, alpha that is zero on EVERY pixel is taken to mean opaque: the colour
-    /// is kept exactly and the alpha set to full. That is Chromium's rule, and the
-    /// reason the formatted view pastes a screenshot correctly: a screenshot tool
-    /// (Windows' Snipping Tool, for one) leaves a 32-bit BI_RGB DIB whose fourth byte
-    /// is padding, 0 on every pixel, and WPF reads it back as Bgra32 with that byte
-    /// as alpha, so encoding it as it stands gives a picture that is transparent
-    /// everywhere. A bitmap with any non-zero alpha, however faint and on however few
-    /// pixels, has real transparency and is returned as it is; so is a format without
-    /// an alpha channel (Bgr32, Bgr24, grey, indexed…).
+    /// The bitmap to encode for <paramref name="image"/>: <paramref name="image"/>
+    /// itself, or, when its alpha channel does not hold real alpha
+    /// (<see cref="MustBeMadeOpaque"/> decides), an opaque copy: the colour kept
+    /// exactly, the alpha set to full, the pixel format unchanged. A format without an
+    /// alpha channel (Bgr32, Bgr24, grey, indexed…) is returned as it is.
+    ///
+    /// This is what makes a pasted screenshot visible. A screenshot tool (Windows'
+    /// Snipping Tool, for one) leaves a 32-bit BI_RGB DIB whose fourth byte is
+    /// padding, 0 on every pixel, and WPF reads it back as Bgra32 with that byte as
+    /// alpha, so encoding it as it stands gives a picture that is transparent
+    /// everywhere. The formatted view pastes the same screenshot opaque because
+    /// Chromium tests the bitmap it reads from the clipboard, and
+    /// <see cref="MustBeMadeOpaque"/> applies that test to Bgra32, the format WPF
+    /// reads a 32-bit clipboard DIB back as, so the two views paste the same picture.
     ///
     /// Opaque is made by writing full alpha into a copy of the pixels, in the same
     /// format, and never by converting to a format without alpha: a conversion from a
@@ -103,7 +107,7 @@ internal static class ImagePaste
         var stride = checked(image.PixelWidth * slot.PixelBytes);
         var pixels = new byte[checked(stride * image.PixelHeight)];
         image.CopyPixels(pixels, stride, 0);
-        if (!AllZero(pixels, slot)) return image;
+        if (!MustBeMadeOpaque(pixels, image.Format)) return image;
         for (var p = slot.Offset; p < pixels.Length; p += slot.PixelBytes)
             slot.Full.CopyTo(pixels, p);
         var opaque = BitmapSource.Create(image.PixelWidth, image.PixelHeight, image.DpiX, image.DpiY,
@@ -113,15 +117,56 @@ internal static class ImagePaste
     }
 
     /// <summary>
-    /// Whether every pixel in <paramref name="pixels"/> (whole pixels in
-    /// <paramref name="format"/>, rows packed with no padding) has an alpha of zero.
-    /// False for a format without an alpha channel: whatever its spare bits hold,
-    /// they are not alpha. One pass, stopping at the first pixel with any alpha at
-    /// all. In the float formats −0 counts as zero.
+    /// Whether <paramref name="pixels"/> (whole pixels in <paramref name="format"/>,
+    /// rows packed with no padding) are to be encoded opaque because their alpha
+    /// channel does not hold real alpha. One pass, stopping at the first pixel that
+    /// settles the answer. False for a format without an alpha channel: whatever its
+    /// spare bits hold, they are not alpha.
+    ///
+    /// <para><b>Bgra32 and Pbgra32</b> are judged by Chromium's test: opaque when any
+    /// pixel has a blue, green or red byte greater than its alpha byte, otherwise left
+    /// alone. Bgra32 is the format WPF reads a 32-bit clipboard DIB back as; Pbgra32
+    /// has the same four bytes a pixel and is judged the same way. The test is cited
+    /// from Chromium's <c>ui/base/clipboard/clipboard_win.cc</c> (the
+    /// premultiplied-validity check, <c>BitmapHasInvalidPremultipliedColors</c>, which
+    /// Chromium applies to a 32-bit bitmap read from the clipboard); it has not been
+    /// observed in a running browser. Chromium's reasoning: Windows bitmaps with alpha
+    /// are premultiplied, and a premultiplied colour never exceeds its alpha, so a
+    /// colour that does shows the fourth byte is not alpha. The scan stops at the
+    /// first such pixel. The bytes are judged that way whichever of the two formats
+    /// WPF labels them, because a clipboard DIB carries no flag saying straight or
+    /// premultiplied: a straight-alpha picture whose colour exceeds its alpha is
+    /// flattened, as Chromium flattens it. A bitmap that is black and alpha 0 on every
+    /// pixel has no colour above its alpha and stays transparent; Chromium's own
+    /// comment names that as the case its test gets wrong, and it is matched here
+    /// rather than improved on, so the two views agree.</para>
+    ///
+    /// <para><b>Rgba64, Prgba64, Rgba128Float and Prgba128Float</b>, which a clipboard
+    /// DIB never arrives in (a DIB has at most 32 bits a pixel), keep a conservative
+    /// rule that is not Chromium's: opaque only when the alpha is zero on every pixel,
+    /// the colour not looked at, which makes opaque only a bitmap that would otherwise
+    /// be invisible. The scan stops at the first pixel with any alpha at all. In the
+    /// float formats −0 counts as zero.</para>
     /// </summary>
-    public static bool AlphaIsAllZero(ReadOnlySpan<byte> pixels, PixelFormat format) =>
-        AlphaSlotOf(format) is { } slot && AllZero(pixels, slot);
+    public static bool MustBeMadeOpaque(ReadOnlySpan<byte> pixels, PixelFormat format) =>
+        AlphaSlotOf(format) is { } slot
+        && (slot.ByChromiumsTest ? AnyColourAboveAlpha(pixels) : AllZero(pixels, slot));
 
+    /// <summary>Chromium's test on Bgra32 or Pbgra32 bytes (blue, green, red, alpha):
+    /// whether any pixel has a colour byte greater than its alpha byte. Stops at the
+    /// first pixel that has.</summary>
+    private static bool AnyColourAboveAlpha(ReadOnlySpan<byte> pixels)
+    {
+        for (var p = 0; p + 3 < pixels.Length; p += 4)
+        {
+            var alpha = pixels[p + 3];
+            if (pixels[p] > alpha || pixels[p + 1] > alpha || pixels[p + 2] > alpha) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The all-zero rule, for the wide formats: whether every pixel's alpha
+    /// is zero. Stops at the first pixel with any alpha at all.</summary>
     private static bool AllZero(ReadOnlySpan<byte> pixels, AlphaSlot slot)
     {
         var top = slot.Width - 1;
@@ -138,14 +183,17 @@ internal static class ImagePaste
 
     /// <summary>Where a format keeps its alpha: bytes a pixel; the alpha's byte
     /// offset within the pixel and its width in bytes, little-endian; the mask for
-    /// its top byte; and full alpha's bytes.</summary>
-    private sealed record AlphaSlot(int PixelBytes, int Offset, int Width, int TopMask, byte[] Full);
+    /// its top byte; full alpha's bytes; and whether the format is judged by
+    /// Chromium's test (<see cref="AnyColourAboveAlpha"/>) rather than by the
+    /// all-zero rule (<see cref="AllZero"/>).</summary>
+    private sealed record AlphaSlot(int PixelBytes, int Offset, int Width, int TopMask, byte[] Full, bool ByChromiumsTest);
 
     // WPF's six formats with an alpha channel, in each of which the three colour
-    // channels come first and the alpha, as wide as each of them, last.
-    private static readonly AlphaSlot Alpha8 = new(4, 3, 1, 0xFF, [0xFF]);
-    private static readonly AlphaSlot Alpha16 = new(8, 6, 2, 0xFF, [0xFF, 0xFF]);
-    private static readonly AlphaSlot AlphaFloat = new(16, 12, 4, 0x7F, BitConverter.GetBytes(1f));
+    // channels come first and the alpha, as wide as each of them, last. A 32-bit
+    // clipboard DIB arrives as Bgra32; the wide formats never come from a DIB.
+    private static readonly AlphaSlot Alpha8 = new(4, 3, 1, 0xFF, [0xFF], ByChromiumsTest: true);
+    private static readonly AlphaSlot Alpha16 = new(8, 6, 2, 0xFF, [0xFF, 0xFF], ByChromiumsTest: false);
+    private static readonly AlphaSlot AlphaFloat = new(16, 12, 4, 0x7F, BitConverter.GetBytes(1f), ByChromiumsTest: false);
 
     private static AlphaSlot? AlphaSlotOf(PixelFormat format) =>
         format == PixelFormats.Bgra32 || format == PixelFormats.Pbgra32 ? Alpha8
