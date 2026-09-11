@@ -80,6 +80,13 @@ public partial class MainWindow : Window
     private System.Text.RegularExpressions.MatchCollection? _sourceFindMatches;
     private string _lastFindSource = "";
     private string _lastFindFlags = "";
+    private (int Start, int Length)? _sourceFindSelection;   // the selection Find/Replace last made in the source view
+    // The source selection as it was when the Find dialog opened, kept as anchors so
+    // it follows the replacements made through it: the Replace All scope once Find's
+    // own selection has taken the place of the user's. Any other edit drops it.
+    private (ICSharpCode.AvalonEdit.Document.TextAnchor Start, ICSharpCode.AvalonEdit.Document.TextAnchor End)? _sourceReplaceScope;
+    private bool _applyingReplace;      // our own source edits must not drop that scope
+    private bool _replaceScopeHooked;
 
     // External-change tracking for the currently-open file.
     private FileSystemWatcher? _watcher;
@@ -2699,17 +2706,62 @@ public partial class MainWindow : Window
         {
             _findDialog = new FindDialog { Owner = this };
             _findDialog.FindRequested += OnFindRequested;
+            _findDialog.ReplaceRequested += OnReplaceRequested;
+            _findDialog.SetReadOnly(_readOnly);
             _findDialog.Closed2 += (_, _) =>
             {
                 _findDialog = null;
                 _ = ClearWysiwygFindAsync();
                 _sourceFindMatches = null;
                 _sourceFindCursor = -1;
+                _sourceFindSelection = null;
+                _sourceReplaceScope = null;
             };
             _findDialog.Show();
         }
+        CaptureReplaceScope();
         _findDialog.FocusQuery();
     }
+
+    /// <summary>
+    /// Keep the selection as it is when Find opens (or is brought back with Ctrl+F)
+    /// for Replace All. Find moves the selection onto each match as the query is
+    /// typed, so by the time Replace All is pressed the selection the user made is
+    /// gone; this is it. A selection that is Find's own — the current match — is not
+    /// taken as a new range (what was kept stays, so Ctrl+F to bring the dialog back
+    /// changes nothing); a caret drops it. Source view: two anchors follow the range
+    /// through the replacements made here, and any other edit drops it. Formatted
+    /// view: the editor keeps it, under the same rules (find.js findCaptureScope).
+    /// </summary>
+    private void CaptureReplaceScope()
+    {
+        if (!_sourceMode)
+        {
+            if (_editorReady) _ = RunEditorAsync("window.MDM.findCaptureScope()");
+            return;
+        }
+        if (!_replaceScopeHooked)
+        {
+            _replaceScopeHooked = true;
+            SourceBox.TextEdited += (_, _, _) => { if (!_applyingReplace) _sourceReplaceScope = null; };
+        }
+        var start = SourceBox.SelectionStart;
+        var length = SourceBox.SelectionLength;
+        if (length <= 0) { _sourceReplaceScope = null; return; }   // deselected: nothing to keep
+        if (IsSourceFindSelection()) return;                        // Find's own: keep what was kept
+        var doc = SourceBox.Document;
+        var s = doc.CreateAnchor(start);
+        s.MovementType = ICSharpCode.AvalonEdit.Document.AnchorMovementType.BeforeInsertion;
+        s.SurviveDeletion = true;
+        var e = doc.CreateAnchor(start + length);
+        e.MovementType = ICSharpCode.AvalonEdit.Document.AnchorMovementType.AfterInsertion;
+        e.SurviveDeletion = true;
+        _sourceReplaceScope = (s, e);
+    }
+
+    /// <summary>Is the source selection the one Find (or Replace) last made?</summary>
+    private bool IsSourceFindSelection() =>
+        _sourceFindSelection is { } f && SourceBox.SelectionStart == f.Start && SourceBox.SelectionLength == f.Length;
 
     private void FindNextRequested(bool forward)
     {
@@ -2727,7 +2779,7 @@ public partial class MainWindow : Window
         {
             _findDialog?.SetStatus(string.IsNullOrEmpty(req.Query)
                 ? "Type to search."
-                : "Invalid pattern.");
+                : FindEngine.InvalidPatternMessage);
             return;
         }
 
@@ -2766,34 +2818,52 @@ public partial class MainWindow : Window
             if (_sourceFindCursor < 0) _sourceFindCursor = req.Wrap ? total - 1 : 0;
         }
 
-        var m = _sourceFindMatches[_sourceFindCursor];
+        SelectSourceMatch(_sourceFindMatches[_sourceFindCursor]);
+        _findDialog?.SetStatus($"Match {_sourceFindCursor + 1} of {total}");
+    }
+
+    private void SelectSourceMatch(System.Text.RegularExpressions.Match m)
+    {
         SourceBox.Select(m.Index, m.Length);
         SourceBox.ScrollToLine(SourceBox.GetLineIndexFromCharacterIndex(m.Index));
-        _findDialog?.SetStatus($"Match {_sourceFindCursor + 1} of {total}");
+        _sourceFindSelection = (m.Index, m.Length);
     }
 
     private async Task DoWysiwygFindAsync(System.Text.RegularExpressions.Regex regex, FindRequest req)
     {
         if (!_editorReady) return;
-        // Pass the regex source + flags to JS (which builds a JS RegExp from it).
+        await EnsureWysiwygIndexAsync(regex);
+        var dir = req.Forward ? "Next" : "Prev";
+        var result = await RunEditorAsync($"JSON.stringify(window.MDM.find{dir}({Js(req.Wrap)}))");
+        ReportFindResult(result, req);
+    }
+
+    /// <summary>
+    /// Pass the regex source + flags to JS (which builds a JS RegExp from it) when
+    /// the pattern OR options changed, so explicit Find Next / Find Previous advance
+    /// the match cursor rather than rebuilding from match 1. The editor keeps its
+    /// index and current match when asked for the same pattern on an unchanged
+    /// document, so re-issuing this after one of our own replacements — the change
+    /// message it raises clears the cache below — loses the place to nothing.
+    /// </summary>
+    private async Task EnsureWysiwygIndexAsync(System.Text.RegularExpressions.Regex regex)
+    {
         var flags = "g";
         if ((regex.Options & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0) flags += "i";
         if ((regex.Options & System.Text.RegularExpressions.RegexOptions.Multiline) != 0) flags += "m";
         var src = regex.ToString();
-
-        // Re-scan only when the pattern OR options change, so explicit Find Next /
-        // Find Previous advance the match cursor rather than rebuilding from match 1.
         if (src != _lastFindSource || flags != _lastFindFlags)
         {
             await RunEditorAsync($"window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)})");
             _lastFindSource = src;
             _lastFindFlags = flags;
         }
-
-        var dir = req.Forward ? "Next" : "Prev";
-        var result = await RunEditorAsync($"JSON.stringify(window.MDM.find{dir}({(req.Wrap ? "true" : "false")}))");
-        ReportFindResult(result, req);
     }
+
+    private static string Js(bool value) => value ? "true" : "false";
+
+    private static int JsonInt(JsonDocument d, string name) =>
+        d.RootElement.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 0;
 
     private void ReportFindResult(string? json, FindRequest req)
     {
@@ -2815,6 +2885,188 @@ public partial class MainWindow : Window
     {
         if (_editorReady)
             await RunEditorAsync("window.MDM.findClear()");
+    }
+
+    // ===== Replace (#5): the current match then the next, or every match as one undo step =====
+
+    private async void OnReplaceRequested(object? sender, ReplaceRequest req)
+    {
+        // The dialog greys its buttons while read-only; this is the gate on the
+        // request itself. A programmatic replace goes past AvalonEdit's IsReadOnly
+        // and the editor's editable flag alike, so nothing below may run read-only.
+        if (_readOnly)
+        {
+            _findDialog?.SetStatus("Read-only document — nothing replaced.");
+            return;
+        }
+
+        var find = req.Find;
+        var spec = FindEngine.Prepare(find.Query, find.Mode, find.MatchCase, find.WholeWord, req.Replacement);
+        if (spec is null)
+        {
+            // The refusal Find gives, and nothing has been applied.
+            _findDialog?.SetStatus(string.IsNullOrEmpty(find.Query)
+                ? "Type to search."
+                : FindEngine.InvalidPatternMessage);
+            return;
+        }
+
+        if (_sourceMode)
+        {
+            if (req.All) DoSourceReplaceAll(spec);
+            else DoSourceReplace(spec, find);
+        }
+        else if (req.All) await DoWysiwygReplaceAllAsync(spec);
+        else await DoWysiwygReplaceAsync(spec, find);
+    }
+
+    /// <summary>
+    /// Replace the current match — the one Find selected — and go on to the next.
+    /// With no current match, or the selection no longer on it (moved away, or the
+    /// text changed under it), this is Find Next, as the button promises.
+    /// </summary>
+    private void DoSourceReplace(FindEngine.ReplaceSpec spec, FindRequest req)
+    {
+        var text = SourceBox.Text;
+        var m = _sourceFindMatches is { } ms && _sourceFindCursor >= 0 && _sourceFindCursor < ms.Count
+            ? ms[_sourceFindCursor]
+            : null;
+        if (m is null || !IsSourceFindSelection() || m.Index + m.Length > text.Length
+            || !string.Equals(text.Substring(m.Index, m.Length), m.Value, StringComparison.Ordinal))
+        {
+            DoSourceFind(spec.Regex, req);
+            return;
+        }
+
+        var replacement = spec.ReplacementFor(m);
+        _applyingReplace = true;
+        try { SourceBox.Document.Replace(m.Index, m.Length, replacement); }
+        finally { _applyingReplace = false; }
+
+        // Search again from the end of the replacement — past it when the match was
+        // empty, or the same empty match would be found there again forever.
+        var resume = m.Index + replacement.Length;
+        var strictlyAfter = m.Length == 0;
+        _sourceFindMatches = spec.Regex.Matches(SourceBox.Text);
+        var total = _sourceFindMatches.Count;
+        _sourceFindCursor = -1;
+        for (var i = 0; i < total; i++)
+        {
+            var idx = _sourceFindMatches[i].Index;
+            if (strictlyAfter ? idx > resume : idx >= resume) { _sourceFindCursor = i; break; }
+        }
+        if (_sourceFindCursor < 0 && req.Wrap && total > 0) _sourceFindCursor = 0;
+        if (_sourceFindCursor < 0)
+        {
+            // AvalonEdit has moved the selection onto the replacement text; left
+            // there it would pass for a selection of the user's and scope the next
+            // Replace All to three characters. A caret after it instead.
+            SourceBox.Select(resume, 0);
+            _sourceFindSelection = null;
+            _findDialog?.SetStatus(total == 0 ? "Replaced. No more matches." : "Replaced. No further matches.");
+            return;
+        }
+        SelectSourceMatch(_sourceFindMatches[_sourceFindCursor]);
+        _findDialog?.SetStatus($"Replaced. Match {_sourceFindCursor + 1} of {total}");
+    }
+
+    private void DoSourceReplaceAll(FindEngine.ReplaceSpec spec)
+    {
+        var text = SourceBox.Text;
+        var wasFinds = IsSourceFindSelection();
+        var scope = SourceReplaceScope();
+        var edits = scope is { } s ? spec.ReplaceAllEdits(text, s.Start, s.Length) : spec.ReplaceAllEdits(text);
+        _applyingReplace = true;
+        int replaced;
+        try { replaced = SourceBox.ApplyEdits(edits); }
+        finally { _applyingReplace = false; }
+        // The match list describes the old text; the next Find rebuilds it.
+        _sourceFindMatches = null;
+        _sourceFindCursor = -1;
+        _sourceFindSelection = null;
+        if (wasFinds)
+        {
+            // Find's selection of a match is now that match's replacement, which
+            // would pass for the user's own next time. The kept range, selected
+            // outright, is what a second Replace All should work on; failing that,
+            // a caret.
+            if (scope is not null && _sourceReplaceScope is { } a && a.End.Offset > a.Start.Offset)
+                SourceBox.Select(a.Start.Offset, a.End.Offset - a.Start.Offset);
+            else
+                SourceBox.Select(SourceBox.SelectionStart, 0);
+        }
+        ReportReplaceAll(replaced, scope is not null, skipped: 0);
+    }
+
+    /// <summary>
+    /// The Replace All scope in the source view: selected text is the scope — unless
+    /// it is Find's own selection of the current match, in which case the selection
+    /// kept when the dialog opened is (<see cref="CaptureReplaceScope"/>). A caret,
+    /// or nothing kept, means the whole document.
+    /// </summary>
+    private (int Start, int Length)? SourceReplaceScope()
+    {
+        var length = SourceBox.SelectionLength;
+        if (length <= 0) return null;
+        if (!IsSourceFindSelection()) return (SourceBox.SelectionStart, length);
+        if (_sourceReplaceScope is { } a && a.End.Offset > a.Start.Offset)
+            return (a.Start.Offset, a.End.Offset - a.Start.Offset);
+        return null;
+    }
+
+    /// <summary>The count, in the status bar and in the dialog.</summary>
+    private void ReportReplaceAll(int replaced, bool inSelection, int skipped)
+    {
+        var where = inSelection ? " in the selection" : "";
+        var msg = replaced == 0
+            ? $"Nothing to replace{where}."
+            : $"Replaced {replaced} occurrence{(replaced == 1 ? "" : "s")}{where}.";
+        if (skipped > 0)
+            msg += $" {skipped} left alone: {(skipped == 1 ? "it spans" : "they span")} paragraphs.";
+        FlashStatus(msg);
+        _findDialog?.SetStatus(msg);
+    }
+
+    private async Task DoWysiwygReplaceAsync(FindEngine.ReplaceSpec spec, FindRequest req)
+    {
+        if (!_editorReady) return;
+        await EnsureWysiwygIndexAsync(spec.Regex);
+        var json = await RunEditorAsync(
+            $"JSON.stringify(window.MDM.findReplace({JsLiteral(spec.Replacement)}, {Js(spec.Literal)}, {Js(req.Wrap)}))");
+        if (string.IsNullOrEmpty(json)) { _findDialog?.SetStatus("No matches."); return; }
+        try
+        {
+            using var d = JsonDocument.Parse(json);
+            var replaced = JsonInt(d, "replaced");
+            var skipped = JsonInt(d, "skipped");
+            var total = JsonInt(d, "total");
+            var current = JsonInt(d, "current");
+            var place = total == 0 ? "No more matches."
+                      : current == 0 ? "No further matches."
+                      : $"Match {current} of {total}";
+            _findDialog?.SetStatus(
+                replaced > 0 ? $"Replaced. {place}"
+                : skipped > 0 ? $"Left alone — that match spans paragraphs. {place}"
+                : total == 0 ? "No matches found."
+                : place);
+        }
+        catch { _findDialog?.SetStatus("No matches."); }
+    }
+
+    private async Task DoWysiwygReplaceAllAsync(FindEngine.ReplaceSpec spec)
+    {
+        if (!_editorReady) return;
+        await EnsureWysiwygIndexAsync(spec.Regex);
+        var json = await RunEditorAsync(
+            $"JSON.stringify(window.MDM.findReplaceAll({JsLiteral(spec.Replacement)}, {Js(spec.Literal)}))");
+        if (string.IsNullOrEmpty(json)) { _findDialog?.SetStatus("No matches."); return; }
+        try
+        {
+            using var d = JsonDocument.Parse(json);
+            var inSelection = d.RootElement.TryGetProperty("inSelection", out var s) && s.ValueKind == JsonValueKind.True;
+            ReportReplaceAll(JsonInt(d, "replaced"), inSelection, JsonInt(d, "skipped"));
+        }
+        catch { _findDialog?.SetStatus("No matches."); }
     }
 
     // ===== Print + PDF export (per-page-width prefs, persisted) =====
@@ -3798,6 +4050,7 @@ public partial class MainWindow : Window
         _readOnly = on;
         MenuReadOnly.IsChecked = on;
         SourceBox.IsReadOnly = on;
+        _findDialog?.SetReadOnly(on);
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setEditable({(on ? "false" : "true")})");
 

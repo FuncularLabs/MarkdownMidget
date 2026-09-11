@@ -5,14 +5,26 @@ using System.Windows.Input;
 namespace MarkdownMidget;
 
 /// <summary>
-/// Modeless Find dialog. Raises <see cref="FindRequested"/> when the user
-/// triggers a search (Find Next / Find Previous / Enter / typing). The host
-/// runs the search and reports back via <see cref="SetStatus"/>.
+/// Modeless Find and Replace dialog. Raises <see cref="FindRequested"/> when the
+/// user triggers a search (Find Next / Find Previous / Enter / typing) and
+/// <see cref="ReplaceRequested"/> for Replace / Replace All. The host runs the
+/// search or replacement and reports back via <see cref="SetStatus"/>.
+///
+/// The window is created afresh each time Find is opened, so the last query and
+/// replacement are kept here, per process, and put back into the boxes.
 /// </summary>
 public partial class FindDialog : Window
 {
     public event EventHandler<FindRequest>? FindRequested;
+    public event EventHandler<ReplaceRequest>? ReplaceRequested;
     public event EventHandler? Closed2;
+
+    private static string s_lastQuery = "";
+    private static string s_lastReplacement = "";
+
+    private const string ReplaceTip = "The current match, then find the next";
+    private const string ReplaceAllTip = "Every match — within the selection when there is one — as one undo step";
+    private const string ReadOnlyTip = "The document is read-only.";
 
     public FindDialog()
     {
@@ -20,11 +32,20 @@ public partial class FindDialog : Window
         ModeExtended.ToolTip = FindEngine.ExtendedTooltip;
         ModeWildcards.ToolTip = FindEngine.WildcardsTooltip;
         ModeRegex.ToolTip = FindEngine.RegexTooltip;
+        // Before the host subscribes, so putting the text back raises no search.
+        QueryBox.Text = s_lastQuery;
+        ReplaceBox.Text = s_lastReplacement;
         Loaded += (_, _) => { QueryBox.Focus(); QueryBox.SelectAll(); };
-        Closed += (_, _) => Closed2?.Invoke(this, EventArgs.Empty);
+        Closed += (_, _) =>
+        {
+            s_lastQuery = QueryBox.Text;
+            s_lastReplacement = ReplaceBox.Text;
+            Closed2?.Invoke(this, EventArgs.Empty);
+        };
     }
 
     public string Query => QueryBox.Text;
+    public string Replacement => ReplaceBox.Text;
     public FindEngine.Mode CurrentMode =>
         ModeRegex.IsChecked == true ? FindEngine.Mode.Regex
         : ModeWildcards.IsChecked == true ? FindEngine.Mode.Wildcards
@@ -43,6 +64,18 @@ public partial class FindDialog : Window
 
     /// <summary>Updates the status line with "Match m of n" or an error.</summary>
     public void SetStatus(string text) => StatusText.Text = text;
+
+    /// <summary>
+    /// Replace and Replace All are greyed while the document is read-only, the way
+    /// the Format menu is; the host also refuses the request itself, so this is the
+    /// visible half of that gate, not the only one.
+    /// </summary>
+    public void SetReadOnly(bool readOnly)
+    {
+        ReplaceButton.IsEnabled = ReplaceAllButton.IsEnabled = !readOnly;
+        ReplaceButton.ToolTip = readOnly ? ReadOnlyTip : ReplaceTip;
+        ReplaceAllButton.ToolTip = readOnly ? ReadOnlyTip : ReplaceAllTip;
+    }
 
     private FindRequest CurrentRequest(bool forward) => new(
         Query, CurrentMode, MatchCaseOn, WholeWordOn, WrapOn, forward);
@@ -64,6 +97,12 @@ public partial class FindDialog : Window
 
     private void FindPrev_Click(object sender, RoutedEventArgs e)
         => FindRequested?.Invoke(this, CurrentRequest(false));
+
+    private void Replace_Click(object sender, RoutedEventArgs e)
+        => ReplaceRequested?.Invoke(this, new ReplaceRequest(CurrentRequest(true), Replacement, All: false));
+
+    private void ReplaceAll_Click(object sender, RoutedEventArgs e)
+        => ReplaceRequested?.Invoke(this, new ReplaceRequest(CurrentRequest(true), Replacement, All: true));
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
@@ -93,3 +132,10 @@ public record FindRequest(
     bool Wrap,
     bool Forward,
     bool LiveTyping = false);
+
+/// <summary>
+/// A Replace (<paramref name="All"/> false: the current match, then find the next)
+/// or Replace All request: the search as the dialog has it, and the replacement
+/// text as typed — the host prepares it for the mode through FindEngine.
+/// </summary>
+public record ReplaceRequest(FindRequest Find, string Replacement, bool All);
