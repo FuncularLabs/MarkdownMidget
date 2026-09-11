@@ -392,6 +392,28 @@ public class OpenGuardTests : IDisposable
         Assert.Equal(OpenGuard.ProbeState.Free, StateOf(e));
     }
 
+    // ---- re-entrant opens: Ctrl+O and the Alt menu are not gated while a load runs ----
+
+    [Fact]
+    public void ASecondBeginLetsTheFirstPendingClaimGo()
+    {
+        // Two opens in flight at once: the second Begin displaces the first's pending
+        // claim. Without that the first pending handle would leak, and its path would
+        // read as held - by a window nobody could be sent to, since it never showed
+        // the file - until the garbage collector got round to the handle.
+        var a = Doc("shown.md");
+        var b = Doc("first-open.md");
+        var c = Doc("second-open.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(c, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(b));   // b's pending claim went with the second Begin
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(a));   // the document on screen is guarded throughout
+        Assert.Equal(a, guard.HeldPath);
+    }
+
     // ---- F3: a held lock proves a process has the file open, not that it is a window of ours ----
 
     [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
