@@ -318,6 +318,49 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, total: 2, inSelection: false });
   });
 
+  test('a selection that was Find’s does not survive as a selection of the replacement', () => {
+    // Replace: the selection equal to the match becomes a caret after the replacement.
+    load('cat one cat');
+    scan('cat');
+    findNext(true);
+    const p = blockRange('cat one cat');
+    ed.selectText(p.from, p.from + 3);
+    findReplace(ed.view(), 'tiger', true, true);
+    let sel = ed.view().state.selection;
+    assert.ok(sel.empty, 'a caret');
+    assert.equal(sel.from, p.from + 5);
+    // ...so a Replace All now is not scoped to "tiger".
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, total: 1, inSelection: false });
+    assert.equal(md(), 'tiger one dog');
+
+    // Replace All with Find's selection and a kept range: the kept range is selected after.
+    load('cat one\n\ncat two\n\ncat three');
+    const two = blockRange('cat two');
+    ed.selectText(two.from, two.to);
+    findCaptureScope(ed.view());
+    scan('cat');
+    findNext(true);
+    const one = blockRange('cat one');
+    ed.selectText(one.from, one.from + 3);
+    findReplaceAll(ed.view(), 'tiger', true);
+    sel = ed.view().state.selection;
+    // The kept range, grown by the replacement inside it ("tiger" is two longer).
+    assert.deepEqual({ from: sel.from, to: sel.to }, { from: two.from, to: two.to + 2 });
+    // A second Replace All in the same range, now as the user's own selection.
+    scan('tiger');
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, total: 1, inSelection: true });
+    assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
+
+    // Replace All with Find's selection and nothing kept: a caret.
+    load('cat cat');
+    scan('cat');
+    findNext(true);
+    const q = blockRange('cat cat');
+    ed.selectText(q.from, q.from + 3);
+    findReplaceAll(ed.view(), 'dog', true);
+    assert.ok(ed.view().state.selection.empty);
+  });
+
   test('a caret is no selection: the whole document', () => {
     load('cat one\n\ncat two');
     const { from } = blockRange('cat two');

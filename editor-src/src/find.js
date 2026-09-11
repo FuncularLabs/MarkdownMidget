@@ -11,6 +11,8 @@
 // undo step. The host hands over the replacement already prepared for the search
 // mode — verbatim text, or a template for Regex mode (expandTemplate).
 
+import { TextSelection } from '@milkdown/kit/prose/state';
+
 let matches = [];     // [{startNode, startOffset, endNode, endOffset, start, end, exec}]
 let cursor = -1;      // index into matches
 
@@ -317,6 +319,11 @@ export function findReplace(view, replacement, literal, wrap) {
   const text = literal ? replacement : expandTemplate(replacement, m.exec);
   const tr = state.tr;
   replaceRange(tr, range.from, range.to, text, marksAt($from));
+  // A selection that was the match itself (F3 in the editor puts it there) would
+  // be mapped onto the replacement text and pass for the user's own next time;
+  // a caret after the replacement instead, as typing over a selection leaves.
+  if (state.selection.from === range.from && state.selection.to === range.to)
+    tr.setSelection(TextSelection.create(tr.doc, range.from + text.length));
   view.dispatch(tr);
   afterChange(view, tr);
 
@@ -336,8 +343,9 @@ export function findReplaceAll(view, replacement, literal) {
   if (!view) return { replaced: 0, skipped: 0, total: matches.length, inSelection: false, error: 'no editor' };
   ensureFresh(view);
   const total = matches.length;
-  const scope = resolveScope(view);
   const { state } = view;
+  const selWasFinds = isCurrentMatch(view, state.selection);
+  const scope = resolveScope(view);
   const plan = [];
   let skipped = 0;
   for (const m of matches) {
@@ -361,6 +369,14 @@ export function findReplaceAll(view, replacement, literal) {
   const tr = state.tr;
   for (let i = plan.length - 1; i >= 0; i--)
     replaceRange(tr, plan[i].from, plan[i].to, plan[i].text, plan[i].marks);
+  if (selWasFinds) {
+    // Find's selection of a match is now that match's replacement, which would
+    // pass for the user's own next time. The kept range, selected outright, is
+    // what a second Replace All should work on; failing that, a caret.
+    tr.setSelection(scope
+      ? TextSelection.create(tr.doc, tr.mapping.map(scope.from, -1), tr.mapping.map(scope.to, 1))
+      : TextSelection.create(tr.doc, tr.mapping.map(state.selection.from, -1)));
+  }
   view.dispatch(tr);
   afterChange(view, tr);
   return { replaced: plan.length, skipped, total, inSelection: !!scope };
