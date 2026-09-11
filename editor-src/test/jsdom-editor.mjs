@@ -40,22 +40,13 @@ function installGlobals(window) {
   }
 }
 
-// What jsdom does not implement and ProseMirror asks for. Every stub says which
-// call needs it; none of them affect the document model or the serialiser.
-function installStubs(window) {
-  const rect = () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 });
-  const rects = () => [];
-  // prosemirror-view coordsAtPos/scrollIntoView measure text through a Range:
-  // textRange(node, from, to).getClientRects() / getBoundingClientRect().
-  window.Range.prototype.getClientRects = rects;
-  window.Range.prototype.getBoundingClientRect = rect;
-  // prosemirror-view scrollRectIntoView walks up from view.dom measuring each
-  // ancestor with getBoundingClientRect; jsdom returns all-zero rects already,
-  // and getClientRects exists but returns an empty list. Nothing to add here.
-  // prosemirror-view posAtCoords starts from document.elementFromPoint; jsdom
-  // has no layout, so there is nothing under any point.
-  window.document.elementFromPoint = () => null;
-}
+// What jsdom lacks and is NOT stubbed: it has no layout, so Range.getClientRects,
+// Range.getBoundingClientRect and document.elementFromPoint do not exist.
+// ProseMirror reaches them only when the view holds the DOM selection
+// (scrollToSelection after a scrollIntoView transaction, coordsAtPos,
+// posAtCoords), which never happens here — nothing focuses the view — and the
+// round trip passes with none of them (checked by removing each). A test that
+// focuses the view and dispatches will need them; stub them then, beside this.
 
 /**
  * Mount one editor. Call once per test file (module caching means a second
@@ -69,7 +60,6 @@ export async function mountEditor(initialMarkdown = '') {
   });
   const { window } = dom;
   installGlobals(window);
-  installStubs(window);
 
   const { createEditor } = await import('../src/editor-factory.js');
   const root = window.document.getElementById('app');
