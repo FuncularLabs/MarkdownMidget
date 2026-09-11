@@ -647,6 +647,24 @@ describe('ZeroWidthMatchesInsert', () => {
   });
 });
 
+describe('AnEmptyMatchStepsByAWholeCodePoint', () => {
+  // The index is a string of UTF-16 code units and the regex always carries the
+  // unicode flag, so an empty match in front of a surrogate pair has to resume past
+  // the WHOLE pair. Step by one code unit instead and lastIndex lands inside the
+  // pair, the engine rounds it back to where the pair starts, and the same empty
+  // match is found again for ever — 50 000 of them before the safety counter breaks
+  // the loop. codeUnitsAt is what prevents that, and nothing failed when it was
+  // mutated to return 1 (#5 NF-2).
+  test('an emoji is one step, not two', () => {
+    load('a\u{1F600}b');
+    // Four positions, not five: before 'a', between 'a' and the emoji, between the
+    // emoji and 'b', and after 'b'.
+    assert.equal(scan('x*').total, 4);
+    assert.equal(findReplaceAll(ed.view(), '-', true).replaced, 4);
+    assert.equal(md(), '-a-\u{1F600}-b-');
+  });
+});
+
 describe('WhatTheHostAcceptsThisViewCanRun', () => {
   // The host's FindEngine.Build is the gate: it refuses, before either view sees it,
   // any pattern the two engines would read differently. What it lets through has to
