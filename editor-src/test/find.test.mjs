@@ -22,6 +22,10 @@ import {
 const templateTable = JSON.parse(
   readFileSync(new URL('./fixtures/replace-templates.json', import.meta.url), 'utf8'));
 
+// And the other one: which regex constructs Find accepts at all (#5 F-6).
+const constructTable = JSON.parse(
+  readFileSync(new URL('./fixtures/regex-constructs.json', import.meta.url), 'utf8'));
+
 let ed;
 before(async () => {
   ed = await mountEditor();
@@ -432,6 +436,47 @@ describe('TheReplacementTemplateSubsetIsTheSameInBothEngines', () => {
     scan('(?<first>a)(b)');
     findReplaceAll(ed.view(), '$1-$2', false);
     assert.equal(md(), 'XXb-aYY');
+  });
+});
+
+describe('WhatTheHostAcceptsThisViewCanRun', () => {
+  // The host's FindEngine.Build is the gate: it refuses, before either view sees it,
+  // any pattern the two engines would read differently. What it lets through has to
+  // compile here — with the unicode flag find.js always adds — or the formatted view
+  // silently finds nothing where the source view finds matches (#5 F-6).
+  for (const row of constructTable.accepted) {
+    test(`accepted: ${row.pattern}`, () => {
+      load('cat one');
+      assert.equal(scan(row.pattern).error, undefined, `${row.pattern} — ${row.why}`);
+    });
+  }
+
+  for (const row of constructTable.literals) {
+    test(`literal ${row.mode}: ${JSON.stringify(row.query)}`, () => {
+      // The pattern the host's escaper writes for a literal query. .NET's own
+      // Regex.Escape wrote "\ " for a space, which the unicode flag rejects outright.
+      load('cat one');
+      assert.equal(scan(row.pattern).error, undefined, `${row.pattern} — ${row.why || ''}`);
+    });
+  }
+
+  test('the unicode flag is on whether or not the host asked for it', () => {
+    load('café and cat');
+    // \p{L} is a Unicode category only under the unicode flag; without it the escape
+    // is read as a literal 'p' and the search silently means something else.
+    assert.equal(scan('\\p{L}+', 'g').total > 0, true);
+    findClear();
+    // …and \A, which .NET has and JavaScript does not, is an error rather than a
+    // literal 'A' match. (The host refuses it earlier; this is the second gate.)
+    assert.deepEqual(scan('\\Acat', 'g'), { total: 0, current: 0, error: 'Invalid pattern' });
+  });
+
+  test('a pattern this engine will not compile is reported, not counted as no matches', () => {
+    for (const p of ['(?i)cat', '(?>ab)c', '(?#note)cat', "(?'n'a)"]) {
+      findClear();
+      load('cat');
+      assert.deepEqual(scan(p), { total: 0, current: 0, error: 'Invalid pattern' }, p);
+    }
   });
 });
 

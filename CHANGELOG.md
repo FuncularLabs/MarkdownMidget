@@ -27,6 +27,16 @@ changes between alpha tags.
   and replacement. (#5)
 
 ### Changed
+- **A Regular-expression pattern has to mean the same thing in both views.** The
+  two views run different regex engines, so a handful of constructs one has and
+  the other does not — `\A`, `\Z`, `\z`, `\G`, `(?>…)`, inline options like
+  `(?i)`, `(?#comments)`, `(?'name'…)`, `\k'name'`, class subtraction
+  `[a-z-[aeiou]]`, possessive quantifiers, Unicode blocks like `\p{IsGreek}`,
+  and a loose `{`, `}` or `]` — are now refused outright with *Invalid pattern.*
+  rather than searching one thing in the source view and another (or nothing) in
+  the formatted one. `\p{L}` and `\p{Lu}` work in both now; they used not to work
+  in the formatted view at all. Help lists the whole set under *Find ▸ Regular
+  expression*. (#5)
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
   list directly follows another, the second is written with `*` bullets (it was
   `-`): with the same marker, CommonMark would read the two as one list. (#2)

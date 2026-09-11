@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace MarkdownMidget;
@@ -24,21 +25,232 @@ public static class FindEngine
 
         var pattern = mode switch
         {
-            Mode.Normal => Regex.Escape(query),
+            Mode.Normal => EscapeLiteral(query),
             Mode.Extended => BuildExtended(query),
             Mode.Wildcards => BuildWildcards(query),
             Mode.Regex => query,
-            _ => Regex.Escape(query),
+            _ => EscapeLiteral(query),
         };
 
         if (wholeWord)
             pattern = $@"\b(?:{pattern})\b";
+
+        // Whatever the source view runs, the formatted view runs too. A pattern only
+        // one of them understands is refused here, before either sees it (#5 F-6).
+        if (!JsCompatible(pattern)) return null;
 
         var opts = RegexOptions.Compiled | RegexOptions.Multiline;
         if (!matchCase) opts |= RegexOptions.IgnoreCase;
 
         try { return new Regex(pattern, opts); }
         catch { return null; } // invalid user pattern (esp. in Regex mode)
+    }
+
+    /// <summary>
+    /// True when <paramref name="pattern"/> means the same thing to the formatted
+    /// view's JavaScript engine (which compiles it with the <c>u</c> flag) as it does
+    /// to .NET. Conservative on purpose: a construct this does not recognise is
+    /// refused rather than allowed to diverge, and over-rejecting says
+    /// "<see cref="InvalidPatternMessage"/>" where under-rejecting would quietly
+    /// write two different documents.
+    ///
+    /// Refused: <c>\A</c> <c>\Z</c> <c>\z</c> <c>\G</c> <c>\a</c> <c>\e</c> and every
+    /// other escape JavaScript does not have; atomic groups <c>(?&gt;…)</c>; inline
+    /// options <c>(?i)</c> / <c>(?i:…)</c>; comment groups <c>(?#…)</c>; conditionals
+    /// <c>(?(…)…)</c>; .NET's <c>(?'name'…)</c> and <c>\k'name'</c> spellings;
+    /// balancing groups; class subtraction <c>[a-z-[aeiou]]</c>; possessive
+    /// quantifiers; Unicode blocks and long category names in <c>\p{…}</c>; and the
+    /// loose <c>{</c>, <c>}</c> and <c>]</c> that .NET reads as literal characters and
+    /// JavaScript reads as errors.
+    /// </summary>
+    public static bool JsCompatible(string pattern)
+    {
+        var inClass = false;
+        for (var i = 0; i < pattern.Length; i++)
+        {
+            var c = pattern[i];
+            if (c == '\\')
+            {
+                if (!EscapeIsShared(pattern, ref i, inClass)) return false;
+                continue;
+            }
+            if (inClass)
+            {
+                if (c == ']') { inClass = false; continue; }
+                // "[a-z-[aeiou]]": .NET subtracts the second class, JavaScript unions it.
+                if (c == '-' && i + 1 < pattern.Length && pattern[i + 1] == '[') return false;
+                continue;
+            }
+            switch (c)
+            {
+                case '[':
+                    inClass = true;
+                    break;
+                case ']':
+                case '}':
+                    return false;          // literal in .NET, a syntax error in JavaScript
+                case '{':
+                    if (!SkipQuantifier(pattern, ref i)) return false;
+                    break;
+                case '*':
+                case '+':
+                case '?':
+                    // A '+' after a quantifier is .NET's possessive form; '?' is lazy
+                    // and both engines have it.
+                    if (i + 1 < pattern.Length && pattern[i + 1] == '+') return false;
+                    break;
+                case '(':
+                    if (!GroupOpeningIsShared(pattern, ref i)) return false;
+                    break;
+            }
+        }
+        return !inClass;
+    }
+
+    /// <summary>The escape starting at <paramref name="i"/> (which points at the
+    /// backslash), advanced past. False when the two engines do not share it.</summary>
+    private static bool EscapeIsShared(string pattern, ref int i, bool inClass)
+    {
+        if (i + 1 >= pattern.Length) return false;     // a trailing backslash: invalid in both
+        var e = pattern[i + 1];
+        i++;                                            // the escaped character
+        switch (e)
+        {
+            // The characters JavaScript's unicode mode lets a backslash stand before.
+            case '^': case '$': case '\\': case '.': case '*': case '+': case '?':
+            case '(': case ')': case '[': case ']': case '{': case '}': case '|': case '/':
+            case 'n': case 'r': case 't': case 'f': case 'v':
+            case 'd': case 'D': case 's': case 'S': case 'w': case 'W':
+                return true;
+            case 'b':
+                return true;                            // word boundary, or backspace in a class
+            case 'B':
+                return !inClass;                        // not a class escape in JavaScript
+            case '-':
+                return inClass;                         // only inside a class
+            case '0':
+                // NUL, but "\01" is an octal escape in .NET and an error in JavaScript.
+                return i + 1 >= pattern.Length || !char.IsAsciiDigit(pattern[i + 1]);
+            case 'x':
+                return TakeHex(pattern, ref i, 2);
+            case 'u':
+                return TakeHex(pattern, ref i, 4);      // "\u{1F600}" is JavaScript's alone
+            case 'c':
+                if (i + 1 >= pattern.Length || !char.IsAsciiLetter(pattern[i + 1])) return false;
+                i++;
+                return true;
+            case 'k':
+                return !inClass && TakeGroupName(pattern, ref i, '<', '>');
+            case 'p':
+            case 'P':
+                return TakeUnicodeCategory(pattern, ref i);
+            default:
+                // \1..\9: a backreference outside a class, an octal escape (.NET) or an
+                // error (JavaScript) inside one.
+                if (char.IsAsciiDigit(e))
+                {
+                    if (inClass) return false;
+                    while (i + 1 < pattern.Length && char.IsAsciiDigit(pattern[i + 1])) i++;
+                    return true;
+                }
+                return false;                           // \A \Z \z \G \a \e \Q … — .NET's own
+        }
+    }
+
+    private static bool TakeHex(string pattern, ref int i, int digits)
+    {
+        if (i + digits >= pattern.Length) return false;
+        for (var k = 1; k <= digits; k++) if (!IsHex(pattern[i + k])) return false;
+        i += digits;
+        return true;
+    }
+
+    /// <summary>A one- or two-letter Unicode general category — the only spelling both
+    /// engines read the same way. Blocks (<c>\p{IsGreek}</c>), long names
+    /// (<c>\p{Letter}</c>) and <c>Script=…</c> belong to one engine or the other.</summary>
+    private static bool TakeUnicodeCategory(string pattern, ref int i)
+    {
+        if (i + 1 >= pattern.Length || pattern[i + 1] != '{') return false;
+        var close = pattern.IndexOf('}', i + 2);
+        if (close < 0) return false;
+        var name = pattern.AsSpan(i + 2, close - i - 2);
+        if (name.Length is < 1 or > 2) return false;
+        foreach (var ch in name) if (!char.IsAsciiLetter(ch)) return false;
+        i = close;
+        return true;
+    }
+
+    /// <summary>Reads <c>&lt;name&gt;</c> (or the delimiters given) after
+    /// <paramref name="i"/>, requiring a name both engines accept: a letter or
+    /// underscore, then letters, digits or underscores. Rules out .NET's balancing
+    /// groups (<c>(?&lt;a-b&gt;…)</c>) and numbered group names.</summary>
+    private static bool TakeGroupName(string pattern, ref int i, char open, char close)
+    {
+        if (i + 1 >= pattern.Length || pattern[i + 1] != open) return false;
+        var end = pattern.IndexOf(close, i + 2);
+        if (end <= i + 2) return false;
+        var name = pattern.AsSpan(i + 2, end - i - 2);
+        if (!(char.IsAsciiLetter(name[0]) || name[0] == '_')) return false;
+        foreach (var ch in name) if (!(char.IsAsciiLetterOrDigit(ch) || ch == '_')) return false;
+        i = end;
+        return true;
+    }
+
+    /// <summary>A <c>{n}</c> / <c>{n,}</c> / <c>{n,m}</c> quantifier, advanced past its
+    /// closing brace. False for a loose <c>{</c> (literal in .NET, an error in
+    /// JavaScript) and for the possessive <c>{n,m}+</c>.</summary>
+    private static bool SkipQuantifier(string pattern, ref int i)
+    {
+        var j = i + 1;
+        var digits = 0;
+        while (j < pattern.Length && char.IsAsciiDigit(pattern[j])) { j++; digits++; }
+        if (digits == 0) return false;
+        if (j < pattern.Length && pattern[j] == ',')
+        {
+            j++;
+            while (j < pattern.Length && char.IsAsciiDigit(pattern[j])) j++;
+        }
+        if (j >= pattern.Length || pattern[j] != '}') return false;
+        if (j + 1 < pattern.Length && pattern[j + 1] == '+') return false;   // possessive
+        i = j;
+        return true;
+    }
+
+    /// <summary>The '(' at <paramref name="i"/> and whatever '?' form follows it.
+    /// Ordinary groups, <c>(?:</c>, <c>(?=</c>, <c>(?!</c>, <c>(?&lt;=</c>,
+    /// <c>(?&lt;!</c> and <c>(?&lt;name&gt;</c> are shared; every other <c>(?</c>
+    /// form is .NET's own.</summary>
+    private static bool GroupOpeningIsShared(string pattern, ref int i)
+    {
+        if (i + 1 >= pattern.Length || pattern[i + 1] != '?') return true;   // a plain capture
+        if (i + 2 >= pattern.Length) return false;
+        var k = pattern[i + 2];
+        if (k is ':' or '=' or '!') { i += 2; return true; }
+        if (k != '<') return false;                       // (?> (?# (?i (?' (?( …
+        var after = i + 3 < pattern.Length ? pattern[i + 3] : '\0';
+        if (after is '=' or '!') { i += 3; return true; } // lookbehind
+        i += 1;                                           // at '?', so '<' is next
+        return TakeGroupName(pattern, ref i, '<', '>');
+    }
+
+    /// <summary>
+    /// True when the formatted view answered with the refusal <c>findReset</c> raises
+    /// for a pattern its engine will not compile. The host shows
+    /// <see cref="InvalidPatternMessage"/> for it, rather than the "No matches found."
+    /// a zero count would otherwise read as.
+    /// </summary>
+    public static bool ReportsInvalidPattern(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return false;
+        try
+        {
+            using var d = JsonDocument.Parse(json);
+            return d.RootElement.ValueKind == JsonValueKind.Object
+                && d.RootElement.TryGetProperty("error", out var e)
+                && e.ValueKind == JsonValueKind.String
+                && e.GetString() == "Invalid pattern";
+        }
+        catch { return false; }
     }
 
     /// <summary>Documentation for tooltips. Kept in code so it stays in sync.</summary>
@@ -60,11 +272,16 @@ public static class FindEngine
         "Escape a literal '*', '?', or '\\' by prefixing with '\\'.";
 
     public const string RegexTooltip =
-        ".NET regular expression syntax. Example patterns:\n" +
+        "Regular expression syntax. Example patterns:\n" +
         "  ^Title           line starting with 'Title'\n" +
         "  \\b\\d{4}\\b        a four-digit number on a word boundary\n" +
         "  [Hh]ello         'Hello' or 'hello'\n" +
-        "  (foo|bar)        'foo' or 'bar'";
+        "  (foo|bar)        'foo' or 'bar'\n" +
+        "Groups, backreferences, lookahead and lookbehind all work. A handful of\n" +
+        ".NET-only constructs are refused as Invalid pattern, because the formatted\n" +
+        "view would read them differently: \\A \\Z \\z \\G, (?>…), inline options\n" +
+        "(?i), (?#comments), (?'name'…), \\k'name', class subtraction [a-z-[aeiou]],\n" +
+        "possessive quantifiers, and Unicode blocks like \\p{IsGreek}.";
 
     // ===== Replace (#5) =====
 
@@ -269,6 +486,44 @@ public static class FindEngine
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Escapes a literal so that it matches itself in BOTH engines. .NET's own
+    /// <see cref="Regex.Escape(string)"/> writes <c>"\ "</c> for a space and
+    /// <c>"\#"</c> for a hash; the formatted view compiles its regex with JavaScript's
+    /// unicode flag, which calls both of those a syntax error — so a Normal-mode
+    /// search for two words would stop working there. This escapes only what one of
+    /// the two engines calls syntax (adding <c>]</c> and <c>}</c>, which .NET leaves
+    /// loose and JavaScript will not), and writes control characters as the escapes
+    /// both spell the same way.
+    /// </summary>
+    private static string EscapeLiteral(string s)
+    {
+        var sb = new StringBuilder(s.Length + 8);
+        foreach (var c in s) AppendLiteral(sb, c);
+        return sb.ToString();
+    }
+
+    private static void AppendLiteral(StringBuilder sb, char c)
+    {
+        switch (c)
+        {
+            case '\\': case '^': case '$': case '.': case '|': case '?':
+            case '*': case '+': case '(': case ')': case '[': case ']':
+            case '{': case '}':
+                sb.Append('\\').Append(c);
+                return;
+            case '\n': sb.Append("\\n"); return;
+            case '\r': sb.Append("\\r"); return;
+            case '\t': sb.Append("\\t"); return;
+            case '\f': sb.Append("\\f"); return;
+            case '\v': sb.Append("\\v"); return;
+        }
+        if (c < ' ' || c == '\u007f')
+            sb.Append("\\u").Append(((int)c).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+        else
+            sb.Append(c);
+    }
+
     private static string BuildExtended(string s)
     {
         var sb = new StringBuilder(s.Length * 2);
@@ -301,11 +556,11 @@ public static class FindEngine
                         break;
                 }
                 // Unknown escape — treat the following char as a literal.
-                sb.Append(Regex.Escape(nxt.ToString()));
+                AppendLiteral(sb, nxt);
                 i++;
                 continue;
             }
-            sb.Append(Regex.Escape(c.ToString()));
+            AppendLiteral(sb, c);
         }
         return sb.ToString();
     }
@@ -318,16 +573,16 @@ public static class FindEngine
             var c = s[i];
             if (c == '\\' && i + 1 < s.Length && (s[i + 1] is '*' or '?' or '\\'))
             {
-                sb.Append(Regex.Escape(s[i + 1].ToString()));
+                AppendLiteral(sb, s[i + 1]);
                 i++;
                 continue;
             }
-            sb.Append(c switch
+            switch (c)
             {
-                '*' => ".*",
-                '?' => ".",
-                _ => Regex.Escape(c.ToString()),
-            });
+                case '*': sb.Append(".*"); break;
+                case '?': sb.Append('.'); break;
+                default: AppendLiteral(sb, c); break;
+            }
         }
         return sb.ToString();
     }

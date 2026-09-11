@@ -135,9 +135,40 @@ Like Normal, but with two wildcards:
 
 ### Regular expression
 
-.NET regex syntax — full power. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`,
-`(foo|bar)`. **Wrap around** lets the search loop from the end back to the
-start when **Find Next** runs off the bottom.
+Regex syntax. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`, `(foo|bar)`. Groups —
+named (`(?<year>\d{4})`) and numbered — backreferences (`\1`, `\k<year>`),
+lookahead (`(?=…)`, `(?!…)`) and lookbehind (`(?<=…)`, `(?<!…)`) all work.
+**Wrap around** lets the search loop from the end back to the start when **Find
+Next** runs off the bottom.
+
+#### Patterns that must mean the same in both views
+
+The two views run different regex engines — the source view .NET's, the formatted
+view the browser's. Rather than let a pattern quietly mean one thing in one view
+and something else in the other, a handful of constructs one engine has and the
+other does not are refused outright, with the same *Invalid pattern.* message:
+
+| Refused                                   | Why                                             |
+| ----------------------------------------- | ----------------------------------------------- |
+| `\A` `\Z` `\z` `\G`                       | .NET anchors the browser has no spelling for    |
+| `\a` `\e`                                 | .NET's bell and escape characters               |
+| `(?>…)`                                   | atomic group — .NET only                        |
+| `(?i)` `(?i:…)` `(?-i:…)`                 | inline options — they would change the search behind your back |
+| `(?#…)`                                   | comment group — .NET only                       |
+| `(?(…)…\|…)`                              | conditional — .NET only                         |
+| `(?'name'…)` `\k'name'`                   | .NET's quoted spellings; `(?<name>…)` and `\k<name>` are fine |
+| `(?<a-b>…)`                               | balancing group — .NET only                     |
+| `[a-z-[aeiou]]`                           | class subtraction; the browser reads it as a union |
+| `a++` `a*+` `a?+` `a{1,2}+`               | possessive quantifiers — .NET only              |
+| `\p{IsGreek}` `\p{Letter}`                | Unicode blocks and long category names; `\p{L}` and `\p{Lu}` work |
+| a loose `{`, `}` or `]`                   | literal in .NET, a syntax error in the browser — write `\{`, `\}`, `\]` |
+
+One difference is **not** refused, because refusing it would take most of regex
+mode with it: `\w`, `\d`, `\s` and `\b` cover all Unicode letters and digits in
+the source view and only ASCII in the formatted view. For English text they agree;
+for `café` or `٤٢` they do not. Spell the class out — `[A-Za-z0-9_]`, `[0-9]` — if
+it matters. For the same reason `.` matches one emoji in the formatted view and
+half of one in the source view.
 
 ### Replace
 

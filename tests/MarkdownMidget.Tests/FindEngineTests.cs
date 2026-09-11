@@ -373,6 +373,116 @@ public class FindEngineTests
         Assert.Equal(expected, FindEngine.ExpandTemplate(template, m));
     }
 
+    // ===== Which constructs Find accepts at all (#5 F-6) =====
+    //
+    // The source view runs .NET's Regex, the formatted view JavaScript's. A pattern
+    // that means one thing in one and something else — or nothing — in the other is
+    // refused outright, with the message Find already shows for a malformed pattern.
+    // editor-src/test/fixtures/regex-constructs.json is the list, and find.test.mjs
+    // reads the same file to check the accepted ones really do compile over there.
+
+    private static JsonElement Constructs()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "regex-constructs.json");
+        return JsonDocument.Parse(File.ReadAllText(path)).RootElement.Clone();
+    }
+
+    private static TheoryData<string, string> ConstructRows(string section)
+    {
+        var data = new TheoryData<string, string>();
+        foreach (var row in Constructs().GetProperty(section).EnumerateArray())
+            data.Add(row.GetProperty("pattern").GetString()!,
+                     row.TryGetProperty("why", out var w) ? w.GetString()! : "");
+        return data;
+    }
+
+    public static TheoryData<string, string> AcceptedConstructs() => ConstructRows("accepted");
+    public static TheoryData<string, string> RefusedConstructs() => ConstructRows("refused");
+
+    public static TheoryData<string, string, bool, string> LiteralPatterns()
+    {
+        var data = new TheoryData<string, string, bool, string>();
+        foreach (var row in Constructs().GetProperty("literals").EnumerateArray())
+            data.Add(row.GetProperty("query").GetString()!,
+                     row.GetProperty("mode").GetString()!,
+                     row.TryGetProperty("wholeWord", out var ww) && ww.GetBoolean(),
+                     row.GetProperty("pattern").GetString()!);
+        return data;
+    }
+
+    [Fact]
+    public void TheSharedConstructTableIsActuallyRead()
+    {
+        var root = Constructs();
+        Assert.True(root.GetProperty("accepted").GetArrayLength() >= 20, "accepted rows");
+        Assert.True(root.GetProperty("refused").GetArrayLength() >= 20, "refused rows");
+        Assert.True(root.GetProperty("literals").GetArrayLength() >= 8, "literal rows");
+    }
+
+    [Theory]
+    [MemberData(nameof(AcceptedConstructs))]
+    public void AcceptedRegexConstructsStillCompile(string pattern, string why)
+    {
+        Assert.True(FindEngine.Build(pattern, FindEngine.Mode.Regex, true, false) is not null,
+            $"{pattern} should be accepted — {why}");
+        Assert.True(FindEngine.JsCompatible(pattern), $"{pattern} — {why}");
+    }
+
+    [Theory]
+    [MemberData(nameof(RefusedConstructs))]
+    public void RefusedRegexConstructsAreRefusedBeforeEitherViewSeesThem(string pattern, string why)
+    {
+        // Build is the one gate: the host asks it before it dispatches to either view,
+        // so a null here is "Invalid pattern." in the source view AND the formatted one.
+        Assert.True(FindEngine.Build(pattern, FindEngine.Mode.Regex, true, false) is null,
+            $"{pattern} should be refused — {why}");
+    }
+
+    [Theory]
+    [MemberData(nameof(LiteralPatterns))]
+    public void LiteralModesEscapeOnlyWhatBothEnginesCallSyntax(string query, string mode, bool wholeWord, string expected)
+    {
+        // .NET's own Regex.Escape writes "\ " for a space and "\#" for a hash. Neither
+        // is an escape JavaScript's unicode mode recognises, so a Normal-mode search
+        // for two words would have stopped compiling in the formatted view.
+        var m = mode switch
+        {
+            "Normal" => FindEngine.Mode.Normal,
+            "Extended" => FindEngine.Mode.Extended,
+            "Wildcards" => FindEngine.Mode.Wildcards,
+            _ => FindEngine.Mode.Regex,
+        };
+        var re = FindEngine.Build(query, m, matchCase: true, wholeWord: wholeWord);
+        Assert.True(re is not null, $"{mode} {query} did not compile");
+        Assert.Equal(expected, re!.ToString());
+    }
+
+    [Fact]
+    public void JsCompatibleJudgesAPatternOnItsOwn()
+    {
+        // The check the host can run without asking the editor anything.
+        Assert.True(FindEngine.JsCompatible(@"\bword\b"));
+        Assert.True(FindEngine.JsCompatible(@"(?<x>a)\k<x>"));
+        Assert.False(FindEngine.JsCompatible(@"\Acat"));
+        Assert.False(FindEngine.JsCompatible("(?>ab)"));
+        Assert.False(FindEngine.JsCompatible(@"trailing\"));
+        Assert.False(FindEngine.JsCompatible("[a-z-[aeiou]]"));
+    }
+
+    [Fact]
+    public void ReportsInvalidPatternReadsTheEditorsRefusal()
+    {
+        // findReset answers { total: 0, current: 0, error: 'Invalid pattern' } for a
+        // pattern JavaScript will not compile. Before this, nothing read that field and
+        // the user saw "No matches found." for a pattern that was never run.
+        Assert.True(FindEngine.ReportsInvalidPattern("{\"total\":0,\"current\":0,\"error\":\"Invalid pattern\"}"));
+        Assert.False(FindEngine.ReportsInvalidPattern("{\"total\":3,\"current\":1}"));
+        Assert.False(FindEngine.ReportsInvalidPattern("{\"replaced\":0,\"error\":\"no editor\"}"));
+        Assert.False(FindEngine.ReportsInvalidPattern(null));
+        Assert.False(FindEngine.ReportsInvalidPattern(""));
+        Assert.False(FindEngine.ReportsInvalidPattern("not json at all"));
+    }
+
     [Fact]
     public void TheSubsetIsWhatReplaceApplies()
     {

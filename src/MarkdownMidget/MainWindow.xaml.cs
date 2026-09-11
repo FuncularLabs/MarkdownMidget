@@ -2832,7 +2832,7 @@ public partial class MainWindow : Window
     private async Task DoWysiwygFindAsync(System.Text.RegularExpressions.Regex regex, FindRequest req)
     {
         if (!_editorReady) return;
-        await EnsureWysiwygIndexAsync(regex);
+        if (!await EnsureWysiwygIndexAsync(regex)) return;   // already reported
         var dir = req.Forward ? "Next" : "Prev";
         var result = await RunEditorAsync($"JSON.stringify(window.MDM.find{dir}({Js(req.Wrap)}))");
         ReportFindResult(result, req);
@@ -2845,8 +2845,15 @@ public partial class MainWindow : Window
     /// index and current match when asked for the same pattern on an unchanged
     /// document, so re-issuing this after one of our own replacements — the change
     /// message it raises clears the cache below — loses the place to nothing.
+    ///
+    /// False when the editor refused the pattern (#5 F-6): the status line already
+    /// says <see cref="FindEngine.InvalidPatternMessage"/> and the caller must not go
+    /// on to find or replace against an index that was never built. FindEngine.Build
+    /// refuses the constructs we know the two engines disagree about before we get
+    /// here, so this is the backstop rather than the gate — and a refusal is not
+    /// cached, so the next attempt asks again and reports again.
     /// </summary>
-    private async Task EnsureWysiwygIndexAsync(System.Text.RegularExpressions.Regex regex)
+    private async Task<bool> EnsureWysiwygIndexAsync(System.Text.RegularExpressions.Regex regex)
     {
         var flags = "g";
         if ((regex.Options & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0) flags += "i";
@@ -2854,10 +2861,19 @@ public partial class MainWindow : Window
         var src = regex.ToString();
         if (src != _lastFindSource || flags != _lastFindFlags)
         {
-            await RunEditorAsync($"window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)})");
+            var json = await RunEditorAsync(
+                $"JSON.stringify(window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)}))");
+            if (FindEngine.ReportsInvalidPattern(json))
+            {
+                _lastFindSource = "";
+                _lastFindFlags = "";
+                _findDialog?.SetStatus(FindEngine.InvalidPatternMessage);
+                return false;
+            }
             _lastFindSource = src;
             _lastFindFlags = flags;
         }
+        return true;
     }
 
     private static string Js(bool value) => value ? "true" : "false";
@@ -2868,6 +2884,12 @@ public partial class MainWindow : Window
     private void ReportFindResult(string? json, FindRequest req)
     {
         if (string.IsNullOrEmpty(json)) { _findDialog?.SetStatus("No matches."); return; }
+        // A refusal is not a count of zero: say so rather than "No matches found."
+        if (FindEngine.ReportsInvalidPattern(json))
+        {
+            _findDialog?.SetStatus(FindEngine.InvalidPatternMessage);
+            return;
+        }
         try
         {
             using var d = JsonDocument.Parse(json);
@@ -3030,10 +3052,15 @@ public partial class MainWindow : Window
     private async Task DoWysiwygReplaceAsync(FindEngine.ReplaceSpec spec, FindRequest req)
     {
         if (!_editorReady) return;
-        await EnsureWysiwygIndexAsync(spec.Regex);
+        if (!await EnsureWysiwygIndexAsync(spec.Regex)) return;   // already reported
         var json = await RunEditorAsync(
             $"JSON.stringify(window.MDM.findReplace({JsLiteral(spec.Replacement)}, {Js(spec.Literal)}, {Js(req.Wrap)}))");
         if (string.IsNullOrEmpty(json)) { _findDialog?.SetStatus("No matches."); return; }
+        if (FindEngine.ReportsInvalidPattern(json))
+        {
+            _findDialog?.SetStatus(FindEngine.InvalidPatternMessage);
+            return;
+        }
         try
         {
             using var d = JsonDocument.Parse(json);
@@ -3056,10 +3083,15 @@ public partial class MainWindow : Window
     private async Task DoWysiwygReplaceAllAsync(FindEngine.ReplaceSpec spec)
     {
         if (!_editorReady) return;
-        await EnsureWysiwygIndexAsync(spec.Regex);
+        if (!await EnsureWysiwygIndexAsync(spec.Regex)) return;   // already reported
         var json = await RunEditorAsync(
             $"JSON.stringify(window.MDM.findReplaceAll({JsLiteral(spec.Replacement)}, {Js(spec.Literal)}))");
         if (string.IsNullOrEmpty(json)) { _findDialog?.SetStatus("No matches."); return; }
+        if (FindEngine.ReportsInvalidPattern(json))
+        {
+            _findDialog?.SetStatus(FindEngine.InvalidPatternMessage);
+            return;
+        }
         try
         {
             using var d = JsonDocument.Parse(json);

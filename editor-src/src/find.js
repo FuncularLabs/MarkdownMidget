@@ -78,21 +78,38 @@ function locate(nodes, offset, atStart) {
   return last ? { node: last.node, offset: last.node.nodeValue.length } : null;
 }
 
-/// Returns { total, current }. Resets the search using a regex described as
+// The unicode flag, always, whatever the host sent (#5 F-6). It is what turns an
+// escape .NET has and JavaScript does not — \A, \Z, \a — into an error we can
+// report rather than a silently different search, and what makes \p{L} mean a
+// Unicode category here as it does there. The host's FindEngine refuses the
+// constructs the two engines read differently before calling in; this is the
+// other half of the same decision, and the reason the host's escaper no longer
+// writes "\ " for a space (unicode mode has no such escape).
+// Normalised here, not at the call site, so the "same search again" comparison
+// below sees one spelling of the flags.
+function withUnicode(flags) {
+  const f = flags || '';
+  return f.includes('u') ? f : `${f}u`;
+}
+
+/// Returns { total, current } — or { total: 0, current: 0, error: 'Invalid
+/// pattern' } for a source this engine will not compile, which the host shows as
+/// its usual "Invalid pattern." Resets the search using a regex described as
 /// (source, flags). If query is empty, clears matches. With the view given, the
 /// same source and flags on an unchanged document keep the index and the current
 /// match instead of starting over.
 export function findReset(source, flags, view) {
-  if (view && source && source === indexed.source && flags === indexed.flags && view.state.doc === indexed.doc)
+  const f = withUnicode(flags);
+  if (view && source && source === indexed.source && f === indexed.flags && view.state.doc === indexed.doc)
     return { total: matches.length, current: cursor + 1 };
   matches = [];
   cursor = -1;
   indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
   if (!source) return { total: 0, current: 0 };
   let re;
-  try { re = new RegExp(source, flags); }
+  try { re = new RegExp(source, f); }
   catch { return { total: 0, current: 0, error: 'Invalid pattern' }; }
-  indexed = { source, flags, doc: view ? view.state.doc : null, regex: re, groupMap: dotnetGroupMap(source) };
+  indexed = { source, flags: f, doc: view ? view.state.doc : null, regex: re, groupMap: dotnetGroupMap(source) };
   reindex();
   return { total: matches.length, current: 0 };
 }

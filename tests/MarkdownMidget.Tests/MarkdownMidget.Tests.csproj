@@ -35,6 +35,8 @@
          someone edits one of them. -->
     <None Include="..\..\editor-src\test\fixtures\replace-templates.json"
           Link="replace-templates.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\editor-src\test\fixtures\regex-constructs.json"
+          Link="regex-constructs.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- A stand-in for the app's embedded themes, so ThemeStore.Refresh can be driven
