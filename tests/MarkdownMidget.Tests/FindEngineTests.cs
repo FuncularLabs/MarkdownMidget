@@ -414,6 +414,28 @@ public class FindEngineTests
         Assert.Null(FindEngine.ResolveScope(4, 3, isFindSelection: true, captured: (1, 0)));
     }
 
+    [Fact]
+    public void ReplaceAllStatusSaysWhichKindOfLeftAloneEachOneWas()
+    {
+        Assert.Equal("Replaced 3 occurrences.", FindEngine.ReplaceAllStatus(3, false, 0, 0));
+        Assert.Equal("Replaced 1 occurrence in the selection.", FindEngine.ReplaceAllStatus(1, true, 0, 0));
+        Assert.Equal("Nothing to replace.", FindEngine.ReplaceAllStatus(0, false, 0, 0));
+        Assert.Equal("Nothing to replace in the selection.", FindEngine.ReplaceAllStatus(0, true, 0, 0));
+
+        // A match that runs from one paragraph into the next is never joined.
+        Assert.Equal("Replaced 2 occurrences. 1 left alone: it spans paragraphs.",
+            FindEngine.ReplaceAllStatus(2, false, 1, 0));
+        Assert.Equal("Replaced 2 occurrences. 2 left alone: they span paragraphs.",
+            FindEngine.ReplaceAllStatus(2, false, 2, 0));
+
+        // A match whose text is no longer where the search left it is a different
+        // thing, and saying it "spans paragraphs" was simply untrue (#5 F-10).
+        Assert.Equal("Replaced 2 occurrences. 1 left alone: the text moved.",
+            FindEngine.ReplaceAllStatus(2, false, 0, 1));
+        Assert.Equal("Nothing to replace. 1 left alone: it spans paragraphs. 2 left alone: the text moved.",
+            FindEngine.ReplaceAllStatus(0, false, 1, 2));
+    }
+
     // ===== Which constructs Find accepts at all (#5 F-6) =====
     //
     // The source view runs .NET's Regex, the formatted view JavaScript's. A pattern

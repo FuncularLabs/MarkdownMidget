@@ -459,10 +459,13 @@ export function findReplace(view, replacement, literal, wrap) {
 }
 
 /// Replace every match — within the scope (see resolveScope) — in ONE
-/// transaction: { replaced, skipped, total, inSelection }. `total` is the match
-/// count before replacing; `skipped` counts matches that run across blocks.
+/// transaction: { replaced, skipped, moved, total, inSelection }. `total` is the
+/// match count before replacing. The two reasons a match is left alone are counted
+/// apart (#5 F-10): `skipped` ran from one block into the next, which a
+/// replacement would have to join; `moved` is no longer where the search left it,
+/// which is a different thing and is worded as one.
 export function findReplaceAll(view, replacement, literal) {
-  if (!view) return { replaced: 0, skipped: 0, total: matches.length, inSelection: false, error: 'no editor' };
+  if (!view) return { replaced: 0, skipped: 0, moved: 0, total: matches.length, inSelection: false, error: 'no editor' };
   ensureFresh(view);
   const total = matches.length;
   const { state } = view;
@@ -470,9 +473,10 @@ export function findReplaceAll(view, replacement, literal) {
   const scope = resolveScope(view);
   const plan = [];
   let skipped = 0;
+  let moved = 0;
   for (const m of matches) {
     const r = pmRange(view, m);
-    if (!r) { skipped++; continue; }
+    if (!r) { moved++; continue; }
     if (scope && (r.from < scope.from || r.to > scope.to)) continue;
     const $from = state.doc.resolve(r.from);
     const $to = state.doc.resolve(r.to);
@@ -484,7 +488,7 @@ export function findReplaceAll(view, replacement, literal) {
       marks: marksAt($from),
     });
   }
-  if (plan.length === 0) return { replaced: 0, skipped, total, inSelection: !!scope };
+  if (plan.length === 0) return { replaced: 0, skipped, moved, total, inSelection: !!scope };
 
   // Last to first, so every position planned against this document is still
   // right when its step is added.
@@ -501,6 +505,6 @@ export function findReplaceAll(view, replacement, literal) {
   }
   view.dispatch(tr);
   afterChange(view, tr);
-  return { replaced: plan.length, skipped, total, inSelection: !!scope };
+  return { replaced: plan.length, skipped, moved, total, inSelection: !!scope };
 }
 

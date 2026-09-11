@@ -3020,7 +3020,9 @@ public partial class MainWindow : Window
             else
                 SourceBox.Select(SourceBox.SelectionStart, 0);
         }
-        ReportReplaceAll(replaced, scope is not null, skipped: 0);
+        // The source view edits the document text directly: nothing spans a block it
+        // cannot cross, and nothing has moved out from under the plan.
+        ReportReplaceAll(replaced, scope is not null, spanningBlocks: 0, moved: 0);
     }
 
     /// <summary>
@@ -3039,14 +3041,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>The count, in the status bar and in the dialog.</summary>
-    private void ReportReplaceAll(int replaced, bool inSelection, int skipped)
+    private void ReportReplaceAll(int replaced, bool inSelection, int spanningBlocks, int moved)
     {
-        var where = inSelection ? " in the selection" : "";
-        var msg = replaced == 0
-            ? $"Nothing to replace{where}."
-            : $"Replaced {replaced} occurrence{(replaced == 1 ? "" : "s")}{where}.";
-        if (skipped > 0)
-            msg += $" {skipped} left alone: {(skipped == 1 ? "it spans" : "they span")} paragraphs.";
+        var msg = FindEngine.ReplaceAllStatus(replaced, inSelection, spanningBlocks, moved);
         FlashStatus(msg);
         _findDialog?.SetStatus(msg);
     }
@@ -3098,7 +3095,7 @@ public partial class MainWindow : Window
         {
             using var d = JsonDocument.Parse(json);
             var inSelection = d.RootElement.TryGetProperty("inSelection", out var s) && s.ValueKind == JsonValueKind.True;
-            ReportReplaceAll(JsonInt(d, "replaced"), inSelection, JsonInt(d, "skipped"));
+            ReportReplaceAll(JsonInt(d, "replaced"), inSelection, JsonInt(d, "skipped"), JsonInt(d, "moved"));
         }
         catch { _findDialog?.SetStatus("No matches."); }
     }

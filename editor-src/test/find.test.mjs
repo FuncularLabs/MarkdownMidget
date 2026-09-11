@@ -229,7 +229,7 @@ describe('ReplaceAllIsOneUndoStep', () => {
     const before = ed.view().state.doc.toJSON();
     scan('cat');
     const r = findReplaceAll(ed.view(), 'dog', true);
-    assert.deepEqual(r, { replaced: 3, skipped: 0, total: 3, inSelection: false });
+    assert.deepEqual(r, { replaced: 3, skipped: 0, moved: 0, total: 3, inSelection: false });
     assert.equal(md(), 'dog one\n\n- dog two\n\ndog three');
     assert.equal(undoDepth(ed.view().state), 1);
     undo(ed.view().state, ed.view().dispatch);
@@ -241,7 +241,7 @@ describe('ReplaceAllIsOneUndoStep', () => {
   test('Replace All with no matches changes nothing and adds no undo step', () => {
     load('cat');
     scan('dog');
-    assert.deepEqual(findReplaceAll(ed.view(), 'x', true), { replaced: 0, skipped: 0, total: 0, inSelection: false });
+    assert.deepEqual(findReplaceAll(ed.view(), 'x', true), { replaced: 0, skipped: 0, moved: 0, total: 0, inSelection: false });
     assert.equal(undoDepth(ed.view().state), 0);
   });
 });
@@ -300,7 +300,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     ed.selectText(from, to);
     scan('cat');
     const r = findReplaceAll(ed.view(), 'dog', true);
-    assert.deepEqual(r, { replaced: 1, skipped: 0, total: 3, inSelection: true });
+    assert.deepEqual(r, { replaced: 1, skipped: 0, moved: 0, total: 3, inSelection: true });
     assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
   });
 
@@ -358,7 +358,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     const { from } = blockRange('cat cat');
     ed.selectText(from, from + 3);      // exactly the first match, as F3 in the editor leaves it
     const r = findReplaceAll(ed.view(), 'dog', true);
-    assert.deepEqual(r, { replaced: 2, skipped: 0, total: 2, inSelection: false });
+    assert.deepEqual(r, { replaced: 2, skipped: 0, moved: 0, total: 2, inSelection: false });
   });
 
   test('the selection captured when Find opened scopes Replace All after Find has moved the selection', () => {
@@ -371,7 +371,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     const one = blockRange('cat one');
     ed.selectText(one.from, one.from + 3);   // Find's own selection of match 1
     const r = findReplaceAll(ed.view(), 'dog', true);
-    assert.deepEqual(r, { replaced: 1, skipped: 0, total: 3, inSelection: true });
+    assert.deepEqual(r, { replaced: 1, skipped: 0, moved: 0, total: 3, inSelection: true });
     assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
   });
 
@@ -387,7 +387,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     assert.equal(shifted.from, two.from + 2);
     ed.selectText(shifted.from, shifted.from + 3);  // Find's selection of what is now match 1 ("cat" of "cat two")
     let r = findReplaceAll(ed.view(), 'dog', true);
-    assert.deepEqual(r, { replaced: 1, skipped: 0, total: 2, inSelection: true });
+    assert.deepEqual(r, { replaced: 1, skipped: 0, moved: 0, total: 2, inSelection: true });
     assert.equal(md(), 'tiger one\n\ndog two\n\ncat three');
 
     // An edit the find layer did not make: the captured scope no longer describes
@@ -402,7 +402,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     const three = blockRange('cat three');
     ed.selectText(three.from, three.from + 3);      // Find's selection of the one remaining match
     r = findReplaceAll(ed.view(), 'dog', true);
-    assert.deepEqual(r, { replaced: 1, skipped: 0, total: 1, inSelection: false });
+    assert.deepEqual(r, { replaced: 1, skipped: 0, moved: 0, total: 1, inSelection: false });
 
     // And findClear forgets it.
     load('cat one\n\ncat two');
@@ -455,7 +455,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     scan('cat');
     findNext(true);
     ed.selectText(one.from, one.from + 3);
-    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, total: 2, inSelection: false });
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, moved: 0, total: 2, inSelection: false });
   });
 
   test('a selection that was Find’s does not survive as a selection of the replacement', () => {
@@ -490,7 +490,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     findNext(true);
     ed.selectText(p.from, p.from + 3);
     findReplace(ed.view(), 'tiger', true, true);
-    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, total: 1, inSelection: false });
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, moved: 0, total: 1, inSelection: false });
     assert.equal(md(), 'tiger one dog');
 
     // Replace All with Find's selection and a kept range: the kept range is selected after.
@@ -508,7 +508,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     assert.deepEqual({ from: sel.from, to: sel.to }, { from: two.from, to: two.to + 2 });
     // A second Replace All in the same range, now as the user's own selection.
     scan('tiger');
-    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, total: 1, inSelection: true });
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, moved: 0, total: 1, inSelection: true });
     assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
 
     // Replace All with Find's selection and nothing kept: a caret.
@@ -526,7 +526,22 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     const { from } = blockRange('cat two');
     ed.selectText(from, from);
     scan('cat');
-    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, total: 2, inSelection: false });
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, moved: 0, total: 2, inSelection: false });
+  });
+});
+
+describe('MatchesLeftAloneAreCountedApart', () => {
+  test('a match whose text has moved is not counted as one that spans paragraphs', () => {
+    // Two different reasons to leave a match alone, reported as one number and one
+    // sentence — "they span paragraphs" — which for this one was simply untrue (#5 F-10).
+    load('cat one');
+    assert.equal(scan('cat').total, 1);
+    // Take the text node out of the editor WITHOUT changing the document: the index
+    // still holds it, and the range it describes is nowhere any more. (ensureFresh
+    // re-scans on a document change; this is the case it cannot see.)
+    ed.window.document.querySelector('.mdm-prosemirror').querySelector('p').firstChild.remove();
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true),
+      { replaced: 0, skipped: 0, moved: 1, total: 1, inSelection: false });
   });
 });
 
@@ -536,7 +551,7 @@ describe('AMatchAcrossBlocksIsLeftAlone', () => {
     // replacement would have to join the paragraphs, and never does.
     load('end\n\nstart');
     assert.equal(scan('endstart').total, 1);
-    assert.deepEqual(findReplaceAll(ed.view(), 'x', true), { replaced: 0, skipped: 1, total: 1, inSelection: false });
+    assert.deepEqual(findReplaceAll(ed.view(), 'x', true), { replaced: 0, skipped: 1, moved: 0, total: 1, inSelection: false });
     assert.equal(md(), 'end\n\nstart');
     findNext(true);
     assert.deepEqual(findReplace(ed.view(), 'x', true, true), { replaced: 0, skipped: 1, total: 1, current: 1 });
@@ -679,7 +694,7 @@ describe('MalformedPatternReplacesNothing', () => {
     const r0 = scan('(unclosed');
     assert.equal(r0.error, 'Invalid pattern');
     assert.equal(r0.total, 0);
-    assert.deepEqual(findReplaceAll(ed.view(), 'x', false), { replaced: 0, skipped: 0, total: 0, inSelection: false });
+    assert.deepEqual(findReplaceAll(ed.view(), 'x', false), { replaced: 0, skipped: 0, moved: 0, total: 0, inSelection: false });
     assert.deepEqual(findReplace(ed.view(), 'x', false, true), { replaced: 0, skipped: 0, total: 0, current: 0 });
     assert.equal(md(), 'cat (unclosed');
   });

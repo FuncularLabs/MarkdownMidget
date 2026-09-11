@@ -225,8 +225,10 @@ is changed. In the formatted view the replacement takes the formatting of the
 first character it replaces — a match that starts in plain text and runs into
 bold comes out plain; one inside a link or inline code stays in it — and a match
 that runs from the end of one paragraph into the next is left as it is: Replace
-never joins blocks. Replace and Replace All are greyed while the document is
-read-only. The dialog reopens with the last query and replacement.
+never joins blocks, and Replace All says how many it left alone and why —
+*it spans paragraphs*, or *the text moved*, if the document changed under the
+search. Replace and Replace All are greyed while the document is read-only. The
+dialog reopens with the last query and replacement.
 
 ## Printing & PDF export
 

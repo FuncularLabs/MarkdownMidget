@@ -289,6 +289,27 @@ public static class FindEngine
     /// by Replace, which refuses the same patterns and applies nothing.</summary>
     public const string InvalidPatternMessage = "Invalid pattern.";
 
+    /// <summary>
+    /// The line Replace All reports, in the status bar and in the dialog. There are
+    /// two reasons a match is left alone and they are counted apart (#5 F-10):
+    /// <paramref name="spanningBlocks"/> ran from one paragraph into the next, which
+    /// a replacement would have to join; <paramref name="moved"/> is no longer where
+    /// the search left it. Calling the second "they span paragraphs" was simply
+    /// untrue, and neither number tells the user anything the other explains.
+    /// </summary>
+    public static string ReplaceAllStatus(int replaced, bool inSelection, int spanningBlocks, int moved)
+    {
+        var where = inSelection ? " in the selection" : "";
+        var msg = replaced == 0
+            ? $"Nothing to replace{where}."
+            : $"Replaced {replaced} occurrence{(replaced == 1 ? "" : "s")}{where}.";
+        if (spanningBlocks > 0)
+            msg += $" {spanningBlocks} left alone: {(spanningBlocks == 1 ? "it spans" : "they span")} paragraphs.";
+        if (moved > 0)
+            msg += $" {moved} left alone: the text moved.";
+        return msg;
+    }
+
     /// <summary>What Ctrl+F does with the selection it finds: <see cref="Take"/> it as
     /// the Replace All scope, <see cref="Keep"/> whatever was already kept, or
     /// <see cref="Drop"/> it.</summary>
