@@ -197,11 +197,22 @@ public class MenuPathsInDocsTests
     /// becomes the <see cref="Bold"/> marker on the way through — every chain in
     /// these files is written inside a pair, and the closing one is where the item's
     /// name ends.
+    ///
+    /// Runs of whitespace collapse to one space, because the break can fall INSIDE
+    /// an item's name: Help wraps "**File ▸ Windows / Integration ▸ Register as .md
+    /// editor…**", and the continuation line is indented under its bullet, so the
+    /// join would otherwise read "Windows   Integration" and match no item.
     /// </summary>
     private static (string Text, int[] Line) Flatten(IReadOnlyList<string> lines, IReadOnlyList<int> scope)
     {
         var sb = new StringBuilder();
         var map = new List<int>();
+        void Append(char c, int line)
+        {
+            if (c == ' ' && (sb.Length == 0 || sb[^1] == ' ')) return;
+            sb.Append(c);
+            map.Add(line);
+        }
         foreach (var index in scope)
         {
             var line = lines[index];
@@ -209,11 +220,10 @@ public class MenuPathsInDocsTests
             {
                 var bold = line[c] == '*' && c + 1 < line.Length && line[c + 1] == '*';
                 if (bold) c++;
-                sb.Append(bold ? Bold : line[c]);
-                map.Add(index + 1);
+                var ch = bold ? Bold : line[c];
+                Append(char.IsWhiteSpace(ch) ? ' ' : ch, index + 1);
             }
-            sb.Append(' ');
-            map.Add(index + 1);
+            Append(' ', index + 1);   // the line break itself is a space
         }
         return (sb.ToString(), map.ToArray());
     }
@@ -383,12 +393,15 @@ public class MenuPathsInDocsTests
     [Fact]
     public void AChainThatWrapsOntoTheNextLineIsStillFollowed()
     {
-        // Help wraps exactly like this, and the deepest level is the half that would
-        // go unchecked if the scan worked a line at a time.
-        var good = new[] { "run **File ▸ Windows", "Integration ▸ Register as .md editor…** once." };
+        // Help wraps exactly like this — mid-name, with the continuation indented
+        // under its bullet — and the deepest level is the half that would go
+        // unchecked if the scan worked a line at a time. The indent is the point of
+        // the second line: without collapsing it, "Windows   Integration" matches no
+        // item and the file's own text reads as a violation.
+        var good = new[] { "- run **File ▸ Windows", "  Integration ▸ Register as .md editor…** once." };
         Assert.Empty(Violations("HELP.md", good, [0, 1], TheAppsMenus()));
 
-        var bad = new[] { "run **File ▸ Windows", "Integration ▸ Register as .txt editor…** once." };
+        var bad = new[] { "- run **File ▸ Windows", "  Integration ▸ Register as .txt editor…** once." };
         Assert.Contains("Register as .txt editor",
             Assert.Single(Violations("HELP.md", bad, [0, 1], TheAppsMenus())));
     }

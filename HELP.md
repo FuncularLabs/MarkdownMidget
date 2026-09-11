@@ -505,8 +505,11 @@ into and what to do instead.
 
 - **No installer, and no Add or Remove Programs entry.** Markdown Midget is a
   single `.exe` you keep wherever you like, so deleting that file is the
-  uninstall. Windows doesn't offer it for `.md` files until you run **File ▸
-  Windows Integration ▸ Register as .md editor…**, which adds the Open With entry
+  uninstall — unless you registered it, which **File ▸ Windows Integration ▸
+  Unregister as .md editor** offers to undo, shortcuts and installed copy
+  included.
+  Windows doesn't offer it for `.md` files until you run **File ▸ Windows
+  Integration ▸ Register as .md editor…**, which adds the Open With entry
   and installs a stable copy under `%LocalAppData%\Programs\MarkdownMidget\`.
   Updating is the app's own job: **Help ▸ About Markdown Midget** lists what's
   available and offers an Update button — for a portable exe that means
@@ -532,9 +535,9 @@ into and what to do instead.
 - **Pictures are embedded in the document, never saved as files.** **Insert ▸
   Picture…** and a pasted picture both write the image into the markdown as a
   base64 `data:` URI, so the document travels whole — and grows by about a third
-  more than the picture's own size. To keep pictures as files instead, write the link
-  yourself (`![alt](images/shot.png)`): a relative path is resolved against the
-  open document's folder.
+  more than the picture's own size. To keep pictures as files instead, write the
+  link yourself (`![alt](images/shot.png)`): a relative path is resolved against
+  the open document's folder.
 - **The already-open guard is a convenience, not a lock.** Opening a file another
   window has brings that window forward; if it can't be brought forward, the file
   opens read-only here with a note saying where it is open. Two cases fall
