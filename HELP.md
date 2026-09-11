@@ -164,11 +164,12 @@ other does not are refused outright, with the same *Invalid pattern.* message:
 | a loose `{`, `}` or `]`                   | literal in .NET, a syntax error in the browser — write `\{`, `\}`, `\]` |
 
 One difference is **not** refused, because refusing it would take most of regex
-mode with it: `\w`, `\d`, `\s` and `\b` cover all Unicode letters and digits in
-the source view and only ASCII in the formatted view. For English text they agree;
-for `café` or `٤٢` they do not. Spell the class out — `[A-Za-z0-9_]`, `[0-9]` — if
-it matters. For the same reason `.` matches one emoji in the formatted view and
-half of one in the source view.
+mode with it: `\w`, `\d` and `\b` cover all Unicode letters and digits in the
+source view and only ASCII in the formatted view. For English text they agree; for
+`café` or `٤٢` they do not. Spell the class out — `[A-Za-z0-9_]`, `[0-9]` — if it
+matters. (`\s` agrees in both on every ordinary space, tab and newline; it differs
+only on a couple of rare control characters.) And `.` matches one emoji in the
+formatted view and half of one in the source view, for the same kind of reason.
 
 #### Matches of no width
 
