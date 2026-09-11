@@ -7,18 +7,21 @@
 // schema put on it on the way in. A bare mdast round trip would pass where the
 // app fails.
 //
-// Two kinds of assertion live here. `Idempotent` is the invariant: whatever the
-// editor makes of a document, it makes the same of its own output, so a save is
-// stable after the first one. `MeasuredRewritesAreReproduced` is the record:
-// one assertion per row of the plan's measured table, stating what the editor
-// does to that construct today. When a convention is pinned (R2) the row's
+// Three kinds of assertion live here. `Idempotent` is the invariant: whatever
+// the editor makes of a document, it makes the same of its own output, so a
+// save is stable after the first one. `MeasuredRewritesAreReproduced` is the
+// record: one assertion per row of the plan's measured table, stating what the
+// editor does to that construct. When a convention is pinned (R2) the row's
 // expectation is changed on purpose, with the reason beside it — never by
-// regenerating.
+// regenerating. `ConventionsArePinned` holds the forms src/conventions.js
+// chooses, one case each, so a drift in any of them is a red case with a name.
 import test, { before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { callCommand } from '@milkdown/kit/utils';
+import { toggleEmphasisCommand, toggleStrongCommand } from '@milkdown/kit/preset/commonmark';
 import { mountEditor } from './jsdom-editor.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -53,22 +56,27 @@ describe('MeasuredRewritesAreReproduced', () => {
   before(() => { out = ed.roundTrip(CORPUS['roundtrip-audit.md']); });
 
   test('setext heading becomes ATX', () => {
+    // Pinned by R2 (setext: false).
     assert.match(out, /^# Title From Setext$/m);
     assert.doesNotMatch(out, /^=+$/m);
   });
 
   test('closing hashes on an ATX heading are stripped', () => {
+    // Pinned by R2 (closeAtx: false).
     assert.match(out, /^## Heading with trailing hashes$/m);
   });
 
-  test('+ bullets become *, and the adjacent * list becomes -', () => {
-    // (The blank line between the two + items is the tight-list row below,
-    // which affects every bullet list, not only the one the table names.)
-    assert.match(out, /^\* plus bullet one\n\n\* plus bullet two$/m);
-    assert.match(out, /^- star bullet$/m);
+  test('+ bullets become -, and the adjacent * list becomes *', () => {
+    // Was `*` then `-` (the serialiser's defaults). R2 pins bullet: '-' and
+    // bulletOther: '*'; the second list still has to differ from the first or
+    // the two would re-parse as one. The blank line between the two + items
+    // went with the tight-list row below.
+    assert.match(out, /^- plus bullet one\n- plus bullet two$/m);
+    assert.match(out, /^\* star bullet$/m);
   });
 
   test('1) ordered becomes 1.', () => {
+    // Pinned by R2 (bulletOrdered: '.', incrementListMarker: true).
     assert.match(out, /^1\. paren ordered\n2\. paren ordered two$/m);
   });
 
@@ -78,10 +86,12 @@ describe('MeasuredRewritesAreReproduced', () => {
   });
 
   test('an indented code block becomes fenced', () => {
+    // Pinned by R2 (fences: true).
     assert.match(out, /^```\nindented code block\nsecond line\n```$/m);
   });
 
   test('two trailing spaces become a backslash hard break', () => {
+    // Pinned by R2 (HARD_BREAK) pending the product decision on the form.
     assert.match(out, /^Line with two trailing spaces\\\ncontinues here\.$/m);
   });
 
@@ -93,10 +103,118 @@ describe('MeasuredRewritesAreReproduced', () => {
     assert.match(out, /^\| Left \| Right \|\n\| :--- \| ----: \|\n\| a {4}\| {5}b \|$/m);
   });
 
-  test('a tight bullet list comes back loose', () => {
-    // The task list is the fixture's `-` list. Its marker is `*` here because
-    // the serialiser's default bullet is `*`; the table between it and the
-    // previous list means it is not "adjacent", so no alternation.
-    assert.match(out, /^\* \[ \] task open\n\n\* \[x\] task done$/m);
+  test('a tight bullet list stays tight', () => {
+    // Was loose (a blank line between the items) until R2's tightBulletList
+    // fix, and `*` until bullet: '-'. The task list is the fixture's `-` list;
+    // the table before it means it is not directly after another list.
+    assert.match(out, /^- \[ \] task open\n- \[x\] task done$/m);
+  });
+});
+
+describe('ConventionsArePinned', () => {
+  // R2: what the serialiser writes, one case per convention. The name in
+  // parentheses is the option in src/conventions.js that decides it; flip that
+  // one line and the case goes red.
+
+  test('bullets are - (bullet)', () => {
+    assert.equal(ed.roundTrip('* one\n* two'), '- one\n- two\n');
+    assert.equal(ed.roundTrip('+ one\n+ two'), '- one\n- two\n');
+  });
+
+  test('one space after the bullet (listItemIndent)', () => {
+    assert.equal(ed.roundTrip('-   one\n-   two'), '- one\n- two\n');
+  });
+
+  test('a list directly after another gets * (bulletOther)', () => {
+    assert.equal(ed.roundTrip('- a\n\n+ b'), '- a\n\n* b\n');
+  });
+
+  test('adjacent lists alternate because one marker would merge them', () => {
+    // Not a convention but the fact behind the one above: CommonMark reads two
+    // `-` lists separated by a blank line as ONE loose list, so the serialiser
+    // has to change marker, and bulletOther only chooses which one it uses.
+    ed.roundTrip('- a\n\n- b');
+    assert.equal(ed.view().state.doc.childCount, 1, 'same marker: one loose list');
+    ed.roundTrip('- a\n\n* b');
+    assert.equal(ed.view().state.doc.childCount, 2, 'different markers: two lists');
+  });
+
+  test('ordered lists are 1. (bulletOrdered)', () => {
+    assert.equal(ed.roundTrip('1) a\n2) b'), '1. a\n2. b\n');
+  });
+
+  test('ordered markers count up (incrementListMarker)', () => {
+    assert.equal(ed.roundTrip('1. a\n1. b\n1. c'), '1. a\n2. b\n3. c\n');
+  });
+
+  test('headings are ATX (setext)', () => {
+    assert.equal(ed.roundTrip('Title\n=====\n\nSub\n---'), '# Title\n\n## Sub\n');
+  });
+
+  test('ATX headings carry no closing hashes (closeAtx)', () => {
+    assert.equal(ed.roundTrip('## H ##'), '## H\n');
+  });
+
+  test('code blocks are fenced (fences)', () => {
+    assert.equal(ed.roundTrip('    code\n    more'), '```\ncode\nmore\n```\n');
+  });
+
+  test('emphasis made in the editor is * (emphasis)', () => {
+    // The option is the default marker of the emphasis mark, so it is only
+    // visible on emphasis the editor creates — Ctrl+I over plain text here.
+    ed.roundTrip('italic');
+    ed.selectText(1, 7);
+    ed.editor.action(callCommand(toggleEmphasisCommand.key));
+    assert.equal(ed.markdown(), '*italic*\n');
+  });
+
+  test('strong made in the editor is ** (strong)', () => {
+    ed.roundTrip('bold');
+    ed.selectText(1, 5);
+    ed.editor.action(callCommand(toggleStrongCommand.key));
+    assert.equal(ed.markdown(), '**bold**\n');
+  });
+
+  test('emphasis markers written in the source are kept as written', () => {
+    // Milkdown's remarkMarker records the marker each emphasis was written
+    // with and the serialiser reuses it; the option above never overrides it.
+    const md = '_a_ and __b__ and *c* and **d**';
+    assert.equal(ed.roundTrip(md), md + '\n');
+  });
+
+  test('a hard break is a backslash (HARD_BREAK)', () => {
+    assert.equal(ed.roundTrip('a  \nb'), 'a\\\nb\n');
+  });
+
+  test('a hard break where no newline can go is a space, as before', () => {
+    // The default break handler writes a space inside an ATX heading or a
+    // table cell, where a newline would end the construct. HARD_BREAK is
+    // applied by wrapping that handler, and this proves the rule survived.
+    // Level 3, because remark writes a level-1/2 heading that holds a break as
+    // setext (the one form that can carry it), whatever `setext` says.
+    ed.roundTrip('### ab');
+    const view = ed.view();
+    view.dispatch(view.state.tr.insert(2, view.state.schema.nodes.hardbreak.create()));
+    assert.equal(ed.markdown(), '### a b\n');
+  });
+
+  test('a tight bullet list stays tight (tightBulletList)', () => {
+    assert.equal(ed.roundTrip('- one\n- two'), '- one\n- two\n');
+  });
+
+  test('a tight nested bullet list stays tight (tightListItem)', () => {
+    assert.equal(ed.roundTrip('- one\n  - nested\n- two'), '- one\n  - nested\n- two\n');
+  });
+
+  test('a loose bullet list stays loose', () => {
+    assert.equal(ed.roundTrip('- one\n\n- two'), '- one\n\n- two\n');
+  });
+
+  test('a tight task list stays tight', () => {
+    assert.equal(ed.roundTrip('- [ ] a\n- [x] b'), '- [ ] a\n- [x] b\n');
+  });
+
+  test('a tight ordered list stays tight, as before', () => {
+    assert.equal(ed.roundTrip('1. a\n2. b'), '1. a\n2. b\n');
   });
 });

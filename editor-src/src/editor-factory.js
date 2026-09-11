@@ -25,6 +25,7 @@ import { mermaidBlock } from './mermaid.js';
 import { spellDecorate } from './spell-decorate.js';
 import { htmlRender } from './html-render.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
+import { conventions, tightBulletList, tightListItem } from './conventions.js';
 
 import {
   wrapInHeadingCommand,
@@ -226,8 +227,11 @@ export function createEditor({ root, initialMarkdown = '', onMarkdownUpdated = (
     .config((ctx) => {
       ctx.set(prismConfig.key, { configureRefractor: () => refractor });
     })
+    .config(conventions)
     .use(commonmark)
     .use(gfm)
+    .use(tightBulletList)   // after the presets: the schema keeps the last definition of a node
+    .use(tightListItem)
     .use(remarkImageSize)
     .use(resizableImage)
     .use(htmlRender)

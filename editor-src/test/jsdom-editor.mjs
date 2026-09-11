@@ -11,7 +11,9 @@
 // import): prosemirror-view captures `navigator`/`document` at module load, and
 // dompurify binds whichever `window` exists when it is first evaluated.
 import { JSDOM } from 'jsdom';
+import { editorViewCtx } from '@milkdown/kit/core';
 import { replaceAll, getMarkdown } from '@milkdown/kit/utils';
+import { TextSelection } from '@milkdown/kit/prose/state';
 
 // Window properties copied onto globalThis. Each is something the editor stack
 // reads as a bare global at module load or at run time.
@@ -80,6 +82,15 @@ export async function mountEditor(initialMarkdown = '') {
     roundTrip(markdown) {
       editor.action(replaceAll(markdown, true));
       return editor.action(getMarkdown());
+    },
+    /** The current document as markdown, the way MDM.getMarkdown reads it. */
+    markdown() { return editor.action(getMarkdown()); },
+    /** The live EditorView (re-read each time: replaceAll(…, true) recreates the state). */
+    view() { return editor.ctx.get(editorViewCtx); },
+    /** Select a text range, for tests that drive a command the way the toolbar does. */
+    selectText(from, to) {
+      const view = this.view();
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, to)));
     },
   };
 }
