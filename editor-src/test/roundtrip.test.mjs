@@ -311,7 +311,7 @@ describe('IntrawordUnderscoreSurvives', () => {
 
   test('guard: a literal backslash before an underscore stays literal', () => {
     // `a\\_b` in the file is a backslash then an underscore; both survive.
-    assert.equal(ed.roundTrip('a\\\\_b'), 'a\\\\\\\_b\n');
+    assert.equal(ed.roundTrip('a\\\\_b'), 'a\\\\\\_b\n');
   });
 });
 
