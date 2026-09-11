@@ -3990,7 +3990,8 @@ public partial class MainWindow : Window
         // it first, and only a claim that is now this window's (or nobody's) may
         // edit - otherwise the un-check would hand out an unguarded editor, and a
         // double-click on the file a second one. Still held by a live window
-        // elsewhere: the checkbox goes back and that window comes forward.
+        // elsewhere: the checkbox goes back, and that window is brought forward
+        // if it can be (the fallback exists because that focus failed once already).
         if (!_imposedReadOnly.Imposed) { SetReadOnly(false); return; }
         var claim = _currentPath is null
             ? new Instances.OpenGuardDecision(Instances.OpenVerdict.Proceed, 0, 0)   // the held document is already gone from here
