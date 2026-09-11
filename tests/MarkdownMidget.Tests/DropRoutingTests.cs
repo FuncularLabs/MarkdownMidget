@@ -361,7 +361,7 @@ public class DropRoutingTests
         Assert.Equal([1], plan.Insert.Select(p => p.Index));
         Assert.Equal([0], plan.TooLarge);
         Assert.Empty(plan.Refused);
-        Assert.Equal("Too large to insert (over 64 MB): huge.png", plan.Notice());
+        Assert.Equal($"Too large to insert (over {DropRouting.MaxPictureBytes / (1024 * 1024)} MB): huge.png", plan.Notice());
     }
 
     [Fact]
@@ -380,7 +380,7 @@ public class DropRoutingTests
         Assert.Empty(plan.Insert);
         Assert.Equal([0], plan.TooLarge);
         Assert.Equal([1], plan.Open);
-        Assert.Equal("Too large to insert (over 64 MB): huge.png", plan.Notice());
+        Assert.Equal($"Too large to insert (over {DropRouting.MaxPictureBytes / (1024 * 1024)} MB): huge.png", plan.Notice());
     }
 
     // ===== the bytes that actually arrived (review finding NF-11) =====
@@ -448,7 +448,7 @@ public class DropRoutingTests
             DropTarget.Editable, oneDocument: false);
 
         Assert.Equal(
-            "Not a picture or a markdown file: a.zip; Too large to insert (over 64 MB): huge.png; "
+            $"Not a picture or a markdown file: a.zip; Too large to insert (over {DropRouting.MaxPictureBytes / (1024 * 1024)} MB): huge.png; "
             + "Not opened (pictures were dropped with it): notes.md",
             plan.Notice());
     }

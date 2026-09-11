@@ -11,10 +11,11 @@ namespace MarkdownMidget.Tests;
 /// <summary>
 /// The two embedded docs Help ▸ View Help and Help ▸ What's New extract and open
 /// read-only. Nothing here can exercise the click path itself — that needs a real
-/// window and a mouse — but the two things that matter and CAN be checked without
-/// one are: does the resource actually ship under the name the code asks for, and
-/// is the changelog's "newest first" claim, which the What's New feature exists to
-/// make good on, actually true rather than assumed.
+/// window and a mouse — but three things that matter CAN be checked without one:
+/// does the resource actually ship under the name the code asks for; is the
+/// changelog's "newest first" claim, which the What's New feature exists to make
+/// good on, actually true rather than assumed; and do the numbers HELP states about
+/// the running program still match the constants the program uses.
 /// </summary>
 public class EmbeddedReaderDocsTests
 {
@@ -112,6 +113,18 @@ public class EmbeddedReaderDocsTests
         Assert.NotNull(got);
         Assert.True(got!.CompareTo(floor!) > 0,
             $"(#{issue}) is credited to [{owner}], which is not newer than {lastReleaseWithout} - the entry is filed under the wrong release");
+    }
+
+    [Fact]
+    public void TheHelpStatesThePictureCeilingTheDropActuallyApplies()
+    {
+        // HELP said "64 MB" as a literal, with nothing tying it to MaxPictureBytes.
+        // Change the constant and HELP goes on telling the user the old number —
+        // invisible in a diff review, and the first thing anyone reads when a drop
+        // refuses their picture. Pinned the way DocumentExtensions is pinned to
+        // OpenFilter: the doc has to state the number the code uses.
+        var megabytes = DropRouting.MaxPictureBytes / (1024 * 1024);
+        Assert.Contains($"picture **larger than {megabytes} MB**", Read("HELP.md"), StringComparison.Ordinal);
     }
 
     private static string Read(string resourceName)
