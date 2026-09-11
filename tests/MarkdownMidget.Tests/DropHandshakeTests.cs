@@ -1,0 +1,270 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using MarkdownMidget;
+using Xunit;
+
+namespace MarkdownMidget.Tests;
+
+/// <summary>
+/// The two-phase drop handshake's generation token, on the host side (issue #6,
+/// review findings NF-1, NF-2, NF-5).
+///
+/// The editor numbers each drop; the number travels out with the fileDrop message,
+/// back in on the host's request for bytes, and out again with the answer. Every
+/// decision that number drives used to live inline in MainWindow, where nothing
+/// could reach it without a window, a WebView2 and a real mouse — so nothing did,
+/// and two ways of getting it wrong shipped: an out-of-order phase-one message
+/// inverted the token (a 20-file drop's message can arrive AFTER a 1-file drop's,
+/// because reading 20 heads takes longer), and a drop that wanted no bytes left the
+/// previous drop's read outstanding to be answered all-null and reported as a
+/// failure. Both decisions are pure functions here now; MainWindow keeps the wiring.
+/// </summary>
+public class DropHandshakeTests
+{
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    private static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
+
+    /// <summary>A droppedFileBytes answer, built from real JSON through the real
+    /// parser — so an entry these tests describe is one the editor could actually
+    /// send, not a dictionary hand-made to suit the assertion.</summary>
+    private static DropBytesMessage Answer(long drop, params (int Index, byte[]? Bytes)[] files)
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            type = "droppedFileBytes",
+            drop,
+            files = System.Array.ConvertAll(files, f => new
+            {
+                index = f.Index,
+                base64 = f.Bytes is null ? null : System.Convert.ToBase64String(f.Bytes),
+            }),
+        });
+        using var doc = JsonDocument.Parse(json);
+        return DropRouting.ParseBytesMessage(doc.RootElement);
+    }
+
+    // ===== NF-1: which fileDrop message wins =====
+
+    [Fact]
+    public void AFileDropMessageOlderThanOneAlreadyHandledIsSuperseded()
+    {
+        // The finding. readHeads is asynchronous: 20 files take longer to read 32
+        // bytes of each than one file does, so drop 1's fileDrop can arrive AFTER
+        // drop 2's. Handling it would cancel drop 2's read (the newest drop, the one
+        // the user is looking at) and then wait on an editor whose counter has moved
+        // past drop 1 — which answers all-null. Newest drop silently abandoned,
+        // superseded one raising the error.
+        Assert.True(DropHandshake.IsSuperseded(newestDrop: 2, arrivingDrop: 1));
+        Assert.True(DropHandshake.IsSuperseded(newestDrop: 9, arrivingDrop: 8));
+    }
+
+    [Fact]
+    public void ANewerFileDropMessageIsHandledAndSoIsTheFirstOne()
+    {
+        Assert.False(DropHandshake.IsSuperseded(newestDrop: 1, arrivingDrop: 2));
+        // Nothing handled yet: the mark starts at 0 and the editor's counter at 1.
+        Assert.False(DropHandshake.IsSuperseded(newestDrop: 0, arrivingDrop: 1));
+        // A repeat of the drop being handled is not OLDER, so it is not swallowed
+        // here — it is the reply path that refuses a second answer.
+        Assert.False(DropHandshake.IsSuperseded(newestDrop: 4, arrivingDrop: 4));
+    }
+
+    // ===== NF-5: which droppedFileBytes answer is acted on =====
+
+    [Fact]
+    public void AnAnswerAboutTheReadBeingWaitedOnIsApplied()
+    {
+        var decision = DropHandshake.Decide(
+            outstandingDrop: 5, replyDrop: 5, requested: [2, 0], reply: Answer(5, (2, Png), (0, Jpeg)));
+
+        Assert.Equal(DropReply.Apply, decision.Outcome);
+        Assert.Empty(decision.Missing);
+        Assert.Equal(Png, decision.Bytes[2]);
+        Assert.Equal(Jpeg, decision.Bytes[0]);
+    }
+
+    [Fact]
+    public void AnAnswerAboutAnEarlierDropIsDiscarded()
+    {
+        // The straggler: drop 4's read was abandoned, drop 5's is outstanding, and
+        // drop 4's answer turns up anyway. Acting on it would insert drop 4's files
+        // into the document drop 5 is about to change.
+        var decision = DropHandshake.Decide(
+            outstandingDrop: 5, replyDrop: 4, requested: [0], reply: Answer(4, (0, Png)));
+
+        Assert.Equal(DropReply.Discard, decision.Outcome);
+        Assert.Empty(decision.Bytes);
+    }
+
+    [Fact]
+    public void ASecondAnswerToAReadAlreadyTakenIsDiscarded()
+    {
+        // The first answer clears the outstanding drop to 0, and 0 is a drop number
+        // the editor never issues (its counter starts at 1) — so a duplicate matches
+        // nothing and inserts nothing a second time.
+        var decision = DropHandshake.Decide(
+            outstandingDrop: 0, replyDrop: 5, requested: [0], reply: Answer(5, (0, Png)));
+
+        Assert.Equal(DropReply.Discard, decision.Outcome);
+    }
+
+    [Fact]
+    public void AnAnswerAboutNoDropAtAllIsDiscarded()
+    {
+        // What the parser reports when a message did not say which drop it is: 0,
+        // which matches no outstanding read even when one is waiting.
+        Assert.Equal(DropReply.Discard, DropHandshake.Decide(5, 0, [0], Answer(0, (0, Png))).Outcome);
+    }
+
+    // ===== all or nothing =====
+
+    [Fact]
+    public void ANullForOneOfSeveralPicturesRefusesAllOfThem()
+    {
+        // A failed path read has always inserted NONE of a drop's pictures rather
+        // than some of them, and the editor route matches it: half a drop in the
+        // document is worse than a status line naming what failed.
+        var decision = DropHandshake.Decide(
+            outstandingDrop: 3, replyDrop: 3, requested: [0, 1, 2], reply: Answer(3, (0, Png), (1, null), (2, Jpeg)));
+
+        Assert.Equal(DropReply.Refuse, decision.Outcome);
+        Assert.Equal([1], decision.Missing);
+        Assert.Empty(decision.Bytes);
+    }
+
+    [Fact]
+    public void AnIndexTheAnswerNeverMentionsIsMissingRatherThanEmpty()
+    {
+        // Not the same as base64:null, and treated the same way: a file the host
+        // asked about and got no word on is not a file it may embed.
+        var decision = DropHandshake.Decide(
+            outstandingDrop: 3, replyDrop: 3, requested: [0, 7], reply: Answer(3, (0, Png)));
+
+        Assert.Equal(DropReply.Refuse, decision.Outcome);
+        Assert.Equal([7], decision.Missing);
+    }
+
+    [Fact]
+    public void AnAnswerWithNoFilesAtAllRefusesEveryIndexAsked()
+    {
+        // What the editor posts when its own post of the bytes failed — an oversized
+        // payload, a bridge fault — as {files: null}. The host has to hear "no", not
+        // wait.
+        using var doc = JsonDocument.Parse("{\"type\":\"droppedFileBytes\",\"drop\":3,\"files\":null,\"error\":\"post-failed\"}");
+        var decision = DropHandshake.Decide(3, 3, [0, 1], DropRouting.ParseBytesMessage(doc.RootElement));
+
+        Assert.Equal(DropReply.Refuse, decision.Outcome);
+        Assert.Equal([0, 1], decision.Missing);
+    }
+
+    [Fact]
+    public void AnEmptyFileIsReadNotMissing()
+    {
+        // Zero bytes is an answer. It will not sniff as a picture and is refused
+        // later for that reason, but the handshake is not where it goes wrong.
+        var decision = DropHandshake.Decide(3, 3, [0], Answer(3, (0, [])));
+
+        Assert.Equal(DropReply.Apply, decision.Outcome);
+        Assert.Empty(decision.Bytes[0]);
+    }
+
+    // ===== the request itself =====
+
+    [Fact]
+    public void BytesTheHostNeverAskedForAreIgnored()
+    {
+        // The answer is trusted for the indices asked about and no further: an extra
+        // entry is not an extra insertion.
+        var decision = DropHandshake.Decide(
+            outstandingDrop: 3, replyDrop: 3, requested: [0], reply: Answer(3, (0, Png), (1, Jpeg), (99, Jpeg)));
+
+        Assert.Equal(DropReply.Apply, decision.Outcome);
+        Assert.Equal(0, Assert.Single(decision.Bytes).Key);
+    }
+
+    [Fact]
+    public void ADuplicatedRequestedIndexIsDecidedOnce()
+    {
+        var decision = DropHandshake.Decide(3, 3, [1, 1, 1], Answer(3, (1, Png)));
+        Assert.Equal(DropReply.Apply, decision.Outcome);
+        Assert.Equal(1, Assert.Single(decision.Bytes).Key);
+
+        var refused = DropHandshake.Decide(3, 3, [1, 1], Answer(3, (1, null)));
+        Assert.Equal(DropReply.Refuse, refused.Outcome);
+        Assert.Equal([1], refused.Missing);
+    }
+
+    // ===== NF-2: a drop that wants nothing still ends the previous read =====
+
+    [Fact]
+    public void ADropThatWantsNoBytesNeedsNoRoundTrip()
+    {
+        // Drop a photo, then quickly a .zip. The .zip's plan chooses nothing, so
+        // there is no request to make — but the photo's read must still be over by
+        // then, which is the caller's job (AbandonDroppedRead), not a reason to skip
+        // it. What this pins is the decision handed back for an empty request: apply
+        // nothing, refuse nothing, so the drop's own status line is what the user
+        // sees rather than "couldn't read".
+        Assert.Equal(DropReply.Apply, DropHandshake.NothingToRead.Outcome);
+        Assert.Empty(DropHandshake.NothingToRead.Bytes);
+        Assert.Empty(DropHandshake.NothingToRead.Missing);
+    }
+
+    [Fact]
+    public void AnAbandonedReadEndsInTheDecisionThatDoesNothing()
+    {
+        // What the window hands the waiter when the user drops again: a decision it
+        // returns on, not a cancellation it has to catch. The catch was how the
+        // newest drop came to be abandoned in silence.
+        Assert.Equal(DropReply.Discard, DropHandshake.Discarded.Outcome);
+        Assert.Empty(DropHandshake.Discarded.Bytes);
+        Assert.Empty(DropHandshake.Discarded.Missing);
+    }
+
+    [Fact]
+    public void AReadThatCannotEvenBeAskedForIsRefusedByName()
+    {
+        // No WebView, so no answer will ever come: say so at once rather than wait
+        // for a message nothing will send.
+        var decision = DropHandshake.Unreadable([0, 2]);
+        Assert.Equal(DropReply.Refuse, decision.Outcome);
+        Assert.Equal([0, 2], decision.Missing);
+    }
+
+    // ===== what the user is told =====
+
+    [Fact]
+    public void EveryAbandonedReadHasSomethingToSay()
+    {
+        // The finding's other half: a superseded drop used to end in a bare return
+        // with nothing on screen, and the drop it superseded raised a modal
+        // "Couldn't read the image". Both are status lines now, and both name what
+        // happened.
+        Assert.Equal("A newer drop replaced this one; nothing from it was inserted.",
+            DropHandshake.SupersededNotice);
+        Assert.Equal("Couldn't read photo.png.", DropHandshake.UnreadableNotice(["photo.png"]));
+        Assert.Equal("Couldn't read a.png, b.png.", DropHandshake.UnreadableNotice(["a.png", "b.png"]));
+    }
+
+    [Fact]
+    public void TheNoticeForOneUnreadableFileIsTheOneTheOpenPathAlreadyUsed()
+    {
+        // The document route said exactly this before the pictures shared it; the
+        // wording does not change because more files can now reach it.
+        var name = "notes.md";
+        Assert.Equal($"Couldn't read {name}.", DropHandshake.UnreadableNotice([name]));
+    }
+
+    [Fact]
+    public void ARefusedDecisionCarriesTheIndicesItsNoticeNeeds()
+    {
+        // The names come from the drop's file list, so Missing has to be indices
+        // into it — the same indices the request used.
+        var files = new List<DroppedFile> { new("a.png", Png, 4), new("b.png", null, 4) };
+        var decision = DropHandshake.Decide(1, 1, [0, 1], Answer(1, (0, Png), (1, null)));
+
+        Assert.Equal([1], decision.Missing);
+        Assert.Equal("Couldn't read b.png.", DropHandshake.UnreadableNotice([.. decision.Missing.Select(i => files[i].Name)]));
+    }
+}

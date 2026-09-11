@@ -4072,76 +4072,112 @@ public partial class MainWindow : Window
     /// </summary>
     private async void HandleDroppedFiles(DropMessage message)
     {
+        // The high-water mark, before anything else. A fileDrop message does NOT
+        // necessarily arrive in drop order: reading 32 bytes of each of 20 files
+        // takes longer than reading one, so a 20-file drop 1 can post after a 1-file
+        // drop 2. Handling drop 1 then cancelled drop 2's read — the newest drop, the
+        // one the user is looking at — and waited on an editor whose counter had
+        // already moved past drop 1, which answers all-null. (DropHandshake.)
+        if (DropHandshake.IsSuperseded(_newestDrop, message.Drop)) return;
+        _newestDrop = message.Drop;
+
+        // This drop owns the window now, so whatever read the last one left
+        // outstanding ends HERE — before the plan, and before knowing whether this
+        // drop wants any bytes at all. A drop that wants nothing (a .zip after a
+        // photo) used to leave the photo's read live, to be answered all-null and
+        // reported as a failure of a drop the user had already replaced. Said now,
+        // synchronously, rather than from the abandoned await: a drop that finishes
+        // without a round trip would otherwise have its own status line overwritten
+        // by this one.
+        if (AbandonDroppedRead()) FlashStatus(DropHandshake.SupersededNotice);
+
         var files = message.Files;
         var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: true);
         // The chosen pictures AND the one document that opens: this route has no
         // path, so the document's bytes have to come from the editor too.
         var wanted = plan.Insert.Select(p => p.Index).Concat(plan.Open.Take(1)).ToList();
 
-        IReadOnlyDictionary<int, byte[]?> bytes;
-        try
+        var reply = await RequestDroppedBytesAsync(message.Drop, wanted);
+        // A newer drop landed while this one was reading; that drop owns the window,
+        // and it has already said so.
+        if (reply.Outcome == DropReply.Discard) return;
+
+        if (reply.Outcome == DropReply.Apply)
         {
-            bytes = await RequestDroppedBytesAsync(message.Drop, wanted);
-        }
-        catch (OperationCanceledException)
-        {
-            return;   // a newer drop landed while this one was reading; that drop owns the window now
+            // Every index asked for has bytes here (that is what Apply means); the
+            // TryGetValue is the belt-and-braces that keeps the all-or-nothing a
+            // failed path read has always had.
+            await InsertDroppedPicturesAsync(plan, i => reply.Bytes.TryGetValue(i, out var b)
+                ? Task.FromResult(b)
+                : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")));
+
+            if (plan.Open.Count > 0 && reply.Bytes.TryGetValue(plan.Open[0], out var content))
+                await HandleDroppedContentAsync(files[plan.Open[0]].Name, content);
         }
 
-        // A null is a file the editor could not read. For pictures that throws out of
-        // bytesOf, and InsertDroppedPicturesAsync inserts NONE of them — the same
-        // all-or-nothing a failed path read has always had.
-        await InsertDroppedPicturesAsync(plan, i => bytes.TryGetValue(i, out var b) && b is not null
-            ? Task.FromResult(b)
-            : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")));
-
-        string? unreadable = null;
-        if (plan.Open.Count > 0)
-        {
-            var index = plan.Open[0];
-            if (bytes.TryGetValue(index, out var content) && content is not null)
-                await HandleDroppedContentAsync(files[index].Name, content);
-            else
-                unreadable = files[index].Name;
-        }
         if (plan.Notice() is { } notice) FlashStatus(notice);
         // Last, so it is what stays on screen: the notice is about files that were
-        // never going to be taken, this is about one that should have been.
-        if (unreadable is { } name) FlashStatus($"Couldn't read {name}.");
+        // never going to be taken, this is about ones that should have been.
+        if (reply.Outcome == DropReply.Refuse)
+            FlashStatus(DropHandshake.UnreadableNotice([.. reply.Missing.Select(i => files[i].Name)]));
     }
 
     // Phase two of a formatted-view drop. One read is in flight at a time — a drop
     // is a single user gesture — and the editor's drop counter says which drop an
     // answer is about, so a reply that arrives after a newer drop has started is
-    // dropped rather than inserted into the wrong document.
-    private TaskCompletionSource<IReadOnlyDictionary<int, byte[]?>>? _droppedBytes;
+    // discarded rather than inserted into the wrong document. DropHandshake holds
+    // both decisions and is where they are tested; what is here is the state they
+    // are made from.
+    private TaskCompletionSource<DropReplyDecision>? _droppedBytes;
     private long _droppedBytesDrop;
+    private IReadOnlyList<int> _droppedBytesIndices = [];
+
+    /// <summary>The highest drop number handled so far, so a fileDrop message that
+    /// overtook a newer one is ignored rather than made to win.</summary>
+    private long _newestDrop;
+
+    /// <summary>
+    /// End whatever read is outstanding, without waiting for it: its drop is no
+    /// longer the one on screen, and its continuation would insert into a document
+    /// the new drop is about to change. Returns true when there was one, so the
+    /// caller can say so.
+    /// </summary>
+    private bool AbandonDroppedRead()
+    {
+        var pending = _droppedBytes;
+        _droppedBytes = null;
+        // 0 is "no read outstanding", which is also what makes a late answer to the
+        // read just abandoned — or a second answer to one already taken — match
+        // nothing in DropHandshake.Decide.
+        _droppedBytesDrop = 0;
+        _droppedBytesIndices = [];
+        if (pending is null) return false;
+        // A result, not a cancellation: the waiter's job is to return without
+        // touching the window, which is a decision rather than an exception.
+        pending.TrySetResult(DropHandshake.Discarded);
+        return true;
+    }
 
     /// <summary>
     /// Ask the editor for the full bytes of <paramref name="indices"/> from drop
     /// <paramref name="drop"/>, and wait for the answer.
     /// </summary>
-    /// <exception cref="OperationCanceledException">A newer drop superseded this one
-    /// while it was reading.</exception>
-    private async Task<IReadOnlyDictionary<int, byte[]?>> RequestDroppedBytesAsync(long drop, IReadOnlyList<int> indices)
+    private async Task<DropReplyDecision> RequestDroppedBytesAsync(long drop, IReadOnlyList<int> indices)
     {
         // Nothing to fetch: don't round-trip, and don't leave a waiter behind for an
-        // answer that will never come.
-        if (indices.Count == 0) return new Dictionary<int, byte[]?>();
+        // answer that will never come. (The previous read is already over — the
+        // caller ended it before the plan was even made.)
+        if (indices.Count == 0) return DropHandshake.NothingToRead;
 
         // No editor, no answer — say so now rather than wait forever for a message
         // nothing will send. (A fileDrop can only have come FROM the editor, so this
-        // is belt and braces.) Checked before any state is touched, so a pending read
-        // is not cancelled by a request that was never going to be made.
-        if (Web.CoreWebView2 is null) return indices.ToDictionary(i => i, _ => (byte[]?)null);
+        // is belt and braces.)
+        if (Web.CoreWebView2 is null) return DropHandshake.Unreadable(indices);
 
-        // An earlier read is abandoned, not awaited: its drop is no longer the one on
-        // screen, and its continuation would insert into a document the new drop is
-        // about to change.
-        _droppedBytes?.TrySetCanceled();
-        var pending = new TaskCompletionSource<IReadOnlyDictionary<int, byte[]?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = new TaskCompletionSource<DropReplyDecision>(TaskCreationOptions.RunContinuationsAsynchronously);
         _droppedBytes = pending;
         _droppedBytesDrop = drop;
+        _droppedBytesIndices = indices;
 
         // Set before the request goes out, so an answer that comes back faster than
         // ExecuteScriptAsync returns still finds its waiter.
@@ -4149,14 +4185,18 @@ public partial class MainWindow : Window
         return await pending.Task;
     }
 
-    /// <summary>The editor's answer to <see cref="RequestDroppedBytesAsync"/>. An
-    /// answer about any drop but the one being waited on is a straggler from a
-    /// superseded read and is discarded.</summary>
+    /// <summary>The editor's answer to <see cref="RequestDroppedBytesAsync"/>. What
+    /// it amounts to is <see cref="DropHandshake.Decide"/>'s to say; an answer about
+    /// any drop but the one being waited on leaves the waiter alone.</summary>
     private void CompleteDroppedFileRead(DropBytesMessage answer)
     {
-        if (_droppedBytes is not { } pending || answer.Drop != _droppedBytesDrop) return;
+        if (_droppedBytes is not { } pending) return;
+        var decision = DropHandshake.Decide(_droppedBytesDrop, answer.Drop, _droppedBytesIndices, answer);
+        if (decision.Outcome == DropReply.Discard) return;
         _droppedBytes = null;
-        pending.TrySetResult(answer.Bytes);
+        _droppedBytesDrop = 0;
+        _droppedBytesIndices = [];
+        pending.TrySetResult(decision);
     }
 
     /// <summary>
