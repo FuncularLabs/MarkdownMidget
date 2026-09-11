@@ -34,6 +34,14 @@ namespace MarkdownMidget.Tests;
 /// dictionary"), which this test knows nothing about; and two submenus are filled at
 /// runtime — View ▸ Theme from the theme files on disk and File ▸ Open Recent from
 /// the user's history — so an unknown name under those two is allowed.
+///
+/// Two things it deliberately cannot see, so nobody reads a pass here as more than
+/// it is. The separator is exactly '▸' and the set is not widened: README spells a
+/// non-menu transition with '→' ("Downloads → app folder"), and admitting that arrow
+/// would turn those into menu claims. And the scan STARTS from the real top-level
+/// menu names, so a chain whose top menu is itself misspelled ("Fiel ▸ New") matches
+/// no starting point and is skipped in silence rather than reported — this pin
+/// catches a wrong ITEM, not a wrong menu name.
 /// </summary>
 public class MenuPathsInDocsTests
 {
@@ -269,7 +277,11 @@ public class MenuPathsInDocsTests
         while (end < text.Length && end - pos < 40)
         {
             var c = text[end];
-            if (c is ',' or ';' or ':' or ')' or '(' or Chevron or Bold) break;
+            // A backtick opens a code span, which is markup around the prose and
+            // never part of an item's name ("… ▸ Register as `.md` editor" aside,
+            // where the name resumes after it). Stopping here keeps the reported
+            // name to the words, so the failure message says what to go looking for.
+            if (c is ',' or ';' or ':' or ')' or '(' or '`' or Chevron or Bold) break;
             // A full stop ends the sentence only when a space follows it: menu items
             // have one in the middle ("Register as .md editor…").
             if (c == '.' && (end + 1 >= text.Length || text[end + 1] == ' ')) break;
@@ -398,12 +410,39 @@ public class MenuPathsInDocsTests
         // unchecked if the scan worked a line at a time. The indent is the point of
         // the second line: without collapsing it, "Windows   Integration" matches no
         // item and the file's own text reads as a violation.
+        //
+        // Where a wrapped chain is REPORTED: at the line the chain starts on, not
+        // the line the bad name happens to land on. lineOf is read at the chain's
+        // first character, so "Register as .txt editor…" on the second line below is
+        // still filed against line 1 — go to that line and read the whole chain.
         var good = new[] { "- run **File ▸ Windows", "  Integration ▸ Register as .md editor…** once." };
         Assert.Empty(Violations("HELP.md", good, [0, 1], TheAppsMenus()));
 
         var bad = new[] { "- run **File ▸ Windows", "  Integration ▸ Register as .txt editor…** once." };
-        Assert.Contains("Register as .txt editor",
-            Assert.Single(Violations("HELP.md", bad, [0, 1], TheAppsMenus())));
+        var violation = Assert.Single(Violations("HELP.md", bad, [0, 1], TheAppsMenus()));
+        Assert.Contains("Register as .txt editor", violation);
+        Assert.Contains("HELP.md(1)", violation);   // the chain's first line, not the name's
+    }
+
+    [Fact]
+    public void AnItemNameMustEndAtAWordBoundary()
+    {
+        // "Theme" is a real item under View; "Themes Folder" is not one — it is the
+        // item under View ▸ Theme, written a level too high. MatchLength must refuse
+        // the five characters that DO match rather than let the shorter real name
+        // swallow the longer written one; drop its word-boundary line (mutate the
+        // last line of MatchLength to `return best;`) and this chain matches "Theme",
+        // finds no chevron after it, and passes as a documented path that does not
+        // exist.
+        var violation = Assert.Single(Violations(
+            "HELP.md", ["**View ▸ Themes Folder** is not an item."], [0], TheAppsMenus()));
+
+        Assert.Contains($"View {Chevron} Themes Folder", violation);
+        Assert.Contains("the View menu has no \"Themes Folder\"", violation);
+
+        // And the real one, one level down, is still not a finding.
+        Assert.Empty(Violations("HELP.md",
+            ["**View ▸ Theme ▸ Open Themes Folder** opens it."], [0], TheAppsMenus()));
     }
 
     [Fact]
