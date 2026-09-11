@@ -99,6 +99,13 @@ changes between alpha tags.
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
   list directly follows another, the second is written with `*` bullets (it was
   `-`): with the same marker, CommonMark would read the two as one list. (#2)
+- **Insert ▸ Picture… and a paste into the formatted view refuse a picture
+  larger than 64 MB**, as dropping a picture file does: nothing is inserted, and
+  the status bar says "Too large to insert (over 64 MB): huge.png" (a pasted
+  picture, having no name, is "pasted picture"). An embedded picture rides inside
+  the document as text, about a third again its size in every copy and every
+  save; there is now one limit on it whichever way it comes in. A picture pasted
+  into the Markdown source view is not held to it yet.
 
 ### Fixed
 - **A document ending in anything but a paragraph or heading is no longer called

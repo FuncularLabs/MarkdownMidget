@@ -131,6 +131,52 @@ public class EmbeddedReaderDocsTests
     }
 
     [Fact]
+    public void TheHelpStatesTheOnePictureCeilingForEveryRouteThatAppliesIt()
+    {
+        // One ceiling (PictureLimit.MaxBytes) and three routes that apply it:
+        // Insert ▸ Picture, a paste into the formatted view, and a dropped file.
+        // HELP states it wherever it describes one of them, and every number it
+        // states there is this constant's — change the constant and each of these
+        // fails until HELP says the new one. Whitespace is flattened because HELP
+        // wraps its sentences; the words are what is pinned.
+        var help = Flat(Read("HELP.md"));
+        var mb = PictureLimit.MaxBytes / (1024 * 1024);
+
+        // Editing behaviors, where pictures are introduced.
+        Assert.Contains(
+            $"A picture larger than **{mb} MB** is not inserted by **Insert ▸ Picture…**, a paste into the formatted view or a drop",
+            help, StringComparison.Ordinal);
+        // Files & windows: the drop (pinned on its own above), pointing at the others.
+        Assert.Contains($"A picture **larger than {mb} MB** is named in the status bar rather than inserted", help, StringComparison.Ordinal);
+        Assert.Contains(
+            "It is the one picture limit — **Insert ▸ Picture…** and a paste into the formatted view apply it too",
+            help, StringComparison.Ordinal);
+        // Known limits: the one bullet that lists every route.
+        Assert.Contains($"**One size limit on a picture: {mb} MB.**", help, StringComparison.Ordinal);
+        Assert.Contains(
+            $"a picture larger than **{mb} MB** is not inserted — not by **Insert ▸ Picture…**, not dropped as a file on either view, and not pasted into the formatted view",
+            help, StringComparison.Ordinal);
+        // And what each of them says, quoted as the code builds it.
+        Assert.Contains(PictureLimit.Notice("huge.png"), help, StringComparison.Ordinal);
+        Assert.Contains(PictureLimit.Notice(null), help, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheChangelogStatesTheCeilingTheCodeApplies()
+    {
+        // The copy most people read (What's New, the release notes) states the same
+        // number and quotes the same notice.
+        var changelog = Flat(Read("CHANGELOG.md"));
+        var mb = PictureLimit.MaxBytes / (1024 * 1024);
+        Assert.Contains($"refuse a picture larger than {mb} MB", changelog, StringComparison.Ordinal);
+        Assert.Contains(PictureLimit.Notice("huge.png"), changelog, StringComparison.Ordinal);
+    }
+
+    /// <summary>The text with every run of whitespace — a line break and the indent
+    /// after it — as one space.</summary>
+    private static string Flat(string text) => Regex.Replace(text, @"\s+", " ");
+
+    [Fact]
     public void TheHelpStatesTheWaitTheDropActuallyAppliesAndWhichMessageEachFailureGives()
     {
         // AR-4. HELP said a drop "gets no answer within a few seconds (a page that
