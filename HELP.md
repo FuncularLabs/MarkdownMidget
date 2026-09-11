@@ -406,7 +406,7 @@ line with `--readonly`.
     18 seconds for a single picture at the 64 MB limit, and
     90 seconds for ten of them, capped at ten minutes — and then the drop ends with
     "Couldn't read the dropped file(s) — try Insert ▸ Picture."
-    rather than waiting on.
+    rather than waiting.
   - **A picture still being written when you drop it** is read anyway — that is the
     point, so a screenshot you drag in the instant it appears works — but the bytes
     that come back are checked before anything is inserted. If the file changed
@@ -420,7 +420,9 @@ line with `--readonly`.
     between the formatted and markdown views (Ctrl+E) — and the drop is abandoned:
     the status bar says the document changed, and nothing from it is inserted or
     opened. The picture would otherwise land in a document that never received it,
-    or in the view you have just left.
+    or in the view you have just left. It need not be you who changes it: if
+    another program rewrites the file and **View ▸ Auto-reload changed files**
+    picks the new version up mid-drop, the drop is abandoned for the same reason.
 
   You can also pass a file path (and optional `--readonly`) on the command line.
 - **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,
