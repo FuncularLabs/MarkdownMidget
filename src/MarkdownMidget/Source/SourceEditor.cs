@@ -116,33 +116,55 @@ public class SourceEditor : TextEditor
     /// <summary>
     /// True when this paste is ours: the editor can take an insertion at the caret —
     /// read-only mode wins here exactly as it does for text, being the same gate
-    /// AvalonEdit's CanPaste applies — and the data is a picture without text. The
-    /// OS synthesises CF_BITMAP from a CF_DIB, so a DIB-only clipboard reads as a
-    /// Bitmap too.
+    /// AvalonEdit's CanPaste applies — and the data is a picture without text. A
+    /// picture is a Bitmap or a registered PNG (<see cref="ImagePaste.PngFormat"/>),
+    /// either one alone: the OS synthesises CF_BITMAP from a CF_DIB, so a DIB-only
+    /// clipboard reads as a Bitmap too, and a clipboard holding only a PNG is a
+    /// picture all the same.
     /// </summary>
     private bool WantsImage(IDataObject data) =>
         TextArea.ReadOnlySectionProvider.CanInsert(TextArea.Caret.Offset)
         && ImagePaste.ShouldHandle(
             hasText: data.GetDataPresent(DataFormats.UnicodeText) || data.GetDataPresent(DataFormats.Text),
-            hasImage: data.GetDataPresent(DataFormats.Bitmap));
+            hasImage: data.GetDataPresent(DataFormats.Bitmap) || data.GetDataPresent(ImagePaste.PngFormat));
 
     /// <summary>
-    /// Paste <paramref name="data"/> as a picture if it is one: the image is encoded
-    /// as PNG and its markdown replaces the selection (or goes in at the caret) as a
+    /// Paste <paramref name="data"/> as a picture if it is one. The clipboard's own
+    /// PNG goes in as it is when it offers a usable one (<see cref="ImagePaste.UsablePng"/>);
+    /// otherwise the bitmap is encoded as PNG (<see cref="ImagePaste.EncodePng"/>).
+    /// The picture's markdown replaces the selection (or goes in at the caret) as a
     /// single undo step, the caret landing after it, as a text paste would. Returns
-    /// false — and touches nothing — when the data carries text, has no image, or the
-    /// editor is read-only, so the caller can let the ordinary paste proceed.
+    /// false — and touches nothing — when the data carries text, has no picture to
+    /// use, or the editor is read-only, so the caller can let the ordinary paste
+    /// proceed.
     /// </summary>
     internal bool TryPasteImage(IDataObject data)
     {
         if (!WantsImage(data)) return false;
-        if (data.GetData(DataFormats.Bitmap, autoConvert: true) is not BitmapSource image) return false;
-        var md = ImagePaste.MarkdownFor(ImagePaste.EncodePng(image));
+        var png = ImagePaste.UsablePng(ReadPng(data));
+        if (png is null)
+        {
+            if (data.GetData(DataFormats.Bitmap, autoConvert: true) is not BitmapSource image) return false;
+            png = ImagePaste.EncodePng(image);
+        }
+        var md = ImagePaste.MarkdownFor(png);
         // The selection's own replace runs inside one document update, so the
         // removal and the insertion undo together; an empty selection is one insert.
         TextArea.Selection.ReplaceSelectionWithText(md);
         TextArea.Caret.BringCaretToView();
         return true;
+    }
+
+    /// <summary>
+    /// What <paramref name="data"/> holds under <see cref="ImagePaste.PngFormat"/>, or
+    /// null. A read that fails with the ExternalException clipboard reads throw is
+    /// null as well, so the bitmap, when there is one, still pastes: the PNG is the
+    /// preferred copy of the picture, not the only one.
+    /// </summary>
+    private static object? ReadPng(IDataObject data)
+    {
+        try { return data.GetData(ImagePaste.PngFormat); }
+        catch (ExternalException) { return null; }
     }
 
     // ===== TextBox property shims =====

@@ -1,4 +1,6 @@
 using System;
+using System.Buffers.Binary;
+using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Input;
@@ -412,6 +414,546 @@ public class SourceEditorTests
 
         Assert.True(image);
         Assert.False(text);
+    }
+
+    // ----- the clipboard's real shapes (#7, found dogfooding) -----
+    //
+    // Every paste above uses a Bgra32 bitmap with full alpha, which is not what a
+    // screenshot is. A Windows screenshot tool leaves a 32-bit DIB whose fourth
+    // byte is padding and always 0; WPF reads it back as an InteropBitmap in Bgra32
+    // and takes that byte as alpha, so the PNG encoded from it was transparent on
+    // every pixel and the document showed an empty frame. Other programs (Chrome,
+    // Office) offer a registered "PNG" format as well. ClipboardFixtures builds
+    // those shapes in memory. Nothing here reads or writes the real clipboard: the
+    // one case driven through ed.Paste() is one the editor's own hook takes both
+    // before and after this fix, so AvalonEdit's text paste, which does read the
+    // real clipboard, is never reached; every other case calls TryPasteImage or
+    // asks CanExecute of the editor, neither of which reaches it.
+
+    /// <summary>BGRA bytes for a small picture: every pixel a different colour, none
+    /// of them black, and its fourth byte whatever <paramref name="alpha"/> says for
+    /// its index.</summary>
+    private static byte[] Bgra(int pixels, Func<int, byte> alpha)
+    {
+        var bytes = new byte[pixels * 4];
+        for (var i = 0; i < pixels; i++)
+        {
+            bytes[i * 4] = (byte)(0x10 + 0x20 * i);
+            bytes[i * 4 + 1] = (byte)(0xF0 - 0x10 * i);
+            bytes[i * 4 + 2] = (byte)(0x40 + 0x08 * i);
+            bytes[i * 4 + 3] = alpha(i);
+        }
+        return bytes;
+    }
+
+    /// <summary>The picture a paste put in the text, as bytes. The text must be
+    /// <paramref name="before"/> and then one image fragment, nothing after it.</summary>
+    private static byte[] PastedBytes(string text, string before)
+    {
+        Assert.StartsWith(before + PngPrefix, text);
+        Assert.EndsWith(")", text);
+        return Convert.FromBase64String(text[(before + PngPrefix).Length..^1]);
+    }
+
+    /// <summary>A PNG's pixels as Bgra32, read back by WPF's own PNG decoder, which
+    /// also proves the bytes are a PNG at all.</summary>
+    private static byte[] DecodeToBgra(byte[] png)
+    {
+        var frame = new PngBitmapDecoder(new MemoryStream(png), BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad).Frames[0];
+        var bgra = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+        var pixels = new byte[bgra.PixelWidth * bgra.PixelHeight * 4];
+        bgra.CopyPixels(pixels, bgra.PixelWidth * 4, 0);
+        return pixels;
+    }
+
+    /// <summary>A real PNG that neither re-encoding path could reproduce byte for
+    /// byte: interlaced, which WPF's encoder never is unless asked, and of a picture
+    /// no bitmap in these tests shows.</summary>
+    private static byte[] InterlacedPng()
+    {
+        var encoder = new PngBitmapEncoder { Interlace = PngInterlaceOption.On };
+        encoder.Frames.Add(BitmapFrame.Create(
+            BitmapSource.Create(3, 1, 96, 96, PixelFormats.Bgra32, null, Bgra(3, _ => 0xFF), 12)));
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
+    }
+
+    [Fact]
+    public void PastedScreenshotKeepsItsColoursAndIsOpaque()
+    {
+        // The dogfood defect, through the real Paste command: a screenshot-shaped
+        // bitmap (alpha 0 on every pixel, colour on every pixel) must paste as the
+        // same colours, opaque.
+        var shot = Bgra(6, _ => 0x00);
+        var (type, format, pasted) = On(ed =>
+        {
+            var image = ClipboardFixtures.Dib(3, 2, shot);
+            var data = new DataObject();
+            data.SetImage(image);
+            ed.ClipboardSource = () => data;
+            ed.CaretOffset = 3;
+            ed.Paste();
+            return (image.GetType().Name, image.Format, DecodeToBgra(PastedBytes(ed.Text, "abc")));
+        }, "abc", laidOut: true);
+
+        Assert.Equal("InteropBitmap", type);           // the fixture has the clipboard's shape,
+        Assert.Equal(PixelFormats.Bgra32, format);     // padding byte read as alpha and all
+        var opaque = (byte[])shot.Clone();
+        for (var i = 3; i < opaque.Length; i += 4) opaque[i] = 0xFF;
+        Assert.Equal(opaque, pasted);
+    }
+
+    [Fact]
+    public void PastedPictureWithRealTransparencyKeepsItsAlpha()
+    {
+        // Alpha that is not zero everywhere is real alpha, and it survives exactly,
+        // the zero pixels included (a rule of "any zero means padding" would have
+        // made those opaque).
+        byte[] alphas = [0x00, 0x40, 0x80, 0xC0, 0xFF, 0x00];
+        var picture = Bgra(6, i => alphas[i]);
+        var pasted = On(ed =>
+        {
+            var data = new DataObject();
+            data.SetImage(ClipboardFixtures.Dib(3, 2, picture));
+            Assert.True(ed.TryPasteImage(data));
+            return DecodeToBgra(PastedBytes(ed.Text, ""));
+        }, "", laidOut: false);
+
+        Assert.Equal(picture, pasted);
+    }
+
+    [Theory]
+    [InlineData(true)]    // a MemoryStream: what WPF hands over for a registered format read through OLE
+    [InlineData(false)]   // a byte[]: what an in-process data object may carry instead
+    public void ClipboardPngGoesInByteForByte(bool asStream)
+    {
+        // Chrome, Office and others offer a registered "PNG" format beside the
+        // bitmap: the picture as its owner encoded it. Those bytes go in untouched.
+        // The bitmap alongside is a different picture, so a fallback to it shows.
+        var (png, text) = On(ed =>
+        {
+            var bytes = InterlacedPng();
+            var data = new DataObject();
+            data.SetImage(TinyBitmap());
+            data.SetData("PNG", asStream ? new MemoryStream(bytes) : (object)bytes);
+            Assert.True(ed.TryPasteImage(data));
+            return (bytes, ed.Text);
+        }, "", laidOut: false);
+
+        Assert.Equal(png, PastedBytes(text, ""));
+    }
+
+    [Fact]
+    public void ClipboardPngReadThroughOleArrivesAsAStreamAndGoesInAsIs()
+    {
+        // The route another program's PNG takes: WPF's OLE converter fetches the
+        // format into an HGLOBAL and hands it back as a MemoryStream. ComOnly sends
+        // an in-memory data object that way. PNG only, no bitmap: the registered
+        // format is a picture on its own.
+        var (arrived, png, text) = On(ed =>
+        {
+            var bytes = InterlacedPng();
+            var owner = new DataObject();
+            owner.SetData("PNG", new MemoryStream(bytes));
+            var data = new DataObject(new ClipboardFixtures.ComOnly(owner));
+            var type = data.GetData("PNG")?.GetType();
+            Assert.True(ed.TryPasteImage(data));
+            return (type, bytes, ed.Text);
+        }, "", laidOut: false);
+
+        Assert.Equal(typeof(MemoryStream), arrived);
+        Assert.Equal(png, PastedBytes(text, ""));
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46 })]  // a JPEG under the PNG name
+    [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00 })]  // CR LF turned to LF: what the signature exists to catch
+    [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A })]                    // seven of the eight signature bytes
+    [InlineData(new byte[0])]                                                                   // nothing at all
+    public void ClipboardPngWithoutTheSignatureFallsBackToTheBitmap(byte[] notPng)
+    {
+        var picture = Bgra(6, _ => 0xFF);
+        var pasted = On(ed =>
+        {
+            var data = new DataObject();
+            data.SetImage(ClipboardFixtures.Dib(3, 2, picture));
+            data.SetData("PNG", new MemoryStream(notPng));
+            Assert.True(ed.TryPasteImage(data));
+            return DecodeToBgra(PastedBytes(ed.Text, ""));
+        }, "", laidOut: false);
+
+        Assert.Equal(picture, pasted);
+    }
+
+    [Fact]
+    public void PngOnlyClipboardIsAPicture()
+    {
+        // No Bitmap, only the registered PNG. The Paste command must be enabled for
+        // it (Ctrl+V and Shift+Insert ask first), and the paste must insert it.
+        var (enabled, png, text) = On(ed =>
+        {
+            var bytes = InterlacedPng();
+            ed.ClipboardSource = () => new DataObject("PNG", new MemoryStream(bytes));
+            var canPaste = ApplicationCommands.Paste.CanExecute(null, ed);
+            ed.CaretOffset = 3;
+            var handled = ed.TryPasteImage(ed.ClipboardSource()!);
+            return (canPaste, bytes, handled ? ed.Text : "(not handled) " + ed.Text);
+        }, "abc", laidOut: false);
+
+        Assert.True(enabled);
+        Assert.Equal(png, PastedBytes(text, "abc"));
+    }
+
+    [Fact]
+    public void TextStillWinsOverAClipboardPng()
+    {
+        var (handled, enabled, text) = On(ed =>
+        {
+            var data = new DataObject("PNG", new MemoryStream(InterlacedPng()));
+            data.SetText("caption");
+            ed.ClipboardSource = () => data;
+            return (ed.TryPasteImage(data), ApplicationCommands.Paste.CanExecute(null, ed), ed.Text);
+        }, "abc", laidOut: false);
+
+        Assert.False(handled);
+        Assert.False(enabled);         // our hook declines, leaving the paste to AvalonEdit's text path
+        Assert.Equal("abc", text);
+    }
+
+    [Fact]
+    public void PngOnlyClipboardWithoutTheSignatureIsNotPasted()
+    {
+        // Nothing usable and no bitmap to fall back to: the paste is declined and the
+        // text left alone, rather than a broken picture going in.
+        var (handled, text) = On(ed =>
+            (ed.TryPasteImage(new DataObject("PNG", new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0]))), ed.Text),
+            "abc", laidOut: false);
+
+        Assert.False(handled);
+        Assert.Equal("abc", text);
+    }
+
+    [Fact]
+    public void AFailingClipboardPngReadFallsBackToTheBitmap()
+    {
+        // Reading the PNG is new, so a read that throws must not cost the paste the
+        // bitmap path it always had.
+        var picture = Bgra(6, _ => 0xFF);
+        var pasted = On(ed =>
+        {
+            var inner = new DataObject();
+            inner.SetImage(ClipboardFixtures.Dib(3, 2, picture));
+            inner.SetData("PNG", new MemoryStream(InterlacedPng()));
+            Assert.True(ed.TryPasteImage(new ClipboardFixtures.PngReadFails(inner)));
+            return DecodeToBgra(PastedBytes(ed.Text, ""));
+        }, "", laidOut: false);
+
+        Assert.Equal(picture, pasted);
+    }
+
+    [Fact]
+    public void TheSameClipboardPngPastesTwice()
+    {
+        // A second paste of the same data must insert the same picture: reading the
+        // stream the first time does not use it up.
+        var (png, text) = On(ed =>
+        {
+            var bytes = InterlacedPng();
+            var data = new DataObject("PNG", new MemoryStream(bytes));
+            Assert.True(ed.TryPasteImage(data));
+            Assert.True(ed.TryPasteImage(data));
+            return (bytes, ed.Text);
+        }, "", laidOut: false);
+
+        var once = ImagePaste.MarkdownFor(png);
+        Assert.Equal(once + once, text);
+    }
+
+    // ----- ImagePaste's alpha rule and PNG pass-through, on their own -----
+
+    /// <summary>Where each WPF format with an alpha channel keeps it: bytes a pixel,
+    /// the alpha's byte offset within the pixel, and its width in bytes. In all six
+    /// the three colour channels come first, each as wide as the alpha. The table is
+    /// checked against WPF itself by <see cref="AlphaSitsWhereTheseTestsSayItDoes"/>.</summary>
+    private static (PixelFormat Format, int PixelBytes, int Offset, int Width) AlphaFormat(string name) => name switch
+    {
+        "Bgra32" => (PixelFormats.Bgra32, 4, 3, 1),
+        "Pbgra32" => (PixelFormats.Pbgra32, 4, 3, 1),
+        "Rgba64" => (PixelFormats.Rgba64, 8, 6, 2),
+        "Prgba64" => (PixelFormats.Prgba64, 8, 6, 2),
+        "Rgba128Float" => (PixelFormats.Rgba128Float, 16, 12, 4),
+        "Prgba128Float" => (PixelFormats.Prgba128Float, 16, 12, 4),
+        _ => throw new ArgumentOutOfRangeException(nameof(name)),
+    };
+
+    /// <summary>Four pixels in one of the alpha formats: colour channels non-zero and
+    /// different on every pixel (real floats in the float formats), the alpha slot
+    /// holding the low bytes of <paramref name="alphaBits"/>(pixel), little-endian.</summary>
+    private static byte[] AlphaPixels(string name, Func<int, uint> alphaBits)
+    {
+        var (_, size, offset, width) = AlphaFormat(name);
+        var bytes = new byte[4 * size];
+        for (var p = 0; p < 4; p++)
+        {
+            var pixel = bytes.AsSpan(p * size, size);
+            for (var c = 0; c < 3; c++)
+            {
+                var channel = pixel.Slice(c * width, width);
+                switch (width)
+                {
+                    case 1: channel[0] = (byte)(0x10 + 0x20 * p + 0x08 * c); break;
+                    case 2: BinaryPrimitives.WriteUInt16LittleEndian(channel, (ushort)(0x1000 + 0x2000 * p + 0x0300 * c)); break;
+                    default: BinaryPrimitives.WriteSingleLittleEndian(channel, 0.1f + 0.2f * p + 0.03f * c); break;
+                }
+            }
+            var a = alphaBits(p);
+            for (var b = 0; b < width; b++) pixel[offset + b] = (byte)(a >> (8 * b));
+        }
+        return bytes;
+    }
+
+    /// <summary>Full alpha's bits in a format's alpha slot.</summary>
+    private static uint FullAlpha(int width) => width switch
+    {
+        1 => 0xFFu,
+        2 => 0xFFFFu,
+        _ => BitConverter.SingleToUInt32Bits(1f),
+    };
+
+    [Theory]
+    [InlineData("Bgra32")]
+    [InlineData("Pbgra32")]
+    [InlineData("Rgba64")]
+    [InlineData("Prgba64")]
+    [InlineData("Rgba128Float")]
+    [InlineData("Prgba128Float")]
+    public void AlphaSitsWhereTheseTestsSayItDoes(string name)
+    {
+        // WPF converts a pixel whose alpha is 0x80; the slot the table names must hold
+        // that alpha. The colours (0x10, 0xF0, 0x40) cannot land on 0x80/255 in any of
+        // these formats, premultiplied or linear, so the slot is not found by chance.
+        var (format, size, offset, width) = AlphaFormat(name);
+        var pixel = On(_ =>
+        {
+            var one = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { 0x10, 0xF0, 0x40, 0x80 }, 4);
+            var bytes = new byte[size];
+            new FormatConvertedBitmap(one, format, null, 0).CopyPixels(bytes, size, 0);
+            return bytes;
+        }, "", laidOut: false);
+
+        var slot = pixel.AsSpan(offset, width);
+        var alpha = width switch
+        {
+            1 => slot[0] / 255.0,
+            2 => BinaryPrimitives.ReadUInt16LittleEndian(slot) / 65535.0,
+            _ => BinaryPrimitives.ReadSingleLittleEndian(slot),
+        };
+        Assert.Equal(0x80 / 255.0, alpha, 3);
+    }
+
+    [Fact]
+    public void TheSixAlphaFormatsAreEveryWpfFormatThatKeepsAlpha()
+    {
+        // "Any format with an alpha channel WPF can hand over": every WPF format is
+        // tried with a pixel whose alpha is 0x80, there and back, and the formats that
+        // keep that alpha must be exactly the six the tests above name and
+        // ForEncoding handles. Indexed formats are left out, as the rule leaves them
+        // out: whatever alpha they have lives in a palette, not in the pixels.
+        var keepsAlpha = On(_ =>
+        {
+            var one = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { 0x10, 0xF0, 0x40, 0x80 }, 4);
+            var found = new List<string>();
+            foreach (var property in typeof(PixelFormats).GetProperties(
+                         System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+            {
+                if (property.Name == "Default" || property.Name.StartsWith("Indexed", StringComparison.Ordinal)) continue;
+                var format = (PixelFormat)property.GetValue(null)!;
+                var back = new FormatConvertedBitmap(new FormatConvertedBitmap(one, format, null, 0), PixelFormats.Bgra32, null, 0);
+                var pixel = new byte[4];
+                back.CopyPixels(pixel, 4, 0);
+                if (pixel[3] != 0xFF) found.Add(property.Name);
+            }
+            found.Sort(StringComparer.Ordinal);
+            return found;
+        }, "", laidOut: false);
+
+        Assert.Equal(new[] { "Bgra32", "Pbgra32", "Prgba128Float", "Prgba64", "Rgba128Float", "Rgba64" }, keepsAlpha);
+    }
+
+    [Theory]
+    [InlineData("Bgra32")]
+    [InlineData("Pbgra32")]
+    [InlineData("Rgba64")]
+    [InlineData("Prgba64")]
+    [InlineData("Rgba128Float")]
+    [InlineData("Prgba128Float")]
+    public void ForEncodingMakesAllZeroAlphaOpaqueAndKeepsTheColour(string name)
+    {
+        // Alpha zero on every pixel is a padding byte, not transparency (Chromium's
+        // rule), in every format with an alpha channel: the colour channels come out
+        // exactly as they went in, the alpha is full, and the format is unchanged.
+        var (format, size, _, width) = AlphaFormat(name);
+        var source = AlphaPixels(name, _ => 0);
+        var (same, outFormat, result) = On(_ =>
+        {
+            var image = BitmapSource.Create(2, 2, 96, 96, format, null, source, 2 * size);
+            var prepared = ImagePaste.ForEncoding(image);
+            var bytes = new byte[4 * size];
+            prepared.CopyPixels(bytes, 2 * size, 0);
+            return (ReferenceEquals(prepared, image), prepared.Format, bytes);
+        }, "", laidOut: false);
+
+        Assert.False(same);
+        Assert.Equal(format, outFormat);
+        Assert.Equal(AlphaPixels(name, _ => FullAlpha(width)), result);
+    }
+
+    [Theory]
+    [InlineData("Bgra32", 0x01u)]
+    [InlineData("Bgra32", 0x80u)]
+    [InlineData("Pbgra32", 0x01u)]
+    [InlineData("Rgba64", 0x0001u)]           // only the low byte of the 16-bit alpha
+    [InlineData("Rgba64", 0x0100u)]           // only the high byte
+    [InlineData("Prgba64", 0x0001u)]
+    [InlineData("Rgba128Float", 0x00000001u)] // the smallest float above zero
+    [InlineData("Rgba128Float", 0x3F800000u)] // 1.0: only the top two bytes set
+    [InlineData("Prgba128Float", 0x00000001u)]
+    public void ForEncodingLeavesAnyNonZeroAlphaAlone(string name, uint alphaBits)
+    {
+        // Real alpha on one pixel, however faint, and on the last pixel so the whole
+        // bitmap is scanned first: it is left exactly as it is, the same instance.
+        var (format, size, _, _) = AlphaFormat(name);
+        var same = On(_ =>
+        {
+            var image = BitmapSource.Create(2, 2, 96, 96, format, null,
+                AlphaPixels(name, p => p == 3 ? alphaBits : 0), 2 * size);
+            return ReferenceEquals(ImagePaste.ForEncoding(image), image);
+        }, "", laidOut: false);
+
+        Assert.True(same);
+    }
+
+    [Theory]
+    [InlineData("Bgr32")]
+    [InlineData("Bgr24")]
+    [InlineData("Gray8")]
+    [InlineData("Rgb48")]
+    [InlineData("Indexed8")]
+    public void ForEncodingLeavesFormatsWithoutAlphaAlone(string name)
+    {
+        // Every byte zero, so Bgr32's fourth byte is zero too, and it is not alpha:
+        // there is nothing to decide, and the bitmap comes back as it went in.
+        var same = On(_ =>
+        {
+            var format = (PixelFormat)typeof(PixelFormats).GetProperty(name)!.GetValue(null)!;
+            var stride = (2 * format.BitsPerPixel + 7) / 8;
+            var palette = format == PixelFormats.Indexed8 ? BitmapPalettes.Gray256 : null;
+            var image = BitmapSource.Create(2, 2, 96, 96, format, palette, new byte[stride * 2], stride);
+            return ReferenceEquals(ImagePaste.ForEncoding(image), image);
+        }, "", laidOut: false);
+
+        Assert.True(same);
+    }
+
+    [Theory]
+    [InlineData("Bgra32")]
+    [InlineData("Pbgra32")]
+    [InlineData("Rgba64")]
+    [InlineData("Prgba64")]
+    [InlineData("Rgba128Float")]
+    [InlineData("Prgba128Float")]
+    public void EncodePngOfAnAllZeroAlphaBitmapIsOpaque(string name)
+    {
+        // EncodePng applies the rule itself, whatever the format: every pixel of the
+        // PNG it writes reads back fully opaque.
+        var (format, size, _, _) = AlphaFormat(name);
+        var decoded = On(_ => DecodeToBgra(ImagePaste.EncodePng(
+            BitmapSource.Create(2, 2, 96, 96, format, null, AlphaPixels(name, _ => 0), 2 * size))),
+            "", laidOut: false);
+
+        for (var i = 3; i < decoded.Length; i += 4) Assert.Equal(0xFF, decoded[i]);
+    }
+
+    [Fact]
+    public void EncodePngKeepsThePremultipliedColourOfAnAllZeroAlphaBitmap()
+    {
+        // A Pbgra32 bitmap with alpha 0 must not come out black: opaque is made by
+        // writing full alpha, never by converting to a format without alpha, which
+        // would un-premultiply the colour by dividing it by that zero.
+        var source = Bgra(4, _ => 0x00);
+        var decoded = On(_ => DecodeToBgra(ImagePaste.EncodePng(
+            BitmapSource.Create(2, 2, 96, 96, PixelFormats.Pbgra32, null, source, 8))),
+            "", laidOut: false);
+
+        var opaque = (byte[])source.Clone();
+        for (var i = 3; i < opaque.Length; i += 4) opaque[i] = 0xFF;
+        Assert.Equal(opaque, decoded);
+    }
+
+    [Fact]
+    public void AlphaIsAllZeroReadsOnlyTheAlphaChannel()
+    {
+        // Colour does not count; one alpha byte anywhere does, first pixel or last.
+        byte[] colourOnly = [0x10, 0x20, 0x30, 0x00, 0xFF, 0xFF, 0xFF, 0x00];
+        byte[] firstHasAlpha = [0x10, 0x20, 0x30, 0x01, 0xFF, 0xFF, 0xFF, 0x00];
+        byte[] lastHasAlpha = [0x10, 0x20, 0x30, 0x00, 0xFF, 0xFF, 0xFF, 0x01];
+
+        Assert.True(ImagePaste.AlphaIsAllZero(colourOnly, PixelFormats.Bgra32));
+        Assert.True(ImagePaste.AlphaIsAllZero(colourOnly, PixelFormats.Pbgra32));
+        Assert.False(ImagePaste.AlphaIsAllZero(firstHasAlpha, PixelFormats.Bgra32));
+        Assert.False(ImagePaste.AlphaIsAllZero(lastHasAlpha, PixelFormats.Bgra32));
+        // A format without alpha has none to be zero: Bgr32's fourth byte is padding.
+        Assert.False(ImagePaste.AlphaIsAllZero(colourOnly, PixelFormats.Bgr32));
+    }
+
+    [Fact]
+    public void AlphaIsAllZeroCountsNegativeZeroAsZero()
+    {
+        // -0 is a zero alpha in the float formats although its sign bit is set; the
+        // smallest negative float is not.
+        var negativeZero = AlphaPixels("Rgba128Float", _ => 0x80000000u);
+        var negativeTiny = AlphaPixels("Rgba128Float", p => p == 3 ? 0x80000001u : 0x80000000u);
+
+        Assert.True(ImagePaste.AlphaIsAllZero(negativeZero, PixelFormats.Rgba128Float));
+        Assert.True(ImagePaste.AlphaIsAllZero(negativeZero, PixelFormats.Prgba128Float));
+        Assert.False(ImagePaste.AlphaIsAllZero(negativeTiny, PixelFormats.Rgba128Float));
+    }
+
+    [Fact]
+    public void UsablePngTakesAPngFromAStreamOrAnArray()
+    {
+        var png = On(_ => InterlacedPng(), "", laidOut: false);
+
+        Assert.Equal(png, ImagePaste.UsablePng(new MemoryStream(png)));
+        Assert.Equal(png, ImagePaste.UsablePng(png));
+        // The whole stream, wherever its position was left: a second paste of the
+        // same data reads the same picture.
+        var read = new MemoryStream(png) { Position = png.Length };
+        Assert.Equal(png, ImagePaste.UsablePng(read));
+        // A MemoryStream can be a window on a larger buffer; only the window is the
+        // PNG (GetBuffer would hand back the whole buffer).
+        var buffer = new byte[png.Length + 7];
+        png.CopyTo(buffer, 7);
+        Assert.Equal(png, ImagePaste.UsablePng(new MemoryStream(buffer, 7, png.Length)));
+        // The check is the signature and nothing more: eight bytes of it pass.
+        byte[] signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        Assert.Equal(signature, ImagePaste.UsablePng(signature));
+    }
+
+    [Fact]
+    public void UsablePngTurnsDownAnythingElse()
+    {
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
+        byte[] signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+        Assert.Null(ImagePaste.UsablePng(null));
+        Assert.Null(ImagePaste.UsablePng(jpeg));
+        Assert.Null(ImagePaste.UsablePng(new MemoryStream(jpeg)));
+        Assert.Null(ImagePaste.UsablePng(signature[..7]));                        // one byte short
+        Assert.Null(ImagePaste.UsablePng(Convert.ToBase64String(signature)));     // text, not the bytes
+        Assert.Null(ImagePaste.UsablePng(new BufferedStream(new MemoryStream(signature)))); // only a MemoryStream is read
     }
 
     // ===== 3. Replace All (#5 F4): the planned edits land as one undo unit =====
