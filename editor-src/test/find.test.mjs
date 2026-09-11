@@ -9,11 +9,18 @@
 // documents expand (F5), and that Replace advances to the next match (F1).
 import test, { before, beforeEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { undo, undoDepth } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
 import {
-  findReset, findNext, findClear, findReplace, findReplaceAll, findCaptureScope, expandTemplate,
+  findReset, findNext, findClear, findReplace, findReplaceAll, findCaptureScope,
+  expandTemplate, dotnetGroupMap,
 } from '../src/find.js';
+
+// The one table both engines answer to (#5 F-1, F-4, F-13). FindEngineTests.cs reads
+// the same file; a row that only one side satisfies is the divergence this pins.
+const templateTable = JSON.parse(
+  readFileSync(new URL('./fixtures/replace-templates.json', import.meta.url), 'utf8'));
 
 let ed;
 before(async () => {
@@ -402,11 +409,29 @@ describe('RegexGroupsSubstitute', () => {
     assert.equal(md(), '$$5 $1');
   });
 
-  test('expandTemplate mirrors the .NET forms the host documents', () => {
-    const m = ['ab', 'a', undefined];
-    m.groups = { first: 'a', none: undefined };
-    assert.equal(expandTemplate('[$$][$&][$0][$1][$2][${first}][$<first>][${none}][${1}][$9][$x][$]', m),
-      '[$][ab][ab][a][][a][a][][a][$9][$x][$]');
+});
+
+describe('TheReplacementTemplateSubsetIsTheSameInBothEngines', () => {
+  // One row per line of editor-src/test/fixtures/replace-templates.json, which the
+  // C# FindEngineTests reads too. Both sides build the regex case-sensitively and
+  // multiline, take the first match, and expand the template against it.
+  for (const row of templateTable.rows) {
+    test(row.name, () => {
+      const re = new RegExp(row.pattern, 'gmu');
+      const m = re.exec(row.input);
+      assert.ok(m, `pattern ${row.pattern} finds nothing in ${JSON.stringify(row.input)}`);
+      assert.equal(expandTemplate(row.template, m, dotnetGroupMap(row.pattern)), row.expected);
+    });
+  }
+
+  test('the .NET group map is used on the real Replace path, not only by the fixture', () => {
+    // Dropping the map argument at the call site would read $1 as JavaScript numbers
+    // it — 'a' rather than 'b' — and the fixture rows, which pass a map of their own,
+    // would not notice.
+    load('XXabYY');
+    scan('(?<first>a)(b)');
+    findReplaceAll(ed.view(), '$1-$2', false);
+    assert.equal(md(), 'XXb-aYY');
   });
 });
 

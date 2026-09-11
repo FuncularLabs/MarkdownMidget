@@ -161,7 +161,23 @@ The replacement follows the search mode:
 | -------------------- | --------------------------------------------------------------- |
 | Normal, Wildcards    | Inserted as typed; a `$` is a dollar sign.                       |
 | Extended             | The same escapes as the query — `\n`, `\r`, `\t`, `\0`, `\\`, `\xNN`, `\uNNNN` — and any other `\c` is `c`; otherwise as typed. |
-| Regular expression   | A .NET replacement pattern: `$1` and `${name}` for groups, `$0` or `$&` for the whole match, `$$` for a dollar sign. |
+| Regular expression   | A replacement template — see below. |
+
+In **Regular expression** mode the replacement understands exactly these forms, and
+the same ones in both views:
+
+| Form            | Meaning                                                          |
+| --------------- | ---------------------------------------------------------------- |
+| `$$`            | a dollar sign                                                     |
+| `$&` or `$0`    | the whole match                                                   |
+| `$1` … `$99`    | a capture group. Two digits when they name a group that exists, otherwise one digit and the rest of the number as typed — with two groups, `$12` is group 1 followed by a `2` |
+| `${name}`       | a named group — `(?<name>…)` — or a group number written in braces |
+
+Anything else after a `$` is left as typed, including `` $` ``, `$'`, `$+`, `$_`,
+`$<name>` and a `$` at the end of the box. Group **numbers** count the unnamed
+groups first, in the order they are written, and then the named ones: in
+`(?<first>a)(b)`, `$1` is `b` and `$2` is `a` (`${first}` is `a` too). A group that
+did not take part in the match is replaced by nothing.
 
 A pattern that does not compile is refused with *Invalid pattern.* and nothing
 is changed. In the formatted view the replacement takes the formatting of the

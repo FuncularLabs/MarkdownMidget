@@ -1,3 +1,6 @@
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 using MarkdownMidget;
 using Xunit;
 
@@ -316,5 +319,66 @@ public class FindEngineTests
     public void ApplyEditsWithNoEditsReturnsTheTextUnchanged()
     {
         Assert.Equal("abc", FindEngine.ApplyEdits("abc", System.Array.Empty<FindEngine.Edit>()));
+    }
+
+    // ===== The replacement-template subset, shared with the formatted view (#5 F-1, F-4, F-13) =====
+    //
+    // editor-src/test/fixtures/replace-templates.json is linked into this test project's
+    // output and read by editor-src/test/find.test.mjs as well. Both sides build the
+    // regex case-sensitively and multiline, take the first match in `input`, expand
+    // `template` against it and must produce `expected`. A row only one side satisfies
+    // is exactly the divergence the table exists to catch.
+
+    public static TheoryData<string, string, string, string, string> TemplateRows()
+    {
+        var data = new TheoryData<string, string, string, string, string>();
+        foreach (var row in ReadTemplateTable())
+            data.Add(row.Name, row.Pattern, row.Input, row.Template, row.Expected);
+        return data;
+    }
+
+    private static (string Name, string Pattern, string Input, string Template, string Expected)[] ReadTemplateTable()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "replace-templates.json");
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        return doc.RootElement.GetProperty("rows").EnumerateArray()
+            .Select(r => (
+                r.GetProperty("name").GetString()!,
+                r.GetProperty("pattern").GetString()!,
+                r.GetProperty("input").GetString()!,
+                r.GetProperty("template").GetString()!,
+                r.GetProperty("expected").GetString()!))
+            .ToArray();
+    }
+
+    [Fact]
+    public void TheSharedTemplateTableIsActuallyRead()
+    {
+        // A theory over an empty table is a green run that proves nothing: if the
+        // csproj ever stops copying the fixture next to the assembly, fail here
+        // rather than pass twenty-seven times over nothing.
+        Assert.True(ReadTemplateTable().Length >= 20,
+            "editor-src/test/fixtures/replace-templates.json must be copied to the test output");
+    }
+
+    [Theory]
+    [MemberData(nameof(TemplateRows))]
+    public void TheReplacementTemplateSubsetIsTheSameInBothEngines(
+        string name, string pattern, string input, string template, string expected)
+    {
+        var re = FindEngine.Build(pattern, FindEngine.Mode.Regex, matchCase: true, wholeWord: false);
+        Assert.True(re is not null, $"{name}: the pattern did not compile");
+        var m = re!.Match(input);
+        Assert.True(m.Success, $"{name}: the pattern finds nothing in {input}");
+        Assert.Equal(expected, FindEngine.ExpandTemplate(template, m));
+    }
+
+    [Fact]
+    public void TheSubsetIsWhatReplaceApplies()
+    {
+        // Not only ExpandTemplate in isolation: the Replace path runs through it too,
+        // so Match.Result's wider set ($_ and friends) cannot come back in by the door.
+        Assert.Equal("x [$_] y", ReplaceAll("x cat y", "cat", FindEngine.Mode.Regex, "[$_]", matchCase: true));
+        Assert.Equal("x [$`][$'] y", ReplaceAll("x cat y", "cat", FindEngine.Mode.Regex, "[$`][$']", matchCase: true));
     }
 }

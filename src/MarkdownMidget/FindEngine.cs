@@ -81,15 +81,17 @@ public static class FindEngine
     /// <summary>
     /// A query and its replacement prepared for one search mode. <see cref="Literal"/>
     /// says whether <see cref="Replacement"/> is inserted verbatim (Normal, Wildcards,
-    /// and Extended once its escapes are expanded) or is a .NET replacement pattern
-    /// (Regex: <c>$1</c>, <c>${name}</c>, <c>$0</c>/<c>$&amp;</c>, <c>$$</c>). The
-    /// formatted view is handed the same two values and its own expander mirrors the
-    /// Regex forms named here.
+    /// and Extended once its escapes are expanded) or is a replacement template
+    /// (Regex): <c>$1</c>…<c>$99</c>, <c>${name}</c>, <c>$0</c>/<c>$&amp;</c>,
+    /// <c>$$</c> — and nothing else, every other <c>$</c> form being literal. See
+    /// <see cref="ExpandTemplate"/> for the whole subset and why it is not
+    /// <see cref="Match.Result"/>. The formatted view is handed the same two values
+    /// and expands the same subset, over the same group numbers.
     /// </summary>
     public sealed record ReplaceSpec(Regex Regex, string Replacement, bool Literal)
     {
         /// <summary>The text one match becomes.</summary>
-        public string ReplacementFor(Match m) => Literal ? Replacement : m.Result(Replacement);
+        public string ReplacementFor(Match m) => Literal ? Replacement : ExpandTemplate(Replacement, m);
 
         /// <summary>
         /// Plans Replace All over <paramref name="text"/>: one edit per match, in
@@ -129,6 +131,83 @@ public static class FindEngine
             Mode.Extended => new ReplaceSpec(regex, UnescapeExtended(replacement), Literal: true),
             _ => new ReplaceSpec(regex, replacement, Literal: true),
         };
+    }
+
+    /// <summary>
+    /// Expands a Regex-mode replacement template against one match, in the one subset
+    /// the formatted view also implements (find.js <c>expandTemplate</c>), pinned for
+    /// both by <c>editor-src/test/fixtures/replace-templates.json</c>:
+    /// <list type="bullet">
+    ///   <item><c>$$</c> — a dollar sign.</item>
+    ///   <item><c>$&amp;</c> and <c>$0</c> — the whole match.</item>
+    ///   <item><c>$1</c>…<c>$99</c> — a capture group: two digits when they name a
+    ///     group that exists, otherwise one digit and the rest of the number literal.</item>
+    ///   <item><c>${name}</c> — a named group, or a group number spelled in braces.</item>
+    /// </list>
+    /// Anything else after a <c>$</c> is literal — <c>$&lt;name&gt;</c>, <c>$`</c>,
+    /// <c>$'</c>, <c>$+</c>, <c>$_</c> and a <c>$</c> at the end of the template
+    /// included. A group that did not take part is empty.
+    ///
+    /// Deliberately not <see cref="Match.Result"/>: that implements .NET's full set,
+    /// which the formatted view's JavaScript engine has no equivalent of, and the two
+    /// views would then write different documents for the same replacement.
+    /// </summary>
+    public static string ExpandTemplate(string template, Match m)
+    {
+        var groupCount = m.Groups.Count - 1;         // group 0 is the whole match
+        var sb = new StringBuilder(template.Length + 16);
+        for (var i = 0; i < template.Length; i++)
+        {
+            var c = template[i];
+            if (c != '$' || i + 1 >= template.Length) { sb.Append(c); continue; }
+            var n = template[i + 1];
+            if (n == '$') { sb.Append('$'); i++; continue; }
+            if (n == '&') { sb.Append(m.Value); i++; continue; }
+            if (n == '{')
+            {
+                var end = template.IndexOf('}', i + 2);
+                if (end > i + 2 && TryGroup(m, template[(i + 2)..end], groupCount, out var named))
+                {
+                    sb.Append(named);
+                    i = end;
+                    continue;
+                }
+                sb.Append(c);
+                continue;
+            }
+            if (char.IsAsciiDigit(n))
+            {
+                // Two digits when they name a group that exists, else one, else literal.
+                if (i + 2 < template.Length && char.IsAsciiDigit(template[i + 2]))
+                {
+                    var two = (n - '0') * 10 + (template[i + 2] - '0');
+                    if (two <= groupCount) { sb.Append(m.Groups[two].Value); i += 2; continue; }
+                }
+                var one = n - '0';
+                if (one <= groupCount) { sb.Append(m.Groups[one].Value); i++; continue; }
+            }
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The group <paramref name="name"/> names, by name or by number.
+    /// False — so the template text stays literal — when nothing does.</summary>
+    private static bool TryGroup(Match m, ReadOnlySpan<char> name, int groupCount, out string value)
+    {
+        value = "";
+        if (name.IsEmpty) return false;
+        var allDigits = true;
+        foreach (var ch in name) if (!char.IsAsciiDigit(ch)) { allDigits = false; break; }
+        if (allDigits)
+        {
+            if (!int.TryParse(name, out var n) || n < 0 || n > groupCount) return false;
+            value = m.Groups[n].Value;
+            return true;
+        }
+        if (!m.Groups.TryGetValue(name.ToString(), out var g)) return false;
+        value = g.Value;
+        return true;
     }
 
     /// <summary>

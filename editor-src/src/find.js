@@ -20,7 +20,7 @@ let cursor = -1;      // index into matches
 // from a new search or a changed document: the host re-issues findReset on every
 // change message, including the ones raised by the replacements made here, and
 // those must not lose the place.
-let indexed = { source: null, flags: null, doc: null, regex: null };
+let indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
 
 // The selection captured when the Find dialog opened (findCaptureScope), as
 // ProseMirror positions mapped through the replacements made here. Replace All
@@ -87,12 +87,12 @@ export function findReset(source, flags, view) {
     return { total: matches.length, current: cursor + 1 };
   matches = [];
   cursor = -1;
-  indexed = { source: null, flags: null, doc: null, regex: null };
+  indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
   if (!source) return { total: 0, current: 0 };
   let re;
   try { re = new RegExp(source, flags); }
   catch { return { total: 0, current: 0, error: 'Invalid pattern' }; }
-  indexed = { source, flags, doc: view ? view.state.doc : null, regex: re };
+  indexed = { source, flags, doc: view ? view.state.doc : null, regex: re, groupMap: dotnetGroupMap(source) };
   reindex();
   return { total: matches.length, current: 0 };
 }
@@ -154,7 +154,7 @@ export function findPrev(wrap) {
 export function findClear() {
   matches = [];
   cursor = -1;
-  indexed = { source: null, flags: null, doc: null, regex: null };
+  indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
   capturedScope = null;
 }
 
@@ -247,11 +247,62 @@ export function findCaptureScope(view) {
   return { from: sel.from, to: sel.to };
 }
 
-/// Expand a replacement template against one match, in the forms the host's
-/// FindEngine documents for Regex mode: $1..$99 (two digits when that group
-/// exists), ${name} and $<name>, $0 or $& for the whole match, $$ for a dollar
-/// sign. A group that did not take part is empty; anything else stays literal.
-export function expandTemplate(template, m) {
+/// The map from a .NET group NUMBER to the JavaScript one, built from a pattern
+/// source. The two engines number capture groups differently: .NET numbers the
+/// unnamed groups in source order and then the named ones, JavaScript numbers
+/// them all in source order — so `$1` against `(?<first>a)(b)` is 'b' in .NET and
+/// 'a' in JavaScript. Everything the host accepts in Regex mode is numbered here
+/// the .NET way, so one replacement template means one thing in both views.
+///
+/// Counts a capture for every '(' that is not escaped, not inside a character
+/// class, and not the start of '(?:' '(?=' '(?!' '(?<=' '(?<!' '(?>' '(?#' or an
+/// inline-option group; '(?<name>' and "(?'name'" are named captures.
+/// Returns { count, toJs } where toJs[dotnetNumber] is the JavaScript index
+/// (toJs[0] === 0: group 0 is the whole match in both).
+export function dotnetGroupMap(source) {
+  const named = [];        // JS indices of the named captures, in source order
+  const unnamed = [];      // JS indices of the unnamed captures, in source order
+  let inClass = false;
+  let count = 0;
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    if (c === '\\') { i++; continue; }           // the escaped character, whatever it is
+    if (inClass) { if (c === ']') inClass = false; continue; }
+    if (c === '[') { inClass = true; continue; }
+    if (c !== '(') continue;
+    if (source[i + 1] !== '?') { unnamed.push(++count); continue; }
+    const k = source[i + 2];
+    const after = source[i + 3];
+    if (k === '<' && after !== '=' && after !== '!') { named.push(++count); continue; }
+    if (k === "'") { named.push(++count); continue; }
+    // (?: (?= (?! (?<= (?<! (?> (?# (?i) (?(cond) — none of them capture.
+  }
+  return { count, toJs: [0, ...unnamed, ...named] };
+}
+
+/// Expand a replacement template against one match, in the one subset both
+/// engines implement (editor-src/test/fixtures/replace-templates.json pins it):
+/// `$$` a dollar sign, `$&` and `$0` the whole match, `$1`..`$99` a capture group
+/// — two digits when they name a group that exists, otherwise one digit and the
+/// rest literal — and `${name}` a named group (or a group number in braces).
+/// Anything else after a `$` is literal, `$<name>`, `` $` ``, `$'`, `$+`, `$_` and
+/// a trailing `$` included. A group that did not take part is empty.
+///
+/// `groupMap` comes from dotnetGroupMap(the pattern source): it is what makes
+/// `$1` name the same group the source view's .NET engine would.
+export function expandTemplate(template, m, groupMap) {
+  // A caller with no pattern source to build a map from gets JavaScript's own
+  // numbering. find.js never takes that path (findReset builds the map next to
+  // the regex), and a test pins that it doesn't.
+  const map = groupMap || { count: Math.max(0, m.length - 1), toJs: m.map((_, i) => i) };
+  const byNumber = (n) => m[map.toJs[n]] ?? '';
+  const byName = (name) => {
+    if (!name) return null;
+    if (m.groups && Object.prototype.hasOwnProperty.call(m.groups, name)) return m.groups[name] ?? '';
+    if (/^\d+$/.test(name) && Number(name) <= map.count) return byNumber(Number(name));
+    return null;
+  };
+
   let out = '';
   for (let i = 0; i < template.length; i++) {
     const c = template[i];
@@ -259,33 +310,25 @@ export function expandTemplate(template, m) {
     const n = template[i + 1];
     if (n === '$') { out += '$'; i++; continue; }
     if (n === '&') { out += m[0]; i++; continue; }
-    if (n === '{' || n === '<') {
-      const end = template.indexOf(n === '{' ? '}' : '>', i + 2);
+    if (n === '{') {
+      const end = template.indexOf('}', i + 2);
       if (end > i + 2) {
-        const name = template.slice(i + 2, end);
-        if (m.groups && Object.prototype.hasOwnProperty.call(m.groups, name)) {
-          out += m.groups[name] ?? '';
-          i = end;
-          continue;
-        }
-        if (/^\d+$/.test(name) && Number(name) < m.length) {
-          out += m[Number(name)] ?? '';
-          i = end;
-          continue;
-        }
+        const v = byName(template.slice(i + 2, end));
+        if (v !== null) { out += v; i = end; continue; }
       }
       out += c;
       continue;
     }
     if (n >= '0' && n <= '9') {
-      const two = template.slice(i + 1, i + 3);
-      if (/^\d\d$/.test(two) && Number(two) > 0 && Number(two) < m.length) {
-        out += m[Number(two)] ?? '';
+      // Two digits when they name a group that exists, else one, else literal.
+      const d2 = template[i + 2];
+      if (d2 >= '0' && d2 <= '9' && Number(n + d2) <= map.count) {
+        out += byNumber(Number(n + d2));
         i += 2;
         continue;
       }
-      if (Number(n) < m.length) {
-        out += m[Number(n)] ?? '';
+      if (Number(n) <= map.count) {
+        out += byNumber(Number(n));
         i += 1;
         continue;
       }
@@ -316,7 +359,7 @@ export function findReplace(view, replacement, literal, wrap) {
   const $to = state.doc.resolve(range.to);
   if (!$from.sameParent($to)) return { replaced: 0, skipped: 1, ...findNext(!!wrap) };
 
-  const text = literal ? replacement : expandTemplate(replacement, m.exec);
+  const text = literal ? replacement : expandTemplate(replacement, m.exec, indexed.groupMap);
   const tr = state.tr;
   replaceRange(tr, range.from, range.to, text, marksAt($from));
   // A selection that was the match itself (F3 in the editor puts it there) would
@@ -358,7 +401,7 @@ export function findReplaceAll(view, replacement, literal) {
     plan.push({
       from: r.from,
       to: r.to,
-      text: literal ? replacement : expandTemplate(replacement, m.exec),
+      text: literal ? replacement : expandTemplate(replacement, m.exec, indexed.groupMap),
       marks: marksAt($from),
     });
   }

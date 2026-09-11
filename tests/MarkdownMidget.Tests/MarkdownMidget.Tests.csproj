@@ -30,6 +30,11 @@
          we actually ship, and a second copy would drift the day someone edits one. -->
     <None Include="..\..\editor-src\styles\theme-default.css"
           Link="theme-default.css" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The cross-engine table. Linked for the same reason: find.test.mjs reads this
+         exact file, and a second copy would let the two engines drift apart the day
+         someone edits one of them. -->
+    <None Include="..\..\editor-src\test\fixtures\replace-templates.json"
+          Link="replace-templates.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- A stand-in for the app's embedded themes, so ThemeStore.Refresh can be driven

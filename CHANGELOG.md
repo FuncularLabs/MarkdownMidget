@@ -16,7 +16,8 @@ changes between alpha tags.
   nothing found yet it is Find Next); Replace All changes every match as one
   undo step — or every match inside the selected text, when some is selected —
   and the status bar reports the count. In Regular expression mode the
-  replacement can name groups (`$1`, `${name}`); in Extended mode it takes the
+  replacement can name groups — `$$`, `$&`, `$0`, `$1`…`$99` and `${name}`, with
+  every other `$` form left as typed, and the same in both views; in Extended mode it takes the
   same `\n`, `\t`, `\r`, `\\` escapes the query does; in Normal and Wildcards
   mode it goes in as typed. In the formatted view a replacement takes the
   formatting of the first character it replaces, and a match that runs from one

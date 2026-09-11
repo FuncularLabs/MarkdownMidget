@@ -1,0 +1,209 @@
+{
+  "note": [
+    "The replacement-template subset, pinned once for both engines (#5 F-1, F-4, F-13).",
+    "Read by tests/MarkdownMidget.Tests/FindEngineTests.cs (FindEngine.ExpandTemplate) and by",
+    "editor-src/test/find.test.mjs (expandTemplate in src/find.js). Both sides build the regex",
+    "from `pattern` case-sensitively and multiline, take the FIRST match in `input`, expand",
+    "`template` against it, and must produce `expected` — character for character.",
+    "",
+    "The subset: $$ = a dollar sign; $& and $0 = the whole match; $1..$99 = a capture group,",
+    "two digits when they name a group that exists, else one digit and the rest literal;",
+    "${name} = a named group (or a group number spelled in braces). Everything else after a $",
+    "is literal, including $<name>, $`, $', $+, $_ and a $ at the end of the template.",
+    "",
+    "Group NUMBERS are .NET's: unnamed groups in source order first, then named groups in",
+    "source order. JavaScript numbers them all in source order, so find.js resolves $n through",
+    "a map built from the pattern (dotnetGroupMap)."
+  ],
+  "rows": [
+    {
+      "name": "named and unnamed groups are numbered the .NET way",
+      "pattern": "(?<first>a)(b)",
+      "input": "XXabYY",
+      "template": "[$1][$2]",
+      "expected": "[b][a]"
+    },
+    {
+      "name": "the same mix reached by name",
+      "pattern": "(?<first>a)(b)",
+      "input": "XXabYY",
+      "template": "[${first}][$1]",
+      "expected": "[a][b]"
+    },
+    {
+      "name": "interleaved named and unnamed groups",
+      "pattern": "(?<n1>a)(b)(?<n2>c)(d)",
+      "input": "abcd",
+      "template": "[$1][$2][$3][$4]",
+      "expected": "[b][d][a][c]"
+    },
+    {
+      "name": "only named groups, numbered in source order",
+      "pattern": "(?<a1>x)(?<b1>y)",
+      "input": "xy",
+      "template": "[$1][$2]",
+      "expected": "[x][y]"
+    },
+    {
+      "name": "$0 is the whole match",
+      "pattern": "cat",
+      "input": "a cat b",
+      "template": "<$0>",
+      "expected": "<cat>"
+    },
+    {
+      "name": "$& is the whole match",
+      "pattern": "cat",
+      "input": "a cat b",
+      "template": "<$&>",
+      "expected": "<cat>"
+    },
+    {
+      "name": "$00 is the two-digit spelling of group 0",
+      "pattern": "cat",
+      "input": "cat",
+      "template": "[$00]",
+      "expected": "[cat]"
+    },
+    {
+      "name": "$$ is one dollar sign",
+      "pattern": "cost",
+      "input": "cost",
+      "template": "$$5",
+      "expected": "$5"
+    },
+    {
+      "name": "$$ directly before a group reference",
+      "pattern": "(a)",
+      "input": "a",
+      "template": "$$$1",
+      "expected": "$a"
+    },
+    {
+      "name": "$12 with two groups is group 1 then a literal 2",
+      "pattern": "(a)(b)",
+      "input": "ab",
+      "template": "[$12]",
+      "expected": "[a2]"
+    },
+    {
+      "name": "$12 with twelve groups is group 12",
+      "pattern": "(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)(l)",
+      "input": "abcdefghijkl",
+      "template": "[$12]",
+      "expected": "[l]"
+    },
+    {
+      "name": "$9 with two groups is literal",
+      "pattern": "(a)(b)",
+      "input": "ab",
+      "template": "[$9]",
+      "expected": "[$9]"
+    },
+    {
+      "name": "$<name> is literal in both engines",
+      "pattern": "(?<first>a)",
+      "input": "a",
+      "template": "[$<first>]",
+      "expected": "[$<first>]"
+    },
+    {
+      "name": "${name} names a named group",
+      "pattern": "(?<user>\\w+)@",
+      "input": "me@host",
+      "template": "${user}!",
+      "expected": "me!"
+    },
+    {
+      "name": "${1} is group 1 in .NET order",
+      "pattern": "(?<first>a)(b)",
+      "input": "ab",
+      "template": "[${1}][${2}]",
+      "expected": "[b][a]"
+    },
+    {
+      "name": "${missing} is literal",
+      "pattern": "(?<first>a)",
+      "input": "a",
+      "template": "[${missing}]",
+      "expected": "[${missing}]"
+    },
+    {
+      "name": "a numbered group that did not take part is empty",
+      "pattern": "(a)|(z)",
+      "input": "a",
+      "template": "[$1][$2]",
+      "expected": "[a][]"
+    },
+    {
+      "name": "a named group that did not take part is empty",
+      "pattern": "(?<x>a)|(?<y>z)",
+      "input": "a",
+      "template": "[${x}][${y}]",
+      "expected": "[a][]"
+    },
+    {
+      "name": "the .NET-only dollar forms are literal",
+      "pattern": "cat",
+      "input": "x cat y",
+      "template": "[$`][$'][$+][$_]",
+      "expected": "[$`][$'][$+][$_]"
+    },
+    {
+      "name": "a dollar at the end of the template is a dollar",
+      "pattern": "cat",
+      "input": "cat",
+      "template": "end$",
+      "expected": "end$"
+    },
+    {
+      "name": "a dollar before an ordinary letter is literal",
+      "pattern": "cat",
+      "input": "cat",
+      "template": "[$x]",
+      "expected": "[$x]"
+    },
+    {
+      "name": "non-capturing groups are not numbered",
+      "pattern": "(?:x)(a)",
+      "input": "xa",
+      "template": "[$1]",
+      "expected": "[a]"
+    },
+    {
+      "name": "an escaped parenthesis is not a group",
+      "pattern": "\\((a)\\)",
+      "input": "(a)",
+      "template": "[$1]",
+      "expected": "[a]"
+    },
+    {
+      "name": "an escaped backslash does not escape the parenthesis after it",
+      "pattern": "\\\\(a)",
+      "input": "\\a",
+      "template": "[$1]",
+      "expected": "[a]"
+    },
+    {
+      "name": "a parenthesis inside a character class is not a group",
+      "pattern": "[(](a)",
+      "input": "(a)",
+      "template": "[$1]",
+      "expected": "[a]"
+    },
+    {
+      "name": "lookarounds are not numbered",
+      "pattern": "(?<=x)(a)(?=b)",
+      "input": "xab",
+      "template": "[$1]",
+      "expected": "[a]"
+    },
+    {
+      "name": "groups in a sentence-shaped template",
+      "pattern": "(\\w+)@(\\w+)",
+      "input": "me@host",
+      "template": "$2 at $1",
+      "expected": "host at me"
+    }
+  ]
+}
