@@ -850,7 +850,18 @@ public partial class MainWindow : Window
         // leave the visible document ahead of the fields, and in source view that
         // mismatch becomes a crash snapshot labelled with the wrong file.
         if (_editorReady)
+        {
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
+            // setMarkdown settles the document before it returns (editor-src/src/settle.js):
+            // one that ends in a list, a table or a code block gains the editor's trailing
+            // empty paragraph THERE rather than on the reader's first click or first F3.
+            // What it hands back from now on is therefore what it holds now — so mirror
+            // that, not what we asked for, or the clean baseline taken in source view
+            // would differ from the formatted view's markdown by one blank line and the
+            // document would read as modified the moment the views were swapped (#5 NF-5).
+            var settled = await RunEditorAsync("window.MDM.getMarkdown()");
+            if (settled is not null) markdown = settled;
+        }
         SourceBox.Text = markdown;
         // Count here rather than in each caller: installing content doesn't raise a
         // 'change' message, so a freshly opened document would otherwise show no

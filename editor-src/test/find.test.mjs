@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { undo, undoDepth } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
+import { settleDocument } from '../src/settle.js';
 import {
   findReset, findNext, findClear, findReplace, findReplaceAll, findCaptureScope,
   expandTemplate, dotnetGroupMap,
@@ -37,8 +38,17 @@ before(async () => {
 // the life of the dialog; each case starts as a freshly opened dialog would.
 beforeEach(() => findClear());
 
-/** Load a document and return the editor's own serialisation of it. */
-const load = (text) => ed.roundTrip(text);
+/**
+ * Load a document the way the host does and return the editor's own serialisation
+ * of it — which is also the clean baseline the host takes right afterwards.
+ * MDM.setMarkdown installs the markdown and then settles the document, so that is
+ * what this does too (#5 NF-5).
+ */
+const load = (text) => {
+  ed.roundTrip(text);
+  settleDocument(ed.view());
+  return ed.markdown();
+};
 /** The document as markdown without the serialiser's trailing newline(s). */
 const md = () => ed.markdown().replace(/\n+$/, '');
 /** Index the current document for `source` (a JS regex source), as the host does. */
@@ -97,6 +107,34 @@ describe('ReplacesExactlyTheFoundRangeAcrossInlineMarks', () => {
     scan('cat ');
     findReplaceAll(ed.view(), '', true);
     assert.equal(md(), 'a b');
+  });
+});
+
+describe('FindLeavesTheDocumentTheHostBaselined', () => {
+  // The editor's trailing plugin appends an empty paragraph to a document that does
+  // not end in a paragraph or a heading — a list, a table, a code block — but it does
+  // it from appendTransaction, so the paragraph does not exist until SOMETHING
+  // dispatches. Find's selection of a match was that something: getMarkdown() then
+  // gained a trailing blank line, the host compared it Ordinal against the baseline
+  // taken at load, and one F3 made an untouched document "modified" — a * in the
+  // title, a crash backup, and a save prompt on close. setMarkdown settles the
+  // document instead, so the baseline is what the editor will hand back from then
+  // on (#5 NF-5).
+  for (const [ending, doc] of [
+    ['a list', 'para cat\n\n- item cat'],
+    ['a table', 'para cat\n\n| a | b |\n| --- | --- |\n| 1 | cat |'],
+  ]) {
+    test(`one Find Next in a document ending in ${ending} changes nothing`, () => {
+      const baseline = load(doc);          // exactly what the host keeps as its clean copy
+      scan('cat');
+      findNext(true);
+      assert.equal(ed.markdown(), baseline);
+      assert.equal(undoDepth(ed.view().state), 0, 'and settling adds no undo step');
+    });
+  }
+
+  test('a document ending in a paragraph is handed back unchanged by the settle', () => {
+    assert.equal(load('para cat\n\nmore cat'), 'para cat\n\nmore cat\n');
   });
 });
 
@@ -221,10 +259,12 @@ describe('FindResetKeepsThePlaceOnAnUnchangedDocument', () => {
 
 describe('ReplaceAllIsOneUndoStep', () => {
   test('one undo restores the whole document', () => {
-    // The list sits in the middle on purpose: the editor's trailing plugin adds
-    // an empty paragraph after a document that ENDS in a list on any transaction
-    // (a Replace All or the undo of one alike), which would make an exact
-    // comparison read as a difference that is not this code's.
+    // The list sits in the middle on purpose. `load` settles the document the way
+    // the host's setMarkdown does, so a trailing list would already carry the
+    // editor's empty paragraph — but the undo of a Replace All restores the document
+    // to before it, and the trailing plugin then puts it back on the next
+    // transaction, which would make an exact comparison read as a difference that is
+    // not this code's.
     const original = load('cat one\n\n- cat two\n\ncat three');
     const before = ed.view().state.doc.toJSON();
     scan('cat');

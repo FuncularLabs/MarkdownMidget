@@ -173,10 +173,12 @@ function applySelection() {
         .setSelection(TextSelection.create(boundView.state.doc, r.from, r.to))
         .setMeta('addToHistory', false));
       // A selection carries no steps of its own and adds no undo step, but a
-      // plugin may append to the document on the back of it — the trailing
-      // paragraph one does, whenever the document ends in a list. Keep the index
-      // in step with what the editor now holds, and keep the place, or the very
-      // next Replace finds the index stale and degrades to Find Next.
+      // plugin may append to the document on the back of it — the trailing one
+      // does, for a document ending in anything but a paragraph or a heading
+      // (a list, a table, a code block), unless setMarkdown has already settled
+      // it (settle.js). Keep the index in step with what the editor now holds,
+      // and keep the place, or the very next Replace finds the index stale and
+      // degrades to Find Next.
       if (boundView.state.doc !== indexed.doc) {
         indexed.doc = boundView.state.doc;
         reindex();
