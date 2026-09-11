@@ -9,6 +9,11 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Changed
+- **Bullet lists are saved with `-` bullets; they were `*`.** And where one
+  list directly follows another, the second is written with `*` bullets (it was
+  `-`): with the same marker, CommonMark would read the two as one list. (#2)
+
 ### Fixed
 - **Saving from the formatted view keeps tight lists tight, `snake_case_word` as
   written, and emphasis that touches punctuation as emphasis.** A document that
@@ -19,8 +24,8 @@ changes between alpha tags.
   kind — opening or closing on punctuation — that directly touches an emoji (or
   any other character UTF-16 stores as a pair): the text is kept whole, the
   emphasis may come back as plain text. The rest of what the formatted view
-  does to a file's style — `-` bullets, `1.` numbering, `#` headings, fenced code,
-  inline links — is unchanged, pinned by tests, and listed in Help under
+  does to a file's style — `1.` numbering, `#` headings, fenced code, inline
+  links — is unchanged, pinned by tests, and listed in Help under
   *Modified state, undo, and saving ▸ Markdown conventions*. (#2)
 
 ## [0.10.0-beta1] - 2026-09-10
