@@ -6,10 +6,10 @@
 // case goes red, which is the point of it.
 //
 // Three things live here: the remark-stringify options and handlers the editor
-// serialises with (`conventions`, a Milkdown config — the hard-break form and,
-// for R3, the underscore rule are handlers), and the schema fix that keeps
-// tight lists tight (`tightBulletList`, `tightListItem`). All are wired in by
-// editor-factory.js.
+// serialises with (`conventions`, a Milkdown config — the hard-break form, the
+// underscore rule of R3 and the emphasis/strong encoding are handlers), and the
+// schema fix that keeps tight lists tight (`tightBulletList`, `tightListItem`).
+// All are wired in by editor-factory.js.
 
 import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { bulletListSchema } from '@milkdown/kit/preset/commonmark';
@@ -61,8 +61,15 @@ function hardBreak(node, parent, state, info) {
 // Milkdown's own text handler and un-escapes exactly those runs; every other
 // `_` keeps its backslash, which is what stops a literal `_x_` from coming back
 // as emphasis. "Word character" is anything that is neither whitespace nor
-// punctuation, punctuation being \p{P} and \p{S}: the classes micromark, the
-// parser, uses, so the two sides of the round trip agree.
+// punctuation, punctuation being \p{P} and \p{S} — the classes micromark, the
+// parser, tests. micromark tests them on UTF-16 code UNITS (its preprocessor
+// reads charCodeAt) where this reads code points, so the two sides disagree on
+// exactly one thing: an astral punctuation or symbol character — an emoji — is
+// a lone surrogate, hence a word character, to the parser and a symbol here.
+// That disagreement only ever runs the safe way: this side keeps the escape on
+// a `_` the parser would have read as literal anyway, and an extra escape is
+// always literal. Image alt text never reaches this handler — the image
+// handler escapes it through state.safe itself — so its `_` stays `\_`.
 const NOT_WORD = /[\s\p{P}\p{S}]/u;
 const isWordChar = (ch) => ch !== '' && !NOT_WORD.test(ch);
 // The neighbouring character as a code point, so an emoji (a surrogate pair)
@@ -86,6 +93,47 @@ function intrawordUnderscores(text) {
   return (node, parent, state, info) => keepIntrawordUnderscores(text(node, parent, state, info), info);
 }
 
+// ---- emphasis beside punctuation survives (#2 F-1) --------------------------
+//
+// Milkdown replaces mdast-util-to-markdown's emphasis and strong handlers with
+// its own (@milkdown/core's remarkHandlers) so that a mark is written with the
+// marker it was READ with — remarkMarker records it on the mdast node as
+// `node.marker`. Theirs write marker, content, marker and nothing else. The
+// defaults also look at the character on each side of the run and, where the
+// pair would keep the run from opening or closing, write the outer letter as a
+// character reference (encodeInfo): `a` + emphasis(`_b`) is `&#x61;*\_b*`,
+// which reads back as emphasis, where Milkdown's `a*\_b*` does not — `\` is
+// punctuation and `a` is not, so that `*` run can open nothing. The wrapper
+// below is the default handler with the node's marker in force. The default
+// reads the marker from state.options, and state.options is the copy
+// remark-stringify makes for each stringify call, so setting it for one node
+// reaches no other document; it is restored after the call because a run can
+// nest one of the other marker. A marker that is neither `*` nor `_` (there
+// is none: remarkMarker reads the construct's first character) falls back to
+// the option, where the default would throw. The peek is what the sibling
+// BEFORE a run is told the run starts with: without one containerPhrasing
+// runs the whole handler as the peek, and the default handler leaves its
+// encoding decision (state.attentionEncodeSurroundingInfo) behind for the
+// wrong node.
+const ATTENTION_MARKERS = new Set(['*', '_']);
+const markerOf = (node, option, state) =>
+  ATTENTION_MARKERS.has(node.marker) ? node.marker : (state.options[option] || '*');
+
+/** mdast-util-to-markdown's `emphasis` / `strong` handler (the `option` names both) writing the node's own marker. */
+function encodedAttention(option) {
+  const handler = (node, parent, state, info) => {
+    const saved = state.options[option];
+    state.options[option] = markerOf(node, option, state);
+    try {
+      return defaultHandlers[option](node, parent, state, info);
+    } finally {
+      state.options[option] = saved;
+    }
+  };
+  handler.peek = (node, parent, state) => markerOf(node, option, state);
+  return handler;
+}
+
 /** Milkdown config: install the options and handlers above. */
 export function conventions(ctx) {
   ctx.update(remarkStringifyOptionsCtx, (prev) => ({
@@ -95,6 +143,8 @@ export function conventions(ctx) {
       ...prev.handlers,
       break: hardBreak,
       text: intrawordUnderscores(prev.handlers.text || defaultHandlers.text),
+      emphasis: encodedAttention('emphasis'),
+      strong: encodedAttention('strong'),
     },
   }));
 }

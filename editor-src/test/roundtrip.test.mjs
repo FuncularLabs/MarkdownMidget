@@ -13,9 +13,9 @@
 // record: one assertion per row of the plan's measured table, stating what the
 // editor does to that construct. When a convention is pinned (R2) the row's
 // expectation is changed on purpose, with the reason beside it — never by
-// regenerating. `ConventionsArePinned` and `IntrawordUnderscoreSurvives` hold
-// the forms src/conventions.js chooses, one case each, so a drift in any of
-// them is a red case with a name.
+// regenerating. `ConventionsArePinned`, `IntrawordUnderscoreSurvives` and
+// `EmphasisBesidePunctuationSurvives` hold the forms src/conventions.js
+// chooses, one case each, so a drift in any of them is a red case with a name.
 import test, { before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -38,6 +38,13 @@ const CORPUS = {
 
 let ed;
 before(async () => { ed = await mountEditor(); });
+
+/** Whether the current document holds an emphasis mark anywhere. */
+const hasEmphasis = () => {
+  let found = false;
+  ed.view().state.doc.descendants((n) => { if (n.marks.some((m) => m.type.name === 'emphasis')) found = true; });
+  return found;
+};
 
 describe('Idempotent', () => {
   for (const [name, text] of Object.entries(CORPUS)) {
@@ -229,11 +236,6 @@ describe('IntrawordUnderscoreSurvives', () => {
   // half of this block, and it is what keeps a literal `_x_` from turning into
   // emphasis on the next open.
   const unchanged = (md) => assert.equal(ed.roundTrip(md), md + '\n');
-  const hasEmphasis = () => {
-    let found = false;
-    ed.view().state.doc.descendants((n) => { if (n.marks.some((m) => m.type.name === 'emphasis')) found = true; });
-    return found;
-  };
 
   test('snake_case_word survives unescaped', () => {
     unchanged('snake_case_word');
@@ -282,6 +284,68 @@ describe('IntrawordUnderscoreSurvives', () => {
 
   test('guard: a literal backslash before an underscore stays literal', () => {
     // `a\\_b` in the file is a backslash then an underscore; both survive.
-    assert.equal(ed.roundTrip('a\\\\_b'), 'a\\\\\\_b\n');
+    assert.equal(ed.roundTrip('a\\\\_b'), 'a\\\\\\\_b\n');
+  });
+});
+
+describe('EmphasisBesidePunctuationSurvives', () => {
+  // Milkdown's own emphasis and strong handlers write marker, content, marker
+  // and nothing else. mdast-util-to-markdown's also look at the character on
+  // each side of the run: where the one outside and the one inside would keep
+  // the run from opening or closing — a letter outside and punctuation inside,
+  // for one — the letter is written as a character reference, so the run still
+  // reads as emphasis on the next open. src/conventions.js puts that back
+  // (encodedAttention). Each case: the editor's output re-parses to the SAME
+  // document, and a second pass changes nothing.
+  const survives = (md) => {
+    const s1 = ed.roundTrip(md);
+    const d1 = ed.view().state.doc.toJSON();
+    const s2 = ed.roundTrip(s1);
+    const d2 = ed.view().state.doc.toJSON();
+    assert.deepEqual(d2, d1, `${JSON.stringify(md)}: the editor's output ${JSON.stringify(s1)} re-parses to a different document`);
+    assert.equal(s2, s1, `${JSON.stringify(md)}: a second pass changed the output`);
+    return s1;
+  };
+
+  test('a*_b*: emphasis opening on an underscore, after a letter', () => {
+    // micromark lets a `*` run open when the next character is another
+    // attention marker, so this is `a` + emphasis(`_b`). Written back as
+    // `a*\_b*` the run could not open — `\` is punctuation and `a` is neither
+    // whitespace nor punctuation — and the emphasis was gone on the next open.
+    // The letter outside the run is encoded instead.
+    assert.equal(survives('a*_b*'), '&#x61;*\\_b*\n');
+    assert.equal(hasEmphasis(), true, 'the emphasis must come back as emphasis');
+  });
+
+  test('guards: a literal underscore against an emphasis or strong run', () => {
+    // Each of these survived before; they hold the encoding to the one case
+    // that needs it.
+    assert.equal(survives('*a*_b'), '*a*\\_b\n');
+    assert.equal(survives('**a**_b'), '**a**\\_b\n');
+    assert.equal(survives('a_*b*'), 'a\\_*b*\n');
+    assert.equal(survives('_a_*b*'), '_a_*b*\n');
+  });
+
+  test('guard: the neighbour is told the marker, the handler is not run for it', () => {
+    // containerPhrasing asks the NEXT sibling what it starts with, through its
+    // handler's peek. Without a peek it runs the handler itself, and the
+    // default handler leaves its encoding decision behind for the wrong node:
+    // here the `*` closing `*x*` would be encoded, and the first emphasis lost.
+    assert.equal(survives('*x*a*_b*'), '*x*&#x61;*\\_b*\n');
+  });
+
+  test('strong made in the editor over a_ then b', () => {
+    // The `**a\_**b` shape: a run closing on an escaped underscore with a
+    // letter after it. The letter outside the run is encoded, and the document
+    // the editor held is the document the file gives back.
+    ed.roundTrip('a_b');
+    ed.selectText(1, 3);
+    ed.editor.action(callCommand(toggleStrongCommand.key));
+    const made = ed.view().state.doc.toJSON();
+    const out = ed.markdown();
+    assert.equal(out, '**a\\_**&#x62;\n');
+    ed.roundTrip(out);
+    assert.deepEqual(ed.view().state.doc.toJSON(), made);
+    assert.equal(survives(out), out);
   });
 });
