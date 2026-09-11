@@ -367,15 +367,16 @@ public class DropHandshakeTests
         var clean = new string("# Notes".AsSpan());
         Assert.True(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.Editable, DropTarget.Editable, false, false));
+            DropTarget.Editable, DropTarget.Editable, 0, 0));
         // An untitled document has no path, and two nulls are the same document.
         Assert.True(DropHandshake.StillApplies(
-            null, null, clean, clean, DropTarget.Editable, DropTarget.Editable, false, false));
+            null, null, clean, clean, DropTarget.Editable, DropTarget.Editable, 0, 0));
         // The source view is a document state like any other, and a drop that
-        // started there and is still there applies.
+        // started there and is still there applies: the view counter has not moved,
+        // whatever it happens to stand at.
         Assert.True(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.Editable, DropTarget.Editable, true, true));
+            DropTarget.Editable, DropTarget.Editable, 7, 7));
     }
 
     [Fact]
@@ -395,15 +396,25 @@ public class DropHandshakeTests
         //   into the source box — which is hidden a few lines later and never read
         //   again.
         //
-        // Either way the picture was gone with nothing said. Both directions are
-        // pinned: neither is the view the plan was made for.
+        // Either way the picture was gone with nothing said.
+        //
+        // F-A, round 5: the first fix pinned _sourceMode ITSELF, which cannot see
+        // either of the two cases above while they are HAPPENING — that is the whole
+        // point of the paragraphs above, and the flag does not turn over until the
+        // bottom of the method. A continuation landing in either gap read the same
+        // bool on both sides and the pin passed. So what is pinned is
+        // _viewGeneration, bumped at the top of SetSourceModeAsync before its first
+        // await: a pin taken at g refuses at g+1 (the switch is in flight, the flag
+        // has not moved yet) and at g+2 (a full round trip out and back, which ends
+        // in the view it started in and which the flag also cannot see).
         var clean = new string("# Notes".AsSpan());
+        const long g = 4;
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.Editable, DropTarget.Editable, sourceThen: false, sourceNow: true));
+            DropTarget.Editable, DropTarget.Editable, viewThen: g, viewNow: g + 1));
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.Editable, DropTarget.Editable, sourceThen: true, sourceNow: false));
+            DropTarget.Editable, DropTarget.Editable, viewThen: g, viewNow: g + 2));
     }
 
     [Fact]
@@ -417,7 +428,7 @@ public class DropHandshakeTests
         var clean = new string("# Notes".AsSpan());
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.Editable, DropTarget.NoDocument, false, false));
+            DropTarget.Editable, DropTarget.NoDocument, 0, 0));
     }
 
     [Fact]
@@ -428,13 +439,13 @@ public class DropHandshakeTests
         var clean = new string("# Notes".AsSpan());
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.Editable, DropTarget.ReadOnly, false, false));
+            DropTarget.Editable, DropTarget.ReadOnly, 0, 0));
         // And the other way round: a window that became editable mid-wait is not the
         // window the plan was made for either — that plan set the picture aside as
         // "not inserted", and its notice has already said so.
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
-            DropTarget.ReadOnly, DropTarget.Editable, false, false));
+            DropTarget.ReadOnly, DropTarget.Editable, 0, 0));
     }
 
     [Fact]
@@ -443,13 +454,13 @@ public class DropHandshakeTests
         var clean = new string("# Notes".AsSpan());
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\other.md", clean, clean,
-            DropTarget.Editable, DropTarget.Editable, false, false));
+            DropTarget.Editable, DropTarget.Editable, 0, 0));
         // A file opened where there was an untitled document, and a document that
         // lost its path, are both a different document from the one routed.
         Assert.False(DropHandshake.StillApplies(
-            null, @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable, false, false));
+            null, @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable, 0, 0));
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", null, clean, clean, DropTarget.Editable, DropTarget.Editable, false, false));
+            @"C:\a\notes.md", null, clean, clean, DropTarget.Editable, DropTarget.Editable, 0, 0));
     }
 
     [Fact]
@@ -474,7 +485,7 @@ public class DropHandshakeTests
         Assert.False(ReferenceEquals(then, now));
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", then, now,
-            DropTarget.Editable, DropTarget.Editable, false, false));
+            DropTarget.Editable, DropTarget.Editable, 0, 0));
     }
 
     [Fact]
@@ -496,19 +507,22 @@ public class DropHandshakeTests
         Assert.True(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md",
             JsonSerializer.Deserialize<string>("\"\""), new string(string.Empty.AsSpan()),
-            DropTarget.Editable, DropTarget.Editable, false, false));
+            DropTarget.Editable, DropTarget.Editable, 0, 0));
 
-        // Deliberately not fixed with a generation counter: the other three
+        // Deliberately not given a BASELINE counter of its own: the other three
         // comparisons still guard the insertion, and an empty document saved to its own
         // path is the same document at the same path in the same view — the picture
-        // goes where the user is looking. This test exists so the comments and HELP
-        // cannot drift back into promising a guarantee this wide.
+        // goes where the user is looking. (The VIEW half is a counter, for a different
+        // reason: _sourceMode does not move until a switch has finished, so the flag
+        // could not see the switch while it was happening at all. An empty baseline
+        // that is reassigned to "" has genuinely not moved.) This test exists so the
+        // comments and HELP cannot drift back into promising a guarantee this wide.
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\other.md", string.Empty, string.Empty,
-            DropTarget.Editable, DropTarget.Editable, false, false));
+            DropTarget.Editable, DropTarget.Editable, 0, 0));
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", string.Empty, string.Empty,
-            DropTarget.Editable, DropTarget.ReadOnly, false, false));
+            DropTarget.Editable, DropTarget.ReadOnly, 0, 0));
     }
 
     [Fact]
@@ -578,7 +592,14 @@ public class DropHandshakeTests
         // with nothing on screen, and the drop it superseded raised a modal
         // "Couldn't read the image". Both are status lines now, and both name what
         // happened.
-        Assert.Equal("A newer drop replaced this one; nothing from it was inserted.",
+        //
+        // "inserted or opened", for the same reason DocumentChangedNotice says it
+        // (F-C, round 5): the supersede check moved to the ENTRY of the insertion
+        // chokepoint, ahead of the empty-plan return, so a drop whose plan only
+        // OPENS a document — a dropped .md, on either surface — is abandoned through
+        // this notice too. "Nothing from it was inserted" was then what a user was
+        // told when what the drop lost was the document it was going to open.
+        Assert.Equal("A newer drop replaced this one; nothing from it was inserted or opened.",
             DropHandshake.SupersededNotice);
         // And the one for a document that moved under the read rather than a drop
         // that replaced it: it names both things the drop could have done, because

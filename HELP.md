@@ -395,8 +395,8 @@ line with `--readonly`.
   - **If a dropped file can't be read**, it is named and *none* of the drop's
     pictures go in — the same all-or-nothing you get if a file goes away mid-drop.
     Where it is named depends on the surface. Dropped on the **toolbar, menu bar or
-    source view** the file is read from disk, and a failure is a message box, the
-    same one **Insert ▸ Picture** shows. On the **formatted editing area** the
+    source view** the file is read from disk, and a failure is a message box
+    worded as **Insert ▸ Picture**'s is. On the **formatted editing area** the
     bytes have to come back from the editor, which has two ways to fail, and both
     of those are status-bar messages. When the editor answers but **can't hand the
     bytes over** — including a picture too large to cross to the window in one
@@ -416,7 +416,8 @@ line with `--readonly`.
     short, emptied, or grew past the size limit), nothing is inserted and a message
     says so. Drop it again once the other program has finished with it.
   - **Drop again before a drop has finished** and the newer drop wins: the status
-    bar says the earlier one was replaced, and nothing from it is inserted.
+    bar says the earlier one was replaced, and nothing from it is inserted or
+    opened.
   - **Change the document while a drop is still being read** — open another file,
     save it under another name, close it, turn on **Edit ▸ Read Only**, or switch
     between the formatted and markdown views (Ctrl+E) — and the drop is abandoned:

@@ -37,6 +37,20 @@ public partial class MainWindow : Window
     private bool _dirty;
     private bool _editorReady;
     private bool _sourceMode;
+
+    /// <summary>
+    /// How many times the window has STARTED switching between the formatted and
+    /// markdown views. Bumped at the top of <see cref="SetSourceModeAsync"/> — the
+    /// only writer of <see cref="_sourceMode"/> — before its first await, so a
+    /// switch that is half-done counts as a movement even though the flag has not
+    /// turned over yet.
+    ///
+    /// Only drops read it (<see cref="DropHandshake.StillApplies"/>). Everything
+    /// else in the window reads <see cref="_sourceMode"/> synchronously, where
+    /// there is no gap to see.
+    /// </summary>
+    private long _viewGeneration;
+
     private bool _syncingStyle;
     private bool _showMarks;
 
@@ -951,6 +965,18 @@ public partial class MainWindow : Window
             MenuViewSource.IsChecked = _sourceMode;
             return;
         }
+
+        // The view is moving, and from HERE it is unsafe for a drop to insert:
+        // _sourceMode does not change until the bottom of this method, so anything
+        // pinned on the flag alone sees no movement across either await below —
+        // which is the whole of the window in which InsertMarkdownFragment would
+        // route to the half being discarded (DropHandshake.StillApplies). Bumped
+        // past the two returns above — already in that view, and no document to flip
+        // between views; the view stays where it is in both — and before the first
+        // await, so an in-flight switch counts as much as a finished one. A
+        // switch that fails below leaves the view where it was and still bumps: a
+        // drop is abandoned that need not have been, which is the safe way round.
+        _viewGeneration++;
 
         if (on)
         {
@@ -2500,10 +2526,18 @@ public partial class MainWindow : Window
     private async Task HandleExternalChangeAsync(string path)
     {
         // Pin the baseline as well as the path. A Save or Load mid-pass reassigns
-        // _cleanMarkdown (always to a fresh string instance, even for identical text),
-        // so a reference check detects ANY baseline movement — without it, a user Save
+        // _cleanMarkdown to a fresh string instance even for identical text, so a
+        // reference check detects that baseline movement — without it, a user Save
         // that lands during our awaits reads as "nothing to lose" and the pass would
         // quietly revert the just-saved document to the stale disk content it read.
+        //
+        // Except for an EMPTY document, where PassValid() is only its StillEditing
+        // half: "" is interned, every route hands back the one string.Empty, and a
+        // reassignment of "" to "" is invisible to a reference check (see
+        // SetCleanBaselineAsync). What stands in for it on the reload path is the
+        // re-read below — `confirm` against `newContent`, taken right before
+        // ReloadPreservingPositionAsync — which a mid-pass save of an empty document
+        // fails, so the pass rechecks instead of reloading.
         var cleanAtStart = _cleanMarkdown;
         bool PassValid() => StillEditing(path) && ReferenceEquals(_cleanMarkdown, cleanAtStart);
 
@@ -4057,18 +4091,21 @@ public partial class MainWindow : Window
     /// read, and the content route's whole round trip to the editor — leaves the
     /// menus live, so all four can move underneath one.
     ///
-    /// The fourth is the VIEW. InsertMarkdownFragment routes by _sourceMode, and
-    /// SetSourceModeAsync yields twice with _sourceMode still at its old value, so
+    /// The fourth is the VIEW, and it is pinned as <see cref="_viewGeneration"/>
+    /// rather than as _sourceMode itself. InsertMarkdownFragment routes by
+    /// _sourceMode, and SetSourceModeAsync yields twice with _sourceMode still at
+    /// its OLD value — so the flag compared equal for the whole of the switch, and
     /// an insertion landing in either gap went into the half of the window that was
-    /// about to be thrown away — and neither half says anything when it is.
+    /// about to be thrown away, with neither half saying anything. The counter moves
+    /// before the first of those awaits, so mid-switch is a movement too.
     ///
     /// <paramref name="generation"/> is not about the document at all: it is which
     /// DROP this is (<see cref="_dropGeneration"/>), and every caller claims a fresh
     /// one as it starts. Two drops racing on the same unchanged document match on
     /// all four of the above, so nothing else can tell them apart.
     /// </summary>
-    private (string? Path, string Clean, DropTarget Target, bool Source, long Generation) DropPin(long generation) =>
-        (_currentPath, _cleanMarkdown, DropTargetNow(), _sourceMode, generation);
+    private (string? Path, string Clean, DropTarget Target, long View, long Generation) DropPin(long generation) =>
+        (_currentPath, _cleanMarkdown, DropTargetNow(), _viewGeneration, generation);
 
     /// <summary>
     /// Which drop the window belongs to, claimed by BOTH surfaces as they start
@@ -4090,15 +4127,15 @@ public partial class MainWindow : Window
     /// <summary>Whether the window is still the one <paramref name="then"/> was taken
     /// from. False means the plan made against it is stale and nothing from the drop
     /// may be applied.</summary>
-    private bool DropStillApplies((string? Path, string Clean, DropTarget Target, bool Source, long Generation) then) =>
+    private bool DropStillApplies((string? Path, string Clean, DropTarget Target, long View, long Generation) then) =>
         DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown,
-            then.Target, DropTargetNow(), then.Source, _sourceMode);
+            then.Target, DropTargetNow(), then.View, _viewGeneration);
 
     /// <summary>Whether <paramref name="then"/>'s drop is still the one the window
     /// belongs to. Separate from <see cref="DropStillApplies"/> because it is a
     /// different failure with a different notice: no document moved, a newer drop
     /// simply took over.</summary>
-    private bool DropIsStillCurrent((string? Path, string Clean, DropTarget Target, bool Source, long Generation) then) =>
+    private bool DropIsStillCurrent((string? Path, string Clean, DropTarget Target, long View, long Generation) then) =>
         DropHandshake.StillTheCurrentDrop(then.Generation, _dropGeneration);
 
     /// <summary>
@@ -4127,7 +4164,7 @@ public partial class MainWindow : Window
     /// </returns>
     private async Task<bool> InsertDroppedPicturesAsync(
         DropPlan plan, Func<int, Task<byte[]>> bytesOf,
-        (string? Path, string Clean, DropTarget Target, bool Source, long Generation) then)
+        (string? Path, string Clean, DropTarget Target, long View, long Generation) then)
     {
         // Before the empty check, not after: a drop that wants no pictures can still
         // open a document (the content route) or flash a notice, and neither belongs
@@ -4802,11 +4839,20 @@ public partial class MainWindow : Window
         // direction, but it also means an unnecessary prompt and an unnecessary
         // backup on every document that follows.
         //
-        // Still a FRESH instance either way: HandleExternalChangeAsync detects a
-        // document swap underneath its awaits by reference-comparing this field, so
-        // "reassigned but identical text" has to be distinguishable from "not
-        // reassigned at all". Leaving the old reference in place would make a reload
-        // of the same path invisible to that check.
+        // Still a FRESH instance either way, with one exception: HandleExternalChangeAsync
+        // detects a document swap underneath its awaits by reference-comparing this
+        // field, and a drop's pin does the same, so "reassigned but identical text"
+        // has to be distinguishable from "not reassigned at all". Leaving the old
+        // reference in place would make a reload of the same path invisible to both.
+        //
+        // The exception is an EMPTY document. "" is interned: the editor's answer
+        // comes back through JsonSerializer.Deserialize<string>, and the fallback
+        // below is new string("".AsSpan()) — both hand back the one string.Empty, so
+        // a reassignment here is invisible to a reference check. Neither caller is
+        // left unguarded by it: the external-change pass still has its path half and
+        // re-reads the disk before it reloads, and a drop still compares the path,
+        // what the window can take, and which view it is in.
+        // (AnEmptyDocumentsBaselineMovesWithoutTheReferencePinSeeingIt pins this.)
         var markdown = await TryGetDocumentMarkdownAsync();
         _cleanMarkdown = markdown ?? new string(_cleanMarkdown.AsSpan());
         _dirty = false;

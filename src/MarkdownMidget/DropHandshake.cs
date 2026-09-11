@@ -83,8 +83,15 @@ internal static class DropHandshake
         new(DropReply.Discard, new Dictionary<int, byte[]>(), []);
 
     /// <summary>What the status line says when a drop is abandoned because the user
-    /// dropped again before it finished. It used to say nothing at all.</summary>
-    public const string SupersededNotice = "A newer drop replaced this one; nothing from it was inserted.";
+    /// dropped again before it finished. It used to say nothing at all.
+    ///
+    /// Names opening as well as inserting, for the same reason
+    /// <see cref="DocumentChangedNotice"/> does: the supersede check sits at the
+    /// ENTRY of the insertion chokepoint, ahead of the empty-plan return, so a drop
+    /// whose plan only OPENS a document — a dropped .md, on either surface — is
+    /// abandoned through this notice too. "Nothing from it was inserted" was then
+    /// said to a user who had a document taken off them.</summary>
+    public const string SupersededNotice = "A newer drop replaced this one; nothing from it was inserted or opened.";
 
     /// <summary>What the status line says when the DOCUMENT moved while the drop was
     /// being read — a different file opened, the document closed, Read Only turned
@@ -132,14 +139,24 @@ internal static class DropHandshake
     /// own.</item>
     /// <item>What the window can take. Read Only turned on mid-wait, or the document
     /// closed, both change this and both mean the insert must not happen.</item>
-    /// <item>Which VIEW is on screen. <c>InsertMarkdownFragment</c> routes by
-    /// <c>_sourceMode</c>, and <c>SetSourceModeAsync</c> yields twice with
-    /// <c>_sourceMode</c> still at its old value, so a drop continuation landing in
-    /// either gap inserted into the half of the window that was about to be
-    /// discarded — into a hidden source box on the way out, or into the WYSIWYG
-    /// document on the way in, where <c>SourceBox.Text = latest</c> then overwrote
-    /// it with markdown fetched before the insertion. Nothing was said either
-    /// time.</item>
+    /// <item>Which VIEW the window is in — as a COUNTER, not as the flag itself.
+    /// <c>InsertMarkdownFragment</c> routes by <c>_sourceMode</c>, and
+    /// <c>SetSourceModeAsync</c> yields twice with <c>_sourceMode</c> still at its
+    /// OLD value. So comparing the FLAG saw nothing while a switch was in flight —
+    /// the very window that is the bug: a drop continuation landing in either gap
+    /// read the same bool on both sides, the pin passed, and the fragment went into
+    /// the half of the window about to be discarded — into a hidden source box on
+    /// the way out, or into the WYSIWYG document on the way in, where
+    /// <c>SourceBox.Text = latest</c> then overwrote it with markdown fetched before
+    /// the insertion. Nothing was said either time. <c>_viewGeneration</c> is bumped
+    /// at the TOP of <c>SetSourceModeAsync</c> — past its two no-op early returns
+    /// (already in that view, or no document) and BEFORE its first await — so the
+    /// in-flight switch and the completed round trip are both a changed number here.
+    /// That method is the only writer of <c>_sourceMode</c>, so the view cannot move
+    /// without this moving first. A switch that is attempted and FAILS (the editor
+    /// cannot answer, so the view is left as it was) bumps it too, and the drop is
+    /// abandoned and says so: the conservative direction, and one failure inside
+    /// another.</item>
     /// </list>
     ///
     /// A window that became MORE permissive mid-wait fails too, and deliberately: a
@@ -151,11 +168,11 @@ internal static class DropHandshake
         string? pathThen, string? pathNow,
         string? cleanThen, string? cleanNow,
         DropTarget targetThen, DropTarget targetNow,
-        bool sourceThen, bool sourceNow) =>
+        long viewThen, long viewNow) =>
         string.Equals(pathThen, pathNow, StringComparison.Ordinal)
         && ReferenceEquals(cleanThen, cleanNow)
         && targetThen == targetNow
-        && sourceThen == sourceNow;
+        && viewThen == viewNow;
 
     /// <summary>
     /// Whether a <c>fileDrop</c> message that has just arrived is older than one
