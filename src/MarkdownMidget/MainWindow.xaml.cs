@@ -3991,12 +3991,12 @@ public partial class MainWindow : Window
     private async void Window_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
-        // Only the first bytes of each file are read to route it; a picture's bytes
-        // are read in full below, and a document's by OpenPathAsync.
-        var files = paths.Select(p => new DroppedFile(Path.GetFileName(p), ReadHead(p))).ToList();
+        // Only the first bytes of each file are read to route it (DropFiles.Read); a
+        // picture's bytes are read in full below, and a document's by OpenPathAsync.
+        var files = paths.Select(DropFiles.Read).ToList();
         var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: false);
 
-        await InsertDroppedPicturesAsync(plan, i => File.ReadAllBytesAsync(paths[i]));
+        await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]));
 
         // Documents open as a drop here always opened them: the first in this window
         // only if it holds an untitled, unmodified document; otherwise (a file is
@@ -4010,28 +4010,6 @@ public partial class MainWindow : Window
         }
         if (plan.Notice() is { } notice) FlashStatus(notice);
         Activate();
-    }
-
-    /// <summary>
-    /// The first <see cref="DropRouting.SniffLength"/> bytes of a dropped path, for
-    /// routing. A file that can't be read (locked, gone, a folder) gives an EMPTY
-    /// head rather than a null one: routing then goes by the name, so a markdown
-    /// name still reaches OpenPathAsync and its own "Couldn't open the file" — as
-    /// a drop always did — and any other name is refused.
-    /// </summary>
-    private static byte[] ReadHead(string path)
-    {
-        try
-        {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var head = new byte[DropRouting.SniffLength];
-            var read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
-            return head[..read];
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return [];
-        }
     }
 
     /// <summary>What the window can do with a dropped picture right now: the same
