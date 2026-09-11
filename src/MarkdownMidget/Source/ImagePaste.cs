@@ -40,8 +40,10 @@ internal static class ImagePaste
     /// The clipboard's own PNG, when <paramref name="data"/> (what reading
     /// <see cref="PngFormat"/> returned) is one to insert as it is: a
     /// <see cref="MemoryStream"/>, which is how WPF hands over a registered format
-    /// another program put there, or a byte array, which an in-process data object
-    /// may hold instead, starting with the eight-byte PNG signature. Those bytes go
+    /// another program put there as raw bytes, or a byte array, which is how it
+    /// arrives when the data object holding it kept it as one, in this process or in
+    /// another .NET program (WPF reads that back as an array), starting with the
+    /// eight-byte PNG signature. Those bytes go
     /// into the document untouched, with no decode and no re-encode: the picture
     /// exactly as its owner encoded it. Anything else (null, another kind of stream,
     /// bytes without the signature) is null, and the caller falls back to the bitmap.

@@ -157,8 +157,13 @@ public class SourceEditor : TextEditor
 
     /// <summary>
     /// What <paramref name="data"/> holds under <see cref="ImagePaste.PngFormat"/>, or
-    /// null. A read that fails with the ExternalException clipboard reads throw is
-    /// null as well, so the bitmap, when there is one, still pastes: the PNG is the
+    /// null. On the real route a failed read does not throw: the clipboard's data is a
+    /// WPF DataObject over another program's OLE data object, and WPF's converter
+    /// returns null for a "PNG" read that fails, so the fallback runs through
+    /// <see cref="ImagePaste.UsablePng"/>(null) and the bitmap, when there is one,
+    /// still pastes (SourceEditorTests.AFailingClipboardPngReadThroughOleFallsBackToTheBitmap
+    /// pins that for CLIPBRD_E_BAD_DATA). The catch is a second line of defence, for a
+    /// data object that throws from GetData itself. Either way the PNG is the
     /// preferred copy of the picture, not the only one.
     /// </summary>
     private static object? ReadPng(IDataObject data)

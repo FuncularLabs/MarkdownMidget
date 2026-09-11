@@ -11,7 +11,9 @@ namespace MarkdownMidget.Tests;
 
 /// <summary>
 /// Clipboard data in the shapes other programs really leave it (#7), built in
-/// memory: nothing here reads or writes the clipboard itself.
+/// memory: nothing here reads or writes the clipboard itself. The one shape no real
+/// route produces is <see cref="PngReadFails"/>, kept for a catch that only a data
+/// object throwing directly can reach.
 /// </summary>
 internal static class ClipboardFixtures
 {
@@ -75,13 +77,24 @@ internal static class ClipboardFixtures
         finally { DeleteObject(hbitmap); }
     }
 
+    /// <summary>CLIPBRD_E_BAD_DATA: the HRESULT the clipboard reports for a format
+    /// whose data could not be rendered.</summary>
+    private const int ClipbrdEBadData = unchecked((int)0x800401D3);
+
     /// <summary>
     /// Only the COM face of <paramref name="inner"/>. Wrapped in a WPF
     /// <see cref="DataObject"/>, it is read the way WPF reads another program's
     /// clipboard data: through its OLE converter, each format fetched into an
     /// HGLOBAL and handed back from there. No clipboard is involved.
+    ///
+    /// With <paramref name="failing"/> named, fetching that format fails the way
+    /// the clipboard fails a format its owner could not render: GetData throws the
+    /// COMException the runtime makes of CLIPBRD_E_BAD_DATA, while the format is
+    /// still advertised (QueryGetData and EnumFormatEtc answer as
+    /// <paramref name="inner"/> does). Every other format is fetched from
+    /// <paramref name="inner"/>.
     /// </summary>
-    public sealed class ComOnly(ComDataObject inner) : ComDataObject
+    public sealed class ComOnly(ComDataObject inner, string? failing = null) : ComDataObject
     {
         public int DAdvise(ref FORMATETC pFormatetc, ADVF advf, IAdviseSink adviseSink, out int connection) =>
             inner.DAdvise(ref pFormatetc, advf, adviseSink, out connection);
@@ -90,22 +103,39 @@ internal static class ClipboardFixtures
         public IEnumFORMATETC EnumFormatEtc(DATADIR direction) => inner.EnumFormatEtc(direction);
         public int GetCanonicalFormatEtc(ref FORMATETC formatIn, out FORMATETC formatOut) =>
             inner.GetCanonicalFormatEtc(ref formatIn, out formatOut);
-        public void GetData(ref FORMATETC format, out STGMEDIUM medium) => inner.GetData(ref format, out medium);
-        public void GetDataHere(ref FORMATETC format, ref STGMEDIUM medium) => inner.GetDataHere(ref format, ref medium);
+        public void GetData(ref FORMATETC format, out STGMEDIUM medium)
+        {
+            FailIfAskedFor(format);
+            inner.GetData(ref format, out medium);
+        }
+        public void GetDataHere(ref FORMATETC format, ref STGMEDIUM medium)
+        {
+            FailIfAskedFor(format);
+            inner.GetDataHere(ref format, ref medium);
+        }
         public int QueryGetData(ref FORMATETC format) => inner.QueryGetData(ref format);
         public void SetData(ref FORMATETC formatIn, ref STGMEDIUM medium, bool release) =>
             inner.SetData(ref formatIn, ref medium, release);
+
+        private void FailIfAskedFor(FORMATETC format)
+        {
+            if (failing is not null && format.cfFormat == unchecked((short)DataFormats.GetDataFormat(failing).Id))
+                throw Marshal.GetExceptionForHR(ClipbrdEBadData)!;
+        }
     }
 
     /// <summary>
-    /// A data object whose "PNG" read throws what a failed clipboard read throws (a
-    /// COMException, here carrying CLIPBRD_E_BAD_DATA) while every other read is
-    /// answered by <paramref name="inner"/>.
+    /// A data object whose own GetData throws for "PNG" (a COMException carrying
+    /// CLIPBRD_E_BAD_DATA) while every other read is answered by
+    /// <paramref name="inner"/>. The real route does not have this shape: there a
+    /// failed read fails inside WPF's OLE converter, which returns null for it
+    /// (<see cref="ComOnly"/> with a failing format;
+    /// AFailingClipboardPngReadThroughOleFallsBackToTheBitmap pins that for
+    /// CLIPBRD_E_BAD_DATA). This is for SourceEditor.ReadPng's catch, the second
+    /// line of defence, which covers a data object that throws directly.
     /// </summary>
     public sealed class PngReadFails(DataObject inner) : WpfDataObject
     {
-        private const int ClipbrdEBadData = unchecked((int)0x800401D3);
-
         public object? GetData(string format) => GetData(format, autoConvert: true);
         public object? GetData(Type format) => inner.GetData(format);
         public object? GetData(string format, bool autoConvert) =>

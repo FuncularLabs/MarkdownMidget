@@ -578,7 +578,7 @@ public class SourceEditorTests
 
     [Theory]
     [InlineData(true)]    // a MemoryStream: what WPF hands over for a registered format read through OLE
-    [InlineData(false)]   // a byte[]: what an in-process data object may carry instead
+    [InlineData(false)]   // a byte[]: what arrives when the data object holding the PNG kept it as one
     public void ClipboardPngGoesInByteForByte(bool asStream)
     {
         // Chrome, Office and others offer a registered "PNG" format beside the
@@ -688,10 +688,38 @@ public class SourceEditorTests
     }
 
     [Fact]
-    public void AFailingClipboardPngReadFallsBackToTheBitmap()
+    public void AFailingClipboardPngReadThroughOleFallsBackToTheBitmap()
     {
-        // Reading the PNG is new, so a read that throws must not cost the paste the
-        // bitmap path it always had.
+        // The real route: another program's data reaches the editor as a WPF
+        // DataObject over that program's OLE data object. When the "PNG" it
+        // advertises fails to render (CLIPBRD_E_BAD_DATA here, as the clipboard
+        // reports it), WPF's OLE converter returns null rather than throwing, and the
+        // paste falls back through UsablePng(null) to the bitmap, which comes over the
+        // same route.
+        var picture = Bgra(6, _ => 0xFF);
+        var (advertised, read, pasted) = On(ed =>
+        {
+            var owner = new DataObject();
+            owner.SetImage(ClipboardFixtures.Dib(3, 2, picture));
+            owner.SetData("PNG", new MemoryStream(InterlacedPng()));
+            var data = new DataObject(new ClipboardFixtures.ComOnly(owner, failing: "PNG"));
+            var present = data.GetDataPresent("PNG");
+            var png = data.GetData("PNG");
+            Assert.True(ed.TryPasteImage(data));
+            return (present, png, DecodeToBgra(PastedBytes(ed.Text, "")));
+        }, "", laidOut: false);
+
+        Assert.True(advertised);          // the PNG is on offer...
+        Assert.Null(read);                // ...its read fails, and WPF hands back null, not an exception
+        Assert.Equal(picture, pasted);    // ...so the bitmap pasted
+    }
+
+    [Fact]
+    public void APngReadThatThrowsFallsBackToTheBitmap()
+    {
+        // A data object that throws from its own GetData for the PNG, which the real
+        // route does not do (see the test above): ReadPng's catch is the second line
+        // of defence, and the bitmap must still paste.
         var picture = Bgra(6, _ => 0xFF);
         var pasted = On(ed =>
         {
