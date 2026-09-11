@@ -99,12 +99,12 @@ changes between alpha tags.
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
   list directly follows another, the second is written with `*` bullets (it was
   `-`): with the same marker, CommonMark would read the two as one list. (#2)
-- **Insert ▸ Picture… and a pasted picture refuse a picture larger than 64 MB**,
-  as dropping a picture file does: nothing is inserted, and the status bar says
-  "Too large to insert (over 64 MB): huge.png" (a pasted picture, having no name,
-  is "pasted picture"). An embedded picture rides inside the document as text,
-  about a third again its size in every copy and every save, so one limit now
-  applies whichever way a picture comes in — dropped on either view, picked
+- **Insert ▸ Picture… and a paste into either view refuse a picture larger than
+  64 MB**, as dropping a picture file does: nothing is inserted, and the status
+  bar says "Too large to insert (over 64 MB): huge.png" (a pasted picture, having
+  no name, is "pasted picture"). An embedded picture rides inside the document as
+  text, about a third again its size in every copy and every save, so one limit
+  now applies whichever way a picture comes in — dropped on either view, picked
   through **Insert ▸ Picture…**, or pasted into either view.
 
 ### Fixed

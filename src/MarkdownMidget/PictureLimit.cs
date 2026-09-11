@@ -14,10 +14,10 @@ namespace MarkdownMidget;
 ///
 /// The routes the host checks ask <see cref="IsTooLarge"/> and say no with
 /// <see cref="Notice"/>, so no two can disagree about where the line is or how the
-/// refusal is worded: a picture file dropped on either view
+/// refusal is worded: dropping a picture file on either view
 /// (<see cref="DropRouting"/>, whose MaxPictureBytes is this constant under the
-/// drop's own name), Insert ▸ Picture (<see cref="PickedPicture"/>), and a picture
-/// pasted into the Markdown source view (<see cref="Source.ImagePaste"/>).
+/// drop's own name), Insert ▸ Picture (<see cref="PickedPicture"/>), and pasting a
+/// picture into the Markdown source view (<see cref="Source.ImagePaste"/>).
 ///
 /// The one route the host cannot check applies the same ceiling itself: a picture
 /// pasted into the FORMATTED view is pasted by Chromium, and never reaches the
