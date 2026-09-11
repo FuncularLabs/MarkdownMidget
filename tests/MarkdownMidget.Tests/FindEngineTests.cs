@@ -574,9 +574,9 @@ public class FindEngineTests
         // the U+2028 / U+2029 separators.
         var caret = FindEngine.Build("^", FindEngine.Mode.Regex, matchCase: true, wholeWord: false)!;
         Assert.Equal(2, caret.Matches("a\nb").Count);
-        Assert.Equal(1, caret.Matches("a\rb").Count);
-        Assert.Equal(1, caret.Matches("a\u2028b").Count);
-        Assert.Equal(1, caret.Matches("a\u2029b").Count);
+        Assert.Single(caret.Matches("a\rb"));
+        Assert.Single(caret.Matches("a\u2028b"));
+        Assert.Single(caret.Matches("a\u2029b"));
     }
 
     [Fact]
