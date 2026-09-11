@@ -135,6 +135,32 @@ describe('ReplaceMovesToTheNextMatch', () => {
     assert.equal(highlighted(), 'cat');
   });
 
+  test('with the caret moved away from the match, Replace is Find Next too', () => {
+    // F3 three times, then a click at the top of the document. Replace must not
+    // change the match Find last landed on — the source view degrades to Find Next
+    // here (IsSourceFindSelection) and this view replaced regardless (#5 F-9).
+    load('cat one\n\ncat two\n\ncat three');
+    scan('cat');
+    findNext(true); findNext(true); findNext(true);       // on the third
+    const one = blockRange('cat one');
+    ed.selectText(one.from, one.from);                    // the user clicks at the top
+    const r = findReplace(ed.view(), 'dog', true, true);
+    assert.deepEqual(r, { replaced: 0, skipped: 0, total: 3, current: 1 });
+    assert.equal(md(), 'cat one\n\ncat two\n\ncat three');
+  });
+
+  test('Find Next leaves a real editor selection, not only a browser highlight', () => {
+    // What makes the check above possible: the source view's Find selects in the
+    // document, and so does this one now.
+    load('cat one cat');
+    scan('cat');
+    findNext(true);
+    const p = blockRange('cat one cat');
+    const sel = ed.view().state.selection;
+    assert.deepEqual({ from: sel.from, to: sel.to }, { from: p.from, to: p.from + 3 });
+    assert.equal(undoDepth(ed.view().state), 0, 'moving the selection is not an undo step');
+  });
+
   test('with nothing found yet, Replace is Find Next', () => {
     load('cat cat');
     scan('cat');                        // indexed, but no current match
@@ -348,7 +374,11 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
   });
 
   test('a selection that was Find’s does not survive as a selection of the replacement', () => {
-    // Replace: the selection equal to the match becomes a caret after the replacement.
+    // Replace: the selection equal to the match becomes a caret after the
+    // replacement, and then Find moves on and selects the NEXT match — never the
+    // replacement text, which would pass for the user's own selection next time.
+    // (The source view does the same: SelectSourceMatch, or a caret with nothing
+    // left to find.)
     load('cat one cat');
     scan('cat');
     findNext(true);
@@ -356,9 +386,25 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     ed.selectText(p.from, p.from + 3);
     findReplace(ed.view(), 'tiger', true, true);
     let sel = ed.view().state.selection;
+    assert.equal(md(), 'tiger one cat');
+    assert.deepEqual({ from: sel.from, to: sel.to }, { from: p.from + 10, to: p.from + 13 });
+
+    // With nothing left to find, a caret after the replacement and nothing selected.
+    load('one cat');
+    scan('cat');
+    findNext(true);
+    const last = blockRange('one cat');
+    assert.deepEqual(findReplace(ed.view(), 'tiger', true, false), { replaced: 1, skipped: 0, total: 0, current: 0 });
+    sel = ed.view().state.selection;
     assert.ok(sel.empty, 'a caret');
-    assert.equal(sel.from, p.from + 5);
-    // ...so a Replace All now is not scoped to "tiger".
+    assert.equal(sel.from, last.from + 9);
+
+    // ...so a Replace All after the first one is not scoped to "tiger".
+    load('cat one cat');
+    scan('cat');
+    findNext(true);
+    ed.selectText(p.from, p.from + 3);
+    findReplace(ed.view(), 'tiger', true, true);
     assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, total: 1, inSelection: false });
     assert.equal(md(), 'tiger one dog');
 

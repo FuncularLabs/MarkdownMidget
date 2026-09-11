@@ -22,6 +22,10 @@ let cursor = -1;      // index into matches
 // those must not lose the place.
 let indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
 
+// The view findReset was given, so findNext/findPrev — which the host calls
+// without one — can move the editor's own selection onto a match.
+let boundView = null;
+
 // The selection captured when the Find dialog opened (findCaptureScope), as
 // ProseMirror positions mapped through the replacements made here. Replace All
 // falls back to it once Find's own selection has taken the place of the user's.
@@ -99,6 +103,7 @@ function withUnicode(flags) {
 /// same source and flags on an unchanged document keep the index and the current
 /// match instead of starting over.
 export function findReset(source, flags, view) {
+  if (view) boundView = view;
   const f = withUnicode(flags);
   if (view && source && source === indexed.source && f === indexed.flags && view.state.doc === indexed.doc)
     return { total: matches.length, current: cursor + 1 };
@@ -151,8 +156,36 @@ function codeUnitsAt(text, i) {
   return c >= 0xd800 && c <= 0xdbff && i + 1 < text.length ? 2 : 1;
 }
 
-function applySelection(match) {
+// Select the current match: in the editor, and in the browser (which is what
+// scrolls it into view). Reads matches[cursor] rather than taking the match,
+// because selecting can rebuild the index underneath it — see below.
+function applySelection() {
+  let match = matches[cursor];
   if (!match) return;
+  // The editor's own selection, the way the source view selects in its document.
+  // Replace asks "is the caret still on the match?" before it changes anything
+  // (#5 F-9), and a browser highlight the editor never saw would answer no.
+  if (boundView) {
+    const r = pmRange(boundView, match);
+    if (r) {
+      const at = cursor;
+      boundView.dispatch(boundView.state.tr
+        .setSelection(TextSelection.create(boundView.state.doc, r.from, r.to))
+        .setMeta('addToHistory', false));
+      // A selection carries no steps of its own and adds no undo step, but a
+      // plugin may append to the document on the back of it — the trailing
+      // paragraph one does, whenever the document ends in a list. Keep the index
+      // in step with what the editor now holds, and keep the place, or the very
+      // next Replace finds the index stale and degrades to Find Next.
+      if (boundView.state.doc !== indexed.doc) {
+        indexed.doc = boundView.state.doc;
+        reindex();
+        cursor = at < matches.length ? at : -1;
+        match = matches[cursor];
+        if (!match) return;
+      }
+    }
+  }
   const sel = window.getSelection();
   const range = document.createRange();
   try {
@@ -169,7 +202,7 @@ export function findNext(wrap) {
   if (matches.length === 0) return { total: 0, current: 0 };
   cursor = cursor + 1;
   if (cursor >= matches.length) cursor = wrap ? 0 : matches.length - 1;
-  applySelection(matches[cursor]);
+  applySelection();
   return { total: matches.length, current: cursor + 1 };
 }
 
@@ -177,7 +210,7 @@ export function findPrev(wrap) {
   if (matches.length === 0) return { total: 0, current: 0 };
   cursor = cursor - 1;
   if (cursor < 0) cursor = wrap ? matches.length - 1 : 0;
-  applySelection(matches[cursor]);
+  applySelection();
   return { total: matches.length, current: cursor + 1 };
 }
 
@@ -186,6 +219,7 @@ export function findClear() {
   cursor = -1;
   indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
   capturedScope = null;
+  boundView = null;
 }
 
 // ===== Replace (#5) =====
@@ -375,13 +409,19 @@ export function expandTemplate(template, m, groupMap) {
 }
 
 /// Replace the current match, then move to the next one: { replaced, skipped,
-/// total, current }. With no current match this is Find Next. A match that runs
-/// across blocks is skipped (never joined); the following match is selected as
-/// usual. `wrap` is Find's wrap-around: past the last match, the first.
+/// total, current }. With no current match — or with the caret moved off it — this
+/// is Find Next, as the button promises. A match that runs across blocks is
+/// skipped (never joined); the following match is selected as usual. `wrap` is
+/// Find's wrap-around: past the last match, the first.
 export function findReplace(view, replacement, literal, wrap) {
   if (!view) return { replaced: 0, skipped: 0, total: matches.length, current: cursor + 1, error: 'no editor' };
   ensureFresh(view);
-  if (cursor < 0 || cursor >= matches.length) return { replaced: 0, skipped: 0, ...findNext(!!wrap) };
+  // The selection has to still BE the current match. Between Find and Replace the
+  // user may have clicked somewhere else entirely, and replacing the match they
+  // can no longer see is not what the button says (#5 F-9). The source view has
+  // always degraded to Find Next here.
+  if (cursor < 0 || cursor >= matches.length || !isCurrentMatch(view, view.state.selection))
+    return { replaced: 0, skipped: 0, ...findNext(!!wrap) };
 
   const m = matches[cursor];
   const range = pmRange(view, m);
@@ -398,11 +438,11 @@ export function findReplace(view, replacement, literal, wrap) {
   const text = literal ? replacement : expandTemplate(replacement, m.exec, indexed.groupMap);
   const tr = state.tr;
   replaceRange(tr, range.from, range.to, text, marksAt($from));
-  // A selection that was the match itself (F3 in the editor puts it there) would
-  // be mapped onto the replacement text and pass for the user's own next time;
-  // a caret after the replacement instead, as typing over a selection leaves.
-  if (state.selection.from === range.from && state.selection.to === range.to)
-    tr.setSelection(TextSelection.create(tr.doc, range.from + text.length));
+  // The selection IS the match (nothing else gets here), and mapped through the
+  // change it would become a selection of the replacement text and pass for the
+  // user's own next time; a caret after it instead, as typing over a selection
+  // leaves.
+  tr.setSelection(TextSelection.create(tr.doc, range.from + text.length));
   view.dispatch(tr);
   afterChange(view, tr);
 
@@ -414,7 +454,7 @@ export function findReplace(view, replacement, literal, wrap) {
   const strictlyAfter = m.end === m.start;
   cursor = matches.findIndex((x) => (strictlyAfter ? x.start > resume : x.start >= resume));
   if (cursor < 0 && wrap && matches.length) cursor = 0;
-  if (cursor >= 0) applySelection(matches[cursor]);
+  if (cursor >= 0) applySelection();
   return { replaced: 1, skipped: 0, total: matches.length, current: cursor + 1 };
 }
 
@@ -463,3 +503,4 @@ export function findReplaceAll(view, replacement, literal) {
   afterChange(view, tr);
   return { replaced: plan.length, skipped, total, inSelection: !!scope };
 }
+
