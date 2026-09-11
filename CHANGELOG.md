@@ -38,6 +38,25 @@ flag dropped, after dogfooding. Everything new on this line:
 
 See the beta notes below for the full detail.
 
+### Fixed
+- **A file's line endings and byte-order mark are kept as found.** A CRLF file
+  with a code block in it came back with mixed endings — the formatted view
+  writes LF between blocks but keeps whatever was inside fenced, indented and
+  HTML blocks — and a file that began with a UTF-8 byte-order mark lost it on
+  the first save. Now the file's convention is detected when it opens (by
+  majority, for a mixed file) and put back throughout on every Save, Save As,
+  encrypt, convert and timestamped `.bak`; the mark stays if it was there and is
+  never added if it wasn't. A new document saves LF. (#3)
+- **A file rewritten on disk with identical content is no longer reported as an
+  external change.** A formatter with nothing to do, a sync client, or a tool
+  that only changed the line endings raised the "modified by another program"
+  prompt — or a silent reload — because the disk was compared against the
+  editor's own serialisation of the document, which differs from the file for
+  anything the editor normalises. The comparison is now against the file as it
+  was last read or written, and if a program only re-encodes the file — line
+  endings or the byte-order mark, text unchanged — the window quietly adopts that
+  convention for its next save. (#4)
+
 ## [0.10.0-beta1] - 2026-09-10
 
 The source view gets colour — and, if you want it, a theme of its own — plus the

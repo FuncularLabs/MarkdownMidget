@@ -44,6 +44,20 @@ public partial class MainWindow : Window
     // matches the last opened/saved markdown — so undoing back to that state clears
     // the modified flag, and undo past the Open state is impossible (history flushed).
     private string _cleanMarkdown = string.Empty;
+    // The file as it was last read from or written to disk, folded to LF - the
+    // second baseline (issue #4). _cleanMarkdown is the EDITOR's serialisation of
+    // that state and differs from it whenever the editor normalises, so "did the
+    // file change on disk?" is asked of this one AS WELL AS _cleanMarkdown: a
+    // rewrite equal to either is not a change (see ExternalChange). Set wherever
+    // _cleanMarkdown is set from disk: load, save, reload, Keep.
+    private string _diskBaseline = string.Empty;
+    // What the open file's bytes looked like, so Save writes them back the same way
+    // (issue #3): its line-ending convention and whether it began with a UTF-8
+    // byte-order mark. In memory the document is always LF (DocumentText). Set on
+    // every load path: a new document gets DocumentText's defaults, a dropped one
+    // keeps the endings the browser handed over (its mark is already gone).
+    private LineEnding _lineEnding = DocumentText.DefaultLineEnding;
+    private bool _hadBom;
     private bool _suppressDirty;
     private string? _pendingOpenPath;
 
@@ -742,7 +756,7 @@ public partial class MainWindow : Window
 
     private async Task StartBlankDocumentAsync()
     {
-        await LoadDocumentAsync(string.Empty, null);
+        await LoadDocumentAsync(DocumentText.NewDocument, null);
         await FocusDocumentAsync();
     }
 
@@ -1116,7 +1130,9 @@ public partial class MainWindow : Window
                         // Task.Run: the KDF is deliberately ~half a second of work.
                         var text = await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(bytes, pw));
                         ShowBusy($"Opening {Path.GetFileName(path)}…");
-                        await LoadDocumentAsync(text, path, pw);
+                        // Detect on the plaintext: the line ending lives inside the
+                        // container (Save puts it there); a byte-order mark does not.
+                        await LoadDocumentAsync(DocumentText.Detect(text), path, pw);
                         loaded = true;
                         break;
                     }
@@ -1135,9 +1151,9 @@ public partial class MainWindow : Window
             }
             else
             {
-                // Same BOM-detecting decode File.ReadAllTextAsync used before.
-                using var reader = new StreamReader(new MemoryStream(bytes));
-                await LoadDocumentAsync(await reader.ReadToEndAsync(), path);
+                // The same BOM-detecting decode File.ReadAllTextAsync used, plus the
+                // file's line ending and mark remembered so Save can put them back.
+                await LoadDocumentAsync(DocumentText.Detect(bytes), path);
                 loaded = true;
             }
             // The new document is on screen: now, and not before, the old claim goes.
@@ -1188,10 +1204,12 @@ public partial class MainWindow : Window
             "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    /// <summary>Loads markdown into the editor and resets the clean baseline + history.
+    /// <summary>Loads a document into the editor and resets the clean baseline + history.
+    /// <paramref name="doc"/> is the text plus, from whichever file it came out of, the
+    /// line ending and byte-order mark Save must reproduce (issue #3).
     /// <paramref name="password"/> is non-null exactly when the document came out of a
     /// .mdenc container; every other load clears the window's encryption state.</summary>
-    private async Task LoadDocumentAsync(string markdown, string? path, string? password = null)
+    private async Task LoadDocumentAsync(DocumentText.Decoded doc, string? path, string? password = null)
     {
         // try/finally, because the awaits below reach into the editor and throw
         // outright when the WebView2 has died. A _suppressDirty left stuck true stops
@@ -1212,8 +1230,15 @@ public partial class MainWindow : Window
             // computed against the OLD document and must never decorate this one.
             _spellGeneration++;
             await ApplyDocBaseAsync(path);            // resolve relative images first
-            await SetDocumentMarkdownAsync(markdown); // setMarkdown flushes undo history
+            await SetDocumentMarkdownAsync(doc.Text); // setMarkdown flushes undo history
             _currentPath = path;
+            _lineEnding = doc.Ending;
+            _hadBom = doc.HadBom;
+            // Folded here rather than trusted: most callers hand over Detect's
+            // output, which already is, but the Save-As-after-external-change path
+            // hands over the editor's own text, and AvalonEdit's Enter can put CRLF
+            // in that (DocumentText.DefaultLineEnding says why).
+            _diskBaseline = DocumentText.Fold(doc.Text);
             _docEncrypted = password is not null;
             _docPassword = password;
             ClearBackupKey();   // the old document's cached backup key must not outlive it
@@ -1498,9 +1523,12 @@ public partial class MainWindow : Window
             {
                 var pw = newPassword ?? _docPassword
                     ?? throw new InvalidOperationException("encrypted save without a password");
-                // Transactional with read-back decrypt-verify; the KDF makes this
-                // ~half a second of real work, so off the UI thread.
-                await Task.Run(() => Secure.SecureMarkdownFile.Save(path, markdown, pw));
+                // The file's line ending is applied to the plaintext the container
+                // seals; its byte-order mark is not - inside ciphertext a mark would
+                // mark nothing. Transactional with read-back decrypt-verify; the KDF
+                // makes this ~half a second of real work, so off the UI thread.
+                var plaintext = DocumentText.ApplyLineEnding(markdown, _lineEnding);
+                await Task.Run(() => Secure.SecureMarkdownFile.Save(path, plaintext, pw));
             }
             else
             {
@@ -1511,9 +1539,11 @@ public partial class MainWindow : Window
                 // for. A few milliseconds per save is a fair price.
                 await using var file = new FileStream(path, FileMode.Create, FileAccess.Write,
                     FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);
-                await using var writer = new StreamWriter(file);
-                await writer.WriteAsync(markdown);
-                await writer.FlushAsync();
+                // Bytes, not a StreamWriter: the file's own line ending and mark go
+                // back on here (DocumentText.Encode). A StreamWriter wrote the endings
+                // as the serialiser left them - mixed, for a CRLF file with a code
+                // block - and never a mark.
+                await file.WriteAsync(DocumentText.Encode(markdown, _lineEnding, _hadBom));
                 file.Flush(flushToDisk: true);
             }
         }
@@ -1536,6 +1566,7 @@ public partial class MainWindow : Window
         if (newPassword is not null) { _docPassword = newPassword; ClearBackupKey(); }
         else if (!wantEncrypted && _docPassword is not null) { _docPassword = null; ClearBackupKey(); }
         _cleanMarkdown = markdown; // new clean baseline; undo history is left intact
+        _diskBaseline = DocumentText.Fold(markdown);   // what the file holds now, as Detect reads it back
         _dirty = false;
         UpdateTitle();
         if (pathChanged) StartWatching(path);
@@ -1597,7 +1628,9 @@ public partial class MainWindow : Window
         _suppressWatcher = true;
         try
         {
-            await Task.Run(() => Secure.SecureMarkdownFile.Save(target, markdown, pw));
+            // Line ending applied, no mark - as SaveAsync's encrypted branch.
+            var plaintext = DocumentText.ApplyLineEnding(markdown, _lineEnding);
+            await Task.Run(() => Secure.SecureMarkdownFile.Save(target, plaintext, pw));
         }
         catch (Exception ex)
         {
@@ -1618,6 +1651,7 @@ public partial class MainWindow : Window
         _docPassword = pw;
         ClearBackupKey();
         _cleanMarkdown = markdown;
+        _diskBaseline = DocumentText.Fold(markdown);
         _dirty = false;
         UpdateTitle();
         StartWatching(target);
@@ -1641,7 +1675,8 @@ public partial class MainWindow : Window
         _suppressWatcher = true;
         try
         {
-            await Task.Run(() => Secure.SecureMarkdownFile.Save(_currentPath, markdown, pw));
+            var plaintext = DocumentText.ApplyLineEnding(markdown, _lineEnding);   // as SaveAsync
+            await Task.Run(() => Secure.SecureMarkdownFile.Save(_currentPath, plaintext, pw));
         }
         catch (Exception ex)
         {
@@ -1653,6 +1688,7 @@ public partial class MainWindow : Window
         _docPassword = pw;
         ClearBackupKey();
         _cleanMarkdown = markdown;
+        _diskBaseline = DocumentText.Fold(markdown);
         _dirty = false;
         UpdateTitle();
         DiscardBackup();
@@ -1684,9 +1720,9 @@ public partial class MainWindow : Window
         {
             await using var file = new FileStream(target, FileMode.Create, FileAccess.Write,
                 FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);
-            await using var writer = new StreamWriter(file);
-            await writer.WriteAsync(markdown);
-            await writer.FlushAsync();
+            // The document's line ending, as SaveAsync; the mark too, if the window
+            // still remembers one from before the document was encrypted.
+            await file.WriteAsync(DocumentText.Encode(markdown, _lineEnding, _hadBom));
             file.Flush(flushToDisk: true);
         }
         catch (Exception ex)
@@ -1713,6 +1749,7 @@ public partial class MainWindow : Window
         _docPassword = null;
         ClearBackupKey();
         _cleanMarkdown = markdown;
+        _diskBaseline = DocumentText.Fold(markdown);
         _dirty = false;
         UpdateTitle();
         StartWatching(target);
@@ -2117,15 +2154,22 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task LoadRecoveredAsync(Backup.BackupSnapshot mine, string markdown)
     {
-        await LoadDocumentAsync(markdown, mine.Path);
+        // The snapshot is the editor's text; the FILE is where the line ending and
+        // byte-order mark come from, so it is read first and the recovered text is
+        // loaded under its conventions. No file (untitled, or since deleted) means a
+        // new document's defaults.
+        var disk = mine.Path is not null && File.Exists(mine.Path)
+            ? await ReadFileOrEmptyAsync(mine.Path)
+            : DocumentText.NewDocument;
+        await LoadDocumentAsync(disk with { Text = markdown }, mine.Path);
         // The snapshot's file is open in this window now, so it is claimed like any
         // other document: a double-click on it must find this window.
         if (mine.Path is not null) RekeyDocumentClaim(mine.Path);
         // Everything above treats a freshly loaded document as clean. This one isn't:
-        // it's unsaved work that never reached the file.
-        _cleanMarkdown = mine.Path is not null && File.Exists(mine.Path)
-            ? await ReadFileOrEmptyAsync(mine.Path)
-            : string.Empty;
+        // it's unsaved work that never reached the file, so both baselines are the
+        // file, not the snapshot.
+        _cleanMarkdown = disk.Text;
+        _diskBaseline = disk.Text;
         _displayName = mine.Path is null ? mine.DisplayName : null;
         _dirty = !string.Equals(markdown, _cleanMarkdown, StringComparison.Ordinal);
         UpdateTitle();
@@ -2137,9 +2181,10 @@ public partial class MainWindow : Window
         await FocusDocumentAsync();
     }
 
-    private static async Task<string> ReadFileOrEmptyAsync(string path)
+    private static async Task<DocumentText.Decoded> ReadFileOrEmptyAsync(string path)
     {
-        try { return await File.ReadAllTextAsync(path); } catch { return string.Empty; }
+        try { return DocumentText.Detect(await File.ReadAllBytesAsync(path)); }
+        catch { return DocumentText.NewDocument; }   // empty baseline: everything reads as unsaved
     }
 
     /// <summary>
@@ -2192,13 +2237,17 @@ public partial class MainWindow : Window
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            await LoadDocumentAsync(text, meta.Path, pw);
-            if (meta.Path is not null) RekeyDocumentClaim(meta.Path);   // same as LoadRecoveredAsync
             // The clean baseline is what the FILE decrypts to — recovered content
             // is unsaved work on top of it. A file that is missing or no longer
             // opens with this password baselines to empty, so everything reads as
-            // unsaved, which errs toward protecting it.
-            _cleanMarkdown = await ReadEncryptedCleanAsync(meta.Path, pw);
+            // unsaved, which errs toward protecting it. Read before the load, as in
+            // LoadRecoveredAsync: the file's line ending is the one the recovered
+            // text is loaded under.
+            var disk = await ReadEncryptedCleanAsync(meta.Path, pw);
+            await LoadDocumentAsync(disk with { Text = text }, meta.Path, pw);
+            if (meta.Path is not null) RekeyDocumentClaim(meta.Path);   // same as LoadRecoveredAsync
+            _cleanMarkdown = disk.Text;
+            _diskBaseline = disk.Text;
             _displayName = meta.Path is null ? meta.DisplayName : null;
             _dirty = !string.Equals(text, _cleanMarkdown, StringComparison.Ordinal);
             UpdateTitle();
@@ -2209,11 +2258,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private static async Task<string> ReadEncryptedCleanAsync(string? path, string password)
+    private static async Task<DocumentText.Decoded> ReadEncryptedCleanAsync(string? path, string password)
     {
-        if (path is null || !File.Exists(path)) return string.Empty;
-        try { return Secure.SecureMarkdownFormat.Decrypt(await File.ReadAllBytesAsync(path), password); }
-        catch { return string.Empty; }
+        if (path is null || !File.Exists(path)) return DocumentText.NewDocument;
+        try { return DocumentText.Detect(Secure.SecureMarkdownFormat.Decrypt(await File.ReadAllBytesAsync(path), password)); }
+        catch { return DocumentText.NewDocument; }
     }
 
     /// <summary>
@@ -2286,6 +2335,9 @@ public partial class MainWindow : Window
             _currentPath = null;
             _displayName = null;
             _cleanMarkdown = string.Empty;
+            _diskBaseline = string.Empty;
+            _lineEnding = DocumentText.DefaultLineEnding;   // nothing open; nothing to keep
+            _hadBom = false;
             _dirty = false;
         }
         finally { _suppressDirty = false; }
@@ -2423,7 +2475,7 @@ public partial class MainWindow : Window
         // Don't read until the writer has stopped changing the file: a program that
         // truncates then streams lets a plain read succeed on half a document, and
         // the reload would then make that half document the new baseline.
-        string? newContent;
+        DocumentText.Decoded fresh;
         if (_docEncrypted && _docPassword is { } docPw)
         {
             // An encrypted document compares DECRYPTED content — text-reading the
@@ -2433,7 +2485,7 @@ public partial class MainWindow : Window
             // content we can't verify.
             var bytes = await ReadBytesWhenStableAsync(path);
             if (bytes is null) return;
-            try { newContent = Secure.SecureMarkdownFormat.Decrypt(bytes, docPw); }
+            try { fresh = DocumentText.Detect(Secure.SecureMarkdownFormat.Decrypt(bytes, docPw)); }
             catch (Secure.SecureMarkdownException)
             {
                 if (!PassValid()) { RecheckExternalChange(path); return; }
@@ -2443,15 +2495,32 @@ public partial class MainWindow : Window
         }
         else
         {
-            newContent = await ReadWhenStableAsync(path);
+            var read = await ReadWhenStableAsync(path);
+            if (read is null) return;
+            fresh = read.Value;
         }
-        if (newContent is null) return;
+        var newContent = fresh.Text;
         // Re-assert identity + freshness after EVERY await: if the user opened another
         // document or saved while we waited, acting now would clobber it — and the
         // unsaved-work check below would cheerfully call it "nothing to lose".
         if (!PassValid()) { RecheckExternalChange(path); return; }
 
-        if (string.Equals(newContent, _cleanMarkdown, StringComparison.Ordinal)) return;
+        // Judged against the DISK baseline as well as the editor's serialisation
+        // of it (issue #4): the two differ for any file the editor normalises, and
+        // only the latter used to be consulted, so a tool that rewrote identical
+        // bytes prompted about a file that had not changed. Equal to either is not
+        // a change; ExternalChange says which baseline means what.
+        if (!ExternalChange.IsRealChange(newContent, _cleanMarkdown, _diskBaseline))
+        {
+            // The same document, possibly re-encoded - dos2unix ran, a tool added
+            // or stripped the mark. Nothing to reload or ask about, but the file's
+            // conventions are whatever it has NOW: "kept as found" means the next
+            // Save writes those, not the ones it had when it was opened.
+            _diskBaseline = newContent;
+            _lineEnding = fresh.Ending;
+            _hadBom = fresh.HadBom;
+            return;
+        }
 
         // Ask the editor what it actually holds rather than trusting `_dirty`, which
         // is a debounced cache: ScheduleDirtyCheck() RESTARTS a 250ms timer on every
@@ -2476,10 +2545,12 @@ public partial class MainWindow : Window
                 // Same decode the ORIGINAL read used: an encrypted document
                 // compares decrypted text. Reading the container as text here
                 // compared ciphertext against plaintext - never equal - and spun
-                // reload/recheck (one full KDF per lap) forever.
+                // reload/recheck (one full KDF per lap) forever. And the same fold,
+                // so it is text against text: a raw read would differ from newContent
+                // on every CRLF file and spin the same way.
                 confirm = _docEncrypted && _docPassword is { } confirmPw
-                    ? await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(File.ReadAllBytes(path), confirmPw))
-                    : await File.ReadAllTextAsync(path);
+                    ? DocumentText.Fold(await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(File.ReadAllBytes(path), confirmPw)))
+                    : DocumentText.Detect(await File.ReadAllBytesAsync(path)).Text;
             }
             catch { RecheckExternalChange(path); return; }
             if (!PassValid() || !string.Equals(confirm, newContent, StringComparison.Ordinal))
@@ -2487,7 +2558,7 @@ public partial class MainWindow : Window
                 RecheckExternalChange(path);
                 return;
             }
-            await ReloadPreservingPositionAsync(path, newContent, PassValid);
+            await ReloadPreservingPositionAsync(path, fresh, PassValid);
             return;
         }
 
@@ -2498,9 +2569,10 @@ public partial class MainWindow : Window
         string backupPath;
         try
         {
+            var (ending, bom) = (_lineEnding, _hadBom);   // read on the UI thread, not inside Task.Run
             backupPath = _docEncrypted && _docPassword is { } bakPw
-                ? await Task.Run(() => WriteTimestampedEncryptedBackup(path, inMemory, bakPw))
-                : WriteTimestampedBackup(path, inMemory);
+                ? await Task.Run(() => WriteTimestampedEncryptedBackup(path, inMemory, ending, bakPw))
+                : WriteTimestampedBackup(path, inMemory, ending, bom);
         }
         catch (Exception ex)
         {
@@ -2517,19 +2589,31 @@ public partial class MainWindow : Window
         {
             case ExternalChangeChoice.Reload:
                 // Same password-preservation as ReloadPreservingPositionAsync.
-                await LoadDocumentAsync(newContent, path, _docEncrypted ? _docPassword : null);
+                await LoadDocumentAsync(fresh, path, _docEncrypted ? _docPassword : null);
                 break;
             case ExternalChangeChoice.SaveAs:
-                await HandleSaveAsAfterExternalChangeAsync(inMemory, newContent, backupPath);
+                await HandleSaveAsAfterExternalChangeAsync(inMemory, fresh, backupPath);
                 break;
             case ExternalChangeChoice.Keep:
             default:
-                // Accept the disk content as the new baseline so dirty reflects "my
-                // edits differ from disk"; the next Save will overwrite the disk.
-                _cleanMarkdown = newContent;
+                AcceptDiskAsBaseline(fresh);   // the next Save will overwrite the disk
                 _ = UpdateDirtyAsync();
                 break;
         }
+    }
+
+    /// <summary>
+    /// The disk version becomes the baseline without being loaded (Keep Current, or
+    /// a Save As backed out of): dirty now means "my edits differ from the file",
+    /// and the file's conventions - which may have changed along with it - are the
+    /// ones the next Save writes.
+    /// </summary>
+    private void AcceptDiskAsBaseline(DocumentText.Decoded disk)
+    {
+        _cleanMarkdown = disk.Text;
+        _diskBaseline = disk.Text;
+        _lineEnding = disk.Ending;
+        _hadBom = disk.HadBom;
     }
 
     /// <summary>
@@ -2560,31 +2644,17 @@ public partial class MainWindow : Window
             catch { return null; }
             await Task.Delay(80);
         }
-        return null;   // same refusal as the text flavour below
-    }
-
-    private static async Task<string?> ReadWhenStableAsync(string path)
-    {
-        long lastLen = -1;
-        var lastWrite = DateTime.MinValue;
-        for (var attempt = 0; attempt < 12; attempt++)
-        {
-            try
-            {
-                var fi = new FileInfo(path);
-                if (!fi.Exists) return null;
-                if (fi.Length == lastLen && fi.LastWriteTimeUtc == lastWrite)
-                    return await File.ReadAllTextAsync(path);
-                lastLen = fi.Length;
-                lastWrite = fi.LastWriteTimeUtc;
-            }
-            catch (IOException) { /* locked mid-write — keep sampling */ }
-            catch { return null; }
-            await Task.Delay(80);
-        }
         // Still changing after ~1s: refuse rather than read a possibly half-written
         // document. A later watcher event (via the pending-path intake) brings us back.
         return null;
+    }
+
+    /// <summary>The plaintext flavour: the same stable read, decoded the way Open
+    /// decodes - folded, with the file's line ending and mark alongside.</summary>
+    private static async Task<DocumentText.Decoded?> ReadWhenStableAsync(string path)
+    {
+        var bytes = await ReadBytesWhenStableAsync(path);
+        return bytes is null ? null : DocumentText.Detect(bytes);
     }
 
     /// <summary>Character index where a 0-based source line starts, or -1.</summary>
@@ -2614,14 +2684,14 @@ public partial class MainWindow : Window
     /// capture's editor round-trip — StillEditing alone would miss a Save landing in
     /// that window.
     /// </summary>
-    private async Task ReloadPreservingPositionAsync(string path, string newContent, Func<bool> stillValid)
+    private async Task ReloadPreservingPositionAsync(string path, DocumentText.Decoded fresh, Func<bool> stillValid)
     {
         var anchor = await CaptureAnchorAsync();
         if (!stillValid()) { RecheckExternalChange(path); return; }
         // Keep the encryption state through the reload: dropping the password here
         // demoted the window to plaintext while _currentPath stayed the .mdenc, and
         // the next silent Ctrl+S would have written DECRYPTED text into it.
-        await LoadDocumentAsync(newContent, path, _docEncrypted ? _docPassword : null);
+        await LoadDocumentAsync(fresh, path, _docEncrypted ? _docPassword : null);
         await RestoreAnchorAsync(anchor);
         FlashStatus("Reloaded — file changed on disk");
     }
@@ -2689,23 +2759,25 @@ public partial class MainWindow : Window
         return path;
     }
 
-    private static string WriteTimestampedBackup(string originalPath, string content)
+    /// <summary>Your version, in the file's own conventions: the .bak sits beside
+    /// the original and may be opened in its place, so it should look like it.</summary>
+    private static string WriteTimestampedBackup(string originalPath, string content, LineEnding ending, bool bom)
     {
         var path = TimestampedBakPath(originalPath);
-        File.WriteAllText(path, content);
+        File.WriteAllBytes(path, DocumentText.Encode(content, ending, bom));
         return path;
     }
 
     /// <summary>The encrypted flavour: same naming, sealed contents (full KDF -
-    /// rare path, correctness over speed).</summary>
-    private static string WriteTimestampedEncryptedBackup(string originalPath, string content, string password)
+    /// rare path, correctness over speed). Line ending applied, no mark - as Save.</summary>
+    private static string WriteTimestampedEncryptedBackup(string originalPath, string content, LineEnding ending, string password)
     {
         var path = TimestampedBakPath(originalPath);
-        File.WriteAllBytes(path, Secure.SecureMarkdownFormat.Encrypt(content, password));
+        File.WriteAllBytes(path, Secure.SecureMarkdownFormat.Encrypt(DocumentText.ApplyLineEnding(content, ending), password));
         return path;
     }
 
-    private async Task HandleSaveAsAfterExternalChangeAsync(string inMemory, string newDiskContent, string backupPath)
+    private async Task HandleSaveAsAfterExternalChangeAsync(string inMemory, DocumentText.Decoded disk, string backupPath)
     {
         if (_currentPath is null) return;
         var dir = Path.GetDirectoryName(_currentPath) ?? "";
@@ -2727,7 +2799,7 @@ public partial class MainWindow : Window
         if (picked is null)
         {
             // User backed out of save-as — treat like Keep Current.
-            _cleanMarkdown = newDiskContent;
+            AcceptDiskAsBaseline(disk);
             _ = UpdateDirtyAsync();
             return;
         }
@@ -2735,11 +2807,15 @@ public partial class MainWindow : Window
         try
         {
             // An encrypted document's "your version" stays encrypted - a plaintext
-            // file wearing the .mdenc name would be both a leak and a lie.
+            // file wearing the .mdenc name would be both a leak and a lie. Either
+            // way it is written in the document's own conventions, as Save would.
             if (_docEncrypted && _docPassword is { } savePw)
-                await Task.Run(() => Secure.SecureMarkdownFile.Save(picked, inMemory, savePw));
+            {
+                var plaintext = DocumentText.ApplyLineEnding(inMemory, _lineEnding);
+                await Task.Run(() => Secure.SecureMarkdownFile.Save(picked, plaintext, savePw));
+            }
             else
-                await File.WriteAllTextAsync(picked, inMemory);
+                await File.WriteAllBytesAsync(picked, DocumentText.Encode(inMemory, _lineEnding, _hadBom));
         }
         catch (Exception ex)
         {
@@ -2760,13 +2836,15 @@ public partial class MainWindow : Window
         // LoadDocumentAsync caller on an encrypted path now passes it through).
         if (pick == MessageBoxResult.Yes)
         {
-            // Already on disk with inMemory content; load + retarget.
-            await LoadDocumentAsync(inMemory, picked, _docEncrypted ? _docPassword : null);
+            // Already on disk with inMemory content, in this document's conventions;
+            // load + retarget.
+            await LoadDocumentAsync(new DocumentText.Decoded(inMemory, _lineEnding, _hadBom), picked,
+                _docEncrypted ? _docPassword : null);
             RekeyDocumentClaim(picked);   // a Save As by another name: the claim moves too
         }
         else
         {
-            await LoadDocumentAsync(newDiskContent, _currentPath, _docEncrypted ? _docPassword : null);
+            await LoadDocumentAsync(disk, _currentPath, _docEncrypted ? _docPassword : null);
         }
     }
 
@@ -3937,7 +4015,13 @@ public partial class MainWindow : Window
             DiscardBackup();
             _backupDirty = false;
             await ApplyDocBaseAsync(null); // dropped content has no folder context
-            await SetDocumentMarkdownAsync(content);
+            // The browser read the file as text: its byte-order mark is gone before
+            // we see it, but its line endings are intact, and they are the convention
+            // the eventual Save As writes.
+            var dropped = DocumentText.Detect(content);
+            await SetDocumentMarkdownAsync(dropped.Text);
+            _lineEnding = dropped.Ending;
+            _hadBom = false;
             _currentPath = null;
             ReleaseDocumentClaim();   // the file this window showed is no longer open here
             _displayName = name;
@@ -3947,6 +4031,7 @@ public partial class MainWindow : Window
             // unsaved from the outset: closing prompts, and the crash copy actually
             // covers it. Baselining it as "clean" made both of those silently skip it.
             _cleanMarkdown = string.Empty;
+            _diskBaseline = string.Empty;   // no file, so no disk baseline either
             _dirty = true;
             _backupDirty = true;
             UpdateTitle();
