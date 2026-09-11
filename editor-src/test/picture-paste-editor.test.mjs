@@ -72,6 +72,28 @@ test('a picture that comes with text is left to ProseMirror, which pastes the te
   assert.match(mounted.markdown(), /pasted words/);
 });
 
+test('a picture past the ceiling is cancelled during an IME composition too', () => {
+  // The reason the guard is a handleDOMEvents handler rather than handlePaste, and
+  // until this test the reason was only a comment: ProseMirror's own paste handler
+  // returns before it asks handlePaste while the view is composing
+  // (prosemirror-view's editHandlers.paste: `if (view.composing && !android)
+  // return`), so a handlePaste guard would never be asked and the browser would
+  // paste the picture. Rewriting the guard as handlePaste fails here and nowhere
+  // else.
+  refused.length = 0;
+  mounted.roundTrip('Some text');
+  const view = mounted.view();
+  view.input.composing = true;
+  try {
+    const event = paste(clipboard({ images: [CEILING + 1] }));
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(refused, [CEILING + 1]);
+    assert.equal(mounted.markdown().trim(), 'Some text');
+  } finally {
+    view.input.composing = false;
+  }
+});
+
 test('a read-only view takes no paste, and reports no refusal for one', () => {
   refused.length = 0;
   const view = mounted.view();

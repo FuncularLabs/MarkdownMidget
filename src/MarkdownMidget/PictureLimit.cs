@@ -12,16 +12,21 @@ namespace MarkdownMidget;
 /// the ceiling the picture is refused with a note in the status bar instead, which
 /// is a far better outcome than a wedged window.
 ///
-/// Every route that puts a picture in asks <see cref="IsTooLarge"/> and says no
-/// with <see cref="Notice"/>, so no two routes can disagree about where the line is
-/// or how the refusal is worded: a picture file dropped on either view
+/// The routes the host checks ask <see cref="IsTooLarge"/> and say no with
+/// <see cref="Notice"/>, so no two can disagree about where the line is or how the
+/// refusal is worded: a picture file dropped on either view
 /// (<see cref="DropRouting"/>, whose MaxPictureBytes is this constant under the
-/// drop's own name); Insert ▸ Picture (<see cref="PickedPicture"/>); and a picture
-/// pasted into the formatted view, which the editor refuses itself because that
-/// paste is Chromium's own and the host never sees it — the host hands it this
-/// ceiling (<see cref="EditorOptionsJson"/>) and answers its
-/// <see cref="RefusedMessageType"/> with <see cref="Notice"/>. A picture pasted
-/// into the Markdown source view is not held to it yet.
+/// drop's own name), and Insert ▸ Picture (<see cref="PickedPicture"/>).
+///
+/// One route the host cannot check applies the same ceiling itself: a picture
+/// pasted into the FORMATTED view is pasted by Chromium, and never reaches the
+/// host, so the editor refuses it there — the host hands the number over
+/// (<see cref="EditorOptionsJson"/>) and answers the editor's
+/// <see cref="RefusedMessageType"/> with <see cref="Notice"/>
+/// (editor-src/src/picture-paste.js).
+///
+/// And one route is held to no limit yet: a picture pasted into the Markdown
+/// SOURCE view.
 ///
 /// Only PICTURES are capped. A dropped markdown or text file is opened, and
 /// File ▸ Open has never capped what it opens.

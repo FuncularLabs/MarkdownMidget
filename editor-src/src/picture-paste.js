@@ -1,8 +1,9 @@
 // The picture ceiling, applied to a paste into the formatted view.
 //
 // A picture goes into the document as a base64 data URI, and the host refuses one
-// larger than its ceiling (PictureLimit on the host) on every route it can see: a
-// dropped file and Insert ▸ Picture. A paste here is the route it can't see. With
+// larger than its ceiling (PictureLimit on the host) on the routes it checks: a
+// dropped file and Insert ▸ Picture (a picture pasted into the Markdown source view
+// is held to no limit yet). A paste here is the route the host cannot see. With
 // no upload plugin, a clipboard holding only a picture reaches ProseMirror as a
 // paste with no text; ProseMirror hands it to Chromium's native paste (its
 // capturePaste, a hidden contenteditable), and then picks the <img src="data:…">

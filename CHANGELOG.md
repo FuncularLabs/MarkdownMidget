@@ -104,8 +104,8 @@ changes between alpha tags.
   the status bar says "Too large to insert (over 64 MB): huge.png" (a pasted
   picture, having no name, is "pasted picture"). An embedded picture rides inside
   the document as text, about a third again its size in every copy and every
-  save; there is now one limit on it whichever way it comes in. A picture pasted
-  into the Markdown source view is not held to it yet.
+  save; the drop, Insert ▸ Picture and a paste into the formatted view now share
+  one limit. A picture pasted into the Markdown source view is not held to it yet.
 
 ### Fixed
 - **A document ending in anything but a paragraph or heading is no longer called

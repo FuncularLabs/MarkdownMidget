@@ -1,5 +1,4 @@
-using System.IO;
-using System.Linq;
+using System;
 using System.Text.Json;
 using MarkdownMidget;
 using Xunit;
@@ -105,36 +104,22 @@ public class PictureLimitTests
         // option's name drifts on one side, the editor's guard gets no ceiling and
         // silently refuses nothing; if the message type drifts, a refused paste is
         // cancelled with no word in the status bar. Each side's behaviour is tested
-        // on that side (picture-paste*.test.mjs; the notice above); this proves only
-        // that the names meet.
-        using var options = JsonDocument.Parse(PictureLimit.EditorOptionsJson());
+        // on that side (picture-paste*.test.mjs; the notice above), and the script
+        // the window sends is pinned in EditorScriptsTests; this proves only that
+        // the names meet.
+        //
+        // The name is taken from the SCRIPT the window sends, not from the JSON
+        // member on its own, so a rename that reached only one of them still fails.
+        var script = EditorScripts.Create(string.Empty);
+        using var options = JsonDocument.Parse(script[script.LastIndexOf(", {", StringComparison.Ordinal)..][2..^1]);
         var option = Assert.Single(options.RootElement.EnumerateObject()).Name;
 
-        var guard = Source("editor-src", "src", "picture-paste.js");
+        var guard = RepoSources.Read("editor-src", "src", "picture-paste.js");
         Assert.Contains($"options.{option}", guard, StringComparison.Ordinal);
         Assert.Contains($"type: '{PictureLimit.RefusedMessageType}'", guard, StringComparison.Ordinal);
 
-        var main = Source("editor-src", "src", "main.js");
+        var main = RepoSources.Read("editor-src", "src", "main.js");
         Assert.Contains("ceilingFrom(options)", main, StringComparison.Ordinal);
         Assert.Contains("postToHost(refusalMessage(size))", main, StringComparison.Ordinal);
-
-        var window = Source("src", "MarkdownMidget", "MainWindow.xaml.cs");
-        Assert.Contains("PictureLimit.EditorOptionsJson()", window, StringComparison.Ordinal);
-        Assert.Contains("case PictureLimit.RefusedMessageType:", window, StringComparison.Ordinal);
-    }
-
-    private static string Source(params string[] path) =>
-        File.ReadAllText(Path.Combine(RepoRoot(), Path.Combine(path)));
-
-    /// <summary>The repository, found from the test assembly (as MenuPathsInDocsTests
-    /// finds it).</summary>
-    private static string RepoRoot()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-            if (dir.EnumerateFiles("MarkdownMidget.sln*").Any()
-                || (dir.EnumerateDirectories("src").Any() && dir.EnumerateFiles("HELP.md").Any()))
-                return dir.FullName;
-        throw new InvalidOperationException(
-            $"No MarkdownMidget.sln[x] (or src/ beside HELP.md) above {AppContext.BaseDirectory}");
     }
 }

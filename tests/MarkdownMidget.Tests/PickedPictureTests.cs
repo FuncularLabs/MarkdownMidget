@@ -238,8 +238,8 @@ public class PickedPictureTests : IDisposable
         // toolbar button (both wired to it in MainWindow.xaml) take the route tested
         // above rather than a read of their own. It proves the call is there, not
         // what it does; the tests above do that.
-        var body = MethodBody(
-            File.ReadAllText(Path.Combine(RepoRoot(), "src", "MarkdownMidget", "MainWindow.xaml.cs")),
+        var body = RepoSources.MethodBody(
+            RepoSources.Read("src", "MarkdownMidget", "MainWindow.xaml.cs"),
             "private async void Picture_Click(");
         Assert.Contains("await PickedPicture.ReadAsync(picked)", body, StringComparison.Ordinal);
         Assert.Contains("FlashStatus(", body, StringComparison.Ordinal);
@@ -247,26 +247,4 @@ public class PickedPictureTests : IDisposable
         Assert.DoesNotContain("ImageMarkdown.Fragment", body, StringComparison.Ordinal);
     }
 
-    /// <summary>A method's text, from its signature to the closing brace at member
-    /// indentation.</summary>
-    private static string MethodBody(string source, string signature)
-    {
-        var start = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"no \"{signature}\" in the source");
-        var end = source.IndexOf("\n    }", start, StringComparison.Ordinal);
-        Assert.True(end > start, $"no end to \"{signature}\"");
-        return source[start..end];
-    }
-
-    /// <summary>The repository, found from the test assembly (as MenuPathsInDocsTests
-    /// finds it).</summary>
-    private static string RepoRoot()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-            if (dir.EnumerateFiles("MarkdownMidget.sln*").Any()
-                || (dir.EnumerateDirectories("src").Any() && dir.EnumerateFiles("HELP.md").Any()))
-                return dir.FullName;
-        throw new InvalidOperationException(
-            $"No MarkdownMidget.sln[x] (or src/ beside HELP.md) above {AppContext.BaseDirectory}");
-    }
 }

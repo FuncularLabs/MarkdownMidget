@@ -461,9 +461,12 @@ public partial class MainWindow : Window
                 // every drop this page ever posts is older than one already handled
                 // and is discarded in silence. (See _newestDrop.)
                 _newestDrop = 0;
-                // Bridge is wired; hand the editor its initial (empty) document, and
-                // the picture ceiling its paste guard applies (PictureLimit).
-                _ = RunEditorAsync($"window.MDM.create({JsLiteral(string.Empty)}, {PictureLimit.EditorOptionsJson()})");
+                // Bridge is wired; hand the editor its initial (empty) document and
+                // its options — the picture ceiling its paste guard applies. The
+                // script is built (and pinned) in EditorScripts: spelled out here,
+                // the options could be quoted without a single test noticing, and
+                // the guard would take no ceiling at all.
+                _ = RunEditorAsync(EditorScripts.Create(string.Empty));
                 break;
             case "ready":
                 _editorReady = true;
@@ -924,7 +927,9 @@ public partial class MainWindow : Window
         else Web.Focus(); // MDM.cmd/insertMarkdown already restores the DOM caret in JS
     }
 
-    private static string JsLiteral(string value) => JsonSerializer.Serialize(value);
+    // The one spelling of a JavaScript literal, in EditorScripts with the scripts
+    // that are built from it (and testable there, as nothing in this file is).
+    private static string JsLiteral(string value) => EditorScripts.JsLiteral(value);
 
     /// <summary>
     /// The document's markdown, or null when the editor can't be asked. Callers making

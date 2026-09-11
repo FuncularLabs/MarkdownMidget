@@ -159,6 +159,15 @@ public class EmbeddedReaderDocsTests
         // And what each of them says, quoted as the code builds it.
         Assert.Contains(PictureLimit.Notice("huge.png"), help, StringComparison.Ordinal);
         Assert.Contains(PictureLimit.Notice(null), help, StringComparison.Ordinal);
+
+        // F-4. Two more sentences state the number, and both survived a change of
+        // the constant: the pins above are satisfied by their SIBLING sentences, in
+        // the same bullet, so nothing failed while HELP told the user 64 MB and the
+        // code refused at 65. The Known limits bullet about drops:
+        Assert.Contains($"A picture **larger than {mb} MB** is refused the same way", help, StringComparison.Ordinal);
+        // And the drop's wait, which is scaled BY the ceiling and states it.
+        var onePicture = (int)DropHandshake.ReadTimeout(PictureLimit.MaxBytes).TotalSeconds;
+        Assert.Contains($"{onePicture} seconds for a single picture at the {mb} MB limit", help, StringComparison.Ordinal);
     }
 
     [Fact]
