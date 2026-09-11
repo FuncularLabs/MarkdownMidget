@@ -204,6 +204,21 @@ test('planDroppedRead calls a request about a drop that has not happened stale',
   assert.deepEqual(planDroppedRead(1, 0, [0]), { stale: true, indices: [0] });
 });
 
+test('planDroppedRead calls a request under drop 0 stale, even before the first drop', async () => {
+  // AR-8. dropSeq is pre-incremented, so 0 is never a drop the editor issued — it
+  // is what the host parses when a message did not say which drop it is, and the
+  // host refuses such a request up front (DropHandshake.CanBeAnswered). Before the
+  // first drop, dropSeq is still 0, so `drop !== dropSeq` matched by arithmetic
+  // accident and a request naming drop 0 was treated as current. droppedFiles is
+  // empty at that moment, so nothing is read today; the decision was wrong all the
+  // same, and it is the only thing standing between a request and the files.
+  assert.deepEqual(planDroppedRead(0, 0, [0]), { stale: true, indices: [0] });
+  assert.deepEqual(planDroppedRead(0, 0, []), { stale: true, indices: [] });
+  // And a drop number below 0 is no editor's either, whatever the counter is on.
+  assert.deepEqual(planDroppedRead(0, -1, [0]), { stale: true, indices: [0] });
+  assert.deepEqual(planDroppedRead(3, -1, [0]), { stale: true, indices: [0] });
+});
+
 test('planDroppedRead asks for a duplicated index once', async () => {
   // Twice would read the file twice and answer twice — two entries with the same
   // key, which is one base64 copy of a picture more than the host needs in memory.

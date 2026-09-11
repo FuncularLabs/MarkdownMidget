@@ -98,6 +98,12 @@ export function readHeads(files, makeReader = newFileReader) {
  * and reads nothing; the host still gets one null entry per index it named, so it
  * can tell "could not read" from "no answer at all".
  *
+ * Drop 0 is stale whatever the counter says. dropSeq is pre-incremented, so 0 is
+ * never a drop this editor issued — it is what the host parses when a message did
+ * not say which drop it is, and the host refuses such a request up front
+ * (DropHandshake.CanBeAnswered). Before the first drop dropSeq is still 0, so
+ * `drop !== dropSeq` alone called that request current by arithmetic accident.
+ *
  * `indices` is sanitised, not trusted: whole numbers only (files[1.5] and
  * files[NaN] are not files), each one once (a duplicate would read the file and
  * base64 it twice), in the order asked. An index that names no file is left in —
@@ -117,7 +123,7 @@ export function planDroppedRead(dropSeq, drop, indices) {
       asked.push(index);
     }
   }
-  return { stale: drop !== dropSeq, indices: asked };
+  return { stale: !(drop > 0) || drop !== dropSeq, indices: asked };
 }
 
 /**
