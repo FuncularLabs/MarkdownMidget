@@ -174,15 +174,42 @@ matters. (`\s` agrees in both on every ordinary space, tab and newline; it diffe
 only on a couple of rare control characters.) And `.` matches one emoji in the
 formatted view and half of one in the source view, for the same kind of reason.
 
+Two smaller ones are left alone as well. A pattern that gives two groups the same
+name — `(?<a>x)(?<a>y)` — compiles in the source view and is refused as *Invalid
+pattern.* in the formatted one, so use distinct names. And `^`/`$` treat a
+carriage return, U+2028 and U+2029 as line endings in the formatted view only; the
+source view counts a line feed and nothing else.
+
 #### Matches of no width
 
 A pattern can match a *position* rather than a run of text — `^`, `$`, `(?=cat)`.
 Find shows one as a blinking caret, and **Replace** inserts there rather than
-replacing anything; `^` with `> ` in **Replace All** is the "prefix every line"
-idiom, and it works in both views. What `^` means differs, though: the source view
-searches the markdown, so `^` is the start of every line, while the formatted view
-searches the document's text — what you see, with no line breaks between
-paragraphs — so there `^` is the start of the whole document and matches once.
+replacing anything.
+
+What `^` and `$` mean differs between the views. The source view searches the
+markdown, so `^` is the start of every line and `$` the end of every line — in
+`one`, a blank line, `two`, `$` matches three times. The formatted view searches
+the document's text — what you see, with no line breaks between paragraphs — so
+there `^` is the start of the whole document and `$` its end, once each. The
+exception is a **code block**, whose text keeps its own line breaks: inside a
+three-line fence the formatted view's `^` matches three times, once per line, and
+`$` likewise.
+
+So `^` with `> ` in **Replace All** — the "prefix every line" idiom — is a
+*source view* idiom. It works there because what you insert is markdown: every
+line gains a `> ` and becomes a quote. The formatted view inserts **characters**,
+not syntax, so the same replacement puts a literal `>` at the start of the
+document's first paragraph — and the markdown that comes back out writes it as
+`\>`, escaped, because a real `>` there would mean a quote nobody asked for.
+Anything meant to change structure — quoting, list markers, headings — belongs in
+the markdown source view.
+
+A position on the boundary between two blocks is the *same* position in the
+formatted view: the index runs the blocks together with nothing between them, so
+the end of one and the start of the next cannot be told apart. In `end`, blank
+line, `start`, both `(?<=end)` and `(?=start)` insert in the second block —
+`end`, blank line, `Xstart`. The source view, which has the line breaks, puts the
+first one where you would expect: `endX`.
 
 ### Replace
 

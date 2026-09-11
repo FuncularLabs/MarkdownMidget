@@ -547,6 +547,39 @@ public class FindEngineTests
     }
 
     [Fact]
+    public void TheSourceViewsAnchorsCountEveryLine()
+    {
+        // HELP's "^ is the start of every line and $ the end of every line" for the
+        // source view, against the formatted view's one-each. Three of each in "one",
+        // a blank line, "two" — where find.test.mjs counts one over the same document
+        // (#5 NF-3).
+        var caret = FindEngine.Build("^", FindEngine.Mode.Regex, matchCase: true, wholeWord: false)!;
+        var dollar = FindEngine.Build("$", FindEngine.Mode.Regex, matchCase: true, wholeWord: false)!;
+        Assert.Equal(3, caret.Matches("one\n\ntwo").Count);
+        Assert.Equal(3, dollar.Matches("one\n\ntwo").Count);
+    }
+
+    [Fact]
+    public void TheDivergencesHelpDocumentsRatherThanRefusesAreRealOnThisSide()
+    {
+        // Two HELP now names, both left alone because the formatted view's own
+        // refusal — or a count — is a safe answer rather than a different document.
+        //
+        // Duplicate group names compile here and are refused over there, where the
+        // host's backstop turns the refusal into the usual "Invalid pattern."
+        Assert.NotNull(FindEngine.Build(@"(?<a>x)(?<a>y)", FindEngine.Mode.Regex, matchCase: true, wholeWord: false));
+
+        // Line terminators: .NET's Multiline starts a line after a line feed and
+        // nothing else, where the browser engine also counts a carriage return and
+        // the U+2028 / U+2029 separators.
+        var caret = FindEngine.Build("^", FindEngine.Mode.Regex, matchCase: true, wholeWord: false)!;
+        Assert.Equal(2, caret.Matches("a\nb").Count);
+        Assert.Equal(1, caret.Matches("a\rb").Count);
+        Assert.Equal(1, caret.Matches("a\u2028b").Count);
+        Assert.Equal(1, caret.Matches("a\u2029b").Count);
+    }
+
+    [Fact]
     public void ANumberedBackreferenceIsRefusedWhereTheTwoEnginesNumberGroupsDifferently()
     {
         // .NET numbers the unnamed groups first and the named ones after; JavaScript

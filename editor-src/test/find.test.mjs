@@ -658,11 +658,56 @@ describe('ZeroWidthMatchesInsert', () => {
 
   test('^ inserts at the start of the text, the way it does in the source view', () => {
     // The index this view searches is the document's text with no line breaks
-    // between blocks, so ^ is the start of that text and matches once. HELP says so.
+    // between blocks, so for a document of paragraphs ^ is the start of that text
+    // and matches once. HELP says so — and says what a code block does instead
+    // (below), since that text keeps its own newlines.
     load('abc');
     assert.equal(scan('^', 'gm').total, 1);
     assert.equal(findReplaceAll(ed.view(), 'X', true).replaced, 1);
     assert.equal(md(), 'Xabc');
+  });
+
+  test('inside a code block ^ matches every line, because that text keeps its newlines', () => {
+    // HELP's "^ is the start of the whole document and matches once" was true of
+    // paragraphs and false of a fence: a code block is one text node WITH line
+    // breaks in it (#5 NF-3).
+    load('```\none\ntwo\nthree\n```');
+    assert.equal(scan('^', 'gm').total, 3);
+    assert.equal(findReplaceAll(ed.view(), 'q', true).replaced, 3);
+    assert.equal(md(), '```\nqone\nqtwo\nqthree\n```');
+  });
+
+  test('$ is the end of the whole text, where the source view counts every line', () => {
+    load('one\n\ntwo');
+    assert.equal(scan('$', 'gm').total, 1);   // .NET, over the markdown, finds three
+  });
+
+  test('"> " inserted at ^ is text in this view, not markdown', () => {
+    // The "prefix every line" idiom belongs to the source view, which inserts
+    // markdown. Here the replacement is characters, and the serialiser escapes a
+    // '>' that would otherwise start a quote (#5 NF-4).
+    load('abc');
+    assert.equal(scan('^', 'gm').total, 1);
+    assert.equal(findReplaceAll(ed.view(), '> ', true).replaced, 1);
+    assert.equal(md(), '\\> abc');
+  });
+
+  test('a match of no width on a block boundary lands in the block that follows', () => {
+    // The index runs the blocks together with no separator, so the end of one and
+    // the start of the next ARE the same position — there is nothing in the index
+    // to tell them apart. A lookbehind for the block that ends and a lookahead for
+    // the one that starts therefore insert in the same place, the second block. The
+    // source view, which searches the markdown and has the line breaks, puts the
+    // lookbehind's insertion in the first: "endX\n\nstart". Documented under
+    // "Matches of no width" rather than changed — telling them apart means a
+    // separator in the index, and that changes what every pattern matches (#5 NF-7).
+    for (const pattern of ['(?<=end)', '(?=start)']) {
+      findClear();
+      load('end\n\nstart');
+      assert.equal(scan(pattern).total, 1, pattern);
+      assert.equal(findReplaceAll(ed.view(), 'X', true).replaced, 1, pattern);
+      assert.equal(md(), 'end\n\nXstart', pattern);
+    }
   });
 
   test('the highlight on a zero-width match is a caret, not a run of text', () => {
@@ -746,6 +791,23 @@ describe('WhatTheHostAcceptsThisViewCanRun', () => {
         assert.equal(row.refusedBy, 'host', `${row.pattern} — unknown refusedBy`);
     });
   }
+
+  test('the divergences HELP documents rather than refuses are real in this engine', () => {
+    // Two the host lets through because the formatted view's own refusal is a safe
+    // answer rather than a different document.
+    //
+    // Duplicate group names: .NET compiles "(?<a>x)(?<a>y)", this engine will not,
+    // and the host's backstop turns that into the usual "Invalid pattern."
+    load('cat');
+    assert.equal(scan('(?<a>x)(?<a>y)').error, 'Invalid pattern');
+
+    // Line terminators: ^ and $ start a new line here at a carriage return and at
+    // U+2028 / U+2029; .NET's Multiline counts a line feed and nothing else. The
+    // editor's own text never holds one of these — the parser normalises them — so
+    // this is the engine fact HELP is describing, not a document the editor can hold.
+    for (const sep of ['\r', '\u2028', '\u2029'])
+      assert.equal(`a${sep}b`.match(/^/gmu).length, 2, JSON.stringify(sep));
+  });
 
   test('a number after a named group means a different group here than in .NET', () => {
     // The measurement behind the refused row "(?<a>x)(y)\1" (#5 NF-1). JavaScript
