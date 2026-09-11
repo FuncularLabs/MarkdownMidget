@@ -402,6 +402,14 @@ internal static class RegistrationService
         return fileExists(Path.Combine(folder, appAssemblyName + ".dll"));
     }
 
+    /// <summary>
+    /// <see cref="NeedsFilesBesideIt"/> for the running exe, with the real probe: the
+    /// question the Register click handler asks before its dialog. InstallGuardTests
+    /// asserts it as the precondition of its live install test.
+    /// </summary>
+    internal static bool CurrentExeNeedsFilesBesideIt() =>
+        NeedsFilesBesideIt(CurrentExePath, AppAssemblyName, File.Exists);
+
     /// <summary>The command <see cref="DevelopmentBuildRefusal"/> gives, run from the
     /// repository root. InstallGuardTests pins its project and publish profile against
     /// the repository.</summary>
@@ -427,7 +435,18 @@ internal static class RegistrationService
     /// <summary>Copy the current exe to %LocalAppData%\Programs\MarkdownMidget.</summary>
     /// <exception cref="InvalidOperationException">The current exe is not the installed
     /// copy and needs files beside it; the message is <see cref="DevelopmentBuildRefusal"/>.</exception>
-    public static string InstallToAppData() => InstallToAppData(CurrentExePath, AppDataInstallDir, File.Exists);
+    public static string InstallToAppData() => InstallToAppData(AppDataInstallDir);
+
+    /// <summary>
+    /// Copy the running exe into <paramref name="installDir"/>, judged by the real
+    /// <see cref="File.Exists(string)"/>: <see cref="InstallToAppData()"/> with only the
+    /// folder left to the caller. The public method passes the real install folder;
+    /// InstallGuardTests passes a temp one, so a test runs the source and the probe
+    /// Register uses without touching the real install.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">As for <see cref="InstallToAppData()"/>.</exception>
+    internal static string InstallToAppData(string installDir) =>
+        InstallToAppData(CurrentExePath, installDir, File.Exists);
 
     /// <summary>
     /// Copy <paramref name="sourceExe"/> into <paramref name="installDir"/> as

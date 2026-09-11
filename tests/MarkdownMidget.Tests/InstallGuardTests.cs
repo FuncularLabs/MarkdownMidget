@@ -17,12 +17,22 @@ namespace MarkdownMidget.Tests;
 /// the repository, and that the README tells a developer the same thing first.
 ///
 /// Nothing here touches the real install or the registry: the decision takes its
-/// file probe as a parameter, and the copy is driven through the overload that
-/// takes its source and destination, pointed at a temp folder.
+/// file probe as a parameter, and every install test passes its own destination
+/// folder, a temp one.
+///
+/// Of the copy's refusal, the tests pin the two internal overloads: the one that
+/// takes the source, the folder and the probe, against temp folders and injected
+/// probes; and the one that takes only the folder and supplies the running exe and
+/// File.Exists itself, live against this test run's own exe. The public
+/// InstallToAppData() is not called here, since its folder is the real install. It
+/// is a one-line delegation to the folder-only overload with the folder as its only
+/// argument, and a change to that line fails no test here.
 ///
 /// Not covered: the click handler's own check before the dialog is UI with no seam,
-/// so dropping it, or moving it after the dialog, fails no test here. What still
-/// stands between that and a broken install is the copy's own refusal, pinned below.
+/// so dropping it, or moving it after the dialog, fails no test here; the question it
+/// asks, CurrentExeNeedsFilesBesideIt, is the live install test's precondition. What
+/// still stands between a dropped check and a broken install is the copy's own
+/// refusal, pinned as above up to that one line.
 /// </summary>
 public class InstallGuardTests : IDisposable
 {
@@ -225,6 +235,33 @@ public class InstallGuardTests : IDisposable
 
         Assert.Throws<InvalidOperationException>(
             () => RegistrationService.InstallToAppData(source, installDir, _ => true));
+        Assert.False(Directory.Exists(installDir));
+    }
+
+    // ===== the running exe, through the real probe =====
+
+    [Fact]
+    public void InstallingThisTestRunsOwnExeThrowsTheRefusalAndCreatesNothing()
+    {
+        // LIVE. The one install test that leaves the source and the probe to the code:
+        // the overload that takes only the folder supplies the running exe and
+        // File.Exists itself, and the public method Register calls hands it nothing
+        // but the real install folder. Under `dotnet test` the running exe is
+        // testhost.exe in this build output, beside the app's DLL: exactly the exe
+        // Register must refuse. Only the folder is ours.
+        Assert.True(RegistrationService.CurrentExeNeedsFilesBesideIt(),
+            $"This test needs the running exe to be a build output, and {RegistrationService.CurrentExePath} " +
+            $"has no {RegistrationService.AppAssemblyName}.dll beside it. Under `dotnet test` the running exe is " +
+            "testhost.exe in the test output folder, where that DLL is. If tests now start some other way " +
+            "(through dotnet.exe, say), this test cannot see the refusal and needs another build output to run; " +
+            "if the exe above IS in the test output folder, CurrentExeNeedsFilesBesideIt is broken, and so is " +
+            "Register's check before its dialog.");
+        var installDir = Path.Combine(_dir, "Programs", "MarkdownMidget");
+        Assert.False(Directory.Exists(installDir));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => RegistrationService.InstallToAppData(installDir));
+
+        Assert.Equal(RegistrationService.DevelopmentBuildRefusal, ex.Message);
         Assert.False(Directory.Exists(installDir));
     }
 

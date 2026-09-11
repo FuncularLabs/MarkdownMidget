@@ -3032,8 +3032,7 @@ public partial class MainWindow : Window
         // is refused here, before the dialog: nothing is asked, copied, registered or
         // handed off. Only when a copy would happen, since registering the installed
         // copy in place copies nothing. InstallToAppData refuses the same exe itself.
-        if (!alreadyInstalled && RegistrationService.NeedsFilesBesideIt(
-                RegistrationService.CurrentExePath, RegistrationService.AppAssemblyName, File.Exists))
+        if (!alreadyInstalled && RegistrationService.CurrentExeNeedsFilesBesideIt())
         {
             MessageBox.Show(this, RegistrationService.DevelopmentBuildRefusal, "Markdown Midget",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
