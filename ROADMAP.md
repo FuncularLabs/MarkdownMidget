@@ -46,10 +46,12 @@ order of risk:
   JPEG, GIF, WebP, BMP, recognised by its bytes, whatever its name) is embedded in
   either view exactly as Insert ▸ Picture embeds it, a markdown or text file opens
   as before, and anything else is refused by name and never replaces the document.
-  Was: any dropped file opened as text — after the discard prompt on the formatted
-  view, or in a fresh window from the toolbar. The other half of this item — pasting an image into the *source*
-  view did nothing — was done 2026-09-11 (unreleased, #7): it inserts the same
-  data-URI markdown the formatted view produces.
+  Was: any dropped file opened as text — in place with no prompt if the document
+  was untitled and unmodified, in a fresh window from the toolbar otherwise, or
+  after the discard prompt on the formatted view. The other half of this item —
+  pasting an image into the *source* view did nothing — was done 2026-09-11
+  (unreleased, #7): it inserts the same data-URI markdown the formatted view
+  produces.
 - ~~**The same file open in two windows silently overwrites.**~~ **Done 2026-09-10
   (unreleased, #1)**: the per-path lock — focus the window that has it, else open
   read-only with a message — described in full where the multi-window list strikes
