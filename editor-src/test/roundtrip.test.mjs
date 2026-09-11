@@ -119,6 +119,18 @@ describe('MeasuredRewritesAreReproduced', () => {
     // the table before it means it is not directly after another list.
     assert.match(out, /^- \[ \] task open\n- \[x\] task done$/m);
   });
+
+  test('CRLF: LF outside code and HTML blocks, CRLF kept inside them', () => {
+    // The fixture is LF-only, so this row has its own input: a paragraph, a
+    // fenced block and an HTML block, all CRLF. The endings between blocks and
+    // inside the paragraph are the parser's to fold; the line breaks INSIDE a
+    // code or HTML block are the block's text and come back as written. The
+    // ending after a block's last line is the serialiser's LF: it closes the
+    // block, it is not part of it. (R4, on the host, makes the whole file one
+    // ending again.)
+    const crlf = 'para one\r\nline two\r\n\r\n```\r\ncode a\r\ncode b\r\n```\r\n\r\n<div>\r\nhtml\r\n</div>\r\n';
+    assert.equal(ed.roundTrip(crlf), 'para one\nline two\n\n```\ncode a\r\ncode b\n```\n\n<div>\r\nhtml\r\n</div>\n');
+  });
 });
 
 describe('ConventionsArePinned', () => {
