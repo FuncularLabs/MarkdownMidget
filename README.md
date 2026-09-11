@@ -61,6 +61,8 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Secure Markdown** — password-protected encrypted documents (`.mdenc`,
   AES-256-GCM with an Argon2id-derived key) that edit exactly like any other;
   the decrypted text never touches disk, crash-protection copies included.
+- A **syntax-highlighted source view** that follows the theme — or runs a theme
+  of its own (View ▸ Theme ▸ Same Theme for Both Views, off).
 - Windows' file dialogs run **in a separate process**, with a **built-in file
   picker** standing by, so a faulty Explorer add-on can't take the editor down.
 - Ships as a **single `.exe`**.
@@ -74,7 +76,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-Beta (0.9.x), in daily use and signed on every release. Windows-only for now; the
+Beta (0.10.x), in daily use and signed on every release. Windows-only for now; the
 editor core is web-based, so a cross-platform shell (MAUI/Avalonia) is a realistic
 future step. A real installer that registers in Add/Remove Programs is on the
 [roadmap](ROADMAP.md) — the portable exe will stay available either way.
@@ -226,6 +228,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v0.10.0** — **The source view is syntax-highlighted** and follows the theme,
+  or runs its own (View ▸ Theme ▸ Same Theme for Both Views). Alt menu shortcuts
+  now work with a document open.
 - **v0.9.0** — **Secure Markdown**: password-protected encrypted documents
   (`.mdenc`) that edit like any other, with encrypted crash protection and no
   password recovery, ever. The **file-dialog crash** is fixed: Windows' dialogs
