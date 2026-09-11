@@ -81,6 +81,43 @@ public class DropRoutingTests
     }
 
     [Fact]
+    public void BothGifVersionsAreSniffed()
+    {
+        // GIF89a is the version every fixture above uses, so the GIF87a branch was
+        // deletable without a single test noticing. A 1987 GIF is still a GIF, and
+        // Insert ▸ Picture would embed it as image/gif.
+        var gif87 = Encoding.ASCII.GetBytes("GIF87a\x01\x00\x01\x00");
+        Assert.Equal("image/gif", DropRouting.SniffImageMime(gif87));
+        Assert.Equal("image/gif", DropRouting.SniffImageMime(Gif));           // GIF89a, for the pair
+        Assert.Equal(DropKind.Picture, DropRouting.Classify("old.gif", gif87).Kind);
+        // Neither the version digits nor the trailing 'a' is optional: "GIF" alone,
+        // and a plausible-looking wrong version, are not pictures.
+        Assert.Null(DropRouting.SniffImageMime(Encoding.ASCII.GetBytes("GIF88a\x01\x00")));
+        Assert.Null(DropRouting.SniffImageMime(Encoding.ASCII.GetBytes("GIF87b\x01\x00")));
+    }
+
+    [Fact]
+    public void NearMissSignaturesAreNotPictures()
+    {
+        // Each of these differs from a real signature in exactly the byte a weakened
+        // check would stop looking at, so each one keeps its branch honest.
+
+        // JPEG is FF D8 FF: the third byte is part of the magic, not padding. A file
+        // that starts FF D8 00 is not a JPEG, and embedding it as image/jpeg would
+        // produce a broken image in the document.
+        Assert.Null(DropRouting.SniffImageMime([0xFF, 0xD8, 0x00, 0xE0, 0x00, 0x10]));
+        Assert.Equal("image/jpeg", DropRouting.SniffImageMime([0xFF, 0xD8, 0xFF, 0xE0]));
+
+        // The PNG signature is eight bytes, and the four after \x89PNG are the point
+        // of it: CR LF SUB LF catches a transfer that translated line endings. A file
+        // whose CR was eaten is a CORRUPT png, not a png — so \x89PNG alone must not
+        // be enough to match.
+        Assert.Null(DropRouting.SniffImageMime([0x89, 0x50, 0x4E, 0x47, 0x0A, 0x0A, 0x1A, 0x0A]));
+        Assert.Null(DropRouting.SniffImageMime([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0D]));
+        Assert.Equal("image/png", DropRouting.SniffImageMime(Png));
+    }
+
+    [Fact]
     public void ShortHeadIsNotAPicture()
     {
         Assert.Null(DropRouting.SniffImageMime([]));
