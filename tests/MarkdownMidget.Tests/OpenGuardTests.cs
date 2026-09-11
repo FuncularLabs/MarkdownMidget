@@ -749,6 +749,48 @@ public class OpenGuardTests : IDisposable
     }
 
     [Fact]
+    public void TheRelaunchCarriesOnlyTheUsersOwnReadOnly()
+    {
+        // Apply-update, and the About dialog's update, restart this window on the
+        // new exe with the document and its view flags. --readonly there reads to
+        // the new process as the user's own choice: the fallback that then lands on
+        // top of it records read-only as "already the user's", and every later
+        // normal open in that window stays read-only, Save disabled, no message. So
+        // the flag rides only when read-only IS the user's own; the new process
+        // claims the document afresh and imposes its own read-only if it must.
+        var doc = Doc("relaunch.md");
+        var none = new ImposedReadOnly();
+        Assert.Equal(new[] { doc }, MainWindow.RelaunchArguments(doc, readOnly: false, none, sourceMode: false));
+        Assert.Equal(new[] { doc, "--readonly", "--source" }, MainWindow.RelaunchArguments(doc, readOnly: true, none, sourceMode: true));
+        Assert.Equal(new[] { "--source" }, MainWindow.RelaunchArguments(null, readOnly: false, none, sourceMode: true));
+        Assert.True(none.IsUsersOwn(readOnly: true));
+        Assert.False(none.IsUsersOwn(readOnly: false));
+
+        // The fallback's read-only is not carried.
+        var imposed = new ImposedReadOnly();
+        imposed.Impose(readOnlyAlready: false);
+        Assert.False(imposed.IsUsersOwn(readOnly: true));
+        Assert.Equal(new[] { doc, "--source" }, MainWindow.RelaunchArguments(doc, readOnly: true, imposed, sourceMode: true));
+        Assert.Equal(new[] { doc }, MainWindow.RelaunchArguments(doc, readOnly: true, imposed, sourceMode: false));
+
+        // ...unless read-only was the user's own before the fallback: then it is
+        // theirs still, underneath, and the restart keeps it.
+        var underneath = new ImposedReadOnly();
+        underneath.Impose(readOnlyAlready: true);
+        Assert.True(underneath.IsUsersOwn(readOnly: true));
+        Assert.Equal(new[] { doc, "--readonly" }, MainWindow.RelaunchArguments(doc, readOnly: true, underneath, sourceMode: false));
+
+        // Once the fallback's read-only is lifted (a successful claim) or cleared (a
+        // normal open), a read-only the user chooses after is their own again.
+        Assert.Equal(ReadOnlyLift.Edit, imposed.Lift(new OpenGuardDecision(OpenVerdict.Proceed, 0, 0)));
+        Assert.True(imposed.IsUsersOwn(readOnly: true));
+        var cleared = new ImposedReadOnly();
+        cleared.Impose(readOnlyAlready: false);
+        cleared.Clear();
+        Assert.True(cleared.IsUsersOwn(readOnly: true));
+    }
+
+    [Fact]
     public void DocumentArgumentSkipsFlagValues()
     {
         // The startup parser's rule, shared by App.OnStartup and the window: the

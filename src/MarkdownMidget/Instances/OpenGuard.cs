@@ -532,6 +532,16 @@ internal sealed class ImposedReadOnly
     /// <summary>True from the fallback until a lift or a normal open.</summary>
     public bool Imposed => _imposed;
 
+    /// <summary>Is <paramref name="readOnly"/> - the window's read-only state - the
+    /// user's own? False only while the fallback's is imposed on a window that was
+    /// editable before it. For the relaunches that reopen this document (Apply
+    /// update, the About dialog's update): they carry the user's own read-only as
+    /// --readonly and leave the fallback's behind, because a --readonly the new
+    /// process starts with reads to it as the user's choice, which a later normal
+    /// open there would then keep; the new process claims the document afresh and
+    /// imposes its own if it must.</summary>
+    public bool IsUsersOwn(bool readOnly) => readOnly && (!_imposed || _wasReadOnly);
+
     /// <summary>The fallback has landed. <paramref name="readOnlyAlready"/>: the window
     /// was read-only before it, which a later open must not undo on the fallback's
     /// behalf if that was the user's own choice. A second fallback on top of a first

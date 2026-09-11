@@ -21,9 +21,11 @@ public partial class AboutDialog : Window
     private bool _updating;
 
     // What the restarted instance should reopen — the owning window's document and
-    // view flags, captured when the dialog opens. An update should not cost the
-    // user their place; the startup argument parser already honours all of these.
-    private readonly System.Collections.Generic.List<string> _relaunchArgs = new();
+    // view flags, captured when the dialog opens. Decided by the window
+    // (MainWindow.RelaunchArguments), the one place that also serves Apply-update,
+    // so the two relaunches cannot drift. An update should not cost the user their
+    // place; the startup argument parser already honours all of these.
+    private readonly System.Collections.Generic.IReadOnlyList<string> _relaunchArgs;
 
     // Whether the owning window's Help menu actually offers Apply-update. Help
     // viewer windows suppress the item, so advice pointing at it there would name
@@ -37,16 +39,13 @@ public partial class AboutDialog : Window
     // and quit (see MainWindow.StartHandingOffDocument).
     private readonly Action<Action> _restart;
 
-    public AboutDialog(string? currentDocumentPath = null, bool readOnly = false,
-                       bool sourceMode = false, bool hasApplyMenu = true,
-                       Action<Action>? restart = null)
+    public AboutDialog(System.Collections.Generic.IReadOnlyList<string>? relaunchArgs = null,
+                       bool hasApplyMenu = true, Action<Action>? restart = null)
     {
         InitializeComponent();
         _hasApplyMenu = hasApplyMenu;
         _restart = restart ?? (start => start());
-        if (currentDocumentPath is not null) _relaunchArgs.Add(currentDocumentPath);
-        if (readOnly) _relaunchArgs.Add("--readonly");
-        if (sourceMode) _relaunchArgs.Add("--source");
+        _relaunchArgs = relaunchArgs ?? [];
         var info = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
         _current = UpdateVersion.Parse(info);
