@@ -37,6 +37,22 @@ internal static class ImagePaste
     public static string MarkdownFor(byte[] png) => ImageMarkdown.Fragment(string.Empty, "image/png", png);
 
     /// <summary>
+    /// The notice that refuses <paramref name="png"/> for its size, or null when it
+    /// goes in. Measured on the PNG that would actually be embedded — the
+    /// clipboard's own when it offered one, otherwise what <see cref="EncodePng"/>
+    /// made of the bitmap — because those are the bytes the document would carry, as
+    /// base64 and a third again as large.
+    ///
+    /// A pasted picture has no file name, so the notice names none
+    /// (<see cref="PictureLimit.Notice"/>) — the same words the formatted view's
+    /// paste is refused with, for the same reason.
+    /// </summary>
+    /// <param name="ceiling">Takes a value only so the boundary is testable without
+    /// 64 MB of PNG; it is <see cref="PictureLimit.MaxBytes"/> in the app.</param>
+    public static string? RefusalFor(byte[] png, long ceiling = PictureLimit.MaxBytes) =>
+        PictureLimit.IsTooLarge(png.LongLength, ceiling) ? PictureLimit.Notice(null, ceiling) : null;
+
+    /// <summary>
     /// The clipboard's own PNG, when <paramref name="data"/> (what reading
     /// <see cref="PngFormat"/> returned) is one to insert as it is: a
     /// <see cref="MemoryStream"/>, which is how WPF hands over a registered format

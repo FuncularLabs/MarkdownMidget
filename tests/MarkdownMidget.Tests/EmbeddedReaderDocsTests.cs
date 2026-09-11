@@ -144,17 +144,17 @@ public class EmbeddedReaderDocsTests
 
         // Editing behaviors, where pictures are introduced.
         Assert.Contains(
-            $"A picture larger than **{mb} MB** is not inserted by **Insert ▸ Picture…**, a paste into the formatted view or a drop",
+            $"A picture larger than **{mb} MB** is not inserted by **Insert ▸ Picture…**, a paste into either view or a drop",
             help, StringComparison.Ordinal);
         // Files & windows: the drop (pinned on its own above), pointing at the others.
         Assert.Contains($"A picture **larger than {mb} MB** is named in the status bar rather than inserted", help, StringComparison.Ordinal);
         Assert.Contains(
-            "It is the one picture limit — **Insert ▸ Picture…** and a paste into the formatted view apply it too",
+            "It is the one picture limit — **Insert ▸ Picture…** and a paste into either view apply it too",
             help, StringComparison.Ordinal);
         // Known limits: the one bullet that lists every route.
         Assert.Contains($"**One size limit on a picture: {mb} MB.**", help, StringComparison.Ordinal);
         Assert.Contains(
-            $"a picture larger than **{mb} MB** is not inserted — not by **Insert ▸ Picture…**, not dropped as a file on either view, and not pasted into the formatted view",
+            $"a picture larger than **{mb} MB** is not inserted — not by **Insert ▸ Picture…**, not dropped as a file on either view, and not pasted into either view",
             help, StringComparison.Ordinal);
         // And what each of them says, quoted as the code builds it.
         Assert.Contains(PictureLimit.Notice("huge.png"), help, StringComparison.Ordinal);

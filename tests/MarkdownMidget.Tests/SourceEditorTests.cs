@@ -783,6 +783,115 @@ public class SourceEditorTests
         Assert.Equal("abc", text);
     }
 
+    // ===== the picture ceiling on a pasted picture =====
+    //
+    // The ceiling the drop, Insert ▸ Picture and the formatted view's paste already
+    // apply (PictureLimit) reaches this route too. It is measured on the PNG that
+    // would actually go in — the clipboard's own when it offers one, otherwise the
+    // one encoded from the bitmap — so both paths are held to it. This editor has no
+    // status bar, so a refusal is raised as PictureRefused and the window says it.
+
+    [Fact]
+    public void APastedPicturePastTheCeilingIsRefusedAndNothingGoesIn()
+    {
+        var (handled, text, notices) = On(ed =>
+        {
+            var seen = new System.Collections.Generic.List<string>();
+            ed.PictureRefused += seen.Add;
+            ed.PictureCeiling = 16;                        // under any PNG there is
+            var h = ed.TryPasteImage(ImageOnly());
+            return (h, ed.Text, seen);
+        }, "abc", laidOut: false);
+
+        // Handled, and nothing inserted: the paste is ours and it goes nowhere.
+        // Returning false would hand it back to AvalonEdit, which pastes the
+        // clipboard's TEXT — and a picture-only clipboard has none, so a refusal
+        // would land as silence.
+        Assert.True(handled);
+        Assert.Equal("abc", text);
+        Assert.Equal(PictureLimit.Notice(null, ceiling: 16), Assert.Single(notices));
+    }
+
+    [Fact]
+    public void AClipboardPngPastTheCeilingIsRefusedOnItsOwnBytes()
+    {
+        // The pass-through path: the clipboard's own PNG goes into the document
+        // untouched, so the ceiling is measured on those bytes and not on some
+        // re-encoding of them.
+        var (handled, text, notices, ceiling) = On(ed =>
+        {
+            var bytes = InterlacedPng();
+            var seen = new System.Collections.Generic.List<string>();
+            ed.PictureRefused += seen.Add;
+            ed.PictureCeiling = bytes.LongLength - 1;      // one byte under what arrived
+            var h = ed.TryPasteImage(new DataObject("PNG", new MemoryStream(bytes)));
+            return (h, ed.Text, seen, ed.PictureCeiling);
+        }, "abc", laidOut: false);
+
+        Assert.True(handled);
+        Assert.Equal("abc", text);
+        Assert.Equal(PictureLimit.Notice(null, ceiling), Assert.Single(notices));
+    }
+
+    [Fact]
+    public void ExactlyAtTheCeilingThePastedPictureGoesIn()
+    {
+        // The boundary, on bytes that cannot drift: the clipboard's PNG is inserted
+        // as it is, so "exactly the ceiling" is exactly its own length.
+        var (text, png, notices) = On(ed =>
+        {
+            var bytes = InterlacedPng();
+            var seen = new System.Collections.Generic.List<string>();
+            ed.PictureRefused += seen.Add;
+            ed.PictureCeiling = bytes.LongLength;
+            ed.TryPasteImage(new DataObject("PNG", new MemoryStream(bytes)));
+            return (ed.Text, bytes, seen);
+        }, "", laidOut: false);
+
+        Assert.Equal(png, PastedBytes(text, ""));
+        Assert.Empty(notices);
+    }
+
+    [Fact]
+    public void TheCeilingThisEditorRunsWithIsTheSharedOne()
+    {
+        // Nothing in the app sets PictureCeiling: it is the ceiling every other route
+        // applies, and only a test lowers it.
+        Assert.Equal(PictureLimit.MaxBytes, On(ed => ed.PictureCeiling, "abc", laidOut: false));
+    }
+
+    [Fact]
+    public void ThePasteCommandRefusesAPicturePastTheCeilingToo()
+    {
+        // The route a user takes (Ctrl+V, Edit ▸ Paste), not only the seam: the
+        // command runs, nothing goes in, and the notice is raised once.
+        var (text, notices) = On(ed =>
+        {
+            var seen = new System.Collections.Generic.List<string>();
+            ed.PictureRefused += seen.Add;
+            ed.PictureCeiling = 16;
+            ed.ClipboardSource = () => ImageOnly();
+            ed.CaretOffset = 3;
+            ed.Paste();
+            return (ed.Text, seen);
+        }, "abc", laidOut: true);
+
+        Assert.Equal("abc", text);
+        Assert.Equal(PictureLimit.Notice(null, ceiling: 16), Assert.Single(notices));
+    }
+
+    [Fact]
+    public void TheWindowShowsWhatThisEditorRefuses()
+    {
+        // The editor has no status bar; the window subscribes. Nothing else would
+        // notice if that line went, so it is pinned in the method that wires the
+        // source view — a scan, because MainWindow needs a real window.
+        var body = RepoSources.MethodBody(
+            RepoSources.Read("src", "MarkdownMidget", "MainWindow.Spell.cs"),
+            "private void InitSource()");
+        Assert.Contains("SourceBox.PictureRefused += FlashStatus", body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AFailingClipboardPngReadThroughOleFallsBackToTheBitmap()
     {

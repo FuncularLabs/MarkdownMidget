@@ -85,6 +85,11 @@ public partial class MainWindow
         {
             if (_sourceMode) _squiggles?.ShiftForEdit(offset, added, removed);
         };
+
+        // A picture pasted here can be past the picture ceiling. The editor refuses
+        // it and has no status bar to say so in, so the window says it — in the words
+        // the drop, Insert ▸ Picture and the formatted view's paste all use.
+        SourceBox.PictureRefused += FlashStatus;
     }
 
     /// <summary>

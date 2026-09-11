@@ -2,8 +2,8 @@
 //
 // A picture goes into the document as a base64 data URI, and the host refuses one
 // larger than its ceiling (PictureLimit on the host) on the routes it checks: a
-// dropped file and Insert ▸ Picture (a picture pasted into the Markdown source view
-// is held to no limit yet). A paste here is the route the host cannot see. With
+// dropped file, Insert ▸ Picture, and a picture pasted into the Markdown source
+// view. A paste here is the route the host cannot see. With
 // no upload plugin, a clipboard holding only a picture reaches ProseMirror as a
 // paste with no text; ProseMirror hands it to Chromium's native paste (its
 // capturePaste, a hidden contenteditable), and then picks the <img src="data:…">

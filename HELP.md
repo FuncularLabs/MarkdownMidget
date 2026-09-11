@@ -65,8 +65,8 @@ or drop your selection.
   screenshot, say — works in the Markdown source view too, and embeds it the same
   way; so does dropping a picture file onto either view (see *Files & windows*).
   A picture larger than **64 MB** is not inserted by **Insert ▸ Picture…**, a
-  paste into the formatted view or a drop — the status bar says so instead (see
-  [Known limits](#known-limits)). <!-- picture-ceiling phase 2: add the source view's paste to this list. -->
+  paste into either view or a drop — the status bar says so instead (see
+  [Known limits](#known-limits)).
   **Right-click a picture ▸ Resize…** to
   scale it (the aspect ratio stays locked to the original); a resized picture is
   stored as inline HTML `<img …>` so the size persists.
@@ -537,7 +537,7 @@ already in it.
     status bar rather than inserted: an embedded picture is carried inside the
     document as text, costing about a third again its size in every copy and
     every save. It is the one picture limit — **Insert ▸ Picture…** and a paste
-    into the formatted view apply it too (see [Known limits](#known-limits)).
+    into either view apply it too (see [Known limits](#known-limits)).
   - A **markdown or text file** (`.md`, `.markdown`, `.txt`, `.mdenc`) **opens**.
     Dropped on the **toolbar, menu bar or source view**, it opens in place (if the
     current document is untitled and unmodified) or in a **new window**. Dropped on
@@ -743,13 +743,12 @@ into and what to do instead.
 - **One size limit on a picture: 64 MB.** An embedded picture rides inside the
   document as text, costing about a third again its size in every copy and every
   save, so a picture larger than **64 MB** is not inserted — not by **Insert ▸
-  Picture…**, not dropped as a file on either view, and not pasted into the
-  formatted view. Nothing goes in, and the status bar says why:
+  Picture…**, not dropped as a file on either view, and not pasted into either
+  view. Nothing goes in, and the status bar says why:
   "Too large to insert (over 64 MB): huge.png" — or, for a pasted picture, which
   has no name, "Too large to insert (over 64 MB): pasted picture". The limit is
   on a picture on its own: one that arrives inside copied text or HTML goes in
-  with that text, as text always does. A picture pasted into the Markdown source
-  view is not held to the limit yet. <!-- picture-ceiling phase 2: the source view's paste applies this limit too; add it to the list above and delete the sentence before this comment. -->
+  with that text, as text always does.
 - **The already-open guard is a convenience, not a lock.** Opening a file another
   window has brings that window forward; if it can't be brought forward, the file
   opens read-only here with a note saying where it is open. Two cases fall

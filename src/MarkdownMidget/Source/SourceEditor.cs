@@ -91,6 +91,16 @@ public class SourceEditor : TextEditor
     /// </summary>
     internal Func<IDataObject?> ClipboardSource { get; set; } = ReadClipboard;
 
+    /// <summary>Raised when a paste was refused for its size, carrying the notice to
+    /// show: this editor has no status bar of its own, and the window has the one it
+    /// shows for every other route (MainWindow.InitSource).</summary>
+    internal event Action<string>? PictureRefused;
+
+    /// <summary>The picture ceiling a paste here is held to. A seam, like
+    /// <see cref="ClipboardSource"/>: the app leaves it at the shared ceiling, and a
+    /// test lowers it rather than building 64 MB of PNG.</summary>
+    internal long PictureCeiling { get; set; } = PictureLimit.MaxBytes;
+
     private static IDataObject? ReadClipboard()
     {
         try { return Clipboard.GetDataObject(); }
@@ -146,6 +156,15 @@ public class SourceEditor : TextEditor
         {
             if (data.GetData(DataFormats.Bitmap, autoConvert: true) is not BitmapSource image) return false;
             png = ImagePaste.EncodePng(image);
+        }
+        // The one picture ceiling, on the bytes that would go in (PictureLimit).
+        // Handled either way: the paste is ours, and a refused one inserts nothing
+        // rather than falling back to AvalonEdit's text paste — which has no text to
+        // paste here, so the refusal would land as silence.
+        if (ImagePaste.RefusalFor(png, PictureCeiling) is { } refusal)
+        {
+            PictureRefused?.Invoke(refusal);
+            return true;
         }
         var md = ImagePaste.MarkdownFor(png);
         // The selection's own replace runs inside one document update, so the
