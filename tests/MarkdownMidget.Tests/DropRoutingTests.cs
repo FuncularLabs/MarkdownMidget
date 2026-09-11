@@ -339,31 +339,99 @@ public class DropRoutingTests
         }
     }
 
-    // ===== I1m: the formatted view's message =====
+    // ===== the size ceiling on an embedded picture =====
 
     [Fact]
-    public void MessageFilesDecodeAndNullIsUnreadable()
+    public void APictureLargerThanTheCeilingIsNamedRatherThanEmbedded()
     {
-        // The editor posts every dropped file as base64 (a picture read as text is
-        // unrecoverable); a read that failed posts null; anything malformed is
-        // treated as unreadable rather than thrown at the message pump.
+        // A picture goes into the document as base64 — about 4/3 its size, in the
+        // markdown, in the editor's copy, and in every save. Past the ceiling the
+        // file is named in the status line instead. Decided from the SIZE, because
+        // only the head has been read at this point: the bytes are fetched after the
+        // plan chooses, which is the whole reason the ceiling can be applied at all.
+        Assert.Equal(DropKind.Picture, DropRouting.Classify("ok.png", Png, DropRouting.MaxPictureBytes).Kind);
+        Assert.Equal(DropKind.TooLarge, DropRouting.Classify("huge.png", Png, DropRouting.MaxPictureBytes + 1).Kind);
+        // A size the drop did not state (-1) is not a size over the ceiling.
+        Assert.Equal(DropKind.Picture, DropRouting.Classify("unknown.png", Png).Kind);
+        Assert.Equal(DropKind.Picture, DropRouting.Classify("unknown.png", Png, -1).Kind);
+
+        var plan = DropRouting.Plan(
+            [new DroppedFile("huge.png", Png, DropRouting.MaxPictureBytes + 1), new DroppedFile("ok.png", Png, 4096)],
+            DropTarget.Editable, oneDocument: false);
+        Assert.Equal([1], plan.Insert.Select(p => p.Index));
+        Assert.Equal([0], plan.TooLarge);
+        Assert.Empty(plan.Refused);
+        Assert.Equal("Too large to insert (over 64 MB): huge.png", plan.Notice());
+    }
+
+    [Fact]
+    public void TheCeilingAppliesToPicturesOnlyAndDoesNotStopADocumentOpening()
+    {
+        // A dropped markdown or text file is OPENED, and File ▸ Open has never
+        // capped what it opens — capping it here would refuse a file the same user
+        // can open from the menu a second later.
+        Assert.Equal(DropKind.Document, DropRouting.Classify("huge.md", Text, DropRouting.MaxPictureBytes * 10).Kind);
+
+        // And a too-large picture is not an insertion, so it does not take the drop
+        // away from a markdown file dropped with it — exactly as a refused file does not.
+        var plan = DropRouting.Plan(
+            [new DroppedFile("huge.png", Png, DropRouting.MaxPictureBytes + 1), new DroppedFile("notes.md", Text, 20)],
+            DropTarget.Editable, oneDocument: false);
+        Assert.Empty(plan.Insert);
+        Assert.Equal([0], plan.TooLarge);
+        Assert.Equal([1], plan.Open);
+        Assert.Equal("Too large to insert (over 64 MB): huge.png", plan.Notice());
+    }
+
+    [Fact]
+    public void NoticeNamesEveryReasonAtOnce()
+    {
+        var plan = DropRouting.Plan(
+            [
+                new DroppedFile("a.zip", Text, 10),
+                new DroppedFile("huge.png", Png, DropRouting.MaxPictureBytes + 1),
+                new DroppedFile("photo.png", Png, 16),
+                new DroppedFile("notes.md", Text, 20),
+            ],
+            DropTarget.Editable, oneDocument: false);
+
+        Assert.Equal(
+            "Not a picture or a markdown file: a.zip; Too large to insert (over 64 MB): huge.png; "
+            + "Not opened (pictures were dropped with it): notes.md",
+            plan.Notice());
+    }
+
+    // ===== I1m: the formatted view's two messages =====
+
+    [Fact]
+    public void FileDropMessageCarriesNameSizeAndHeadOnly()
+    {
+        // Phase one. The editor sends each file's name, size and FIRST bytes — never
+        // the whole file, which is what stopped a dropped 200 MB video from being
+        // base64'd into a web message before anything had decided it was not a
+        // picture. A head that failed to read is null; anything malformed is treated
+        // as unreadable rather than thrown at the message pump.
         var json = JsonSerializer.Serialize(new
         {
             type = "fileDrop",
+            drop = 7,
             files = new object[]
             {
-                new { name = "photo.png", base64 = Convert.ToBase64String(Png) },
-                new { name = "folder", base64 = (string?)null },
-                new { name = "bad.md", base64 = "not base64!" },
-                new { name = "empty.md", base64 = "" },
+                new { name = "photo.png", size = 120_000, headBase64 = Convert.ToBase64String(Png) },
+                new { name = "folder", size = 0, headBase64 = (string?)null },
+                new { name = "bad.md", size = 12, headBase64 = "not base64!" },
+                new { name = "empty.md", size = 0, headBase64 = "" },
             },
         });
         using var doc = JsonDocument.Parse(json);
-        var files = DropRouting.ParseMessage(doc.RootElement);
+        var message = DropRouting.ParseMessage(doc.RootElement);
 
+        Assert.Equal(7, message.Drop);
+        var files = message.Files;
         Assert.Equal(4, files.Count);
         Assert.Equal("photo.png", files[0].Name);
         Assert.Equal(Png, files[0].Head);
+        Assert.Equal(120_000, files[0].Size);
         Assert.Null(files[1].Head);
         Assert.Null(files[2].Head);
         var empty = files[3].Head;
@@ -372,12 +440,56 @@ public class DropRoutingTests
     }
 
     [Fact]
+    public void AHeadLongerThanSniffLengthIsTolerated()
+    {
+        // The editor's head length is its own constant, not one read from here. A
+        // head longer than SniffLength must route on its prefix rather than be
+        // rejected, so the two can differ without breaking the drop.
+        var longHead = new byte[DropRouting.SniffLength * 4];
+        Png.CopyTo(longHead, 0);
+        var json = JsonSerializer.Serialize(new
+        {
+            files = new[] { new { name = "photo.png", size = 900, headBase64 = Convert.ToBase64String(longHead) } },
+        });
+        using var doc = JsonDocument.Parse(json);
+        var file = Assert.Single(DropRouting.ParseMessage(doc.RootElement).Files);
+
+        Assert.Equal(longHead.Length, file.Head!.Length);
+        Assert.Equal(DropKind.Picture, DropRouting.Classify(file.Name, file.Head, file.Size).Kind);
+    }
+
+    [Fact]
+    public void MissingOrNonsenseSizeMeansNoCeiling()
+    {
+        // The editor always sends File.size; a message without a usable one says -1,
+        // and a picture is not refused because a field went missing.
+        var json = JsonSerializer.Serialize(new
+        {
+            files = new object[]
+            {
+                new { name = "no-size.png", headBase64 = Convert.ToBase64String(Png) },
+                new { name = "text-size.png", size = "lots", headBase64 = Convert.ToBase64String(Png) },
+                new { name = "negative.png", size = -5, headBase64 = Convert.ToBase64String(Png) },
+            },
+        });
+        using var doc = JsonDocument.Parse(json);
+        var files = DropRouting.ParseMessage(doc.RootElement).Files;
+
+        Assert.All(files, f => Assert.Equal(-1, f.Size));
+        Assert.All(files, f => Assert.Equal(DropKind.Picture, DropRouting.Classify(f.Name, f.Head, f.Size).Kind));
+    }
+
+    [Fact]
     public void MessageWithoutFilesIsEmpty()
     {
-        using var none = JsonDocument.Parse("{\"type\":\"fileDrop\"}");
-        Assert.Empty(DropRouting.ParseMessage(none.RootElement));
+        using var none = JsonDocument.Parse("{\"type\":\"fileDrop\",\"drop\":3}");
+        var parsed = DropRouting.ParseMessage(none.RootElement);
+        Assert.Equal(3, parsed.Drop);              // the drop id survives, so a stale answer is still detectable
+        Assert.Empty(parsed.Files);
         using var notAnArray = JsonDocument.Parse("{\"type\":\"fileDrop\",\"files\":\"photo.png\"}");
-        Assert.Empty(DropRouting.ParseMessage(notAnArray.RootElement));
+        Assert.Empty(DropRouting.ParseMessage(notAnArray.RootElement).Files);
+        using var noDrop = JsonDocument.Parse("{\"type\":\"fileDrop\",\"files\":[]}");
+        Assert.Equal(0, DropRouting.ParseMessage(noDrop.RootElement).Drop);
     }
 
     [Fact]
@@ -385,11 +497,61 @@ public class DropRoutingTests
     {
         // A File always has a name in the browser; if one ever arrived without, the
         // bytes are still routed (a picture is still a picture) under a placeholder.
-        using var doc = JsonDocument.Parse("{\"files\":[{\"base64\":\"\"}]}");
-        var file = Assert.Single(DropRouting.ParseMessage(doc.RootElement));
+        using var doc = JsonDocument.Parse("{\"files\":[{\"headBase64\":\"\"}]}");
+        var file = Assert.Single(DropRouting.ParseMessage(doc.RootElement).Files);
         Assert.Equal("Dropped", file.Name);
         Assert.NotNull(file.Head);
         Assert.Empty(file.Head);
+        Assert.Equal(-1, file.Size);
+    }
+
+    [Fact]
+    public void BytesMessageIsIndexedByPositionInTheDrop()
+    {
+        // Phase two: the bytes of the files the plan chose, keyed by their index in
+        // the fileDrop list — indices rather than names because two files from
+        // different folders can share one. A null is a file the editor could not
+        // read, and malformed base64 is the same thing.
+        var json = JsonSerializer.Serialize(new
+        {
+            type = "droppedFileBytes",
+            drop = 4,
+            files = new object[]
+            {
+                new { index = 2, base64 = Convert.ToBase64String(Png) },
+                new { index = 0, base64 = (string?)null },
+                new { index = 5, base64 = "not base64!" },
+                new { index = 6, base64 = "" },
+            },
+        });
+        using var doc = JsonDocument.Parse(json);
+        var answer = DropRouting.ParseBytesMessage(doc.RootElement);
+
+        Assert.Equal(4, answer.Drop);
+        Assert.Equal(Png, answer.Bytes[2]);
+        Assert.Null(answer.Bytes[0]);
+        Assert.Null(answer.Bytes[5]);
+        Assert.Empty(answer.Bytes[6]!);            // an empty file is read, not unreadable
+        Assert.False(answer.Bytes.ContainsKey(1)); // an index never asked about is absent, not null
+    }
+
+    [Fact]
+    public void BytesMessageSurvivesAMalformedEntry()
+    {
+        // An entry with no usable index is skipped rather than throwing at the
+        // message pump — the host then finds no bytes for that index and refuses to
+        // insert, which is the safe direction.
+        using var doc = JsonDocument.Parse(
+            "{\"drop\":1,\"files\":[{\"base64\":\"QUJD\"},{\"index\":\"two\",\"base64\":\"QUJD\"},{\"index\":3,\"base64\":\"QUJD\"}]}");
+        var answer = DropRouting.ParseBytesMessage(doc.RootElement);
+
+        Assert.Equal(1, answer.Drop);
+        Assert.Equal(3, Assert.Single(answer.Bytes).Key);
+
+        using var empty = JsonDocument.Parse("{\"drop\":9}");
+        var none = DropRouting.ParseBytesMessage(empty.RootElement);
+        Assert.Equal(9, none.Drop);
+        Assert.Empty(none.Bytes);
     }
 
     // ===== ImageMarkdown's share =====

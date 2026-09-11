@@ -372,7 +372,10 @@ line with `--readonly`.
     view, exactly as **Insert ▸ Picture** would insert it. The document you have
     open stays open. Several pictures go in one after another, each on its own
     line. A read-only window, or one with no document open, takes no pictures and
-    says so in the status bar.
+    says so in the status bar. A picture **larger than 64 MB** is named in the
+    status bar rather than inserted: an embedded picture is carried inside the
+    document as text, costing about a third again its size in every copy and
+    every save.
   - A **markdown or text file** (`.md`, `.markdown`, `.txt`, `.mdenc`) **opens**.
     Dropped on the **toolbar, menu bar or source view**, it opens in place (if the
     current document is untitled and unmodified) or in a **new window**. Dropped on

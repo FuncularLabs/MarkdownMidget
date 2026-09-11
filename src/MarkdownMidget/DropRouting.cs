@@ -7,11 +7,23 @@ using System.Text.Json;
 
 namespace MarkdownMidget;
 
-/// <summary>A file dropped on the window: its name, and its first bytes — the whole
-/// file when the drop came through the editor as content, the first
-/// <see cref="DropRouting.SniffLength"/> when it came as a path. Null when the
-/// bytes could not be read at all (a dropped folder).</summary>
-internal sealed record DroppedFile(string Name, byte[]? Head);
+/// <summary>
+/// A file dropped on the window, as much of it as routing needs: its name, its
+/// first <see cref="DropRouting.SniffLength"/> bytes, and its length. Neither
+/// route reads a whole file to route it — the bytes of the one or two files the
+/// plan chooses are fetched afterwards, by path or by asking the editor.
+///
+/// <paramref name="Head"/> is null when the bytes could not be read at all (a
+/// dropped folder through the editor). It may be LONGER than SniffLength: routing
+/// only ever looks at the prefix, so the editor's head and the host's constant can
+/// differ without breaking.
+///
+/// <paramref name="Size"/> is the file's full length, for
+/// <see cref="DropRouting.MaxPictureBytes"/>; -1 means the drop did not say, and
+/// no ceiling is applied. Both routes always say (a path has a length; the editor
+/// sends File.size).
+/// </summary>
+internal sealed record DroppedFile(string Name, byte[]? Head, long Size = -1);
 
 /// <summary>Where one dropped file goes.</summary>
 internal enum DropKind
@@ -20,6 +32,9 @@ internal enum DropKind
     Picture,
     /// <summary>Opened as a document, the way a drop always opened one.</summary>
     Document,
+    /// <summary>A picture, but past <see cref="DropRouting.MaxPictureBytes"/>: named
+    /// in the status line, and nothing else happens to it.</summary>
+    TooLarge,
     /// <summary>Neither: named in the status line, and nothing else happens to it.</summary>
     Refused,
 }
@@ -50,6 +65,7 @@ internal sealed record DroppedPicture(int Index, string Mime);
 /// <param name="NotInserted">Pictures the window could not take (read-only, or no document).</param>
 /// <param name="NotOpened">Documents set aside: pictures took the drop, or the surface opens one at a time.</param>
 /// <param name="Refused">Neither a picture nor a markdown file, or unreadable.</param>
+/// <param name="TooLarge">Pictures past <see cref="DropRouting.MaxPictureBytes"/>.</param>
 internal sealed record DropPlan(
     IReadOnlyList<DroppedFile> Files,
     DropTarget Target,
@@ -57,7 +73,8 @@ internal sealed record DropPlan(
     IReadOnlyList<int> Open,
     IReadOnlyList<int> NotInserted,
     IReadOnlyList<int> NotOpened,
-    IReadOnlyList<int> Refused)
+    IReadOnlyList<int> Refused,
+    IReadOnlyList<int> TooLarge)
 {
     /// <summary>
     /// The status line for what the drop did NOT do, naming every file involved —
@@ -67,8 +84,10 @@ internal sealed record DropPlan(
     /// </summary>
     public string? Notice()
     {
-        var parts = new List<string>(3);
+        var parts = new List<string>(4);
         if (Refused.Count > 0) parts.Add("Not a picture or a markdown file: " + Names(Refused));
+        if (TooLarge.Count > 0)
+            parts.Add($"Too large to insert (over {DropRouting.MaxPictureBytes / (1024 * 1024)} MB): " + Names(TooLarge));
         if (NotInserted.Count > 0)
             parts.Add((Target == DropTarget.NoDocument ? "No document open, so not inserted: " : "Read-only, so not inserted: ") + Names(NotInserted));
         if (NotOpened.Count > 0)
@@ -101,6 +120,19 @@ internal static class DropRouting
     /// for the longest signature below (a BMP's file header plus the DIB header size
     /// at offset 14).</summary>
     public const int SniffLength = 32;
+
+    /// <summary>
+    /// The largest picture a drop will embed. A picture goes into the document as
+    /// base64, so it costs about 4/3 its size in the markdown, again in the editor's
+    /// copy of it, and again in every save — 64 MB is already an 85 MB data URI in a
+    /// text file. Past this the picture is named in the status line instead, which
+    /// is a far better outcome than a wedged window.
+    ///
+    /// Only PICTURES are capped. A dropped markdown or text file is opened, and
+    /// File ▸ Open has never capped what it opens; capping it here would refuse a
+    /// file the same user can open from the menu a second later.
+    /// </summary>
+    public const long MaxPictureBytes = 64L * 1024 * 1024;
 
     /// <summary>
     /// The names that open as a document: the extensions File ▸ Open lists
@@ -137,14 +169,22 @@ internal static class DropRouting
 
     /// <summary>
     /// Route one file. Content first: a sniffed picture is a picture whatever its
-    /// name. Then the name: a markdown extension opens. A null <paramref name="head"/>
-    /// (unreadable) is refused regardless — there is nothing to embed or open — while
-    /// an empty one is an empty file, which is still a document if its name is.
+    /// name — unless <paramref name="size"/> puts it past
+    /// <see cref="MaxPictureBytes"/>, which is still a picture, just not one that
+    /// goes in. Then the name: a markdown extension opens. A null
+    /// <paramref name="head"/> (unreadable) is refused regardless — there is nothing
+    /// to embed or open — while an empty one is an empty file, which is still a
+    /// document if its name is.
     /// </summary>
-    public static (DropKind Kind, string? Mime) Classify(string name, byte[]? head)
+    /// <param name="size">The file's full length, or -1 when the drop did not say
+    /// (then no ceiling applies). Only the head is in hand here; the bytes are
+    /// fetched after the plan chooses, which is exactly why the ceiling has to be
+    /// decided from the size rather than from what was read.</param>
+    public static (DropKind Kind, string? Mime) Classify(string name, byte[]? head, long size = -1)
     {
         if (head is null) return (DropKind.Refused, null);
-        if (SniffImageMime(head) is { } mime) return (DropKind.Picture, mime);
+        if (SniffImageMime(head) is { } mime)
+            return size > MaxPictureBytes ? (DropKind.TooLarge, null) : (DropKind.Picture, mime);
         var ext = Path.GetExtension(name);
         return DocumentExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)
             ? (DropKind.Document, null)
@@ -165,14 +205,16 @@ internal static class DropRouting
         var notInserted = new List<int>();
         var documents = new List<int>();
         var refused = new List<int>();
+        var tooLarge = new List<int>();
         for (var i = 0; i < files.Count; i++)
         {
-            var (kind, mime) = Classify(files[i].Name, files[i].Head);
+            var (kind, mime) = Classify(files[i].Name, files[i].Head, files[i].Size);
             switch (kind)
             {
                 case DropKind.Picture when target == DropTarget.Editable: insert.Add(new DroppedPicture(i, mime!)); break;
                 case DropKind.Picture: notInserted.Add(i); break;
                 case DropKind.Document: documents.Add(i); break;
+                case DropKind.TooLarge: tooLarge.Add(i); break;
                 default: refused.Add(i); break;
             }
         }
@@ -182,7 +224,7 @@ internal static class DropRouting
         else if (oneDocument && documents.Count > 1) { open = documents.Take(1).ToList(); notOpened = documents.Skip(1).ToList(); }
         else { open = documents; notOpened = []; }
 
-        return new DropPlan(files, target, insert, open, notInserted, notOpened, refused);
+        return new DropPlan(files, target, insert, open, notInserted, notOpened, refused, tooLarge);
     }
 
     /// <summary>The markdown for one dropped picture: Insert ▸ Picture's fragment,
@@ -196,25 +238,87 @@ internal static class DropRouting
     public static string Markdown(IReadOnlyList<string> fragments) => string.Join("\n\n", fragments);
 
     /// <summary>
-    /// The files in the editor's <c>fileDrop</c> message: <c>{files: [{name, base64}]}</c>.
-    /// A null <c>base64</c> is a file the browser could not read; malformed base64 is
-    /// treated the same way rather than thrown at the message pump.
+    /// The editor's <c>fileDrop</c> message — phase one of the drop:
+    /// <c>{drop: n, files: [{name, size, headBase64}]}</c>.
+    ///
+    /// Only the HEAD of each file travels, so a 200 MB video dropped by accident
+    /// costs 32 bytes in the message rather than a base64 copy of itself in both
+    /// processes. The host routes on this and then asks for the bytes of the one or
+    /// two files it chose (<c>MDM.readDroppedFiles</c>, answered into
+    /// <see cref="ParseBytesMessage"/>).
+    ///
+    /// <c>drop</c> is the editor's counter for which drop this is; it comes back on
+    /// the phase-two request and answer so a reply about a superseded drop can be
+    /// told apart from the current one. A missing head is a file the browser could
+    /// not read; malformed base64 is treated the same way rather than thrown at the
+    /// message pump.
     /// </summary>
-    public static List<DroppedFile> ParseMessage(JsonElement root)
+    public static DropMessage ParseMessage(JsonElement root)
     {
         var files = new List<DroppedFile>();
-        if (!root.TryGetProperty("files", out var array) || array.ValueKind != JsonValueKind.Array) return files;
+        var drop = DropId(root);
+        if (!root.TryGetProperty("files", out var array) || array.ValueKind != JsonValueKind.Array)
+            return new DropMessage(drop, files);
         foreach (var f in array.EnumerateArray())
         {
             var name = f.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString()! : "Dropped";
-            byte[]? head = null;
-            if (f.TryGetProperty("base64", out var b) && b.ValueKind == JsonValueKind.String)
-            {
-                try { head = Convert.FromBase64String(b.GetString()!); }
-                catch (FormatException) { head = null; }
-            }
-            files.Add(new DroppedFile(name, head));
+            files.Add(new DroppedFile(name, Base64Property(f, "headBase64"), SizeProperty(f)));
         }
-        return files;
+        return new DropMessage(drop, files);
     }
+
+    /// <summary>
+    /// The editor's <c>droppedFileBytes</c> message — phase two:
+    /// <c>{drop: n, files: [{index, base64}]}</c>, the full bytes of the files the
+    /// host asked for, keyed by their index in the phase-one list. A null
+    /// <c>base64</c> (or one that will not decode) is a file the browser could not
+    /// read; the host inserts none of the pictures when any of them is null, as a
+    /// failed path read has always done.
+    /// </summary>
+    public static DropBytesMessage ParseBytesMessage(JsonElement root)
+    {
+        var bytes = new Dictionary<int, byte[]?>();
+        var drop = DropId(root);
+        if (!root.TryGetProperty("files", out var array) || array.ValueKind != JsonValueKind.Array)
+            return new DropBytesMessage(drop, bytes);
+        foreach (var f in array.EnumerateArray())
+        {
+            // An entry with no usable index is skipped rather than throwing at the
+            // message pump: the host then finds no bytes for it and declines to
+            // insert, which is the safe direction.
+            if (!f.TryGetProperty("index", out var i) || i.ValueKind != JsonValueKind.Number || !i.TryGetInt32(out var index)) continue;
+            bytes[index] = Base64Property(f, "base64");
+        }
+        return new DropBytesMessage(drop, bytes);
+    }
+
+    /// <summary>Which drop a message is about; 0 when it did not say, which no drop
+    /// the editor numbers ever is (the counter starts at 1).</summary>
+    private static long DropId(JsonElement root) =>
+        root.TryGetProperty("drop", out var d) && d.ValueKind == JsonValueKind.Number && d.TryGetInt64(out var n) ? n : 0;
+
+    /// <summary>A base64 string property as bytes; null when absent, not a string,
+    /// or not decodable.</summary>
+    private static byte[]? Base64Property(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var b) || b.ValueKind != JsonValueKind.String) return null;
+        try { return Convert.FromBase64String(b.GetString()!); }
+        catch (FormatException) { return null; }
+    }
+
+    /// <summary>A dropped file's length, or -1 when the message did not state a
+    /// usable one — no ceiling then, rather than refusing a picture because a field
+    /// went missing. The editor always sends File.size.</summary>
+    private static long SizeProperty(JsonElement element) =>
+        element.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.Number
+        && s.TryGetInt64(out var size) && size >= 0
+            ? size
+            : -1;
 }
+
+/// <summary>One <c>fileDrop</c> message: which drop it is, and its files in drop order.</summary>
+internal sealed record DropMessage(long Drop, IReadOnlyList<DroppedFile> Files);
+
+/// <summary>One <c>droppedFileBytes</c> answer: which drop it is about, and the bytes
+/// of each index asked for (null where the editor could not read the file).</summary>
+internal sealed record DropBytesMessage(long Drop, IReadOnlyDictionary<int, byte[]?> Bytes);

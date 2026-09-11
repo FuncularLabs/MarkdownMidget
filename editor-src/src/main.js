@@ -26,6 +26,7 @@ import { SEPARATOR } from './spell-separator.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
+import { readHeads, readFull } from './file-drop.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 
 import {
@@ -387,12 +388,27 @@ function installContextMenus(view) {
   });
 }
 
-// Make the editor area a file drop target. The OS doesn't expose dropped-file
-// paths to web content, so we read every dropped file and hand the host its name
-// and bytes (base64) — bytes, not text, because the host routes each file by what
-// it is (a picture is embedded, markdown opens, anything else is refused), and a
-// picture read as text is unrecoverable. A read that fails — a dropped folder —
-// reports null, which the host refuses by name.
+// ===== file drop =====
+//
+// The OS doesn't expose dropped-file paths to web content, so the host can't open
+// a dropped file itself — the editor has to read it. It does so in two phases, and
+// the reason is memory: reading every dropped file in full before the host has
+// said it wants any of them turned an accidentally-dropped 200 MB video into a
+// >260 MB base64 string, copied into a web message, decoded again on the host.
+//
+// Phase one posts only what routing needs — each file's name, size and first
+// HEAD_BYTES bytes. The host runs DropRouting.Plan on that (the rules live there,
+// never here) and then calls readDroppedFiles for the one or two files it chose;
+// phase two reads those in full and posts them back. The File objects of the last
+// drop are kept here in the meantime — a File is a handle, not its contents, so
+// holding them costs nothing.
+//
+// `dropSeq` numbers the drops. It travels out with phase one, back in on the
+// request, and out again with the answer, so a second drop landing while the first
+// is still being read can't be answered with the wrong files.
+let droppedFiles = [];
+let dropSeq = 0;
+
 function installFileDrop() {
   const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
   window.addEventListener('dragover', (e) => {
@@ -406,20 +422,11 @@ function installFileDrop() {
     e.stopPropagation();
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
-    const readBase64 = (file) => new Promise((resolve) => {
-      const reader = new FileReader();
-      // A data URL is "data:<type>;base64,<payload>"; only the payload travels. An
-      // empty file can come back as a bare "data:" with no comma: that is an empty
-      // payload, not an unreadable file.
-      reader.onload = () => {
-        const s = String(reader.result);
-        const comma = s.indexOf(',');
-        resolve({ name: file.name, base64: comma < 0 ? '' : s.slice(comma + 1) });
-      };
-      reader.onerror = () => resolve({ name: file.name, base64: null });
-      reader.readAsDataURL(file);
-    });
-    Promise.all(files.map(readBase64)).then((read) => postToHost({ type: 'fileDrop', files: read }));
+    // Held before the heads are posted: the host's request can only arrive after
+    // the message, and it must find this drop's files waiting.
+    droppedFiles = files;
+    const drop = ++dropSeq;
+    readHeads(files).then((read) => postToHost({ type: 'fileDrop', drop, files: read }));
   }, true);
 }
 
@@ -679,6 +686,31 @@ const MDM = {
   getMarkdown() {
     if (!editor) return '';
     return editor.action(getMarkdown());
+  },
+
+  /**
+   * Phase two of a file drop: the full bytes of the files the host's plan chose.
+   *
+   * `drop` is the counter that came out with the fileDrop message; `indices` are
+   * positions in that message's file list. The answer goes back as the
+   * droppedFileBytes message rather than as this function's return value, because
+   * ExecuteScriptAsync does not await a promise — it would serialise this one as
+   * {} and the host would be handed nothing.
+   *
+   * It ALWAYS posts exactly once, whatever happens: a stale drop, an index that
+   * isn't in the drop, a read that fails, or a throw on the way. The host is
+   * waiting on this message, so a silent return would leave the drop hanging with
+   * nothing on screen to say why.
+   */
+  readDroppedFiles(drop, indices) {
+    const list = Array.isArray(indices) ? indices : [];
+    const answer = (files) => postToHost({ type: 'droppedFileBytes', drop, files });
+    // A drop that has been superseded: the files it names are gone, so every index
+    // answers null rather than reading whatever is at that position now.
+    if (drop !== dropSeq) return Promise.resolve(answer(list.map((index) => ({ index, base64: null }))));
+    return readFull(droppedFiles, list)
+      .then(answer)
+      .catch(() => answer(list.map((index) => ({ index, base64: null }))));
   },
 
   // flush=true rebuilds editor state, clearing undo history — used when loading a

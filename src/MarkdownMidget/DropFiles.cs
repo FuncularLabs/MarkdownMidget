@@ -28,7 +28,9 @@ internal static class DropFiles
             using var stream = Open(path);
             var head = new byte[DropRouting.SniffLength];
             var read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
-            return new DroppedFile(Path.GetFileName(path), head[..read]);
+            // Length from the handle already open, not a second FileInfo probe: one
+            // stat, and it cannot disagree with the bytes just read.
+            return new DroppedFile(Path.GetFileName(path), head[..read], stream.Length);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

@@ -514,8 +514,15 @@ public partial class MainWindow : Window
             case "fileDrop":
                 {
                     using var d = JsonDocument.Parse(e.WebMessageAsJson);
-                    var files = DropRouting.ParseMessage(d.RootElement);
-                    Dispatcher.BeginInvoke(() => HandleDroppedFiles(files));
+                    var message = DropRouting.ParseMessage(d.RootElement);
+                    Dispatcher.BeginInvoke(() => HandleDroppedFiles(message));
+                }
+                break;
+            case "droppedFileBytes":
+                {
+                    using var d = JsonDocument.Parse(e.WebMessageAsJson);
+                    var answer = DropRouting.ParseBytesMessage(d.RootElement);
+                    Dispatcher.BeginInvoke(() => CompleteDroppedFileRead(answer));
                 }
                 break;
         }
@@ -3977,10 +3984,15 @@ public partial class MainWindow : Window
     // only text drags (its handler marks nothing handled for a file drag) and lets a
     // file drop bubble up to Window_Drop, with the file's path. The formatted view
     // is a WebView2, a separate HWND that takes its own drops and posts them as the
-    // 'fileDrop' message, with each file's bytes but no path (HandleDroppedFiles).
-    // Both hand their files to DropRouting and act on its plan, so the rules are in
-    // one place and tested there; what differs here is only how a picture's bytes
-    // are fetched and how a document opens.
+    // 'fileDrop' message, with each file's name, size and first bytes but no path
+    // (HandleDroppedFiles). Both hand their files to DropRouting and act on its
+    // plan, so the rules are in one place and tested there; what differs here is
+    // only how a picture's bytes are fetched and how a document opens.
+    //
+    // Neither route reads a whole file to route one. The path route reads
+    // SniffLength bytes off disk; the content route is sent SniffLength bytes and
+    // asks the editor for the rest of whichever files the plan chose
+    // ('droppedFileBytes'). A dropped 200 MB video costs 32 bytes on both.
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
@@ -4044,20 +4056,107 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// A drop on the formatted view, which arrives as content: the editor read every
-    /// dropped file's bytes, because web content never sees a dropped file's path.
-    /// Pictures embed through the same path as Window_Drop's; a markdown file opens
-    /// as an untitled document named after the file — one per drop, since there is
-    /// no path to hand a new window (the plan names any others).
+    /// A drop on the formatted view, which arrives as content: web content never
+    /// sees a dropped file's path, so the editor has to read the bytes.
+    ///
+    /// In two phases, and the second one is the point. The editor posts only each
+    /// file's name, size and first bytes; this routes on that and then asks for the
+    /// full bytes of the one or two files the plan chose. Reading everything up
+    /// front — which is what this did — turned an accidentally-dropped 200 MB video
+    /// into a base64 copy of itself in the editor, another in the web message, and a
+    /// third decoded here, before anything had decided it was not even a picture.
+    ///
+    /// Pictures then embed through the same path as Window_Drop's; a markdown file
+    /// opens as an untitled document named after the file — one per drop, since
+    /// there is no path to hand a new window (the plan names any others).
     /// </summary>
-    private async void HandleDroppedFiles(IReadOnlyList<DroppedFile> files)
+    private async void HandleDroppedFiles(DropMessage message)
     {
+        var files = message.Files;
         var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: true);
-        // Head is the whole file on this route, and never null for a file the plan
-        // chose: an unreadable file is refused before it can be chosen.
-        await InsertDroppedPicturesAsync(plan, i => Task.FromResult(files[i].Head!));
-        if (plan.Open.Count > 0) await HandleDroppedContentAsync(files[plan.Open[0]].Name, files[plan.Open[0]].Head!);
+        // The chosen pictures AND the one document that opens: this route has no
+        // path, so the document's bytes have to come from the editor too.
+        var wanted = plan.Insert.Select(p => p.Index).Concat(plan.Open.Take(1)).ToList();
+
+        IReadOnlyDictionary<int, byte[]?> bytes;
+        try
+        {
+            bytes = await RequestDroppedBytesAsync(message.Drop, wanted);
+        }
+        catch (OperationCanceledException)
+        {
+            return;   // a newer drop landed while this one was reading; that drop owns the window now
+        }
+
+        // A null is a file the editor could not read. For pictures that throws out of
+        // bytesOf, and InsertDroppedPicturesAsync inserts NONE of them — the same
+        // all-or-nothing a failed path read has always had.
+        await InsertDroppedPicturesAsync(plan, i => bytes.TryGetValue(i, out var b) && b is not null
+            ? Task.FromResult(b)
+            : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")));
+
+        string? unreadable = null;
+        if (plan.Open.Count > 0)
+        {
+            var index = plan.Open[0];
+            if (bytes.TryGetValue(index, out var content) && content is not null)
+                await HandleDroppedContentAsync(files[index].Name, content);
+            else
+                unreadable = files[index].Name;
+        }
         if (plan.Notice() is { } notice) FlashStatus(notice);
+        // Last, so it is what stays on screen: the notice is about files that were
+        // never going to be taken, this is about one that should have been.
+        if (unreadable is { } name) FlashStatus($"Couldn't read {name}.");
+    }
+
+    // Phase two of a formatted-view drop. One read is in flight at a time — a drop
+    // is a single user gesture — and the editor's drop counter says which drop an
+    // answer is about, so a reply that arrives after a newer drop has started is
+    // dropped rather than inserted into the wrong document.
+    private TaskCompletionSource<IReadOnlyDictionary<int, byte[]?>>? _droppedBytes;
+    private long _droppedBytesDrop;
+
+    /// <summary>
+    /// Ask the editor for the full bytes of <paramref name="indices"/> from drop
+    /// <paramref name="drop"/>, and wait for the answer.
+    /// </summary>
+    /// <exception cref="OperationCanceledException">A newer drop superseded this one
+    /// while it was reading.</exception>
+    private async Task<IReadOnlyDictionary<int, byte[]?>> RequestDroppedBytesAsync(long drop, IReadOnlyList<int> indices)
+    {
+        // Nothing to fetch: don't round-trip, and don't leave a waiter behind for an
+        // answer that will never come.
+        if (indices.Count == 0) return new Dictionary<int, byte[]?>();
+
+        // No editor, no answer — say so now rather than wait forever for a message
+        // nothing will send. (A fileDrop can only have come FROM the editor, so this
+        // is belt and braces.) Checked before any state is touched, so a pending read
+        // is not cancelled by a request that was never going to be made.
+        if (Web.CoreWebView2 is null) return indices.ToDictionary(i => i, _ => (byte[]?)null);
+
+        // An earlier read is abandoned, not awaited: its drop is no longer the one on
+        // screen, and its continuation would insert into a document the new drop is
+        // about to change.
+        _droppedBytes?.TrySetCanceled();
+        var pending = new TaskCompletionSource<IReadOnlyDictionary<int, byte[]?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _droppedBytes = pending;
+        _droppedBytesDrop = drop;
+
+        // Set before the request goes out, so an answer that comes back faster than
+        // ExecuteScriptAsync returns still finds its waiter.
+        await RunEditorAsync($"window.MDM.readDroppedFiles({drop}, {JsonSerializer.Serialize(indices)})");
+        return await pending.Task;
+    }
+
+    /// <summary>The editor's answer to <see cref="RequestDroppedBytesAsync"/>. An
+    /// answer about any drop but the one being waited on is a straggler from a
+    /// superseded read and is discarded.</summary>
+    private void CompleteDroppedFileRead(DropBytesMessage answer)
+    {
+        if (_droppedBytes is not { } pending || answer.Drop != _droppedBytesDrop) return;
+        _droppedBytes = null;
+        pending.TrySetResult(answer.Bytes);
     }
 
     /// <summary>
