@@ -61,16 +61,19 @@ tool that rewrites the file with identical bytes reads as an external change.
 
 ## Stages
 
-One user-visible change per release, in the order the risk deserves — except the
-already-open guard, pulled to the front because it is felt daily, stands alone, and
-is the first piece of the cross-instance registry the roadmap wants anyway.
-Versions are the house cadence; the numbers are suggestions.
+**Decided 2026-09-10:** everything below lands on ONE line, 0.11 (unreleased
+while the work is in progress), and ships together as 1.0.0-beta1, then rc1, then
+1.0.0 after dogfooding — no per-stage tags. The stage numbers that follow are WORK
+ORDER, kept so the issues' "Release" lines still map; they are not release numbers.
+The order is the one the risk deserves, except the already-open guard, pulled to
+the front because it is felt daily, stands alone, and is the first piece of the
+cross-instance registry the roadmap wants anyway.
 
 ### 0.10.0 — promote the current beta
 
-After dogfooding. Same shape as the 0.9.0 promote. Nothing new.
+Done 2026-09-10 (v0.10.0). Same shape as the 0.9.0 promote. Nothing new.
 
-### 0.11.0 — the already-open guard
+### Stage 1 (was 0.11) — the already-open guard (#1)
 
 Today every open — File ▸ Open, Open Recent, a drop, a double-click in Explorer —
 lands in `OpenPathAsync`, and a double-click or File ▸ New is a fresh process. If the
@@ -95,7 +98,7 @@ hash, holding the owner's process id and window handle. This is the minimal form
 of the roadmap's cross-instance registry: the same file, read by a Window menu
 later, lists every open document.
 
-### 0.12.0 — round-trip honesty
+### Stage 2 (was 0.12) — round-trip honesty (#2, #3, #4)
 
 The core promise, made true or stated. Infrastructure first because the rest is
 unpinnable without it.
@@ -103,7 +106,7 @@ unpinnable without it.
 | AC | Test |
 |---|---|
 | R1. A round-trip harness exists: markdown in, editor, markdown out, in Node with the real bundle's parser and serialiser | `editor-src/test/roundtrip.test.mjs` with a fixture corpus: `editor-src/test/fixtures/roundtrip-audit.md` (committed with this plan) plus README.md and HELP.md themselves |
-| R2. The serialiser's conventions are pinned: `-` bullets, `1.` ordered, ATX headings, fenced code, `*`/`**` emphasis, a chosen hard-break form, and tight bullet lists stay tight (today `- one` / `- two` comes back loose; ordered lists already stay tight) — and the harness fails if any drifts | `roundtrip.test.mjs: ConventionsArePinned` (each convention one case) |
+| R2. The serialiser's conventions are pinned: `-` bullets, `1.` ordered, ATX headings, fenced code, `*`/`**` emphasis, the backslash hard break (decided 2026-09-10 over two trailing spaces), and tight bullet lists stay tight (today `- one` / `- two` comes back loose; ordered lists already stay tight) — and the harness fails if any drifts | `roundtrip.test.mjs: ConventionsArePinned` (each convention one case) |
 | R3. Intraword underscores are not escaped (`snake_case_word` survives) | `roundtrip.test.mjs: IntrawordUnderscoreSurvives` — investigate `mdast-util-to-markdown` `unsafe` overrides; if it cannot be done safely, this AC moves to "documented limit" |
 | R4. Line endings are preserved end to end: a CRLF file saves CRLF throughout, an LF file LF, a mixed file takes the majority — including inside code and HTML blocks, where the serialiser today keeps the original endings while normalising everything else | `DocumentTextTests.LineEndingsRoundTrip` (host, pure): detect on load; on save FOLD every `\r\n`, `\r` and `\n` to `\n` first, then re-apply the detected ending. A naive `Replace("\n", "\r\n")` would produce `\r\r\n` inside every code block. The corpus must include a CRLF file with a fenced block, an indented block and an HTML block |
 | R5. A UTF-8 BOM is preserved when present and not added when absent | `DocumentTextTests.BomRoundTrip` |
@@ -120,17 +123,17 @@ definition; keeping it needs a schema change) and preserving the user's *existin
 bullet/heading style per document (a per-document style sniff is possible but it is
 a second serialiser configuration to test). Both go in the documented list.
 
-### 0.13.0 — Find & Replace
+### Stage 3 (was 0.13) — Find & Replace (#5)
 
 | AC | Test |
 |---|---|
-| F1. Replace and Replace All in both views, honouring the current search mode (normal, extended, wildcard, regex with groups) | `FindEngineTests.Replace*` (pure, per mode) |
+| F1. Replace and Replace All in both views — a Replace field and Replace / Replace All buttons added to the existing Find dialog (decided 2026-09-10) — honouring the current search mode (normal, extended, wildcard, regex with groups) | `FindEngineTests.Replace*` (pure, per mode) |
 | F2. Replace All scoped to the selection when there is one | `FindEngineTests.ReplaceAllWithinSelection` |
 | F3. Replace in the formatted view replaces exactly the found range and nothing else, including across inline marks | `find.test.mjs` (jsdom, the editor's find ranges) |
 | F4. Replace All is one undo step in both views | source: `SourceEditorTests.ReplaceAllIsOneUndoUnit`; formatted: `find.test.mjs` |
 | F5. A regex replacement with `$1` groups substitutes correctly and a malformed pattern is refused with the existing message, never applied | `FindEngineTests.ReplaceGroups`, `MalformedPatternIsRefused` |
 
-### 0.14.0 — images
+### Stage 4 (was 0.14) — images (#6, #7)
 
 | AC | Test |
 |---|---|
@@ -144,7 +147,7 @@ file. It is small (clipboard image to PNG to base64 to insert at caret). If it t
 out to fight AvalonEdit's paste pipeline, the fallback is a status message pointing
 at the formatted view, which is still better than today's silent nothing.
 
-### 1.0.0 — the limits, written down; no new features
+### Stage 5 — the limits, written down; no new features (#9)
 
 | AC | Test |
 |---|---|
@@ -165,7 +168,8 @@ MSIX spike, WebView2 packaging, updater hand-off). Two honest options:
   uninstall; the in-app updater no-ops when it detects the MSI install. A spike
   first; if the spike is clean, it can ride 1.0 without moving the other stages.
 
-Pick before 0.14 starts.
+**Decided 2026-09-10: A.** Recorded on #8 (closed). Stage 5 adds the README/HELP
+line; the installer is the 1.1 headline.
 
 ## Stated limits (what "Won't unless asked" should say)
 
@@ -188,9 +192,9 @@ reference them.
 
 | Stage | Issues |
 |---|---|
-| 0.11.0 already-open guard | #1 (enhancement — single-instance-per-file was never promised) |
-| 0.12.0 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change |
-| 0.13.0 Find & Replace | #5 |
-| 0.14.0 images | #6 dropped image file opens as text, #7 source-view image paste |
-| installer decision | #8 |
-| 1.0.0 limits written down | #9 |
+| Stage 1 already-open guard | #1 (enhancement — single-instance-per-file was never promised) |
+| Stage 2 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change |
+| Stage 3 Find & Replace | #5 |
+| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste |
+| installer decision | #8 — decided A, closed |
+| Stage 5 limits written down | #9 |

@@ -11,7 +11,7 @@ deliberately parked).
 
 ---
 
-## 1.0 (after 0.10 is promoted)
+## 1.0 (0.10.0 promoted 2026-09-10; everything below ships as 1.0.0-beta1 from the 0.11 line)
 
 The 2026-09-10 readiness audit, planned in detail in
 [docs/plans/release-1.0.md](docs/plans/release-1.0.md). The verdict was "close on
@@ -46,10 +46,10 @@ order of risk:
   works.
 - **The same file open in two windows silently overwrites.** A per-path lock: focus
   the window that has it, else open read-only with a message. The minimal form of
-  the cross-instance registry below — and the first release after the 0.10 promote,
-  because it is felt daily and stands alone.
-- **No installer.** Decision pending: portable-only 1.0 with the installer as the
-  1.1 headline (recommended), or a minimal per-user MSI after a spike.
+  the cross-instance registry below — and first in the work order, because it is
+  felt daily and stands alone.
+- **No installer.** Decided 2026-09-10: portable-only 1.0, stated in README/HELP;
+  the installer is the 1.1 headline (#8, closed).
 
 Then 1.0 itself adds no features: it writes every deliberate limit down (see the
 last section) and makes the README's promise true as written.
