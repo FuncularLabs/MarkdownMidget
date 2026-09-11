@@ -168,6 +168,27 @@ internal static class DropHandshake
     public static bool CanBeAnswered(long drop) => drop > 0;
 
     /// <summary>
+    /// Whether the drop that claimed <paramref name="generationThen"/> is still the
+    /// drop the window belongs to.
+    ///
+    /// This is not <see cref="IsSuperseded"/>, which is about the EDITOR's counter
+    /// and one route. This counter is the host's, and both surfaces bump it as they
+    /// start, because the abandon was one-directional: a drop on either surface ends
+    /// the CONTENT route's outstanding read (there is a waiter to complete), and
+    /// neither ends the PATH route's <c>DropFiles.ReadAllAsync</c> — nothing is
+    /// waiting on it, an await in <c>Window_Drop</c> simply carries on. Two drops
+    /// then inserted into the same document, in read order, and the document pin
+    /// could not tell: both were about the SAME document, so path, baseline, target
+    /// and view all matched.
+    ///
+    /// Identity, not order. The counter only goes up in practice, but the question
+    /// is "is this still the number I claimed" — letting a higher one through would
+    /// be a second way into a drop that has already been replaced.
+    /// </summary>
+    public static bool StillTheCurrentDrop(long generationThen, long generationNow) =>
+        generationThen == generationNow;
+
+    /// <summary>
     /// What to do with one answer.
     /// </summary>
     /// <param name="outstandingDrop">The drop whose read is being waited on, or 0

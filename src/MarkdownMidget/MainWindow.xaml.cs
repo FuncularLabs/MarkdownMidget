@@ -4017,7 +4017,10 @@ public partial class MainWindow : Window
         // Only the first bytes of each file are read to route it (DropFiles.Read); a
         // picture's bytes are read in full below, and a document's by OpenPathAsync.
         var files = paths.Select(DropFiles.Read).ToList();
-        var then = DropPin();
+        // This drop is the window's now. The bump is what a drop on the formatted
+        // view will see if it lands while ReadAllAsync below is still going —
+        // AbandonDroppedRead cannot reach that read, so this is what ends it.
+        var then = DropPin(++_dropGeneration);
         var plan = DropRouting.Plan(files, then.Target, oneDocument: false);
 
         // False means the drop is no longer the window's to act on, and it has said
@@ -4058,16 +4061,45 @@ public partial class MainWindow : Window
     /// SetSourceModeAsync yields twice with _sourceMode still at its old value, so
     /// an insertion landing in either gap went into the half of the window that was
     /// about to be thrown away — and neither half says anything when it is.
+    ///
+    /// <paramref name="generation"/> is not about the document at all: it is which
+    /// DROP this is (<see cref="_dropGeneration"/>), and every caller claims a fresh
+    /// one as it starts. Two drops racing on the same unchanged document match on
+    /// all four of the above, so nothing else can tell them apart.
     /// </summary>
-    private (string? Path, string Clean, DropTarget Target, bool Source) DropPin() =>
-        (_currentPath, _cleanMarkdown, DropTargetNow(), _sourceMode);
+    private (string? Path, string Clean, DropTarget Target, bool Source, long Generation) DropPin(long generation) =>
+        (_currentPath, _cleanMarkdown, DropTargetNow(), _sourceMode, generation);
+
+    /// <summary>
+    /// Which drop the window belongs to, claimed by BOTH surfaces as they start
+    /// (<see cref="DropHandshake.StillTheCurrentDrop"/>).
+    ///
+    /// AbandonDroppedRead only ends the content route's read — it completes a
+    /// waiter, and the path route has none: its DropFiles.ReadAllAsync is a plain
+    /// await inside Window_Drop that no one can reach. So a drop on the formatted
+    /// view during a toolbar drop's disk read left both drops inserting into the
+    /// same document. The pin's other four values cannot see that, because both
+    /// drops are about the same document.
+    ///
+    /// Not _newestDrop: that is the EDITOR's counter, it numbers only formatted-view
+    /// drops, and it restarts when the page does. This one is the host's and covers
+    /// both surfaces.
+    /// </summary>
+    private long _dropGeneration;
 
     /// <summary>Whether the window is still the one <paramref name="then"/> was taken
     /// from. False means the plan made against it is stale and nothing from the drop
     /// may be applied.</summary>
-    private bool DropStillApplies((string? Path, string Clean, DropTarget Target, bool Source) then) =>
+    private bool DropStillApplies((string? Path, string Clean, DropTarget Target, bool Source, long Generation) then) =>
         DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown,
             then.Target, DropTargetNow(), then.Source, _sourceMode);
+
+    /// <summary>Whether <paramref name="then"/>'s drop is still the one the window
+    /// belongs to. Separate from <see cref="DropStillApplies"/> because it is a
+    /// different failure with a different notice: no document moved, a newer drop
+    /// simply took over.</summary>
+    private bool DropIsStillCurrent((string? Path, string Clean, DropTarget Target, bool Source, long Generation) then) =>
+        DropHandshake.StillTheCurrentDrop(then.Generation, _dropGeneration);
 
     /// <summary>
     /// Embed the pictures a drop plan chose, as ONE insertion into whichever view is
@@ -4094,8 +4126,15 @@ public partial class MainWindow : Window
     /// always has.
     /// </returns>
     private async Task<bool> InsertDroppedPicturesAsync(
-        DropPlan plan, Func<int, Task<byte[]>> bytesOf, (string? Path, string Clean, DropTarget Target, bool Source) then)
+        DropPlan plan, Func<int, Task<byte[]>> bytesOf,
+        (string? Path, string Clean, DropTarget Target, bool Source, long Generation) then)
     {
+        // Before the empty check, not after: a drop that wants no pictures can still
+        // open a document (the content route) or flash a notice, and neither belongs
+        // to a drop the user has already replaced. This is the case AbandonDroppedRead
+        // cannot reach — a path-route drop starting after CompleteDroppedFileRead has
+        // cleared the waiter but before this continuation runs.
+        if (!DropIsStillCurrent(then)) { FlashStatus(DropHandshake.SupersededNotice); return false; }
         if (plan.Insert.Count == 0) return true;
         var fragments = new List<string>(plan.Insert.Count);
         try
@@ -4132,6 +4171,13 @@ public partial class MainWindow : Window
         // fetch, and the window was live throughout it. A plan made against a
         // different document — or against one that has since closed, which nothing
         // downstream tests for — must not reach InsertMarkdownFragment.
+        //
+        // Asked again here, and this is the ask that matters for the path route: its
+        // await is DropFiles.ReadAllAsync, right above, and a drop on the formatted
+        // view during it cannot end it — there is no waiter to complete. Two drops
+        // inserting into the same unchanged document look identical to the four
+        // values below, so only the generation separates them.
+        if (!DropIsStillCurrent(then)) { FlashStatus(DropHandshake.SupersededNotice); return false; }
         if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return false; }
         InsertMarkdownFragment(DropRouting.Markdown(fragments));
         return true;
@@ -4192,7 +4238,9 @@ public partial class MainWindow : Window
         // all reachable for however long it lasts — 10 s at the floor, 90 s for ten
         // pictures at the ceiling, and up to the ten-minute clamp for a stated size
         // no picture could reach.
-        var then = DropPin();
+        // After the supersede check above, so an out-of-order fileDrop that is NOT
+        // the newest drop does not claim the window on its way out.
+        var then = DropPin(++_dropGeneration);
         var plan = DropRouting.Plan(files, then.Target, oneDocument: true);
         // The chosen pictures AND the one document that opens: this route has no
         // path, so the document's bytes have to come from the editor too.

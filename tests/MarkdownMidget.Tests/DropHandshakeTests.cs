@@ -453,6 +453,30 @@ public class DropHandshakeTests
     }
 
     [Fact]
+    public void ADropThatStartedWhileThisOneWasReadingOwnsTheWindowInstead()
+    {
+        // NF-7. The abandon was one-directional. A drop on the formatted view calls
+        // AbandonDroppedRead, which ends the CONTENT route's outstanding read — and
+        // a drop on the window does the same. Neither ends the PATH route's
+        // DropFiles.ReadAllAsync: there is no waiter to complete, just an await in
+        // Window_Drop that keeps going. So a picture dropped on the formatted view
+        // while a toolbar drop's file was still coming off disk left both drops
+        // inserting into the same document, in read order.
+        //
+        // The document pin cannot see this: both drops are about the SAME document,
+        // so path, baseline, target and view all match. What separates them is only
+        // which drop is current, so both routes now claim a generation as they start
+        // and the insertion chokepoint checks it.
+        //
+        // Identity, not order: the counter only goes up in practice, but "not the
+        // number I claimed" is the whole question — a comparison that let a higher
+        // number through would be a second way to insert into a replaced drop.
+        Assert.True(DropHandshake.StillTheCurrentDrop(1, 1));
+        Assert.False(DropHandshake.StillTheCurrentDrop(1, 2));
+        Assert.False(DropHandshake.StillTheCurrentDrop(2, 1));
+    }
+
+    [Fact]
     public void TheInsertionChokepointSaysWhetherTheDropStillOwnsTheWindow()
     {
         // NF-3. The two routes disagreed about what a STALE drop tells the user.
