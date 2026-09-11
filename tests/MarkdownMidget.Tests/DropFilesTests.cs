@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text;
 using MarkdownMidget;
 using Xunit;
@@ -84,6 +85,79 @@ public class DropFilesTests : IDisposable
         // file that really ends in them, and "BM" + 16 zeros sniffs as a bitmap.
         Assert.Equal<byte>([(byte)'h', (byte)'i'], DropFiles.Read(Write("tiny.md", "hi"u8.ToArray())).Head!);
         Assert.Empty(DropFiles.Read(Write("empty.md", [])).Head!);
+    }
+
+    [Fact]
+    public void ReadReportsTheFilesOwnLengthAsItsSize()
+    {
+        // The size is the only thing the picture ceiling is decided from, and on this
+        // route nothing checked it: DropFiles.Read could have reported -1 for every
+        // file — no ceiling, ever — and the whole suite stayed green.
+        var bytes = new byte[Png.Length + 5000];
+        Png.CopyTo(bytes, 0);
+        Assert.Equal(bytes.Length, DropFiles.Read(Write("photo.png", bytes)).Size);
+        Assert.Equal(2, DropFiles.Read(Write("tiny2.md", "hi"u8.ToArray())).Size);
+        Assert.Equal(0, DropFiles.Read(Write("nothing.md", [])).Size);
+    }
+
+    [Fact]
+    public void AnUnreadablePathSaysItDoesNotKnowTheSize()
+    {
+        // -1 is "the drop did not say", and no ceiling is applied to it. A file that
+        // could not be opened has no length to report, and must not report 0 — a
+        // zero-length picture and an unknown one are different answers.
+        Assert.Equal(-1, DropFiles.Read(Path.Combine(_dir, "not-here.md")).Size);
+        Assert.Equal(-1, DropFiles.Read(Directory.CreateDirectory(Path.Combine(_dir, "sized folder")).FullName).Size);
+    }
+
+    [Fact]
+    public void APictureOverTheCeilingIsTooLargeOnThePathRouteToo()
+    {
+        // End to end on the route that has paths: a real file just over the ceiling,
+        // read the way a drop reads one, routed the way a drop routes it. The ceiling
+        // had no test at all on this side — only on the message route, where the size
+        // is whatever the test passes in.
+        var path = Path.Combine(_dir, "huge.png");
+        using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write))
+        {
+            stream.Write(Png);
+            stream.SetLength(DropRouting.MaxPictureBytes + 1);
+        }
+
+        var over = DropFiles.Read(path);
+        Assert.Equal(DropRouting.MaxPictureBytes + 1, over.Size);
+        var plan = DropRouting.Plan([over], DropTarget.Editable, oneDocument: false);
+        Assert.Empty(plan.Insert);
+        Assert.Equal([0], plan.TooLarge);
+        Assert.Equal($"Too large to insert (over {DropRouting.MaxPictureBytes / (1024 * 1024)} MB): huge.png", plan.Notice());
+
+        // And exactly AT the ceiling it still goes in — the boundary is the half of
+        // this that a wrong comparison gets wrong.
+        using (var stream = new FileStream(path, FileMode.Open, FileAccess.Write))
+            stream.SetLength(DropRouting.MaxPictureBytes);
+
+        var atCeiling = DropFiles.Read(path);
+        Assert.Equal(DropRouting.MaxPictureBytes, atCeiling.Size);
+        Assert.Equal([0], DropRouting.Plan([atCeiling], DropTarget.Editable, oneDocument: false).Insert.Select(p => p.Index));
+    }
+
+    [Fact]
+    public void AMalformedPathIsUnreadableRatherThanAThrow()
+    {
+        // Carried over from the previous round. The catch filter listed IOException
+        // and UnauthorizedAccessException only, and a path the OS cannot parse at all
+        // throws neither: an embedded null character is FileStream's own
+        // ArgumentException, and an empty path likewise. Read() is called from
+        // Window_Drop, which is `async void` — nothing there catches, and the throw
+        // takes the process down over a path the shell should never have handed us.
+        var nullChar = DropFiles.Read($"{_dir}\\a\0b.md");
+        Assert.NotNull(nullChar.Head);
+        Assert.Empty(nullChar.Head);
+        Assert.Equal(-1, nullChar.Size);
+
+        var empty = DropFiles.Read("");
+        Assert.NotNull(empty.Head);
+        Assert.Empty(empty.Head);
     }
 
     [Fact]

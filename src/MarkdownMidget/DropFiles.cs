@@ -32,8 +32,20 @@ internal static class DropFiles
             // stat, and it cannot disagree with the bytes just read.
             return new DroppedFile(Path.GetFileName(path), head[..read], stream.Length);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        // ArgumentException and NotSupportedException are the MALFORMED-path shapes,
+        // and they belong here for the same reason the other two do: this is called
+        // from Window_Drop, which is `async void`, so anything that escapes takes the
+        // process down rather than refusing one file. FileStream raises
+        // ArgumentException for an embedded null character or an empty path, and
+        // documents NotSupportedException for "path is in an invalid format" — which
+        // the current Windows implementation reports as IOException instead, so that
+        // one is the documented contract rather than an observed shape.
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                      or ArgumentException or NotSupportedException)
         {
+            // No length to report, which is -1 (unknown), never 0: a zero-length
+            // picture and one that could not be opened are different answers, and 0
+            // would put an unreadable file under the ceiling rather than outside it.
             return new DroppedFile(Path.GetFileName(path), []);
         }
     }
