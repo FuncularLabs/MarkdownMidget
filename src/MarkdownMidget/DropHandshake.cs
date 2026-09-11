@@ -308,8 +308,14 @@ internal static class DropHandshake
     /// way round it.</summary>
     public const string TimedOutNotice = "Couldn't read the dropped file(s) — try Insert ▸ Picture.";
 
-    /// <summary>The status line for files the drop chose and could not get: the
-    /// wording the document route already used, extended to name more than one.
+    /// <summary>The status line for files the drop chose and could not get.
+    ///
+    /// New wording, not a reused one: nothing at 2e47107 produced
+    /// "Couldn't read &lt;name&gt;." — the nearest thing was Insert ▸ Picture's modal
+    /// "Couldn't read the image:", and the document route's failure was
+    /// "Couldn't open &lt;name&gt;:". It borrows that opening on purpose, so a dropped
+    /// picture and a picked one fail in the same voice, and it names every file
+    /// because a drop can choose more than one.
     /// </summary>
     public static string UnreadableNotice(IReadOnlyList<string> names) =>
         $"Couldn't read {string.Join(", ", names)}.";

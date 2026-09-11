@@ -13,7 +13,11 @@ namespace MarkdownMidget;
 internal static class ImageMarkdown
 {
     /// <summary>The alt text Insert ▸ Picture gives a file: its name without the
-    /// extension. A dropped file gets the same, so the two produce the same markdown.</summary>
+    /// extension. A dropped file gets the same alt, so a picture inserted either way
+    /// reads the same. (Only the alt: a dropped file's MIME comes from its BYTES —
+    /// <see cref="DropRouting.SniffImageMime"/> — where a picked one's comes from
+    /// <see cref="MimeForImage"/> and its extension, so the two fragments can differ
+    /// for a file whose name lies about its content.)</summary>
     public static string AltText(string path) => Path.GetFileNameWithoutExtension(path);
 
     /// <summary>

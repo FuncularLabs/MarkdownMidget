@@ -63,7 +63,7 @@ or drop your selection.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
   in the editor and travel with the file. Pasting a picture from the clipboard — a
   screenshot, say — works in the Markdown source view too, and embeds it the same
-  way; so does dropping a picture file onto either view (see *Files*).
+  way; so does dropping a picture file onto either view (see *Files & windows*).
   **Right-click a picture ▸ Resize…** to
   scale it (the aspect ratio stays locked to the original); a resized picture is
   stored as inline HTML `<img …>` so the size persists.
@@ -392,13 +392,15 @@ line with `--readonly`.
   - Drop pictures and a markdown file **together** and the pictures are inserted;
     the markdown file is not opened (the status bar says so) — drop it on its own
     to open it.
-  - **If a dropped file can't be read**, the status bar names it and *none* of the
-    drop's pictures go in — the same all-or-nothing you get if a file goes away
-    mid-drop. On the **formatted editing area** the bytes have to come back from
-    the editor, and the two ways that can fail say different things. When the
-    editor answers but **can't hand the bytes over** — including a picture too
-    large to cross to the window in one message — the status bar names the files,
-    exactly as it does for any file that can't be read:
+  - **If a dropped file can't be read**, it is named and *none* of the drop's
+    pictures go in — the same all-or-nothing you get if a file goes away mid-drop.
+    Where it is named depends on the surface. Dropped on the **toolbar, menu bar or
+    source view** the file is read from disk, and a failure is a message box, the
+    same one **Insert ▸ Picture** shows. On the **formatted editing area** the
+    bytes have to come back from the editor, which has two ways to fail, and both
+    of those are status-bar messages. When the editor answers but **can't hand the
+    bytes over** — including a picture too large to cross to the window in one
+    message — the status bar names the files:
     "Couldn't read a.png, b.png."
     When **nothing comes back at all**, because the page has stopped responding or
     the link to it is gone, the wait is

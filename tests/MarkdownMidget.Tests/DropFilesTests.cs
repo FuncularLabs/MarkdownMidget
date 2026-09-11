@@ -9,8 +9,11 @@ namespace MarkdownMidget.Tests;
 /// <summary>
 /// Reading a dropped PATH off disk (issue #6, review finding F-8). The routing
 /// rules live in <see cref="DropRouting"/> and are tested there; what is tested
-/// here is the only thing these two methods decide — how tolerant the open is of
-/// whoever else has the file.
+/// here is everything these two methods decide on their own — how tolerant the
+/// open is of whoever else has the file, what a head is when the file is short or
+/// unreadable, the size reported for a path that will not open, the bound on a
+/// full read, and that a malformed path is refused rather than thrown at an
+/// `async void` handler.
 /// </summary>
 public class DropFilesTests : IDisposable
 {

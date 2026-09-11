@@ -10,8 +10,13 @@ using Xunit;
 namespace MarkdownMidget.Tests;
 
 /// <summary>
-/// The two-phase drop handshake's generation token, on the host side (issue #6,
-/// review findings NF-1, NF-2, NF-5).
+/// The two-phase drop handshake's generation token, on the host side (issue #6).
+///
+/// The numbering of review findings restarted with each round, so they are
+/// described here rather than cited: this file was created for the round that
+/// found the out-of-order phase-one message and the drop that wanted no bytes, and
+/// grew with the rounds after it — the bounded wait and its clamp, the
+/// re-validation of a plan against the document, the view and the drop generation.
 ///
 /// The editor numbers each drop; the number travels out with the fileDrop message,
 /// back in on the host's request for bytes, and out again with the answer. Every
@@ -47,7 +52,7 @@ public class DropHandshakeTests
         return DropRouting.ParseBytesMessage(doc.RootElement);
     }
 
-    // ===== NF-1: which fileDrop message wins =====
+    // ===== which fileDrop message wins =====
 
     [Fact]
     public void AFileDropMessageOlderThanOneAlreadyHandledIsSuperseded()
@@ -79,7 +84,7 @@ public class DropHandshakeTests
         Assert.False(DropHandshake.IsSuperseded(newestDrop: 4, arrivingDrop: 4));
     }
 
-    // ===== NF-5: which droppedFileBytes answer is acted on =====
+    // ===== which droppedFileBytes answer is acted on =====
 
     [Fact]
     public void AnAnswerAboutTheReadBeingWaitedOnIsApplied()
@@ -204,7 +209,7 @@ public class DropHandshakeTests
         Assert.Equal([1], refused.Missing);
     }
 
-    // ===== NF-2: a drop that wants nothing still ends the previous read =====
+    // ===== a drop that wants nothing still ends the previous read =====
 
     [Fact]
     public void ADropThatWantsNoBytesNeedsNoRoundTrip()
@@ -493,8 +498,8 @@ public class DropHandshakeTests
             JsonSerializer.Deserialize<string>("\"\""), new string(string.Empty.AsSpan()),
             DropTarget.Editable, DropTarget.Editable, false, false));
 
-        // Deliberately not fixed with a generation counter: the other three halves
-        // still guard the insertion, and an empty document that was saved to its own
+        // Deliberately not fixed with a generation counter: the other three
+        // comparisons still guard the insertion, and an empty document saved to its own
         // path is the same document at the same path in the same view — the picture
         // goes where the user is looking. This test exists so the comments and HELP
         // cannot drift back into promising a guarantee this wide.
@@ -585,12 +590,19 @@ public class DropHandshakeTests
     }
 
     [Fact]
-    public void TheNoticeForOneUnreadableFileIsTheOneTheOpenPathAlreadyUsed()
+    public void TheNoticeForOneUnreadableFileNamesThatFileAndNothingElse()
     {
-        // The document route said exactly this before the pictures shared it; the
-        // wording does not change because more files can now reach it.
-        var name = "notes.md";
-        Assert.Equal($"Couldn't read {name}.", DropHandshake.UnreadableNotice([name]));
+        // Renamed in the truth sweep. This was called
+        // ...IsTheOneTheOpenPathAlreadyUsed, and said "the document route said
+        // exactly this before the pictures shared it". It did not: at 2e47107
+        // nothing in src/ or tests/ produced "Couldn't read <name>." at all — the
+        // document route's failure was a modal "Couldn't open <name>:" and
+        // Insert ▸ Picture's was "Couldn't read the image:". The wording is new and
+        // borrows Insert ▸ Picture's opening on purpose, so a dropped picture and a
+        // picked one fail in the same voice.
+        Assert.Equal("Couldn't read notes.md.", DropHandshake.UnreadableNotice(["notes.md"]));
+        // One file, one name: no list punctuation for a list of one.
+        Assert.DoesNotContain(",", DropHandshake.UnreadableNotice(["notes.md"]));
     }
 
     [Fact]
