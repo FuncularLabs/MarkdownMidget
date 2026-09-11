@@ -4163,7 +4163,9 @@ public partial class MainWindow : Window
         // await below is bounded by ReadTimeout, not by anything the user is stopped
         // from doing in the meantime: there is no busy overlay, so File ▸ Open,
         // File ▸ New, File ▸ Close, View ▸ Read Only and a drop on the toolbar are
-        // all reachable for the whole 10–90 seconds of it.
+        // all reachable for however long it lasts — 10 s at the floor, 90 s for ten
+        // pictures at the ceiling, and up to the ten-minute clamp for a stated size
+        // no picture could reach.
         var then = DropPin();
         var plan = DropRouting.Plan(files, then.Target, oneDocument: true);
         // The chosen pictures AND the one document that opens: this route has no
