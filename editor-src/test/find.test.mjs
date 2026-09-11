@@ -35,8 +35,12 @@ before(async () => {
   globalThis.NodeFilter = ed.window.NodeFilter;
 });
 // The module holds the index and the captured scope between calls, as it does for
-// the life of the dialog; each case starts as a freshly opened dialog would.
-beforeEach(() => findClear());
+// the life of the dialog; each case starts as a freshly opened dialog would — and at
+// the match cap the app itself runs at. The cases that lower the cap restore it in a
+// finally, but that is the lowering case's own discipline: one written without it, or
+// one that throws where a finally cannot help, would hand every later case a 3-match
+// index. Restoring it here is what makes that impossible rather than remembered.
+beforeEach(() => { findClear(); findMatchLimit(); });
 
 /**
  * Load a document the way the host does and return the editor's own serialisation
@@ -807,10 +811,17 @@ describe('WhatTheHostAcceptsThisViewCanRun', () => {
       else if (row.refusedBy === 'dotnet')
         assert.ok(!refusedHere,
           `${row.pattern} is JavaScript's own and compiles here; only the host refuses it — ${row.why}`);
-      else
-        // 'host': both engines may compile it, and FindEngineTests is the only place
-        // the refusal can be proved. Nothing to measure here beyond the row being read.
+      else {
+        // 'host': the row exists BECAUSE this engine compiles it — a pattern both
+        // engines accept and read differently is one only FindEngine.JsCompatible can
+        // refuse, and FindEngineTests is where that refusal is proved. So the half
+        // this side owns is not "nothing to measure": it is that the pattern really
+        // does compile here. Asserting only the label let a row this engine rejects
+        // sit under 'host' and be checked by neither suite.
         assert.equal(row.refusedBy, 'host', `${row.pattern} — unknown refusedBy`);
+        assert.ok(!refusedHere,
+          `${row.pattern} is marked refusedBy 'host', which claims both engines compile it — this one does not, so it belongs under 'javascript'`);
+      }
     });
   }
 
@@ -907,6 +918,17 @@ describe('AnIndexThatStoppedAtTheCapSaysSo', () => {
       assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 3);
       assert.equal(md(), 'dog dog dog');
     } finally { findMatchLimit(was); }
+  });
+
+  test('the lowered cap does not outlive the case that lowered it', () => {
+    // The cases above restore it in a finally, but the cap is module state and the
+    // next case inherits whatever the last one left: one case that throws before its
+    // finally is written, or is written without one, and every later case silently
+    // searches a 3-match document. The reset belongs in beforeEach; this is what
+    // says it is there. findMatchLimit() with no argument restores the default and
+    // hands back the limit that was in force — which must already be the default.
+    assert.equal(findMatchLimit(), 50000,
+      'a lowered match cap leaked out of an earlier case');
   });
 });
 

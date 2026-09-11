@@ -18,7 +18,9 @@
     "                           to be the gate.",
     "  refusedBy 'host'       — both engines compile it today and read it differently (or not",
     "                           every browser has it): only FindEngine.JsCompatible refuses it,",
-    "                           and only FindEngineTests can prove that."
+    "                           and only FindEngineTests can prove that refusal. find.test.mjs",
+    "                           checks the half this side owns — that the pattern does compile",
+    "                           here — so a row this engine rejects cannot hide under 'host'."
   ],
   "literals": [
     { "query": "hello world", "mode": "Normal", "pattern": "hello world",
