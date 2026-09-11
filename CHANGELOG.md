@@ -23,7 +23,7 @@ changes between alpha tags.
   replacement takes the formatting of the first character it replaces, and a
   match that runs from one paragraph into the next is left alone. A pattern that
   does not compile is refused with the message Find shows, and nothing is
-  changed. In the formatted view a search stops after 50 000 matches — `\b` or
+  changed. In the formatted view a search stops after 50000 matches — `\b` or
   `x*` matches at every position — and says so beside the count; Replace All
   then refuses rather than changing the part of the document the search reached.
   Replace is greyed while the document is read-only, and the dialog reopens with
@@ -40,9 +40,8 @@ changes between alpha tags.
   the formatted one. So is `\1` in a pattern that writes a named group before an
   unnamed one, where the two views number the groups differently: write
   `\k<name>`, which means the same group in both. `\p{L}` and `\p{Lu}` work in
-  both now; they used not to work
-  in the formatted view at all. Help lists the whole set under *Find ▸ Regular
-  expression*. (#5)
+  both now; they used not to work in the formatted view at all. Help lists the
+  whole set under *Find ▸ Regular expression*. (#5)
 - **A pattern that matches a position rather than text now replaces in the
   formatted view too.** `^`, `$` and `(?=…)` match no characters; the formatted
   view used to skip them, so `^` with `> ` — the "prefix every line" idiom that
@@ -53,13 +52,13 @@ changes between alpha tags.
   `-`): with the same marker, CommonMark would read the two as one list. (#2)
 
 ### Fixed
-- **A document that ends in a list, a table or a code block is no longer called
-  modified the moment you click in it.** The formatted view adds an empty
-  paragraph after such a document, and did it on the first thing you did — a
-  click, or F3 — so the title gained its `*`, a crash copy was written and
-  closing asked to save, for a document nobody had edited. That paragraph is now
-  added as the document is opened, where it belongs, and Undo is unaffected.
-  (#5)
+- **A document ending in anything but a paragraph or heading is no longer called
+  modified the moment you click in it.** A list, a table, a code block, a
+  blockquote, a thematic break: the formatted view adds an empty paragraph after
+  such a document, and did it on the first thing you did — a click, or F3 — so
+  the title gained its `*`, a crash copy was written and closing asked to save,
+  for a document nobody had edited. That paragraph is now added as the document
+  is opened, where it belongs, and Undo is unaffected. (#5)
 - **Saving from the formatted view keeps tight lists tight, `snake_case_word` as
   written, and emphasis that touches punctuation as emphasis.** A document that
   passed through the formatted view came back with a blank line between every

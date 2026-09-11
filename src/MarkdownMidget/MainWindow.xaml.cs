@@ -841,8 +841,26 @@ public partial class MainWindow : Window
     // the failure impossible to ignore instead: TryGet returns null, and the caller
     // has to say what that means.
 
-    private async Task SetDocumentMarkdownAsync(string markdown)
+    /// <summary>
+    /// Installs <paramref name="markdown"/> in both surfaces and hands back what the
+    /// editor settled on — the serialisation it will return from now on, and so the
+    /// markdown a clean baseline should be taken from. Null when the editor could not
+    /// be asked (not ready, or it did not answer): a caller that needs to know whether
+    /// the document landed in the formatted view reads that, rather than serialising
+    /// the whole document a second time to ask the same question.
+    /// </summary>
+    private async Task<string?> SetDocumentMarkdownAsync(string markdown)
     {
+        // A new document is not the one the find index was built from, and installing
+        // it raises no change message to say so (#5 NF-9, the same invariant). Forget
+        // it BEFORE the awaits below rather than after: if setMarkdown lands and the
+        // getMarkdown after it throws — a WebView2 that has died mid-call — the new
+        // document is installed while _lastFindSource still names the OLD document's
+        // index, and the next Find would skip findReset and answer from it. Forgetting
+        // a moment too early costs one findReset that was not needed; forgetting too
+        // late is the stale answer this helper exists to prevent.
+        ForgetWysiwygFindIndex();
+        string? settled = null;
         // Editor first, source box second. If the script throws, both surfaces are
         // left showing the OLD document — which is what _currentPath still says, since
         // callers assign it after this returns. Setting the source box first would
@@ -852,23 +870,26 @@ public partial class MainWindow : Window
         {
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
             // setMarkdown settles the document before it returns (editor-src/src/settle.js):
-            // one that ends in a list, a table or a code block gains the editor's trailing
-            // empty paragraph THERE rather than on the reader's first click or first F3.
+            // one that ends in anything but a paragraph or a heading — a list, a table, a
+            // code block, a blockquote, a thematic break — gains the editor's trailing empty
+            // paragraph THERE rather than on the reader's first click or first F3.
             // What it hands back from now on is therefore what it holds now — so mirror
             // that, not what we asked for, or the clean baseline taken in source view
             // would differ from the formatted view's markdown by one blank line and the
             // document would read as modified the moment the views were swapped (#5 NF-5).
-            var settled = await RunEditorAsync("window.MDM.getMarkdown()");
+            settled = await RunEditorAsync("window.MDM.getMarkdown()");
             if (settled is not null) markdown = settled;
         }
-        // A new document is not the one the find index was built from, and installing
-        // it raises no change message to say so (#5 NF-9, the same invariant).
-        ForgetWysiwygFindIndex();
+        // The box mirrors the settled serialisation the editor just handed back, which
+        // is what makes it the same document the baseline is taken from. Whether a
+        // file-backed document keeps its OWN spelling (line endings, BOM) across the
+        // view switch is #9's question, answered where the switch happens, not here.
         SourceBox.Text = markdown;
         // Count here rather than in each caller: installing content doesn't raise a
         // 'change' message, so a freshly opened document would otherwise show no
         // count at all until the first keystroke.
         UpdateCounts(markdown);
+        return settled;
     }
 
     private async Task OpenThenApplyStartupViewAsync(string path)
@@ -928,10 +949,14 @@ public partial class MainWindow : Window
             // actually landed. A silently failed setMarkdown would leave the editor
             // showing the pre-edit document while the source box — the only copy of
             // the edits — is hidden and about to be treated as stale.
-            await SetDocumentMarkdownAsync(SourceBox.Text);
-            // Ask the editor directly: TryGetDocumentMarkdownAsync would hand back
-            // SourceBox.Text, since _sourceMode is still true until below.
-            var landed = _editorReady ? await RunEditorAsync("window.MDM.getMarkdown()") : null;
+            //
+            // What it returns IS the editor's own answer, read straight after the set:
+            // asking again here serialised the whole document a second time for the
+            // same fact. (TryGetDocumentMarkdownAsync is not that answer either way —
+            // it would hand back SourceBox.Text, since _sourceMode is still true until
+            // below.) Null means the editor could not be asked, which is the same
+            // "it didn't land" this has always refused to switch views on.
+            var landed = await SetDocumentMarkdownAsync(SourceBox.Text);
             if (landed is null)
             {
                 MessageBox.Show(this, "Couldn't hand your markdown back to the formatted " +
@@ -2870,7 +2895,8 @@ public partial class MainWindow : Window
     /// last query, so without this the answer came back from an empty index —
     /// "Nothing to replace." on a document full of matches); loading a document
     /// replaces what the index describes, and unlike an edit it raises no change
-    /// message to clear the cache the other way.
+    /// message to clear the cache the other way; and a pattern the editor refused
+    /// built no index at all, so nothing may claim to describe one.
     /// </summary>
     private void ForgetWysiwygFindIndex()
     {
@@ -2905,8 +2931,8 @@ public partial class MainWindow : Window
                 $"JSON.stringify(window.MDM.findReset({JsLiteral(src)}, {JsLiteral(flags)}))");
             if (FindEngine.ReportsInvalidPattern(json))
             {
-                _lastFindSource = "";
-                _lastFindFlags = "";
+                // A refusal built no index, so nothing here describes one (#5 NF-9).
+                ForgetWysiwygFindIndex();
                 _findDialog?.SetStatus(FindEngine.InvalidPatternMessage);
                 return false;
             }

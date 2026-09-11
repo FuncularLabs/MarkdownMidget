@@ -161,7 +161,7 @@ other does not are refused outright, with the same *Invalid pattern.* message:
 | `(?'name'…)` `\k'name'`                   | .NET's quoted spellings; `(?<name>…)` and `\k<name>` are fine |
 | `(?<a-b>…)`                               | balancing group — .NET only                     |
 | `[a-z-[aeiou]]`                           | class subtraction; .NET subtracts, and the browser refuses the pattern outright |
-| `\1` after `(?<name>…)` and before `(…)`  | the two engines number the groups differently there — write `\k<name>` |
+| `\1` in a pattern with `(?<name>…)` before `(…)` | the two engines number the groups differently there — write `\k<name>` |
 | `a++` `a*+` `a?+` `a{1,2}+`               | possessive quantifiers — .NET only              |
 | `\p{IsGreek}` `\p{Letter}`                | Unicode blocks and long category names; `\p{L}` and `\p{Lu}` work |
 | a loose `{`, `}` or `]`                   | literal in .NET, a syntax error in the browser — write `\{`, `\}`, `\]` |
@@ -222,7 +222,7 @@ The dialog has a **Replace with** box under **Find what**, and two buttons:
 - **Replace All** changes every match as **one undo step** — Ctrl+Z puts the
   whole document back. When part of the document is selected, only matches lying
   entirely inside the selection are changed; a caret means the whole document.
-  In the WYSIWYG view a search stops after 50 000 matches — a pattern like `\b` or
+  In the WYSIWYG view a search stops after 50000 matches — a pattern like `\b` or
   `x*` matches at every position — and Find says so beside the count. Replace All
   then refuses and changes nothing, rather than changing the part of the document
   the search reached and reporting it as all of them; narrow the search.
