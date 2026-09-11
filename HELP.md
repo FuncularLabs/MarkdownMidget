@@ -92,9 +92,10 @@ and heading ends, **↵** at manual line breaks, and **→** for tabs.
 
 ## Find
 
-**Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find dialog. **F3** jumps to
-the next match, **Shift+F3** to the previous. The status line shows
-**`Match m of n`**. Find works in either the WYSIWYG or the Markdown source view.
+**Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find and Replace dialog.
+**F3** jumps to the next match, **Shift+F3** to the previous. The status line
+shows **`Match m of n`**. Find works in either the WYSIWYG or the Markdown source
+view, and so does Replace (below).
 
 The dialog has four **Search modes**:
 
@@ -137,6 +138,38 @@ Like Normal, but with two wildcards:
 .NET regex syntax — full power. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`,
 `(foo|bar)`. **Wrap around** lets the search loop from the end back to the
 start when **Find Next** runs off the bottom.
+
+### Replace
+
+The dialog has a **Replace with** box under **Find what**, and two buttons:
+
+- **Replace** changes the match Find is currently on and moves to the next one.
+  With nothing found yet it simply finds the next match, so it is safe to press
+  first. Past the last match it goes round to the first when **Wrap around** is
+  on, and stops when it is off.
+- **Replace All** changes every match as **one undo step** — Ctrl+Z puts the
+  whole document back. When part of the document is selected, only matches lying
+  entirely inside the selection are changed; a caret means the whole document.
+  Find moves the selection onto each match as you type, so what counts is the
+  selection *you* made: the one there when you opened the dialog (or pressed
+  Ctrl+F again), or one you make afterwards. The status bar reports how many
+  were replaced.
+
+The replacement follows the search mode:
+
+| Mode                 | Replacement                                                     |
+| -------------------- | --------------------------------------------------------------- |
+| Normal, Wildcards    | Inserted as typed; a `$` is a dollar sign.                       |
+| Extended             | The same escapes as the query — `\n`, `\r`, `\t`, `\0`, `\\`, `\xNN`, `\uNNNN` — and any other `\c` is `c`; otherwise as typed. |
+| Regular expression   | A .NET replacement pattern: `$1` and `${name}` for groups, `$0` or `$&` for the whole match, `$$` for a dollar sign. |
+
+A pattern that does not compile is refused with *Invalid pattern.* and nothing
+is changed. In the formatted view the replacement takes the formatting of the
+first character it replaces — a match that starts in plain text and runs into
+bold comes out plain; one inside a link or inline code stays in it — and a match
+that runs from the end of one paragraph into the next is left as it is: Replace
+never joins blocks. Replace and Replace All are greyed while the document is
+read-only. The dialog reopens with the last query and replacement.
 
 ## Printing & PDF export
 

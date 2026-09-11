@@ -9,6 +9,22 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Find has Replace.** The Find dialog (Ctrl+F) has a *Replace with* box and
+  **Replace** / **Replace All** buttons, in both views and in all four search
+  modes. Replace changes the match Find is on and moves to the next one (with
+  nothing found yet it is Find Next); Replace All changes every match as one
+  undo step — or every match inside the selected text, when some is selected —
+  and the status bar reports the count. In Regular expression mode the
+  replacement can name groups (`$1`, `${name}`); in Extended mode it takes the
+  same `\n`, `\t`, `\r`, `\\` escapes the query does; in Normal and Wildcards
+  mode it goes in as typed. In the formatted view a replacement takes the
+  formatting of the first character it replaces, and a match that runs from one
+  paragraph into the next is left alone. A pattern that does not compile is
+  refused with the message Find shows, and nothing is changed. Replace is greyed
+  while the document is read-only, and the dialog reopens with the last query
+  and replacement. (#5)
+
 ### Changed
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
   list directly follows another, the second is written with `*` bullets (it was

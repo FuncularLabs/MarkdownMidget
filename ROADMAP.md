@@ -34,8 +34,9 @@ order of risk:
   Preserve both, end to end (fold every ending before re-applying the detected one).
 - **A file rewritten with identical bytes reads as an external change**, because the
   watcher compares against that normalised baseline. Compare against the raw text.
-- **Find has no Replace.** Replace / Replace All, both views, all four modes, scoped
-  to the selection.
+- ~~**Find has no Replace.**~~ **Done 2026-09-11 (unreleased, #5)**: Replace and
+  Replace All in the Find dialog, both views, all four modes; Replace All is one
+  undo step and is scoped to the selection when there is one. Was: Find only.
 - **Dropping an image file on the editor opens it as text** (after the discard
   prompt, when there are unsaved changes).
   Insert it as a picture instead; refuse other non-markdown drops with a
@@ -410,8 +411,9 @@ release, with infrastructure riding along with whatever needs it.
   Word's CUSTOM.DIC" — import only, never write back. Sharing the OS dictionary
   was considered and deliberately rejected as too risky.
 
-- **Find & Replace.** Find is done (4 modes, F3/Shift+F3); add the Replace tab —
-  Replace / Replace All, scoped to selection, honoring the current search mode.
+- ~~**Find & Replace.**~~ **Done 2026-09-11 (unreleased, #5)**: not a tab — a
+  Replace field and Replace / Replace All buttons in the Find dialog, scoped to the
+  selection, honouring the current search mode, one undo step per Replace All.
 - ~~**Independent code-view theme.**~~ **Done 2026-09-10 (unreleased)**, in a
   simpler shape than first scoped: no second theme format and no second list. One
   list of themes; **View ▸ Theme ▸ Same Theme for Both Views** (on by default) and,
