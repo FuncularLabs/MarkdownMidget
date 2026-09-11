@@ -12,7 +12,10 @@ import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
 import { setSpellRanges, beginSpellCheck, misspellingAt } from './spell-decorate.js';
 import { extractSpellText } from './spell-extract.js';
 import { SEPARATOR } from './spell-separator.js';
-import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
+import {
+  findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear,
+  findReplace as fReplace, findReplaceAll as fReplaceAll, findCaptureScope as fCaptureScope,
+} from './find.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 
@@ -618,10 +621,15 @@ const MDM = {
 
   // Find (WYSIWYG view). The host hands us a regex (source + flags) it built from
   // its FindEngine, so the four search modes stay consistent between views.
-  findReset(source, flags) { return fReset(source, flags); },
+  findReset(source, flags) { return fReset(source, flags, editorView); },
   findNext(wrap) { return fNext(!!wrap); },
   findPrev(wrap) { return fPrev(!!wrap); },
   findClear() { fClear(); },
+  // Replace (#5): the host hands over the replacement prepared for the search
+  // mode and says whether it is literal text or a Regex-mode template.
+  findReplace(replacement, literal, wrap) { return fReplace(editorView, replacement || '', !!literal, !!wrap); },
+  findReplaceAll(replacement, literal) { return fReplaceAll(editorView, replacement || '', !!literal); },
+  findCaptureScope() { return fCaptureScope(editorView); },
 
   // Apply width/height (px) to the currently selected image node.
   setImageSize(width, height) {
