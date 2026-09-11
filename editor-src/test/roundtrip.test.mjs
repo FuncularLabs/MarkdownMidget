@@ -485,6 +485,35 @@ describe('AstralNeighboursSurvive', () => {
     assert.equal(textSurvives(tail, EMOJI)[1], `\\_${EMOJI}\\_a\n`);
   });
 
+  // The case above uses a run whose content is exactly the emoji, so its plain
+  // content starts with a high half AND ends with a low one: either anchor
+  // answers for either end and the two are interchangeable in it. The two below
+  // put the emoji at ONE end only, so each anchor is pinned by itself — pair the
+  // head reference with the tail anchor (or the reverse) and the fallback stops
+  // firing and a lone surrogate ships.
+  test('an emoji at the HEAD of a `_` run only: the head anchor is the high half', () => {
+    // `😀x` starts high and ends in a letter. The default encodes the run's
+    // first character — half the pair — so the head reference is real and the
+    // run must be written plain.
+    ed.roundTrip(`_${EMOJI}x_`);
+    const view = ed.view();
+    view.dispatch(view.state.tr.insert(1, view.state.schema.text('a')));  // a bare text node: no marks
+    const out = ed.markdown();
+    assert.equal(out, `a_${EMOJI}x_\n`);
+    textSurvives(out, EMOJI);
+  });
+
+  test('an emoji at the TAIL of a `_` run only: the tail anchor is the low half', () => {
+    // The mirror: `x😀` starts with a letter and ends low, and the letter goes
+    // after the run, so it is the run's LAST character the default encodes.
+    ed.roundTrip(`_x${EMOJI}_`);
+    const view = ed.view();
+    view.dispatch(view.state.tr.insert(4, view.state.schema.text('a')));  // after the run: `x` plus the pair is three code units
+    const out = ed.markdown();
+    assert.equal(out, `_x${EMOJI}_a\n`);
+    textSurvives(out, EMOJI);
+  });
+
   test('guard: a literal &#xD83D; in the run is not half a character', () => {
     // #2 O-5. `&#xD83D;` is also something a user can type. Here it is the last
     // eight characters of the run's own text, written `\&#xD83D;`, and the tail
