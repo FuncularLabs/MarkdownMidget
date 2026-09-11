@@ -65,9 +65,8 @@ internal static class DocumentText
 
     /// <summary>
     /// The string flavour, for text that arrives already decoded: the plaintext
-    /// out of an encrypted container, or a file the browser read for a drop. There
-    /// is no mark to find in a string (the decoder that produced it took it), so
-    /// <see cref="Decoded.HadBom"/> is false.
+    /// out of an encrypted container. There is no mark to find in a string (the
+    /// decoder that produced it took it), so <see cref="Decoded.HadBom"/> is false.
     /// </summary>
     public static Decoded Detect(string text) => new(Fold(text), Classify(text), HadBom: false);
 

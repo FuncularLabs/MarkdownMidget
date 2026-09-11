@@ -42,10 +42,14 @@ order of risk:
 - ~~**Find has no Replace.**~~ **Done 2026-09-11 (unreleased, #5)**: Replace and
   Replace All in the Find dialog, both views, all four modes; Replace All is one
   undo step and is scoped to the selection when there is one. Was: Find only.
-- **Dropping an image file on the editor opens it as text** (after the discard
-  prompt, when there are unsaved changes).
-  Insert it as a picture instead; refuse other non-markdown drops with a
-  message.
+- ~~**Dropping an image file on the editor opens it as text**~~ **Done 2026-09-11
+  (unreleased, #6)**: a dropped file is routed by its content — a picture (PNG,
+  JPEG, GIF, WebP, BMP, recognised by its bytes, whatever its name) is embedded in
+  either view exactly as Insert ▸ Picture embeds it, a markdown or text file opens
+  as before, and anything else is refused by name and never replaces the document.
+  Was: any dropped file opened as text — in place with no prompt if the document
+  was untitled and unmodified, in a fresh window from the toolbar otherwise, or
+  after the discard prompt on the formatted view.
   ~~Pasting an image into the *source* view does nothing.~~ **Done 2026-09-11
   (unreleased, #7)**: Ctrl+V with an image and no text on the clipboard inserts the
   same data-URI markdown the formatted view produces — `![](data:image/png;base64,…)`

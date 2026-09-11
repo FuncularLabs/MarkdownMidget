@@ -79,7 +79,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
   light whatever you pick.
 - **Document width** (Portrait / Landscape / Full, remembered between sessions) and
   a **zoom** indicator (Ctrl + mouse wheel).
-- **Recent files**, drag-and-drop to open, **read-only** mode, and a bundled Help
+- **Recent files**, **drag-and-drop** (a dropped picture is inserted, a dropped
+  markdown or text file opens, anything else is refused by name), **read-only**
+  mode, and a bundled Help
   document and changelog (**Help ▸ What's New**, or click the mascot — it flags
   unread entries with a small gold asterisk).
 - **Secure Markdown** — password-protected encrypted documents (`.mdenc`,
@@ -238,9 +240,15 @@ is deferred from this first iteration. Notable deferrals / divergences:
   matches the last opened/saved markdown, so undoing back to that state clears the
   modified flag. Opening/new flushes undo history (you can't undo past the open
   state); saving leaves history intact (you can undo past a save).
-- **Drag & drop:** dropping a file opens it in place when the window holds an
-  untitled, unmodified document; otherwise it opens in a new instance. Files can
-  also be passed on the command line.
+- **Drag & drop** is routed by what the file *is*, not by what it is called:
+  dropping a **picture** (PNG, JPEG, GIF, WebP, BMP — recognised by its magic
+  bytes) inserts it at the caret, exactly as Insert ▸ Picture would, leaving the
+  document you have open alone; dropping a **markdown or text file** opens it in
+  place when the window holds an untitled, unmodified document, otherwise in a new
+  instance (the formatted editing area, which never sees a path, opens it as one
+  untitled document per drop instead); **anything else** is refused by name in the
+  status bar and changes nothing. Drop pictures and a markdown file together and
+  the pictures win. Files can also be passed on the command line.
 - **Read-only mode:** Edit ▸ Read Only locks the document; also available via the
   `--readonly` command-line switch. Help ▸ View Help opens the bundled
   [HELP.md](HELP.md) read-only in a new instance.

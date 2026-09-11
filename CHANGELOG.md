@@ -43,6 +43,33 @@ changes between alpha tags.
   do nothing in the source view, silently. It now inserts the picture at the caret
   as the same base64 data URI Insert ▸ Picture and the formatted view produce, in
   one undo step. A paste that carries text still pastes the text. (#7)
+- **A picture file dropped on the editor is inserted as a picture.** Dropping a
+  PNG, JPEG, GIF, WebP or BMP file on either view used to open it as a text
+  document — in place with no prompt if the document was untitled and unmodified,
+  in a fresh window from the toolbar otherwise, or after the discard prompt on the
+  formatted view — and fill the editor with garbage. Now a dropped file is routed
+  by what it is: a picture is embedded at the caret exactly as Insert ▸ Picture
+  embeds it (recognised by its bytes, so a picture named `.md` is still a
+  picture), a markdown or text file opens as before, and anything else is refused
+  with a note in the status bar naming it — the document you have open is never
+  replaced. Several pictures are inserted in the order dropped; a markdown file
+  dropped with them is not opened. A markdown file dropped on the formatted view
+  now also keeps its byte-order mark, as one opened with File ▸ Open does.
+  Dropping again before a drop has finished replaces it rather than mixing the
+  two, and if the document changes while a drop is being read — another file
+  opened, this one closed or turned read-only, the view switched — nothing is
+  inserted and the status bar says so. A drop on the formatted view that gets no
+  answer back from the editor gives up rather than waiting, and says so in the
+  status bar: the wait is 10 seconds plus a second for every 8 MB it asked for,
+  18 seconds for one picture at the size limit, capped at ten minutes. A picture
+  another program is still writing is read rather than refused, and the bytes that
+  come back are checked before anything is inserted — a file cut short or grown
+  past the size limit in between is named rather than embedded as a picture
+  nothing can display. **Note:** a *text* file without a markdown or `.txt`
+  extension — `notes.json`, `app.log`, `Program.cs` — used to open when dropped
+  and is now refused; the drop route is the only one that insists on a markdown or
+  text extension, so those files still open normally through File ▸ Open (choose
+  **All files** in the dialog) and by passing the path on the command line. (#6)
 - **Help gains a Known limits section.** The deliberate limits, in one place,
   each with what you run into and what to do instead: no installer and no Add or
   Remove Programs entry, the markdown conventions a save through the formatted

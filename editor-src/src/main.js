@@ -17,6 +17,7 @@ import {
   findReplace as fReplace, findReplaceAll as fReplaceAll, findCaptureScope as fCaptureScope,
 } from './find.js';
 import { settleDocument } from './settle.js';
+import { readHeads, readFull, planDroppedRead, postAnswer } from './file-drop.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 
@@ -65,14 +66,22 @@ let editor = null;
 let editorView = null;
 let suppressChange = false;
 
+// Returns whether the message actually went. Almost every caller ignores that —
+// a 'change' or 'contextmenu' the host missed is not worth a second thought — but
+// the drop handshake does not: the host BLOCKS on the droppedFileBytes message,
+// and an oversized payload (about 85 MB of base64 at the 64 MB picture ceiling) is
+// exactly the kind the bridge refuses. Swallowing that failure left the host
+// waiting with nothing on screen to say why. See postAnswer in file-drop.js.
 function postToHost(message) {
   try {
     if (window.chrome && window.chrome.webview) {
       window.chrome.webview.postMessage(message);
+      return true;
     }
   } catch (_) {
-    /* host bridge not present (e.g. running in a plain browser) */
+    /* the bridge refused the message — an oversized payload, or a dead WebView */
   }
+  return false;   // also the plain-browser case: there is no host to hear it
 }
 
 // Apply / remove print-only body classes precisely during print rendering.
@@ -222,8 +231,27 @@ function installContextMenus(view) {
   });
 }
 
-// Make the editor area a file drop target. The OS doesn't expose dropped-file
-// paths to web content, so we read the text and hand the host the name + content.
+// ===== file drop =====
+//
+// The OS doesn't expose dropped-file paths to web content, so the host can't open
+// a dropped file itself — the editor has to read it. It does so in two phases, and
+// the reason is memory: reading every dropped file in full before the host has
+// said it wants any of them turned an accidentally-dropped 200 MB video into a
+// >260 MB base64 string, copied into a web message, decoded again on the host.
+//
+// Phase one posts only what routing needs — each file's name, size and first
+// HEAD_BYTES bytes. The host runs DropRouting.Plan on that (the rules live there,
+// never here) and then calls readDroppedFiles for the one or two files it chose;
+// phase two reads those in full and posts them back. The File objects of the last
+// drop are kept here in the meantime — a File is a handle, not its contents, so
+// holding them costs nothing.
+//
+// `dropSeq` numbers the drops. It travels out with phase one, back in on the
+// request, and out again with the answer, so a second drop landing while the first
+// is still being read can't be answered with the wrong files.
+let droppedFiles = [];
+let dropSeq = 0;
+
 function installFileDrop() {
   const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
   window.addEventListener('dragover', (e) => {
@@ -235,11 +263,13 @@ function installFileDrop() {
     if (!hasFiles(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => postToHost({ type: 'fileDrop', name: file.name, content: String(reader.result) });
-    reader.readAsText(file);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    // Held before the heads are posted: the host's request can only arrive after
+    // the message, and it must find this drop's files waiting.
+    droppedFiles = files;
+    const drop = ++dropSeq;
+    readHeads(files).then((read) => postToHost({ type: 'fileDrop', drop, files: read }));
   }, true);
 }
 
@@ -465,6 +495,36 @@ const MDM = {
   getMarkdown() {
     if (!editor) return '';
     return editor.action(getMarkdown());
+  },
+
+  /**
+   * Phase two of a file drop: the full bytes of the files the host's plan chose.
+   *
+   * `drop` is the counter that came out with the fileDrop message; `indices` are
+   * positions in that message's file list. The answer goes back as the
+   * droppedFileBytes message rather than as this function's return value, because
+   * ExecuteScriptAsync does not await a promise — it would serialise this one as
+   * {} and the host would be handed nothing.
+   *
+   * It always ANSWERS, whatever happens: a stale drop, an index that isn't in the
+   * drop, a read that fails, or a throw on the way. What it cannot promise is that
+   * the answer arrives — the bridge can refuse a message, and an answer carrying a
+   * picture at the host's ceiling is about 85 MB of base64. postAnswer follows a
+   * refused payload with a small message saying so; if that is refused too the
+   * bridge is gone, and the host's own timeout is what ends the wait.
+   */
+  readDroppedFiles(drop, indices) {
+    const answer = (files) => postAnswer(postToHost, drop, files);
+    // Which drop this is about, and what it really asks for: planDroppedRead, which
+    // is where that decision is tested (file-drop.js). A stale request — the user
+    // dropped again while the host was routing — answers null for every index it
+    // named rather than reading whatever is at that position in the NEW drop.
+    const { stale, indices: wanted } = planDroppedRead(dropSeq, drop, indices);
+    const allNull = () => wanted.map((index) => ({ index, base64: null }));
+    if (stale) return Promise.resolve(answer(allNull()));
+    return readFull(droppedFiles, wanted)
+      .then(answer)
+      .catch(() => answer(allNull()));
   },
 
   // flush=true rebuilds editor state, clearing undo history — used when loading a

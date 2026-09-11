@@ -63,7 +63,8 @@ or drop your selection.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
   in the editor and travel with the file. Pasting a picture from the clipboard — a
   screenshot, say — works in the Markdown source view too, and embeds it the same
-  way. **Right-click a picture ▸ Resize…** to
+  way; so does dropping a picture file onto either view (see *Files & windows*).
+  **Right-click a picture ▸ Resize…** to
   scale it (the aspect ratio stays locked to the original); a resized picture is
   stored as inline HTML `<img …>` so the size persists.
 - **Underline** has no markdown equivalent, so it is stored as inline `<u>…</u>`.
@@ -522,12 +523,69 @@ already in it.
   Version As…** (with a suggested name, then asks whether to switch to it or stay
   on the externally-modified file), or **Keep Current** (your next Save will
   overwrite the disk version).
-- **Drag a file onto the window** to open it. Dropping on the **toolbar or menu
-  bar** opens it in place (if the current document is untitled and unmodified) or
-  in a **new window**. Dropping on the **editing area** opens the file's text as a
-  new untitled document — the OS doesn't reveal a dropped file's path to the
-  editor, so **Save** will prompt for a location. You can also pass a file path
-  (and optional `--readonly`) on the command line.
+- **Drag a file onto the window.** What happens depends on what the file *is*,
+  not on what it is called:
+  - A **picture** (PNG, JPEG, GIF, WebP or BMP — recognised by its bytes, so a
+    PNG named `.md` is still a picture) is **inserted at the caret**, in either
+    view, exactly as **Insert ▸ Picture** would insert it. The document you have
+    open stays open. Several pictures go in one after another, each on its own
+    line. A read-only window, or one with no document open, takes no pictures and
+    says so in the status bar. A picture **larger than 64 MB** is named in the
+    status bar rather than inserted: an embedded picture is carried inside the
+    document as text, costing about a third again its size in every copy and
+    every save.
+  - A **markdown or text file** (`.md`, `.markdown`, `.txt`, `.mdenc`) **opens**.
+    Dropped on the **toolbar, menu bar or source view**, it opens in place (if the
+    current document is untitled and unmodified) or in a **new window**. Dropped on
+    the **formatted editing area**, its text opens as a new untitled document —
+    the OS doesn't reveal a dropped file's path to the editor, so **Save** will
+    prompt for a location — and that area opens one document per drop; the one
+    exception is an encrypted `.mdenc`, which that area redirects to **File ▸
+    Open** with a message, since there is no path there to prompt for the
+    password from (dropped on the toolbar, menu bar or source view it opens
+    normally, password prompt and all). A text file named `.png` is neither a
+    picture nor markdown, and is refused.
+  - **Anything else** is refused: the status bar names the file, and nothing
+    changes.
+  - Drop pictures and a markdown file **together** and the pictures are inserted;
+    the markdown file is not opened (the status bar says so) — drop it on its own
+    to open it.
+  - **If a dropped file can't be read**, it is named and *none* of the drop's
+    pictures go in — the same all-or-nothing you get if a file goes away mid-drop.
+    Where it is named depends on the surface. Dropped on the **toolbar, menu bar or
+    source view** the file is read from disk, and a failure is a message box
+    worded as **Insert ▸ Picture**'s is. On the **formatted editing area** the
+    bytes have to come back from the editor, which has two ways to fail, and both
+    of those are status-bar messages. When the editor answers but **can't hand the
+    bytes over** — including a picture too large to cross to the window in one
+    message — the status bar names the files:
+    "Couldn't read a.png, b.png."
+    When **nothing comes back at all**, because the page has stopped responding or
+    the link to it is gone, the wait is
+    **10 seconds plus a second for every 8 MB** asked for —
+    18 seconds for a single picture at the 64 MB limit, and
+    90 seconds for ten of them, capped at ten minutes — and then the drop ends with
+    "Couldn't read the dropped file(s) — try Insert ▸ Picture."
+    rather than waiting.
+  - **A picture still being written when you drop it** is read anyway — that is the
+    point, so a screenshot you drag in the instant it appears works — but the bytes
+    that come back are checked before anything is inserted. If the file changed
+    enough in between that it is no longer the picture it looked like (it was cut
+    short, emptied, or grew past the size limit), nothing is inserted and a message
+    says so. Drop it again once the other program has finished with it.
+  - **Drop again before a drop has finished** and the newer drop wins: the status
+    bar says the earlier one was replaced, and nothing from it is inserted or
+    opened.
+  - **Change the document while a drop is still being read** — open another file,
+    save it under another name, close it, turn on **Edit ▸ Read Only**, or switch
+    between the formatted and markdown views (Ctrl+E) — and the drop is abandoned:
+    the status bar says the document changed, and nothing from it is inserted or
+    opened. The picture would otherwise land in a document that never received it,
+    or in the view you have just left. It need not be you who changes it: if
+    another program rewrites the file and **View ▸ Auto-reload changed files**
+    picks the new version up mid-drop, the drop is abandoned for the same reason.
+
+  You can also pass a file path (and optional `--readonly`) on the command line.
 - **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,
   rather than replacing what's in the current one — so there's never a prompt
   about unsaved changes. The window you clicked New from is untouched.
@@ -729,8 +787,21 @@ into and what to do instead.
   different place in each view; see [Patterns that must mean the same in both
   views](#patterns-that-must-mean-the-same-in-both-views) and [Matches of no
   width](#matches-of-no-width).
-
-<!-- #5/#6 limits land with their merges -->
+- **A drop is fussier than File ▸ Open, and it can be abandoned before anything
+  lands.** A *text* file whose name isn't `.md`, `.markdown`, `.txt` or `.mdenc` —
+  `notes.json`, `app.log`, `Program.cs` — is refused when you drop it: the status
+  bar names it and nothing changes. The drop route is the only one that insists on
+  a markdown or text extension, so those files still open through **File ▸ Open**
+  (choose **All files** in the dialog) and by passing the path on the command
+  line. A picture **larger than 64 MB** is refused the same way, because an
+  embedded picture rides inside the document as text. And reading a dropped
+  picture takes time, so the drop is abandoned — status bar saying so, nothing
+  inserted — if the document moves under it in the meantime: another file opened,
+  this window closed or turned read-only, a **Ctrl+E** switch between the views
+  (even one that ends back on the view you started from), or **View ▸ Auto-reload
+  changed files** picking up a rewrite. Drop again before a drop has finished and
+  the newer one replaces it rather than adding to it. What each surface does with
+  a drop is in [Files & windows](#files--windows).
 
 ## Distribution
 

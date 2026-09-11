@@ -37,6 +37,20 @@ public partial class MainWindow : Window
     private bool _dirty;
     private bool _editorReady;
     private bool _sourceMode;
+
+    /// <summary>
+    /// How many times the window has STARTED switching between the formatted and
+    /// markdown views. Bumped at the top of <see cref="SetSourceModeAsync"/> — the
+    /// only writer of <see cref="_sourceMode"/> — before its first await, so a
+    /// switch that is half-done counts as a movement even though the flag has not
+    /// turned over yet.
+    ///
+    /// Only drops read it (<see cref="DropHandshake.StillApplies"/>). Everything
+    /// else in the window reads <see cref="_sourceMode"/> synchronously, where
+    /// there is no gap to see.
+    /// </summary>
+    private long _viewGeneration;
+
     private bool _syncingStyle;
     private bool _showMarks;
 
@@ -323,7 +337,8 @@ public partial class MainWindow : Window
 
         // The WebView covers the window centre, so let it accept drops; the editor
         // intercepts file drops and posts them to the host (see the 'fileDrop'
-        // message). Drops on the toolbar/menu are still handled by Window_Drop.
+        // message). Drops on the toolbar/menu, and on the source view, are still
+        // handled by Window_Drop; both routes decide by DropRouting.
         Web.AllowExternalDrop = true;
 
         Web.ZoomFactorChanged += OnZoomChanged;
@@ -430,6 +445,11 @@ public partial class MainWindow : Window
         switch (type)
         {
             case "loaded":
+                // A fresh page carries a fresh dropSeq, which starts at 0 and numbers
+                // its first drop 1. The high-water mark has to start over with it, or
+                // every drop this page ever posts is older than one already handled
+                // and is discarded in silence. (See _newestDrop.)
+                _newestDrop = 0;
                 // Bridge is wired; hand the editor its initial (empty) document.
                 _ = RunEditorAsync($"window.MDM.create({JsLiteral(string.Empty)})");
                 break;
@@ -528,9 +548,15 @@ public partial class MainWindow : Window
             case "fileDrop":
                 {
                     using var d = JsonDocument.Parse(e.WebMessageAsJson);
-                    var name = d.RootElement.TryGetProperty("name", out var nv) ? nv.GetString() ?? "Dropped.md" : "Dropped.md";
-                    var content = d.RootElement.TryGetProperty("content", out var cv) ? cv.GetString() ?? "" : "";
-                    Dispatcher.BeginInvoke(() => HandleDroppedContent(name, content));
+                    var message = DropRouting.ParseMessage(d.RootElement);
+                    Dispatcher.BeginInvoke(() => HandleDroppedFiles(message));
+                }
+                break;
+            case "droppedFileBytes":
+                {
+                    using var d = JsonDocument.Parse(e.WebMessageAsJson);
+                    var answer = DropRouting.ParseBytesMessage(d.RootElement);
+                    Dispatcher.BeginInvoke(() => CompleteDroppedFileRead(answer));
                 }
                 break;
         }
@@ -994,6 +1020,18 @@ public partial class MainWindow : Window
             MenuViewSource.IsChecked = _sourceMode;
             return;
         }
+
+        // The view is moving, and from HERE it is unsafe for a drop to insert:
+        // _sourceMode does not change until the bottom of this method, so anything
+        // pinned on the flag alone sees no movement across either await below —
+        // which is the whole of the window in which InsertMarkdownFragment would
+        // route to the half being discarded (DropHandshake.StillApplies). Bumped
+        // past the two returns above — already in that view, and no document to flip
+        // between views; the view stays where it is in both — and before the first
+        // await, so an in-flight switch counts as much as a finished one. A
+        // switch that fails below leaves the view where it was and still bumps: a
+        // drop is abandoned that need not have been, which is the safe way round.
+        _viewGeneration++;
 
         if (on)
         {
@@ -2576,10 +2614,18 @@ public partial class MainWindow : Window
     private async Task HandleExternalChangeAsync(string path)
     {
         // Pin the baseline as well as the path. A Save or Load mid-pass reassigns
-        // _cleanMarkdown (always to a fresh string instance, even for identical text),
-        // so a reference check detects ANY baseline movement — without it, a user Save
+        // _cleanMarkdown to a fresh string instance even for identical text, so a
+        // reference check detects that baseline movement — without it, a user Save
         // that lands during our awaits reads as "nothing to lose" and the pass would
         // quietly revert the just-saved document to the stale disk content it read.
+        //
+        // Except for an EMPTY document, where PassValid() is only its StillEditing
+        // half: "" is interned, every route hands back the one string.Empty, and a
+        // reassignment of "" to "" is invisible to a reference check (see
+        // SetCleanBaselineAsync). What stands in for it on the reload path is the
+        // re-read below — `confirm` against `newContent`, taken right before
+        // ReloadPreservingPositionAsync — which a mid-pass save of an empty document
+        // fails, so the pass rechecks instead of reloading.
         var cleanAtStart = _cleanMarkdown;
         bool PassValid() => StillEditing(path) && ReferenceEquals(_cleanMarkdown, cleanAtStart);
 
@@ -4261,14 +4307,14 @@ public partial class MainWindow : Window
         });
         if (picked is null) return;
 
-        var alt = Path.GetFileNameWithoutExtension(picked);
         string md;
         try
         {
             // Embedded as a base64 data URI — ImageMarkdown says why, and a picture
-            // pasted into the source view takes the same shape from the same place.
+            // pasted into the source view or dropped on either view takes the same
+            // shape from the same place (a dropped file gets this alt text too).
             var bytes = await File.ReadAllBytesAsync(picked);
-            md = ImageMarkdown.Fragment(alt, MimeForImage(picked), bytes);
+            md = ImageMarkdown.Fragment(ImageMarkdown.AltText(picked), ImageMarkdown.MimeForImage(picked), bytes);
         }
         catch (Exception ex)
         {
@@ -4278,17 +4324,6 @@ public partial class MainWindow : Window
         }
         InsertMarkdownFragment(md);
     }
-
-    private static string MimeForImage(string path) => Path.GetExtension(path).ToLowerInvariant() switch
-    {
-        ".png" => "image/png",
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".gif" => "image/gif",
-        ".webp" => "image/webp",
-        ".bmp" => "image/bmp",
-        ".svg" => "image/svg+xml",
-        _ => "application/octet-stream",
-    };
 
     private void CodeBlock_Click(object sender, RoutedEventArgs e)
     {
@@ -4396,7 +4431,22 @@ public partial class MainWindow : Window
         WrapToggle.IsChecked = _sourceMode && _wordWrap;
     }
 
-    // ===== Drag & drop: open in this instance if idle, else launch a new one =====
+    // ===== Drag & drop: pictures go in, markdown opens, anything else is refused =====
+    //
+    // Two surfaces receive drops. The WPF window — toolbar, menu bar, status bar,
+    // the closed-document splash, and the source view: AvalonEdit's TextArea takes
+    // only text drags (its handler marks nothing handled for a file drag) and lets a
+    // file drop bubble up to Window_Drop, with the file's path. The formatted view
+    // is a WebView2, a separate HWND that takes its own drops and posts them as the
+    // 'fileDrop' message, with each file's name, size and first bytes but no path
+    // (HandleDroppedFiles). Both hand their files to DropRouting and act on its
+    // plan, so the rules are in one place and tested there; what differs here is
+    // only how a picture's bytes are fetched and how a document opens.
+    //
+    // Neither route reads a whole file to route one. The path route reads
+    // SniffLength bytes off disk; the content route is sent SniffLength bytes and
+    // asks the editor for the rest of whichever files the plan chose
+    // ('droppedFileBytes'). A dropped 200 MB video costs 32 bytes on both.
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
@@ -4404,34 +4454,435 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void Window_Drop(object sender, DragEventArgs e)
+    private async void Window_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        // This drop owns the window now, so a read the formatted view left
+        // outstanding ends here — the same thing a second drop on the formatted view
+        // does. Without it, a toolbar drop during a content-route wait let that wait
+        // finish and insert its own picture on top of this one.
+        if (AbandonDroppedRead()) FlashStatus(DropHandshake.SupersededNotice);
 
-        // Open the first file here only if this window holds an untitled, unmodified
-        // document; otherwise (a file is open, or there are unsaved edits) keep it and
-        // open everything in fresh instances.
+        // Only the first bytes of each file are read to route it (DropFiles.Read); a
+        // picture's bytes are read in full below, and a document's by OpenPathAsync.
+        var files = paths.Select(DropFiles.Read).ToList();
+        // This drop is the window's now. The bump is what a drop on the formatted
+        // view will see if it lands while ReadAllAsync below is still going —
+        // AbandonDroppedRead cannot reach that read, so this is what ends it.
+        var then = DropPin(++_dropGeneration);
+        var plan = DropRouting.Plan(files, then.Target, oneDocument: false);
+
+        // False means the drop is no longer the window's to act on, and it has said
+        // so. Everything below is about the same stale plan — the opens would put a
+        // document the user never asked for into a window that has moved on, and
+        // FlashStatus ASSIGNS, so plan.Notice() would replace the abandonment notice
+        // with a line about files that were never going in. The content route has
+        // always returned here; this is that route's answer, not a new policy.
+        if (!await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]), then)) return;
+
+        // Documents open as a drop here always opened them: the first in this window
+        // only if it holds an untitled, unmodified document; otherwise (a file is
+        // open, or there are unsaved edits) keep it and open everything in fresh
+        // instances. The plan leaves this list empty when a picture went in.
         var openHere = _currentPath is null && !_dirty;
-        for (var i = 0; i < files.Length; i++)
+        for (var n = 0; n < plan.Open.Count; n++)
         {
-            if (i == 0 && openHere) _ = OpenPathAsync(files[0]);
-            else OpenInNewInstance(files[i]);
+            if (n == 0 && openHere) _ = OpenPathAsync(paths[plan.Open[0]]);
+            else OpenInNewInstance(paths[plan.Open[n]]);
         }
+        if (plan.Notice() is { } notice) FlashStatus(notice);
         Activate();
     }
 
+    /// <summary>What the window can do with a dropped picture right now: the same
+    /// two states that gate every other edit (SetReadOnly, SetClosed).</summary>
+    private DropTarget DropTargetNow() =>
+        _closed ? DropTarget.NoDocument : _readOnly ? DropTarget.ReadOnly : DropTarget.Editable;
+
     /// <summary>
-    /// Opens a file dropped onto the editor area. Web content can't see the file
-    /// path, so this loads the dropped text as an untitled document named after the
+    /// What a drop plan is decided against, captured BEFORE the drop's first await
+    /// so it can be compared with the same four values afterwards
+    /// (<see cref="DropHandshake.StillApplies"/>). Every await in a drop — a path
+    /// read, and the content route's whole round trip to the editor — leaves the
+    /// menus live, so all four can move underneath one.
+    ///
+    /// The fourth is the VIEW, and it is pinned as <see cref="_viewGeneration"/>
+    /// rather than as _sourceMode itself. InsertMarkdownFragment routes by
+    /// _sourceMode, and SetSourceModeAsync yields twice with _sourceMode still at
+    /// its OLD value — so the flag compared equal for the whole of the switch, and
+    /// an insertion landing in either gap went into the half of the window that was
+    /// about to be thrown away, with neither half saying anything. The counter moves
+    /// before the first of those awaits, so mid-switch is a movement too.
+    ///
+    /// <paramref name="generation"/> is not about the document at all: it is which
+    /// DROP this is (<see cref="_dropGeneration"/>), and every caller claims a fresh
+    /// one as it starts. Two drops racing on the same unchanged document match on
+    /// all four of the above, so nothing else can tell them apart.
+    /// </summary>
+    private (string? Path, string Clean, DropTarget Target, long View, long Generation) DropPin(long generation) =>
+        (_currentPath, _cleanMarkdown, DropTargetNow(), _viewGeneration, generation);
+
+    /// <summary>
+    /// Which drop the window belongs to, claimed by BOTH surfaces as they start
+    /// (<see cref="DropHandshake.StillTheCurrentDrop"/>).
+    ///
+    /// AbandonDroppedRead only ends the content route's read — it completes a
+    /// waiter, and the path route has none: its DropFiles.ReadAllAsync is a plain
+    /// await inside Window_Drop that no one can reach. So a drop on the formatted
+    /// view during a toolbar drop's disk read left both drops inserting into the
+    /// same document. The pin's other four values cannot see that, because both
+    /// drops are about the same document.
+    ///
+    /// Not _newestDrop: that is the EDITOR's counter, it numbers only formatted-view
+    /// drops, and it restarts when the page does. This one is the host's and covers
+    /// both surfaces.
+    /// </summary>
+    private long _dropGeneration;
+
+    /// <summary>Whether the window is still the one <paramref name="then"/> was taken
+    /// from. False means the plan made against it is stale and nothing from the drop
+    /// may be applied.</summary>
+    private bool DropStillApplies((string? Path, string Clean, DropTarget Target, long View, long Generation) then) =>
+        DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown,
+            then.Target, DropTargetNow(), then.View, _viewGeneration);
+
+    /// <summary>Whether <paramref name="then"/>'s drop is still the one the window
+    /// belongs to. Separate from <see cref="DropStillApplies"/> because it is a
+    /// different failure with a different notice: no document moved, a newer drop
+    /// simply took over.</summary>
+    private bool DropIsStillCurrent((string? Path, string Clean, DropTarget Target, long View, long Generation) then) =>
+        DropHandshake.StillTheCurrentDrop(then.Generation, _dropGeneration);
+
+    /// <summary>
+    /// Embed the pictures a drop plan chose, as ONE insertion into whichever view is
+    /// active — through InsertMarkdownFragment, the path Insert ▸ Picture takes, so a
+    /// dropped photo.png and a picked photo.png land as the same markdown at the
+    /// caret. <paramref name="bytesOf"/> fetches a picture's bytes by its index in
+    /// the plan (a path read, or the bytes the editor already sent). A read that
+    /// fails inserts none of the pictures, with Insert ▸ Picture's message.
+    /// </summary>
+    /// <param name="then">What the plan was decided against, taken before the
+    /// caller's first await. Fetching the bytes is itself an await, so the document
+    /// can move between the plan and the insertion here too; this is the chokepoint
+    /// both routes' insertions go through, so the last word on whether the insertion
+    /// still applies is taken here.</param>
+    /// <returns>
+    /// Whether the drop is still the window's to act on
+    /// (<see cref="DropHandshake.CallerFinishesTheDrop"/>). False means the drop was
+    /// abandoned and the status line already says so — so the CALLER must stop too.
+    /// This used to be void, and Window_Drop carried on: it opened documents against
+    /// the stale plan and then flashed <c>plan.Notice()</c>, which ASSIGNS, straight
+    /// over the abandonment notice. The content route returns on the same condition,
+    /// so both routes now tell the user the same thing about the same failure. A
+    /// failed READ is not this: the modal has spoken, the drop is still live, and
+    /// the caller carries on as it always has.
+    /// </returns>
+    /// <remarks>
+    /// The ORDER of the gates, what each arm says, and which arms stop the caller
+    /// are <see cref="DropHandshake.DecideInsert"/>, <see cref="DropHandshake.StatusFor"/>
+    /// and <see cref="DropHandshake.CallerFinishesTheDrop"/> — pure, and pinned
+    /// arm by arm. They were statements here, in a member no test can reach without
+    /// a window and a real mouse, and F-D measured what that cost: before the lift,
+    /// forcing every `return false` in this method to `true` passed the whole suite,
+    /// and so did flipping the empty-plan early return to `false` — which would have
+    /// stopped every dropped markdown file from opening, on both surfaces. What is
+    /// left here is the fetching of the bytes and the acting-out.
+    /// </remarks>
+    private async Task<bool> InsertDroppedPicturesAsync(
+        DropPlan plan, Func<int, Task<byte[]>> bytesOf,
+        (string? Path, string Clean, DropTarget Target, long View, long Generation) then)
+    {
+        // Asked before the bytes are fetched — and, in DecideInsert, before the
+        // empty-plan arm: a drop that wants no pictures can still open a document,
+        // and that open belongs to the drop the user has already replaced. This is
+        // the case AbandonDroppedRead cannot reach — a path-route drop starting
+        // after CompleteDroppedFileRead has cleared the waiter but before this
+        // continuation runs.
+        var currentAtEntry = DropIsStillCurrent(then);
+        var fragments = new List<string>(plan.Insert.Count);
+        Exception? readFailure = null;
+        // Nothing is fetched for a drop that has already lost the window, or for a
+        // plan that chose no pictures; both are decided below on these same values.
+        if (currentAtEntry && plan.Insert.Count > 0)
+        {
+            try
+            {
+                foreach (var picture in plan.Insert)
+                {
+                    var name = plan.Files[picture.Index].Name;
+                    var bytes = await bytesOf(picture.Index);
+                    // What goes into the document is what actually arrived, so that is
+                    // what is measured — the plan's ceiling and format came from a head
+                    // and a size that are a sniff or a round trip old. The case the drop
+                    // widened its sharing mode for (a screenshot tool still flushing the
+                    // PNG you dragged in) is the very case where the file changes in
+                    // between, and a truncated picture embeds as a data URI no viewer can
+                    // decode, silently. The size the plan routed on is passed in because
+                    // the signature alone cannot see a truncation BELOW it: eight bytes
+                    // of PNG magic still sniff as a PNG. Both routes state a size — a
+                    // path from the handle it read the head through, the editor from
+                    // File.size — and -1 (neither said) skips only the length half.
+                    if (!DropRouting.PictureSurvivedTheRead(bytes, picture.Mime, plan.Files[picture.Index].Size))
+                        throw new IOException($"{name} changed while it was being read — nothing was inserted.");
+                    fragments.Add(DropRouting.PictureMarkdown(name, picture.Mime, bytes));
+                }
+            }
+            // One file that could not be read, not a document that moved. None of
+            // the pictures go in — the all-or-nothing a failed path read has always
+            // had — and the drop itself is still live.
+            catch (Exception ex) { readFailure = ex; }
+        }
+
+        // The two gates that belong AFTER the read are evaluated here whatever
+        // happened above, and DecideInsert consults them only on the arms they
+        // belong to: both are plain reads of window state with nothing to undo, and
+        // every earlier arm is reached without either of them mattering.
+        //
+        // DropIsStillCurrent is asked a SECOND time because fetching the bytes is an
+        // await, and for the path route that is the ask that matters: its
+        // DropFiles.ReadAllAsync has no waiter a newer drop can complete, and two
+        // drops about the same unchanged document match on path, baseline, target
+        // and view, so only the generation separates them. DropStillApplies is the
+        // last word on the document itself — including one that has since CLOSED,
+        // which nothing downstream tests for.
+        var outcome = DropHandshake.DecideInsert(
+            currentAtEntry, plan.Insert.Count, readFailure is not null,
+            DropIsStillCurrent(then), DropStillApplies(then));
+
+        if (DropHandshake.StatusFor(outcome) is { } notice) FlashStatus(notice);
+        if (outcome == DropInsertOutcome.ReadFailed)
+            MessageBox.Show(this, $"Couldn't read the image:\n{readFailure!.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        if (outcome == DropInsertOutcome.Insert) InsertMarkdownFragment(DropRouting.Markdown(fragments));
+        return DropHandshake.CallerFinishesTheDrop(outcome);
+    }
+
+    /// <summary>
+    /// A drop on the formatted view, which arrives as content: web content never
+    /// sees a dropped file's path, so the editor has to read the bytes.
+    ///
+    /// In two phases, and the second one is the point. The editor posts only each
+    /// file's name, size and first bytes; this routes on that and then asks for the
+    /// full bytes of the one or two files the plan chose. Reading everything up
+    /// front — which is what this did — turned an accidentally-dropped 200 MB video
+    /// into a base64 copy of itself in the editor, another in the web message, and a
+    /// third decoded here, before anything had decided it was not even a picture.
+    ///
+    /// Pictures then embed through the same path as Window_Drop's; a markdown file
+    /// opens as an untitled document named after the file — one per drop, since
+    /// there is no path to hand a new window (the plan names any others).
+    /// </summary>
+    private async void HandleDroppedFiles(DropMessage message)
+    {
+        // The high-water mark, before anything else. A fileDrop message does NOT
+        // necessarily arrive in drop order: reading 32 bytes of each of 20 files
+        // takes longer than reading one, so a 20-file drop 1 can post after a 1-file
+        // drop 2. Handling drop 1 then cancelled drop 2's read — the newest drop, the
+        // one the user is looking at — and waited on an editor whose counter had
+        // already moved past drop 1, which answers all-null. (DropHandshake.)
+        //
+        // And it is said, not swallowed. This drop is the one being discarded, and
+        // HELP promises that dropping again says the earlier drop was replaced — a
+        // promise the OTHER ordering kept (AbandonDroppedRead below) and this one
+        // did not: the user saw a drop land on the page and absolutely nothing
+        // happen. The wording is right either way round; "this one" is whichever
+        // drop is being dropped.
+        if (DropHandshake.IsSuperseded(_newestDrop, message.Drop))
+        {
+            FlashStatus(DropHandshake.SupersededNotice);
+            return;
+        }
+        _newestDrop = message.Drop;
+
+        // This drop owns the window now, so whatever read the last one left
+        // outstanding ends HERE — before the plan, and before knowing whether this
+        // drop wants any bytes at all. A drop that wants nothing (a .zip after a
+        // photo) used to leave the photo's read live, to be answered all-null and
+        // reported as a failure of a drop the user had already replaced. Said now,
+        // synchronously, rather than from the abandoned await: a drop that finishes
+        // without a round trip would otherwise have its own status line overwritten
+        // by this one.
+        if (AbandonDroppedRead()) FlashStatus(DropHandshake.SupersededNotice);
+
+        var files = message.Files;
+        // Pinned before the request goes out and checked after it comes back. The
+        // await below is bounded by ReadTimeout, not by anything the user is stopped
+        // from doing in the meantime: there is no busy overlay, so File ▸ Open,
+        // File ▸ New, File ▸ Close, Edit ▸ Read Only, Ctrl+E and a drop on the
+        // toolbar are all reachable for however long it lasts — 10 s at the floor,
+        // 90 s for ten pictures at the ceiling, and the ten-minute clamp for about
+        // 74 of them (the ceiling is per picture; nothing caps the count) or for a
+        // stated size no honest drop produces.
+        // After the supersede check above, so an out-of-order fileDrop that is NOT
+        // the newest drop does not claim the window on its way out.
+        var then = DropPin(++_dropGeneration);
+        var plan = DropRouting.Plan(files, then.Target, oneDocument: true);
+        // The chosen pictures AND the one document that opens: this route has no
+        // path, so the document's bytes have to come from the editor too.
+        var wanted = plan.Insert.Select(p => p.Index).Concat(plan.Open.Take(1)).ToList();
+
+        var reply = await RequestDroppedBytesAsync(message.Drop, files, wanted);
+        // A newer drop landed while this one was reading; that drop owns the window,
+        // and it has already said so.
+        if (reply.Outcome == DropReply.Discard) return;
+
+        // The document the plan was made for is not necessarily the one on screen
+        // now. Checked before ANY of the outcomes are acted on, because none of them
+        // is about this document any more: a picture would go into a file that never
+        // received the drop (or into a closed one, which nothing downstream tests
+        // for), a dropped .md would replace a document the user has since opened, and
+        // "Couldn't read a.png" would be said about a drop that is no longer live.
+        if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return; }
+
+        if (reply.Outcome == DropReply.Apply)
+        {
+            // Every index asked for has bytes here (that is what Apply means); the
+            // TryGetValue is the belt-and-braces that keeps the all-or-nothing a
+            // failed path read has always had.
+            // Same answer as Window_Drop's: false means the document moved under the
+            // insertion and the notice is already on screen, so neither the open
+            // below nor plan.Notice() may speak over it.
+            if (!await InsertDroppedPicturesAsync(plan, i => reply.Bytes.TryGetValue(i, out var b)
+                ? Task.FromResult(b)
+                : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")), then)) return;
+
+            if (plan.Open.Count > 0 && reply.Bytes.TryGetValue(plan.Open[0], out var content))
+                await HandleDroppedContentAsync(files[plan.Open[0]].Name, content);
+        }
+
+        if (plan.Notice() is { } notice) FlashStatus(notice);
+        // Last, so it is what stays on screen: the notice is about files that were
+        // never going to be taken, these are about ones that should have been.
+        if (reply.Outcome == DropReply.Refuse)
+            FlashStatus(DropHandshake.UnreadableNotice([.. reply.Missing.Select(i => files[i].Name)]));
+        else if (reply.Outcome == DropReply.TimedOut)
+            FlashStatus(DropHandshake.TimedOutNotice);
+    }
+
+    // Phase two of a formatted-view drop. One read is in flight at a time — a drop
+    // is a single user gesture — and the editor's drop counter says which drop an
+    // answer is about, so a reply that arrives after a newer drop has started is
+    // discarded rather than inserted into the wrong document. DropHandshake holds
+    // both decisions and is where they are tested; what is here is the state they
+    // are made from.
+    private TaskCompletionSource<DropReplyDecision>? _droppedBytes;
+    private long _droppedBytesDrop;
+    private IReadOnlyList<int> _droppedBytesIndices = [];
+
+    /// <summary>
+    /// The highest drop number handled so far, so a fileDrop message that overtook a
+    /// newer one is ignored rather than made to win.
+    ///
+    /// Reset to 0 when the page loads, because the counter it tracks restarts there:
+    /// dropSeq is a module variable in main.js, so any reload of the editor (a
+    /// re-Navigate, a WebView2 process failure and recovery) numbers the next drop 1
+    /// again. A mark left where the previous page finished would make that drop — and
+    /// every drop after it, for the life of the window — look older than one already
+    /// handled, and every one of them would be discarded in silence. Today the page
+    /// is navigated once and nothing handles ProcessFailed, so the reset is unreachable
+    /// and cheap; it is here so that adding either does not quietly kill drag and
+    /// drop. (A read left outstanding by the vanished page is a separate thing, and it
+    /// already ends itself: the wait in RequestDroppedBytesAsync is bounded.)
+    /// </summary>
+    private long _newestDrop;
+
+    /// <summary>
+    /// End whatever read is outstanding, without waiting for it: its drop is no
+    /// longer the one on screen, and its continuation would insert into a document
+    /// the new drop is about to change. Returns true when there was one, so the
+    /// caller can say so.
+    /// </summary>
+    private bool AbandonDroppedRead()
+    {
+        var pending = _droppedBytes;
+        _droppedBytes = null;
+        // 0 is "no read outstanding", which is also what makes a late answer to the
+        // read just abandoned — or a second answer to one already taken — match
+        // nothing in DropHandshake.Decide.
+        _droppedBytesDrop = 0;
+        _droppedBytesIndices = [];
+        if (pending is null) return false;
+        // A result, not a cancellation: the waiter's job is to return without
+        // touching the window, which is a decision rather than an exception.
+        pending.TrySetResult(DropHandshake.Discarded);
+        return true;
+    }
+
+    /// <summary>
+    /// Ask the editor for the full bytes of <paramref name="indices"/> from drop
+    /// <paramref name="drop"/>, and wait — for at most
+    /// <see cref="DropHandshake.ReadTimeout"/> — for the answer.
+    /// </summary>
+    private async Task<DropReplyDecision> RequestDroppedBytesAsync(
+        long drop, IReadOnlyList<DroppedFile> files, IReadOnlyList<int> indices)
+    {
+        // Nothing to fetch: don't round-trip, and don't leave a waiter behind for an
+        // answer that will never come. (The previous read is already over — the
+        // caller ended it before the plan was even made.)
+        if (indices.Count == 0) return DropHandshake.NothingToRead;
+
+        // A drop number this editor never issued (0 — the message did not say). Its
+        // answer would carry the same 0, which matches no outstanding read, so waiting
+        // for it could only ever end in the timeout. Refuse it at once instead.
+        if (!DropHandshake.CanBeAnswered(drop)) return DropHandshake.Unreadable(indices);
+
+        // No editor, no answer — say so now rather than wait forever for a message
+        // nothing will send. (A fileDrop can only have come FROM the editor, so this
+        // is belt and braces.)
+        if (Web.CoreWebView2 is null) return DropHandshake.Unreadable(indices);
+
+        var pending = new TaskCompletionSource<DropReplyDecision>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _droppedBytes = pending;
+        _droppedBytesDrop = drop;
+        _droppedBytesIndices = indices;
+
+        // Set before the request goes out, so an answer that comes back faster than
+        // ExecuteScriptAsync returns still finds its waiter.
+        await RunEditorAsync($"window.MDM.readDroppedFiles({drop}, {JsonSerializer.Serialize(indices)})");
+
+        // Bounded. The editor answers on every path it can see, and posts a small
+        // failure message when its own post of the bytes is refused — but if the
+        // bridge itself is gone, neither post arrives and there is nothing on the
+        // editor side left to tell us. This is the only thing that ends that wait.
+        var timeout = DropHandshake.ReadTimeout(DropHandshake.BytesRequested(files, indices));
+        if (await Task.WhenAny(pending.Task, Task.Delay(timeout)) == pending.Task) return await pending.Task;
+        // The delay won the race; if the answer landed in the same turn anyway, take
+        // it rather than throw away a good read over a tie.
+        if (pending.Task.IsCompleted) return await pending.Task;
+
+        // Give the window back. The read is abandoned so a late answer finds no
+        // waiter and is discarded, rather than inserted into whatever is on screen by
+        // then. (Only if it is still OURS: a newer drop would already have ended it,
+        // and that path completes pending.Task above rather than reaching here.)
+        if (ReferenceEquals(_droppedBytes, pending)) AbandonDroppedRead();
+        return DropHandshake.TimedOut(indices);
+    }
+
+    /// <summary>The editor's answer to <see cref="RequestDroppedBytesAsync"/>. What
+    /// it amounts to is <see cref="DropHandshake.Decide"/>'s to say; an answer about
+    /// any drop but the one being waited on leaves the waiter alone.</summary>
+    private void CompleteDroppedFileRead(DropBytesMessage answer)
+    {
+        if (_droppedBytes is not { } pending) return;
+        var decision = DropHandshake.Decide(_droppedBytesDrop, answer.Drop, _droppedBytesIndices, answer);
+        if (decision.Outcome == DropReply.Discard) return;
+        _droppedBytes = null;
+        _droppedBytesDrop = 0;
+        _droppedBytesIndices = [];
+        pending.TrySetResult(decision);
+    }
+
+    /// <summary>
+    /// Opens a file dropped onto the formatted view. Web content can't see the file
+    /// path, so this loads the dropped bytes as an untitled document named after the
     /// file (Save will prompt for a location).
     /// </summary>
-    private async void HandleDroppedContent(string name, string content)
+    private async Task HandleDroppedContentAsync(string name, byte[] bytes)
     {
-        // The drop path reads files as TEXT in the browser, which mangles binary
-        // containers — and the sniff still works because the magic is ASCII. Refuse
-        // with directions rather than corrupt: every text-based route is unsafe
-        // for a .mdenc, so this isn't a prompt, it's a redirect.
-        if (Secure.SecureUi.IsEncryptedPath(name) || content.StartsWith("MDMSEC", StringComparison.Ordinal))
+        // The container is sniffed by content, as OpenPathAsync sniffs it — but the
+        // password prompt lives on the path route, and this route has no path to
+        // reopen from, so this isn't a prompt, it's a redirect.
+        if (Secure.SecureUi.IsEncryptedPath(name) || Secure.SecureMarkdownFormat.LooksLikeContainer(bytes))
         {
             MessageBox.Show(this,
                 "Encrypted documents can't be opened by dropping them here — use " +
@@ -4452,13 +4903,13 @@ public partial class MainWindow : Window
             DiscardBackup();
             _backupDirty = false;
             await ApplyDocBaseAsync(null); // dropped content has no folder context
-            // The browser read the file as text: its byte-order mark is gone before
-            // we see it, but its line endings are intact, and they are the convention
-            // the eventual Save As writes.
-            var dropped = DocumentText.Detect(content);
+            // The editor hands the file's bytes over, so its line ending and
+            // byte-order mark are detected exactly as File ▸ Open detects them, and
+            // both are the convention the eventual Save As writes back.
+            var dropped = DocumentText.Detect(bytes);
             await SetDocumentMarkdownAsync(dropped.Text);
             _lineEnding = dropped.Ending;
-            _hadBom = false;
+            _hadBom = dropped.HadBom;
             _currentPath = null;
             ReleaseDocumentClaim();   // the file this window showed is no longer open here
             _displayName = name;
@@ -4840,11 +5291,20 @@ public partial class MainWindow : Window
         // direction, but it also means an unnecessary prompt and an unnecessary
         // backup on every document that follows.
         //
-        // Still a FRESH instance either way: HandleExternalChangeAsync detects a
-        // document swap underneath its awaits by reference-comparing this field, so
-        // "reassigned but identical text" has to be distinguishable from "not
-        // reassigned at all". Leaving the old reference in place would make a reload
-        // of the same path invisible to that check.
+        // Still a FRESH instance either way, with one exception: HandleExternalChangeAsync
+        // detects a document swap underneath its awaits by reference-comparing this
+        // field, and a drop's pin does the same, so "reassigned but identical text"
+        // has to be distinguishable from "not reassigned at all". Leaving the old
+        // reference in place would make a reload of the same path invisible to both.
+        //
+        // The exception is an EMPTY document. "" is interned: the editor's answer
+        // comes back through JsonSerializer.Deserialize<string>, and the fallback
+        // below is new string("".AsSpan()) — both hand back the one string.Empty, so
+        // a reassignment here is invisible to a reference check. Neither caller is
+        // left unguarded by it: the external-change pass still has its path half and
+        // re-reads the disk before it reloads, and a drop still compares the path,
+        // what the window can take, and which view it is in.
+        // (AnEmptyDocumentsBaselineMovesWithoutTheReferencePinSeeingIt pins this.)
         var markdown = await TryGetDocumentMarkdownAsync();
         _cleanMarkdown = markdown ?? new string(_cleanMarkdown.AsSpan());
         _dirty = false;
