@@ -13,8 +13,9 @@
 // record: one assertion per row of the plan's measured table, stating what the
 // editor does to that construct. When a convention is pinned (R2) the row's
 // expectation is changed on purpose, with the reason beside it — never by
-// regenerating. `ConventionsArePinned` holds the forms src/conventions.js
-// chooses, one case each, so a drift in any of them is a red case with a name.
+// regenerating. `ConventionsArePinned` and `IntrawordUnderscoreSurvives` hold
+// the forms src/conventions.js chooses, one case each, so a drift in any of
+// them is a red case with a name.
 import test, { before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -95,8 +96,10 @@ describe('MeasuredRewritesAreReproduced', () => {
     assert.match(out, /^Line with two trailing spaces\\\ncontinues here\.$/m);
   });
 
-  test('intraword underscores are escaped', () => {
-    assert.match(out, /snake\\_case\\_word/);
+  test('intraword underscores survive', () => {
+    // Was `snake\_case\_word` until R3: an underscore between two word
+    // characters cannot open or close emphasis, so it is not escaped.
+    assert.match(out, /a snake_case_word and/);
   });
 
   test('the table is reformatted to the widest cell', () => {
@@ -216,5 +219,69 @@ describe('ConventionsArePinned', () => {
 
   test('a tight ordered list stays tight, as before', () => {
     assert.equal(ed.roundTrip('1. a\n2. b'), '1. a\n2. b\n');
+  });
+});
+
+describe('IntrawordUnderscoreSurvives', () => {
+  // R3. An underscore run with a word character on BOTH sides can neither open
+  // nor close emphasis (CommonMark's flanking rules for `_`), so escaping it
+  // only defaces the text. Everywhere else the escape stays: that is the guard
+  // half of this block, and it is what keeps a literal `_x_` from turning into
+  // emphasis on the next open.
+  const unchanged = (md) => assert.equal(ed.roundTrip(md), md + '\n');
+  const hasEmphasis = () => {
+    let found = false;
+    ed.view().state.doc.descendants((n) => { if (n.marks.some((m) => m.type.name === 'emphasis')) found = true; });
+    return found;
+  };
+
+  test('snake_case_word survives unescaped', () => {
+    unchanged('snake_case_word');
+    unchanged('call get_user_by_id then done');
+  });
+
+  test('a run of underscores inside a word survives', () => {
+    unchanged('a__b and a___b');
+  });
+
+  test('word characters are any script, not only ASCII', () => {
+    unchanged('ключ_значение and 変数_名');
+  });
+
+  test('inside a table cell too', () => {
+    assert.equal(
+      ed.roundTrip('| a | b |\n|---|---|\n| c_d | e |'),
+      '| a   | b |\n| --- | - |\n| c_d | e |\n');
+  });
+
+  test('guard: _italic_ and __bold__ still round-trip', () => {
+    unchanged('_italic_ and __bold__');
+    assert.equal(hasEmphasis(), true);
+  });
+
+  test('guard: a literal underscore at a word boundary is still escaped', () => {
+    // Each of these would read as emphasis, or could, if the escape went.
+    unchanged('\\_x\\_ y');
+    assert.equal(hasEmphasis(), false, 'the escaped pair must not come back as emphasis');
+    unchanged('w\\_ v and \\_w v');
+    unchanged('start\\_');
+  });
+
+  test('guard: punctuation and symbols are boundaries, whatever the script', () => {
+    // A `_` after an emoji (a symbol) or before a currency sign is flanking
+    // by the spec, so it stays escaped. The neighbour is read as a code point,
+    // not a UTF-16 unit, or the emoji would pass for a word character.
+    unchanged('😀\\_x and a\\_€ and a\\_.b');
+  });
+
+  test('guard: the boundary is read across nodes', () => {
+    // The character before a text node's leading `_` is the previous node's
+    // last output character — here the closing `*` of the emphasis.
+    unchanged('*em*\\_x and x\\_*em*');
+  });
+
+  test('guard: a literal backslash before an underscore stays literal', () => {
+    // `a\\_b` in the file is a backslash then an underscore; both survive.
+    assert.equal(ed.roundTrip('a\\\\_b'), 'a\\\\\\_b\n');
   });
 });

@@ -5,10 +5,11 @@
 // test/roundtrip.test.mjs (ConventionsArePinned); change a line here and that
 // case goes red, which is the point of it.
 //
-// Two things live here: the remark-stringify options and handlers the editor
-// serialises with (`conventions`, a Milkdown config), and the schema fix that
-// keeps tight lists tight (`tightBulletList`, `tightListItem`). Both are wired
-// in by editor-factory.js.
+// Three things live here: the remark-stringify options and handlers the editor
+// serialises with (`conventions`, a Milkdown config — the hard-break form and,
+// for R3, the underscore rule are handlers), and the schema fix that keeps
+// tight lists tight (`tightBulletList`, `tightListItem`). All are wired in by
+// editor-factory.js.
 
 import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { bulletListSchema } from '@milkdown/kit/preset/commonmark';
@@ -49,12 +50,52 @@ function hardBreak(node, parent, state, info) {
   return out === '\\\n' ? HARD_BREAK : out;
 }
 
+// ---- intraword underscores survive (R3) ------------------------------------
+//
+// mdast-util-to-markdown escapes every `_` in phrasing (its `unsafe` list, which
+// options can add to but not trim), so `snake_case_word` was saved as
+// `snake\_case\_word`. Under CommonMark's flanking rules a `_` run with a word
+// character on BOTH sides can neither open nor close emphasis — it is left- and
+// right-flanking at once, and `_` needs punctuation beside it to be a delimiter
+// in that state — so that escape buys nothing. The handler below wraps
+// Milkdown's own text handler and un-escapes exactly those runs; every other
+// `_` keeps its backslash, which is what stops a literal `_x_` from coming back
+// as emphasis. "Word character" is anything that is neither whitespace nor
+// punctuation, punctuation being \p{P} and \p{S}: the classes micromark, the
+// parser, uses, so the two sides of the round trip agree.
+const NOT_WORD = /[\s\p{P}\p{S}]/u;
+const isWordChar = (ch) => ch !== '' && !NOT_WORD.test(ch);
+// The neighbouring character as a code point, so an emoji (a surrogate pair)
+// is read as itself and not as its second half.
+const lastChar = (s) => [...s.slice(-2)].pop() ?? '';
+const firstChar = (s) => [...s.slice(0, 2)][0] ?? '';
+
+function keepIntrawordUnderscores(escaped, info) {
+  return escaped.replace(/(?:\\_)+/g, (run, offset) => {
+    // At the node's edges the neighbour is what the serialiser wrote before
+    // this node / will write after it: `info.before` and `info.after`.
+    const end = offset + run.length;
+    const prev = offset > 0 ? lastChar(escaped.slice(0, offset)) : lastChar(info.before || '');
+    const next = end < escaped.length ? firstChar(escaped.slice(end)) : firstChar(info.after || '');
+    return isWordChar(prev) && isWordChar(next) ? run.replaceAll('\\', '') : run;
+  });
+}
+
+/** Milkdown's `text` handler (which escapes through state.safe) with the underscore rule on top. */
+function intrawordUnderscores(text) {
+  return (node, parent, state, info) => keepIntrawordUnderscores(text(node, parent, state, info), info);
+}
+
 /** Milkdown config: install the options and handlers above. */
 export function conventions(ctx) {
   ctx.update(remarkStringifyOptionsCtx, (prev) => ({
     ...prev,
     ...SERIALIZER_OPTIONS,
-    handlers: { ...prev.handlers, break: hardBreak },
+    handlers: {
+      ...prev.handlers,
+      break: hardBreak,
+      text: intrawordUnderscores(prev.handlers.text || defaultHandlers.text),
+    },
   }));
 }
 
