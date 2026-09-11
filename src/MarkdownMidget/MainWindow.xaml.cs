@@ -199,6 +199,27 @@ public partial class MainWindow : Window
         return null;
     }
 
+    /// <summary>
+    /// What a relaunch that reopens this document (Apply update, the About dialog's
+    /// update) starts the new process with: the document path, then the view flags,
+    /// all of which the parser above honours. --readonly rides only when read-only
+    /// is the user's own (ImposedReadOnly.IsUsersOwn): what the already-open
+    /// fallback imposed would read to the new process as the user's choice, and
+    /// every later normal open there would stay read-only, Save disabled, with no
+    /// message. The new process claims the document afresh and imposes its own
+    /// read-only if it must. The one place that decides these, so the two relaunch
+    /// sites cannot drift; pure, so it can be tested.
+    /// </summary>
+    internal static List<string> RelaunchArguments(string? currentPath, bool readOnly,
+                                                   Instances.ImposedReadOnly imposed, bool sourceMode)
+    {
+        var args = new List<string>();
+        if (currentPath is not null) args.Add(currentPath);
+        if (imposed.IsUsersOwn(readOnly)) args.Add("--readonly");
+        if (sourceMode) args.Add("--source");
+        return args;
+    }
+
     // ===== WebView2 / editor bootstrap =====
 
     private static string WebViewBaseDir => Path.Combine(
@@ -1176,8 +1197,10 @@ public partial class MainWindow : Window
             // A cancelled password prompt, an unreadable file, an editor that threw:
             // the window still shows what it showed before, and that document's
             // claim was never let go of. Only the one begun on the file that never
-            // opened is released.
-            if (!loaded) _openGuard.Abandon();
+            // opened is released - by path, so that a second open started while
+            // this one was in flight (Ctrl+O is not gated by the busy overlay)
+            // keeps its own pending claim for its own commit.
+            if (!loaded) _openGuard.Abandon(path);
         }
     }
 
@@ -4073,7 +4096,8 @@ public partial class MainWindow : Window
         // it first, and only a claim that is now this window's (or nobody's) may
         // edit - otherwise the un-check would hand out an unguarded editor, and a
         // double-click on the file a second one. Still held by a live window
-        // elsewhere: the checkbox goes back and that window comes forward.
+        // elsewhere: the checkbox goes back, and that window is brought forward
+        // if it can be (the fallback exists because that focus failed once already).
         if (!_imposedReadOnly.Imposed) { SetReadOnly(false); return; }
         var claim = _currentPath is null
             ? new Instances.OpenGuardDecision(Instances.OpenVerdict.Proceed, 0, 0)   // the held document is already gone from here
@@ -4202,11 +4226,12 @@ public partial class MainWindow : Window
     private void About_Click(object sender, RoutedEventArgs e)
     {
         // Hand over this window's place so an update started from the dialog can
-        // reopen the same document in the same view after its restart - and the
-        // claim on the document goes with it, or the restart would find this
-        // window still holding the file (see StartHandingOffDocument).
-        new AboutDialog(_currentPath, _readOnly, _sourceMode, hasApplyMenu: !_isHelpWindow,
-                        restart: StartHandingOffDocument) { Owner = this }.ShowDialog();
+        // reopen the same document in the same view after its restart (the same
+        // arguments as Apply-update: RelaunchArguments) - and the claim on the
+        // document goes with it, or the restart would find this window still
+        // holding the file (see StartHandingOffDocument).
+        new AboutDialog(RelaunchArguments(_currentPath, _readOnly, _imposedReadOnly, _sourceMode),
+                        hasApplyMenu: !_isHelpWindow, restart: StartHandingOffDocument) { Owner = this }.ShowDialog();
     }
 
     // ===== Help ▸ Apply vX.Y.Z update =====
@@ -4277,12 +4302,11 @@ public partial class MainWindow : Window
 
         var exe = Updates.UpdateService.CurrentExePath;   // canonical path → the NEW exe
         var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
-        // Reopen what this window holds, the way this window holds it. The document
-        // path rides as an argument (the startup parser already honours it), and the
-        // view flags keep read-only and source mode faithful across the relaunch.
-        if (_currentPath is not null) psi.ArgumentList.Add(_currentPath);
-        if (_readOnly) psi.ArgumentList.Add("--readonly");
-        if (_sourceMode) psi.ArgumentList.Add("--source");
+        // Reopen what this window holds, the way this window holds it: the document
+        // path and the view flags (RelaunchArguments) - read-only only if it is the
+        // user's own, not what the already-open fallback imposed.
+        foreach (var arg in RelaunchArguments(_currentPath, _readOnly, _imposedReadOnly, _sourceMode))
+            psi.ArgumentList.Add(arg);
 
         try
         {

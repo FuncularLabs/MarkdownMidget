@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using MarkdownMidget.Instances;
 using Xunit;
 
@@ -261,6 +263,89 @@ public class OpenGuardTests : IDisposable
         }
     }
 
+    // ---- the 0/0 window: a holder caught between opening its lock and writing to it ----
+
+    [Fact]
+    public void AHolderCaughtBeforeItsWriteIsReadAgain()
+    {
+        // Take opens the lock and then writes pid and handle into it. A reader that
+        // lands in between (tens of microseconds) sees an empty file: held, by nobody
+        // it can name, which the decision refuses - and the open would proceed
+        // unguarded beside a window of ours that was about to say who it was. So a
+        // read that yields 0/0 waits once and looks again. The wait is injected;
+        // here it is the moment the holder's write lands.
+        var path = Doc("racing.md");
+        var lockPath = New().LockPathFor(path);
+        using var holder = new FileStream(lockPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+        var waits = new List<int>();
+        void WriteDuringTheWait(int ms)
+        {
+            waits.Add(ms);
+            holder.Write(Encoding.UTF8.GetBytes($"{Other}\n{0x1234}\n{path}\n"));
+            holder.Flush();
+        }
+
+        var guard = new OpenGuard(_dir, WriteDuringTheWait);
+        _cleanup.Add(guard);
+        var probe = guard.Acquire(path, Me, hwnd: 1);
+        Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
+        Assert.Equal(Other, probe.HolderPid);
+        Assert.Equal(0x1234, probe.HolderHwnd);
+        Assert.Equal(new[] { OpenGuard.HolderWriteGraceMs }, waits);
+        Assert.Null(guard.HeldPath);
+
+        // Peek (App.OnStartup's probe) lands in the same gap and takes the same second look.
+        holder.SetLength(0);
+        waits.Clear();
+        var peeked = OpenGuard.Peek(_dir, path, WriteDuringTheWait);
+        Assert.Equal(OpenGuard.ProbeState.Held, peeked.State);
+        Assert.Equal(Other, peeked.HolderPid);
+        Assert.Equal(0x1234, peeked.HolderHwnd);
+        Assert.Equal(new[] { OpenGuard.HolderWriteGraceMs }, waits);
+
+        // A holder that has written is read the first time: no wait at all.
+        waits.Clear();
+        Assert.Equal(Other, guard.Acquire(path, Me, hwnd: 1).HolderPid);
+        Assert.Equal(Other, OpenGuard.Peek(_dir, path, WriteDuringTheWait).HolderPid);
+        Assert.Empty(waits);
+
+        // Still nothing after the wait: held by nobody nameable, as before - and the
+        // second look is the last. The guard does not sit polling a lock that a
+        // backup tool holds.
+        holder.SetLength(0);
+        var looks = 0;
+        var patient = new OpenGuard(_dir, _ => looks++);
+        _cleanup.Add(patient);
+        var empty = patient.Acquire(path, Me, hwnd: 1);
+        Assert.Equal(OpenGuard.ProbeState.Held, empty.State);
+        Assert.Equal(0, empty.HolderPid);
+        Assert.Equal(0, empty.HolderHwnd);
+        Assert.Equal(1, looks);
+        looks = 0;
+        Assert.Equal(0, OpenGuard.Peek(_dir, path, _ => looks++).HolderPid);
+        Assert.Equal(1, looks);
+    }
+
+    [Fact]
+    public void TheHolderWriteGraceIsARealPause()
+    {
+        // Without an injected wait the second look comes after a real pause: short,
+        // since every read of a lock a backup tool holds pays it, but long enough to
+        // cover a holder's write and flush. Only the lower bound is asserted - an
+        // upper bound is the scheduler's to break, not the guard's.
+        Assert.InRange(OpenGuard.HolderWriteGraceMs, 10, 100);
+        var path = Doc("slow.md");
+        var lockPath = New().LockPathFor(path);
+        using var holder = new FileStream(lockPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+        var clock = Stopwatch.StartNew();
+        var probe = New().Acquire(path, Me, hwnd: 1);
+        clock.Stop();
+        Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
+        Assert.Equal(0, probe.HolderPid);
+        Assert.True(clock.ElapsedMilliseconds >= OpenGuard.HolderWriteGraceMs / 2,
+            $"the second look came after {clock.ElapsedMilliseconds} ms; the grace is {OpenGuard.HolderWriteGraceMs} ms");
+    }
+
     [Fact]
     public void AcquireOfAnotherPathSwapsTheLock()
     {
@@ -390,6 +475,109 @@ public class OpenGuardTests : IDisposable
         g2.Dispose();
         Assert.Equal(OpenGuard.ProbeState.Free, StateOf(d));
         Assert.Equal(OpenGuard.ProbeState.Free, StateOf(e));
+    }
+
+    // ---- re-entrant opens: Ctrl+O and the Alt menu are not gated while a load runs ----
+
+    [Fact]
+    public void ASecondBeginLetsTheFirstPendingClaimGo()
+    {
+        // Two opens in flight at once: the second Begin displaces the first's pending
+        // claim. Without that the first pending handle would leak, and its path would
+        // read as held - by a window nobody could be sent to, since it never showed
+        // the file - until the garbage collector got round to the handle.
+        var a = Doc("shown.md");
+        var b = Doc("first-open.md");
+        var c = Doc("second-open.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(c, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(b));   // b's pending claim went with the second Begin
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(a));   // the document on screen is guarded throughout
+        Assert.Equal(a, guard.HeldPath);
+    }
+
+    [Fact]
+    public void AReentrantOpenCommitsOnlyItsOwnPath()
+    {
+        // Open1 begins b; Open2 begins c before Open1 has landed (displacing b's
+        // pending claim, above); Open1 lands first and commits b. The pending claim
+        // is c's, not b's, and must not be promoted: the window would show b while
+        // holding c, and a cancelled Open2 would then leave it holding a document it
+        // never showed. What is true instead: b is on screen with its claim
+        // displaced, so - like a Begin that found its path held - b is shown
+        // unguarded; a is no longer shown, so its claim goes; c stays pending for
+        // Open2 to commit or abandon.
+        var a = Doc("shown.md");
+        var b = Doc("first-open.md");
+        var c = Doc("second-open.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(c, Me, hwnd: 1).State);
+        guard.Commit(b);
+        Assert.Null(guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(a));
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(b));
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));   // still pending
+
+        // Open2 lands: its own path, so its claim is promoted as usual - and the path
+        // is matched by identity, not spelling (KeyFor), like every other comparison.
+        guard.Commit(c.ToUpperInvariant());
+        Assert.Equal(c, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));
+
+        // The other order: Open2 lands first, then Open1. c is promoted; b's commit
+        // then finds nothing pending and c held, and c is not what the window shows
+        // any more, so it goes. b is shown unguarded, as above.
+        var d = Doc("shown-2.md");
+        var e = Doc("first-open-2.md");
+        var f = Doc("second-open-2.md");
+        var g2 = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Acquire(d, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Begin(e, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Begin(f, Me, hwnd: 1).State);
+        g2.Commit(f);
+        Assert.Equal(f, g2.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(d));
+        g2.Commit(e);
+        Assert.Null(g2.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(f));
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(e));
+    }
+
+    [Fact]
+    public void AReentrantOpenAbandonsOnlyItsOwnPath()
+    {
+        // Open1 begins b, Open2 begins c, and Open1 fails (an unreadable file, an
+        // editor that threw) while Open2 is still in flight. Open1 lets go of ITS
+        // pending claim - which the second Begin already displaced - and must leave
+        // c's alone, or Open2 would commit with nothing pending and show c unguarded.
+        var a = Doc("shown.md");
+        var b = Doc("first-open.md");
+        var c = Doc("second-open.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(c, Me, hwnd: 1).State);
+        guard.Abandon(b);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));   // Open2's claim is untouched
+        Assert.Equal(a, guard.HeldPath);
+        guard.Commit(c);
+        Assert.Equal(c, guard.HeldPath);
+
+        // Its own pending claim it does let go of, however the path is spelled; and
+        // with nothing pending there is nothing to do.
+        var d = Doc("cancelled.md");
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(d, Me, hwnd: 1).State);
+        guard.Abandon(d.ToUpperInvariant());
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(d));
+        Assert.Equal(c, guard.HeldPath);
+        guard.Abandon(d);
+        Assert.Equal(c, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));
     }
 
     // ---- F3: a held lock proves a process has the file open, not that it is a window of ours ----
@@ -558,6 +746,48 @@ public class OpenGuardTests : IDisposable
         twice.Impose(readOnlyAlready: false);
         twice.Impose(readOnlyAlready: true);
         Assert.True(twice.Clear());
+    }
+
+    [Fact]
+    public void TheRelaunchCarriesOnlyTheUsersOwnReadOnly()
+    {
+        // Apply-update, and the About dialog's update, restart this window on the
+        // new exe with the document and its view flags. --readonly there reads to
+        // the new process as the user's own choice: the fallback that then lands on
+        // top of it records read-only as "already the user's", and every later
+        // normal open in that window stays read-only, Save disabled, no message. So
+        // the flag rides only when read-only IS the user's own; the new process
+        // claims the document afresh and imposes its own read-only if it must.
+        var doc = Doc("relaunch.md");
+        var none = new ImposedReadOnly();
+        Assert.Equal(new[] { doc }, MainWindow.RelaunchArguments(doc, readOnly: false, none, sourceMode: false));
+        Assert.Equal(new[] { doc, "--readonly", "--source" }, MainWindow.RelaunchArguments(doc, readOnly: true, none, sourceMode: true));
+        Assert.Equal(new[] { "--source" }, MainWindow.RelaunchArguments(null, readOnly: false, none, sourceMode: true));
+        Assert.True(none.IsUsersOwn(readOnly: true));
+        Assert.False(none.IsUsersOwn(readOnly: false));
+
+        // The fallback's read-only is not carried.
+        var imposed = new ImposedReadOnly();
+        imposed.Impose(readOnlyAlready: false);
+        Assert.False(imposed.IsUsersOwn(readOnly: true));
+        Assert.Equal(new[] { doc, "--source" }, MainWindow.RelaunchArguments(doc, readOnly: true, imposed, sourceMode: true));
+        Assert.Equal(new[] { doc }, MainWindow.RelaunchArguments(doc, readOnly: true, imposed, sourceMode: false));
+
+        // ...unless read-only was the user's own before the fallback: then it is
+        // theirs still, underneath, and the restart keeps it.
+        var underneath = new ImposedReadOnly();
+        underneath.Impose(readOnlyAlready: true);
+        Assert.True(underneath.IsUsersOwn(readOnly: true));
+        Assert.Equal(new[] { doc, "--readonly" }, MainWindow.RelaunchArguments(doc, readOnly: true, underneath, sourceMode: false));
+
+        // Once the fallback's read-only is lifted (a successful claim) or cleared (a
+        // normal open), a read-only the user chooses after is their own again.
+        Assert.Equal(ReadOnlyLift.Edit, imposed.Lift(new OpenGuardDecision(OpenVerdict.Proceed, 0, 0)));
+        Assert.True(imposed.IsUsersOwn(readOnly: true));
+        var cleared = new ImposedReadOnly();
+        cleared.Impose(readOnlyAlready: false);
+        cleared.Clear();
+        Assert.True(cleared.IsUsersOwn(readOnly: true));
     }
 
     [Fact]

@@ -17,7 +17,9 @@ changes between alpha tags.
   front instead, and a double-click never flashes a second window. If that window
   can't be brought forward, the file opens read-only in the new one, with a note
   saying where it is open; turning View ▸ Read Only off again claims the file
-  first, so it stays read-only while the other window still has it. (#1)
+  first, so it stays read-only while the other window still has it. Applying an
+  update from a window in that state restarts it without carrying that read-only
+  over: the new window asks for the file again, as any open does. (#1)
 
 ### Fixed
 - **A file's line endings and byte-order mark are kept as found.** A CRLF file

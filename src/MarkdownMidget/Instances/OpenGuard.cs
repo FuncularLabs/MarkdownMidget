@@ -60,8 +60,27 @@ internal sealed class OpenGuard : IDisposable
     // beside the current one until Commit or Abandon says which of the two survives.
     private FileStream? _pending;
     private string? _pendingPath;
+    // The pause before a 0/0 read's second look (see ReadHolder). Injected so a test
+    // can put the holder's write exactly there; the window uses the real one.
+    private readonly Action<int> _wait;
 
-    public OpenGuard(string directory) => _dir = directory;
+    public OpenGuard(string directory, Action<int>? wait = null)
+    {
+        _dir = directory;
+        _wait = wait ?? DefaultWait;
+    }
+
+    /// <summary>
+    /// How long a reader that found a held lock empty gives its holder to finish
+    /// writing before the second look. Take opens the lock and then writes into it,
+    /// so a reader can land in between and see 0/0 for a window that is a few
+    /// microseconds from saying who it is; ~20 ms covers that write and flush
+    /// many times over, and is paid only by such reads and by reads of a lock a
+    /// backup tool sits on.
+    /// </summary>
+    internal const int HolderWriteGraceMs = 20;
+
+    private static readonly Action<int> DefaultWait = Thread.Sleep;
 
     public static string DefaultDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -113,7 +132,12 @@ internal sealed class OpenGuard : IDisposable
     /// until Commit says the new one is on screen. Abandon (a cancelled prompt, a
     /// failed read) lets the new handle go, and the old claim was never released.
     /// On a Held or Unavailable answer nothing is pending; Commit then decides what
-    /// becomes of the old claim.
+    /// becomes of the old claim. Only one open can be pending: a second Begin
+    /// while the first is still in flight (Ctrl+O and the Alt menu are not gated
+    /// by the busy overlay) displaces the first's pending claim - or its handle
+    /// would leak, and its path read as held until the collector closed it - and
+    /// the first open then commits its document unguarded, or abandons only what
+    /// is still its own (the path forms of Commit and Abandon).
     /// </summary>
     public Probe Begin(string path, int pid, long hwnd)
     {
@@ -128,15 +152,19 @@ internal sealed class OpenGuard : IDisposable
     }
 
     /// <summary>
-    /// The document at <paramref name="path"/> is on screen now. A pending claim
-    /// replaces the current one. Without one, Begin found the path held: by this
-    /// guard (the same document opened again) the claim simply stays; by anyone else,
-    /// or with the guard unable to answer, the old document is no longer what this
-    /// window shows, so its claim is released and the new one is shown unguarded.
+    /// The document at <paramref name="path"/> is on screen now. A pending claim on
+    /// that path replaces the current one. Without one, either Begin found the path
+    /// held - by this guard (the same document opened again) the claim simply
+    /// stays; by anyone else, or with the guard unable to answer, the old document
+    /// is no longer what this window shows, so its claim is released and the new
+    /// one is shown unguarded - or a later open displaced this one's pending claim
+    /// (see Begin). That open's claim is not this document's and is left pending
+    /// for it; this document is shown unguarded, as after a Begin that found it
+    /// held, and the old claim goes the same way.
     /// </summary>
     public void Commit(string path)
     {
-        if (_pending is not null)
+        if (_pendingPath is not null && SamePath(_pendingPath, path))
         {
             Release();
             _lock = _pending;
@@ -144,14 +172,16 @@ internal sealed class OpenGuard : IDisposable
             _pending = null;
             _pendingPath = null;
         }
-        else if (_heldPath is null || !string.Equals(KeyFor(_heldPath), KeyFor(path), StringComparison.Ordinal))
+        else if (_heldPath is null || !SamePath(_heldPath, path))
         {
             Release();
         }
     }
 
-    /// <summary>The open didn't happen: let the pending claim go. The current claim
-    /// was never touched. Safe to call when nothing is pending.</summary>
+    /// <summary>The open didn't happen: let the pending claim go, whatever it is on.
+    /// The current claim was never touched. Safe to call when nothing is pending.
+    /// For Begin (the previous pending claim is displaced) and Dispose; an open that
+    /// failed uses the path form, so that it lets go of its own claim only.</summary>
     public void Abandon()
     {
         try { _pending?.Dispose(); } catch { }
@@ -159,12 +189,22 @@ internal sealed class OpenGuard : IDisposable
         _pendingPath = null;
     }
 
+    /// <summary>The open of <paramref name="path"/> didn't happen: let its pending
+    /// claim go. A pending claim on another path is a later open still in flight
+    /// (see Begin), and is left for that open to commit or abandon. Safe to call
+    /// when nothing is pending.</summary>
+    public void Abandon(string path)
+    {
+        if (_pendingPath is not null && SamePath(_pendingPath, path)) Abandon();
+    }
+
     /// <summary>
     /// Who holds <paramref name="path"/>, without claiming it. For App.OnStartup,
     /// which asks before any window exists so that a double-click on an already-open
-    /// file never flashes a second window.
+    /// file never flashes a second window. <paramref name="wait"/> is the pause
+    /// before a 0/0 read's second look (see ReadHolder); tests inject theirs.
     /// </summary>
-    public static Probe Peek(string directory, string path)
+    public static Probe Peek(string directory, string path, Action<int>? wait = null)
     {
         var lockPath = Path.Combine(directory, KeyFor(path) + ".lock");
         if (!File.Exists(lockPath)) return new Probe(ProbeState.Free, 0, 0);
@@ -178,7 +218,7 @@ internal sealed class OpenGuard : IDisposable
             return new Probe(ProbeState.Free, 0, 0);
         }
         catch (FileNotFoundException) { return new Probe(ProbeState.Free, 0, 0); }
-        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath); }
+        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath, wait ?? DefaultWait); }
         catch (Exception) { return new Probe(ProbeState.Unavailable, 0, 0); }
     }
 
@@ -208,19 +248,36 @@ internal sealed class OpenGuard : IDisposable
             taken = fs;
             return new Probe(ProbeState.Free, 0, 0);
         }
-        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath); }
+        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath, _wait); }
         catch (Exception) { return new Probe(ProbeState.Unavailable, 0, 0); }
     }
 
     /// <summary>
-    /// Read pid and hwnd out of a lock somebody else holds. Delete must be in the
-    /// share mode: the holder opened the file DeleteOnClose, and Windows refuses any
-    /// later open of such a file that doesn't share delete. Unreadable or
+    /// Read pid and hwnd out of a lock somebody else holds. Unreadable or
     /// unparseable content is reported as held by nobody in particular (0/0), which
     /// HolderIsLive refuses outright: the lock IS held, but by nothing that can be
-    /// shown to be a window of ours, and there is no window to send them to.
+    /// shown to be a window of ours, and there is no window to send them to. But
+    /// the holder writes AFTER it opens (Take), and a reader can land in that gap -
+    /// or an AV scanner's exclusive open right after the create can make the
+    /// holder's own write fail for the moment - so a first look that yields 0/0
+    /// waits HolderWriteGraceMs and looks once more before the holder is refused. A
+    /// second 0/0 stands: the guard does not sit polling a lock a backup tool holds.
     /// </summary>
-    private static Probe ReadHolder(string lockPath)
+    private static Probe ReadHolder(string lockPath, Action<int> wait)
+    {
+        var probe = ReadHolderOnce(lockPath);
+        if (probe.HolderPid == 0 && probe.HolderHwnd == 0)
+        {
+            wait(HolderWriteGraceMs);
+            probe = ReadHolderOnce(lockPath);
+        }
+        return probe;
+    }
+
+    /// <summary>One look. Delete must be in the share mode: the holder opened the
+    /// file DeleteOnClose, and Windows refuses any later open of such a file that
+    /// doesn't share delete.</summary>
+    private static Probe ReadHolderOnce(string lockPath)
     {
         try
         {
@@ -251,6 +308,10 @@ internal sealed class OpenGuard : IDisposable
     /// </summary>
     public static string KeyFor(string path) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Normalize(path).ToUpperInvariant())));
+
+    /// <summary>The same document, by KeyFor's identity rather than by spelling.</summary>
+    private static bool SamePath(string a, string b) =>
+        string.Equals(KeyFor(a), KeyFor(b), StringComparison.Ordinal);
 
     /// <summary>
     /// Full path, relative segments resolved, trailing separators trimmed, and 8.3
@@ -470,6 +531,16 @@ internal sealed class ImposedReadOnly
 
     /// <summary>True from the fallback until a lift or a normal open.</summary>
     public bool Imposed => _imposed;
+
+    /// <summary>Is <paramref name="readOnly"/> - the window's read-only state - the
+    /// user's own? False only while the fallback's is imposed on a window that was
+    /// editable before it. For the relaunches that reopen this document (Apply
+    /// update, the About dialog's update): they carry the user's own read-only as
+    /// --readonly and leave the fallback's behind, because a --readonly the new
+    /// process starts with reads to it as the user's choice, which a later normal
+    /// open there would then keep; the new process claims the document afresh and
+    /// imposes its own if it must.</summary>
+    public bool IsUsersOwn(bool readOnly) => readOnly && (!_imposed || _wasReadOnly);
 
     /// <summary>The fallback has landed. <paramref name="readOnlyAlready"/>: the window
     /// was read-only before it, which a later open must not undo on the fallback's
