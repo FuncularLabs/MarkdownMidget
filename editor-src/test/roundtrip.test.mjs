@@ -13,9 +13,10 @@
 // record: one assertion per row of the plan's measured table, stating what the
 // editor does to that construct. When a convention is pinned (R2) the row's
 // expectation is changed on purpose, with the reason beside it — never by
-// regenerating. `ConventionsArePinned`, `IntrawordUnderscoreSurvives` and
-// `EmphasisBesidePunctuationSurvives` hold the forms src/conventions.js
-// chooses, one case each, so a drift in any of them is a red case with a name.
+// regenerating. `ConventionsArePinned`, `IntrawordUnderscoreSurvives`,
+// `EmphasisBesidePunctuationSurvives` and `AstralNeighboursSurvive` hold the
+// forms src/conventions.js chooses, one case each, so a drift in any of them is
+// a red case with a name.
 import test, { before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -44,6 +45,20 @@ const hasEmphasis = () => {
   let found = false;
   ed.view().state.doc.descendants((n) => { if (n.marks.some((m) => m.type.name === 'emphasis')) found = true; });
   return found;
+};
+
+/**
+ * Round-trip `md` and prove its output holds: it re-parses to the SAME
+ * ProseMirror document, and a second pass changes nothing. Returns the output.
+ */
+const survives = (md) => {
+  const s1 = ed.roundTrip(md);
+  const d1 = ed.view().state.doc.toJSON();
+  const s2 = ed.roundTrip(s1);
+  const d2 = ed.view().state.doc.toJSON();
+  assert.deepEqual(d2, d1, `${JSON.stringify(md)}: the editor's output ${JSON.stringify(s1)} re-parses to a different document`);
+  assert.equal(s2, s1, `${JSON.stringify(md)}: a second pass changed the output`);
+  return s1;
 };
 
 describe('Idempotent', () => {
@@ -307,17 +322,8 @@ describe('EmphasisBesidePunctuationSurvives', () => {
   // the run from opening or closing — a letter outside and punctuation inside,
   // for one — the letter is written as a character reference, so the run still
   // reads as emphasis on the next open. src/conventions.js puts that back
-  // (encodedAttention). Each case: the editor's output re-parses to the SAME
-  // document, and a second pass changes nothing.
-  const survives = (md) => {
-    const s1 = ed.roundTrip(md);
-    const d1 = ed.view().state.doc.toJSON();
-    const s2 = ed.roundTrip(s1);
-    const d2 = ed.view().state.doc.toJSON();
-    assert.deepEqual(d2, d1, `${JSON.stringify(md)}: the editor's output ${JSON.stringify(s1)} re-parses to a different document`);
-    assert.equal(s2, s1, `${JSON.stringify(md)}: a second pass changed the output`);
-    return s1;
-  };
+  // (encodedAttention). Each case, through `survives`: the editor's output
+  // re-parses to the SAME document, and a second pass changes nothing.
 
   test('a*_b*: emphasis opening on an underscore, after a letter', () => {
     // micromark lets a `*` run open when the next character is another
@@ -359,5 +365,114 @@ describe('EmphasisBesidePunctuationSurvives', () => {
     ed.roundTrip(out);
     assert.deepEqual(ed.view().state.doc.toJSON(), made);
     assert.equal(survives(out), out);
+  });
+});
+
+describe('AstralNeighboursSurvive', () => {
+  // #2 F-A. The default handlers, and containerPhrasing after them, read the
+  // character beside a run as a UTF-16 code unit, so where F-1's encoding
+  // landed on an astral character — an emoji, a mathematical letter — the file
+  // got a character reference to HALF of it (`\uD83D&#xDE00;*\_b*`), which
+  // micromark decodes as U+FFFD: the text was destroyed and the second save
+  // differed from the first. src/conventions.js now writes such a run plain
+  // (encodedAttention's fallback). Pinned here: the text survives every pass —
+  // no reference to half a character, no lone surrogate, no U+FFFD, and the
+  // character itself present in each output and each re-opened document — and
+  // the save is stable from the second one on. The mark is the accepted loss:
+  // to micromark a surrogate half is a letter, and a `*` after a letter cannot
+  // open on punctuation, so the next open reads the plain run as text and the
+  // second save escapes its markers. The cases where that happens say so.
+  const EMOJI = '\u{1F600}';   // U+1F600, a surrogate pair
+  const MATH_A = '\u{1D400}';  // U+1D400 MATHEMATICAL BOLD CAPITAL A: a letter, and a surrogate pair
+  const HALF_REFERENCE = /&#x[dD][89a-fA-F][0-9a-fA-F]{2};/;  // a reference to D800–DFFF, either half
+  const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  const intact = (s, ch, where) => {
+    assert.doesNotMatch(s, HALF_REFERENCE, `${where}: a reference to half a character`);
+    assert.doesNotMatch(s, LONE_SURROGATE, `${where}: a lone surrogate`);
+    assert.doesNotMatch(s, /�/, `${where}: U+FFFD`);
+    assert.ok(s.includes(ch), `${where}: ${JSON.stringify(ch)} is missing from ${JSON.stringify(s)}`);
+  };
+  /** Three saves: `ch` intact in every output and every re-opened document; the third save equals the second. Returns the first two. */
+  const textSurvives = (md, ch) => {
+    const s1 = ed.roundTrip(md);
+    intact(s1, ch, 'the first save');
+    const s2 = ed.roundTrip(s1);
+    intact(ed.view().state.doc.textContent, ch, 'the document re-opened from the first save');
+    intact(s2, ch, 'the second save');
+    const s3 = ed.roundTrip(s2);
+    intact(ed.view().state.doc.textContent, ch, 'the document re-opened from the second save');
+    assert.equal(s3, s2, 'the third save must equal the second');
+    return [s1, s2];
+  };
+
+  test('an emoji before a run opening on an underscore', () => {
+    // Was `\uD83D&#xDE00;*\_b*`. Plain, the run cannot open on the next open
+    // (the emoji's second half is a letter to micromark): the mark is lost and
+    // the second save writes the markers as the literal text they now are.
+    const [s1, s2] = textSurvives(`${EMOJI}*_b*`, EMOJI);
+    assert.equal(s1, `${EMOJI}*\\_b*\n`);
+    ed.roundTrip(s1);
+    assert.equal(hasEmphasis(), false, 'the accepted loss: the run is text on the next open');
+    assert.equal(s2, `${EMOJI}\\*\\_b\\*\n`);
+  });
+
+  test('the same after a letter, and with a mathematical letter', () => {
+    assert.equal(textSurvives(`x${EMOJI}*_b*`, EMOJI)[0], `x${EMOJI}*\\_b*\n`);
+    assert.equal(textSurvives(`${MATH_A}*_b*`, MATH_A)[0], `${MATH_A}*\\_b*\n`);
+  });
+
+  test('an astral letter after a run closing on a letter', () => {
+    // `*_b_*` reads as emphasis written `_` around `b` (the two nestings
+    // collapse to one mark). For `_` the default encodes the letter on both
+    // sides of the closing run, and the outer one was `&#xD835;\uDC00`.
+    const [s1, s2] = textSurvives(`*_b_*${MATH_A}`, MATH_A);
+    assert.equal(s1, `_b_${MATH_A}\n`);
+    assert.equal(s2, `\\_b_${MATH_A}\n`);
+  });
+
+  test('emphasis made in the editor over _b after an emoji', () => {
+    ed.roundTrip(`${EMOJI}_b`);
+    ed.selectText(3, 5);  // `_b`; the emoji is two positions
+    ed.editor.action(callCommand(toggleEmphasisCommand.key));
+    const out = ed.markdown();
+    assert.equal(out, `${EMOJI}*\\_b*\n`);
+    textSurvives(out, EMOJI);
+  });
+
+  test('strong made in the editor over a_ before an astral letter keeps its mark', () => {
+    // The `**a\_**𝐀` shape — F-1's `**a\_**b` with the letter astral: the
+    // reference to half of it was the only thing wrong. Closing on `_`, an
+    // attention marker, the run closes whatever follows it, so written plain
+    // this one comes back whole and the second save equals the first.
+    ed.roundTrip(`a_${MATH_A}`);
+    ed.selectText(1, 3);
+    ed.editor.action(callCommand(toggleStrongCommand.key));
+    const made = ed.view().state.doc.toJSON();
+    const out = ed.markdown();
+    assert.equal(out, `**a\\_**${MATH_A}\n`);
+    ed.roundTrip(out);
+    assert.deepEqual(ed.view().state.doc.toJSON(), made);
+    assert.equal(survives(out), out);
+    textSurvives(out, MATH_A);
+  });
+
+  test('a letter typed beside _emoji_ read from a file: the encoding would land inside the run', () => {
+    // `_😀_` is emphasis written `_`. A letter typed against it with the mark
+    // off puts a letter outside and the emoji inside, and for `_` the default
+    // encodes BOTH — the emoji's first half, or its last. The run is written
+    // plain; on the next open it is text (a `_` between two letters can open
+    // or close nothing), and the second save escapes the underscores.
+    const typed = (md, pos) => {
+      ed.roundTrip(md);
+      const view = ed.view();
+      view.dispatch(view.state.tr.insert(pos, view.state.schema.text('a')));  // a bare text node: no marks
+      return ed.markdown();
+    };
+    const head = typed(`_${EMOJI}_`, 1);
+    assert.equal(head, `a_${EMOJI}_\n`);
+    assert.equal(textSurvives(head, EMOJI)[1], `a\\_${EMOJI}\\_\n`);
+    const tail = typed(`_${EMOJI}_`, 3);
+    assert.equal(tail, `_${EMOJI}_a\n`);
+    assert.equal(textSurvives(tail, EMOJI)[1], `\\_${EMOJI}\\_a\n`);
   });
 });

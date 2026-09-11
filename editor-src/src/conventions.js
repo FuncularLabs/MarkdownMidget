@@ -104,7 +104,9 @@ function intrawordUnderscores(text) {
 // character reference (encodeInfo): `a` + emphasis(`_b`) is `&#x61;*\_b*`,
 // which reads back as emphasis, where Milkdown's `a*\_b*` does not — `\` is
 // punctuation and `a` is not, so that `*` run can open nothing. The wrapper
-// below is the default handler with the node's marker in force. The default
+// below is the default handler with the node's marker in force (and, where
+// the default's encoding would land on half a character, the plain form
+// instead: the section after this one). The default
 // reads the marker from state.options, and state.options is the copy
 // remark-stringify makes for each stringify call, so setting it for one node
 // reaches no other document; it is restored after the call because a run can
@@ -122,16 +124,68 @@ const markerOf = (node, option, state) =>
 /** mdast-util-to-markdown's `emphasis` / `strong` handler (the `option` names both) writing the node's own marker. */
 function encodedAttention(option) {
   const handler = (node, parent, state, info) => {
+    const marker = markerOf(node, option, state);
+    const fence = option === 'strong' ? marker + marker : marker;
     const saved = state.options[option];
-    state.options[option] = markerOf(node, option, state);
+    state.options[option] = marker;
     try {
-      return defaultHandlers[option](node, parent, state, info);
+      const out = defaultHandlers[option](node, parent, state, info);
+      return encodesHalfACharacter(out, fence, state, info) ? plainAttention(node, option, state, info, fence) : out;
     } finally {
       state.options[option] = saved;
     }
   };
   handler.peek = (node, parent, state) => markerOf(node, option, state);
   return handler;
+}
+
+// ---- an astral neighbour is left alone (#2 F-A) ----------------------------
+//
+// The default handlers, and containerPhrasing after them, read the characters
+// around a run as UTF-16 code UNITS — `charCodeAt`, `slice(-1)`, `slice(0, 1)`
+// — so when the letter they decide to encode is an astral character (an emoji,
+// a mathematical letter) the reference they write is to ONE HALF of its
+// surrogate pair: `😀*_b*` was saved as `\uD83D&#xDE00;*\_b*`, and micromark
+// decodes a reference to a lone surrogate as U+FFFD. The text was destroyed
+// (the half left behind is a lone surrogate, which a UTF-8 writer can only
+// replace as well) and the second save differed from the first. Before F-1 the
+// same input lost the MARK and kept the text, and that is the outcome kept
+// here: where the default's encoding landed, or would land, on half a
+// character, the run is written plain — fence, content, fence, Milkdown's own
+// form — and nothing is asked of the neighbours. The text survives and a save
+// is stable from the second one on; the mark may not survive the next open (to
+// micromark a surrogate half is a letter, and a `*` after a letter cannot open
+// on punctuation), which is the accepted cost of that rare case. Encoding the
+// whole character instead (`&#x1F600;*\_b*` keeps mark and text) would mean
+// rewriting the neighbouring text node, which this handler does not reach.
+const ENDS_IN_LOW_SURROGATE = /[\uDC00-\uDFFF]$/;      // `info.before`: the character before the run, by its second half
+const STARTS_WITH_HIGH_SURROGATE = /^[\uD800-\uDBFF]/; // `info.after`: the character after the run, by its first half
+const HALF_REFERENCE = '&#x[dD][89a-fA-F][0-9a-fA-F]{2};';  // what encodeCharacterReference makes of either half: D800–DFFF
+const HEAD_HALF_REFERENCE = new RegExp('^' + HALF_REFERENCE);
+const TAIL_HALF_REFERENCE = new RegExp(HALF_REFERENCE + '$');
+
+/**
+ * Whether the default handler's encoding hit half a character: the run's own
+ * first or last character, already written as a reference, or a neighbour the
+ * handler asked containerPhrasing (state.attentionEncodeSurroundingInfo) to encode.
+ */
+function encodesHalfACharacter(out, fence, state, info) {
+  const asked = state.attentionEncodeSurroundingInfo || {};
+  const content = out.slice(fence.length, -fence.length);
+  return (asked.before && ENDS_IN_LOW_SURROGATE.test(info.before))
+    || (asked.after && STARTS_WITH_HIGH_SURROGATE.test(info.after))
+    || HEAD_HALF_REFERENCE.test(content) || TAIL_HALF_REFERENCE.test(content);
+}
+
+/** Milkdown's own form of the run — fence, content, fence — with no encoding asked of the neighbours. */
+function plainAttention(node, option, state, info, fence) {
+  state.attentionEncodeSurroundingInfo = undefined;
+  const exit = state.enter(option);
+  const tracker = state.createTracker(info);
+  const open = tracker.move(fence);
+  const content = tracker.move(state.containerPhrasing(node, { before: open, after: fence[0], ...tracker.current() }));
+  exit();
+  return open + content + tracker.move(fence);
 }
 
 /** Milkdown config: install the options and handlers above. */
