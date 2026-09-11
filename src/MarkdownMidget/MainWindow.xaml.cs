@@ -461,8 +461,9 @@ public partial class MainWindow : Window
                 // every drop this page ever posts is older than one already handled
                 // and is discarded in silence. (See _newestDrop.)
                 _newestDrop = 0;
-                // Bridge is wired; hand the editor its initial (empty) document.
-                _ = RunEditorAsync($"window.MDM.create({JsLiteral(string.Empty)})");
+                // Bridge is wired; hand the editor its initial (empty) document, and
+                // the picture ceiling its paste guard applies (PictureLimit).
+                _ = RunEditorAsync($"window.MDM.create({JsLiteral(string.Empty)}, {PictureLimit.EditorOptionsJson()})");
                 break;
             case "ready":
                 _editorReady = true;
@@ -569,6 +570,12 @@ public partial class MainWindow : Window
                     var answer = DropRouting.ParseBytesMessage(d.RootElement);
                     Dispatcher.BeginInvoke(() => CompleteDroppedFileRead(answer));
                 }
+                break;
+            case PictureLimit.RefusedMessageType:
+                // The editor cancelled a paste of a picture past the ceiling — the
+                // paste is Chromium's, so the editor is where it can be stopped.
+                // Said in the words every other route uses for the same refusal.
+                FlashStatus(PictureLimit.Notice(null));
                 break;
         }
     }

@@ -53,8 +53,11 @@ function installGlobals(window) {
  * mount would reuse the factory bound to the first window); drive it with
  * roundTrip, which loads and reads the document exactly the way the host does
  * through MDM.setMarkdown / MDM.getMarkdown.
+ *
+ * `options` go to createEditor as they are, beside root and the document — the
+ * paste guard's ceiling and callback, say (picture-paste-editor.test.mjs).
  */
-export async function mountEditor(initialMarkdown = '') {
+export async function mountEditor(initialMarkdown = '', options = {}) {
   const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>', {
     pretendToBeVisual: true,   // gives requestAnimationFrame
   });
@@ -63,7 +66,7 @@ export async function mountEditor(initialMarkdown = '') {
 
   const { createEditor } = await import('../src/editor-factory.js');
   const root = window.document.getElementById('app');
-  const editor = await createEditor({ root, initialMarkdown });
+  const editor = await createEditor({ root, initialMarkdown, ...options });
 
   return {
     editor,

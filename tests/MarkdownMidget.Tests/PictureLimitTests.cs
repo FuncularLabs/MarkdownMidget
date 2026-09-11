@@ -1,3 +1,6 @@
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 using MarkdownMidget;
 using Xunit;
 
@@ -80,5 +83,58 @@ public class PictureLimitTests
             [new DroppedFile("a.png", Png, PictureLimit.MaxBytes + 1), new DroppedFile("b.png", Png, PictureLimit.MaxBytes + 1)],
             DropTarget.Editable, oneDocument: false);
         Assert.Equal(PictureLimit.Notice("a.png, b.png"), two.Notice());
+    }
+
+    [Fact]
+    public void TheEditorIsHandedTheCeilingAsJson()
+    {
+        // A paste into the formatted view is Chromium's own, so the editor applies
+        // the ceiling to it there — the host's ceiling, handed over in MDM.create's
+        // options, never a second 64 MB written into the editor.
+        using var options = JsonDocument.Parse(PictureLimit.EditorOptionsJson());
+        var only = Assert.Single(options.RootElement.EnumerateObject());
+        Assert.Equal("maxPictureBytes", only.Name);
+        Assert.Equal(PictureLimit.MaxBytes, only.Value.GetInt64());
+    }
+
+    [Fact]
+    public void TheEditorReadsTheCeilingAndReportsARefusalUnderTheNamesTheHostUses()
+    {
+        // A wiring pin, read from the sources, for the one seam no test runs end to
+        // end: host and editor are two languages talking through a WebView. If the
+        // option's name drifts on one side, the editor's guard gets no ceiling and
+        // silently refuses nothing; if the message type drifts, a refused paste is
+        // cancelled with no word in the status bar. Each side's behaviour is tested
+        // on that side (picture-paste*.test.mjs; the notice above); this proves only
+        // that the names meet.
+        using var options = JsonDocument.Parse(PictureLimit.EditorOptionsJson());
+        var option = Assert.Single(options.RootElement.EnumerateObject()).Name;
+
+        var guard = Source("editor-src", "src", "picture-paste.js");
+        Assert.Contains($"options.{option}", guard, StringComparison.Ordinal);
+        Assert.Contains($"type: '{PictureLimit.RefusedMessageType}'", guard, StringComparison.Ordinal);
+
+        var main = Source("editor-src", "src", "main.js");
+        Assert.Contains("ceilingFrom(options)", main, StringComparison.Ordinal);
+        Assert.Contains("postToHost(refusalMessage(size))", main, StringComparison.Ordinal);
+
+        var window = Source("src", "MarkdownMidget", "MainWindow.xaml.cs");
+        Assert.Contains("PictureLimit.EditorOptionsJson()", window, StringComparison.Ordinal);
+        Assert.Contains("case PictureLimit.RefusedMessageType:", window, StringComparison.Ordinal);
+    }
+
+    private static string Source(params string[] path) =>
+        File.ReadAllText(Path.Combine(RepoRoot(), Path.Combine(path)));
+
+    /// <summary>The repository, found from the test assembly (as MenuPathsInDocsTests
+    /// finds it).</summary>
+    private static string RepoRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+            if (dir.EnumerateFiles("MarkdownMidget.sln*").Any()
+                || (dir.EnumerateDirectories("src").Any() && dir.EnumerateFiles("HELP.md").Any()))
+                return dir.FullName;
+        throw new InvalidOperationException(
+            $"No MarkdownMidget.sln[x] (or src/ beside HELP.md) above {AppContext.BaseDirectory}");
     }
 }

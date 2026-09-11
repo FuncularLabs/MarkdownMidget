@@ -16,7 +16,12 @@ namespace MarkdownMidget;
 /// with <see cref="Notice"/>, so no two routes can disagree about where the line is
 /// or how the refusal is worded: a picture file dropped on either view
 /// (<see cref="DropRouting"/>, whose MaxPictureBytes is this constant under the
-/// drop's own name), and Insert ▸ Picture (<see cref="PickedPicture"/>).
+/// drop's own name); Insert ▸ Picture (<see cref="PickedPicture"/>); and a picture
+/// pasted into the formatted view, which the editor refuses itself because that
+/// paste is Chromium's own and the host never sees it — the host hands it this
+/// ceiling (<see cref="EditorOptionsJson"/>) and answers its
+/// <see cref="RefusedMessageType"/> with <see cref="Notice"/>. A picture pasted
+/// into the Markdown source view is not held to it yet.
 ///
 /// Only PICTURES are capped. A dropped markdown or text file is opened, and
 /// File ▸ Open has never capped what it opens.
@@ -51,4 +56,19 @@ internal static class PictureLimit
     public static string Notice(string? names, long ceiling = MaxBytes) =>
         string.Create(CultureInfo.InvariantCulture,
             $"Too large to insert (over {ceiling / BytesPerMegabyte} MB): {names ?? "pasted picture"}");
+
+    /// <summary>
+    /// The options the host hands <c>MDM.create</c>: this ceiling, for the editor's
+    /// paste guard (editor-src/src/picture-paste.js). A paste into the formatted
+    /// view is Chromium's own and never reaches the host, so the editor applies the
+    /// ceiling there — and this is how it gets the host's number rather than one of
+    /// its own. Invariant, so no culture can put a separator in it.
+    /// </summary>
+    public static string EditorOptionsJson() =>
+        "{\"maxPictureBytes\":" + MaxBytes.ToString(CultureInfo.InvariantCulture) + "}";
+
+    /// <summary>The web message the editor posts when its paste guard cancelled a
+    /// paste (<c>{type: 'pictureRefused', size}</c>). The window answers it with
+    /// <see cref="Notice"/> for a picture that has no name.</summary>
+    public const string RefusedMessageType = "pictureRefused";
 }

@@ -26,6 +26,7 @@ import { spellDecorate } from './spell-decorate.js';
 import { htmlRender } from './html-render.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { conventions, tightBulletList, tightListItem } from './conventions.js';
+import { refusedPictureSize } from './picture-paste.js';
 
 import {
   wrapInHeadingCommand,
@@ -196,6 +197,29 @@ const selectionState = (report) => $prose(() => new Plugin({
   }),
 }));
 
+// The picture ceiling on a paste (picture-paste.js says why the editor applies it
+// rather than the host). A handleDOMEvents handler, not handlePaste: ProseMirror
+// runs these ahead of its own paste handling, so a refused paste is cancelled
+// before ProseMirror can hand a picture-only clipboard to the browser's native
+// paste (capturePaste) — and it runs during an IME composition too, when
+// ProseMirror leaves the whole paste to the browser without asking handlePaste.
+// A read-only view takes no paste, so there is nothing to refuse and nothing said.
+const pictureCeiling = (maxPictureBytes, onPictureRefused) => $prose(() => new Plugin({
+  key: new PluginKey('MDM_PICTURE_CEILING'),
+  props: {
+    handleDOMEvents: {
+      paste(view, event) {
+        if (!view.editable) return false;
+        const size = refusedPictureSize(event.clipboardData, maxPictureBytes);
+        if (size === null) return false;
+        event.preventDefault();
+        onPictureRefused(size);
+        return true;
+      },
+    },
+  },
+}));
+
 /**
  * Build the editor.
  *
@@ -204,9 +228,16 @@ const selectionState = (report) => $prose(() => new Plugin({
  * @param {string}  [o.initialMarkdown]  the first document
  * @param {() => void} [o.onMarkdownUpdated]  the listener's markdownUpdated hook
  * @param {(state) => void} [o.onSelectionState]  block style + marks at the cursor
+ * @param {number|null} [o.maxPictureBytes]  the host's picture ceiling, applied to
+ *   a paste; null applies none (see picture-paste.js)
+ * @param {(size: number) => void} [o.onPictureRefused]  told the size of a picture
+ *   whose paste that ceiling cancelled
  * @returns {Promise<Editor>}
  */
-export function createEditor({ root, initialMarkdown = '', onMarkdownUpdated = () => {}, onSelectionState = () => {} }) {
+export function createEditor({
+  root, initialMarkdown = '', onMarkdownUpdated = () => {}, onSelectionState = () => {},
+  maxPictureBytes = null, onPictureRefused = () => {},
+}) {
   return Editor.make()
     .config((ctx) => {
       ctx.set(rootCtx, root);
@@ -246,6 +277,7 @@ export function createEditor({ root, initialMarkdown = '', onMarkdownUpdated = (
     .use(mermaidBlock)
     .use(spellDecorate)
     .use(selectionState(onSelectionState))
+    .use(pictureCeiling(maxPictureBytes, onPictureRefused))
     .use(splitHeadingCommand)
     .use(headingEnterKeymap)
     .use(exitBlockCommand)

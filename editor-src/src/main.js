@@ -18,6 +18,7 @@ import {
 } from './find.js';
 import { settleDocument } from './settle.js';
 import { readHeads, readFull, planDroppedRead, postAnswer } from './file-drop.js';
+import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 
@@ -453,7 +454,7 @@ function resolveThemeIsolated(css) {
 }
 
 const MDM = {
-  async create(initialMarkdown) {
+  async create(initialMarkdown, options) {
     const root = document.getElementById('app');
     editor = await createEditor({
       root,
@@ -465,6 +466,12 @@ const MDM = {
         setTimeout(postHistory, 0);
       },
       onSelectionState: postSelectionState,
+      // The host's picture ceiling (PictureLimit.EditorOptionsJson), applied here
+      // to a paste — the one route a picture takes that the host never sees
+      // (picture-paste.js). A refusal is reported so the host can say why nothing
+      // went in, in the words its other routes use.
+      maxPictureBytes: ceilingFrom(options),
+      onPictureRefused: (size) => postToHost(refusalMessage(size)),
     });
 
     editorView = editor.ctx.get(editorViewCtx);
