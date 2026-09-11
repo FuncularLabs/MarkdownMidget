@@ -416,11 +416,11 @@ line with `--readonly`.
   - **Drop again before a drop has finished** and the newer drop wins: the status
     bar says the earlier one was replaced, and nothing from it is inserted.
   - **Change the document while a drop is still being read** — open another file,
-    close this one, save it, turn on **Edit ▸ Read Only**, or switch between the
-    formatted and markdown views (Ctrl+E) — and the drop is abandoned: the status
-    bar says the document changed, and nothing from it is inserted or opened. The
-    picture would otherwise land in a document that never received it, or in the
-    view you have just left.
+    save it under another name, close it, turn on **Edit ▸ Read Only**, or switch
+    between the formatted and markdown views (Ctrl+E) — and the drop is abandoned:
+    the status bar says the document changed, and nothing from it is inserted or
+    opened. The picture would otherwise land in a document that never received it,
+    or in the view you have just left.
 
   You can also pass a file path (and optional `--readonly`) on the command line.
 - **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,

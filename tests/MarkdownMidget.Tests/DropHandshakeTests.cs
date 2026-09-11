@@ -440,9 +440,18 @@ public class DropHandshakeTests
     public void TheSameFileReloadedToIdenticalTextIsStillAChange()
     {
         // The baseline is pinned by REFERENCE, exactly as HandleExternalChangeAsync
-        // pins it: SetCleanBaselineAsync assigns a FRESH instance even when the text
-        // is identical, so a save, a reload or a Keep that landed during the wait is
-        // visible here. A value comparison would miss every one of them.
+        // pins it, so a reassignment to identical text is still a movement and a
+        // value comparison would miss it.
+        //
+        // Which reassignments those are, named honestly (NF-4): SetCleanBaselineAsync
+        // is the one that takes the trouble to build a fresh instance, and it is
+        // reached by an OPEN and by a RELOAD (LoadDocumentAsync, so both the external
+        // -change Reload and the auto-reload). A SAVE does not call it —
+        // SaveToPathAsync assigns _cleanMarkdown = markdown directly, as do the
+        // encrypt and convert paths — and neither does a Keep, which is
+        // AcceptDiskAsBaseline assigning disk.Text. Those two are fresh instances in
+        // practice, because the string came from a fresh deserialise or a fresh read,
+        // not because anything makes them so.
         var then = new string("# Notes".AsSpan());
         var now = new string("# Notes".AsSpan());
         Assert.Equal(then, now);
@@ -450,6 +459,40 @@ public class DropHandshakeTests
         Assert.False(DropHandshake.StillApplies(
             @"C:\a\notes.md", @"C:\a\notes.md", then, now,
             DropTarget.Editable, DropTarget.Editable, false, false));
+    }
+
+    [Fact]
+    public void AnEmptyDocumentsBaselineMovesWithoutTheReferencePinSeeingIt()
+    {
+        // NF-4, the exception the comments claimed did not exist. "" is interned, and
+        // every route that produces a baseline hands back that one instance: the
+        // editor's answer arrives through JsonSerializer.Deserialize<string>
+        // (RunEditorAsync), a disk read through GetString, and even
+        // SetCleanBaselineAsync's own fresh-instance fallback is
+        // new string(_cleanMarkdown.AsSpan()), which returns string.Empty for an
+        // empty span.
+        Assert.Same(string.Empty, JsonSerializer.Deserialize<string>("\"\""));
+        Assert.Same(string.Empty, JsonDocument.Parse("\"\"").RootElement.GetString());
+        Assert.Same(string.Empty, new string(string.Empty.AsSpan()));
+
+        // So for an EMPTY document the baseline half of the pin is blind: a save to
+        // the existing path, or a reload, moves it and StillApplies still says yes.
+        Assert.True(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md",
+            JsonSerializer.Deserialize<string>("\"\""), new string(string.Empty.AsSpan()),
+            DropTarget.Editable, DropTarget.Editable, false, false));
+
+        // Deliberately not fixed with a generation counter: the other three halves
+        // still guard the insertion, and an empty document that was saved to its own
+        // path is the same document at the same path in the same view — the picture
+        // goes where the user is looking. This test exists so the comments and HELP
+        // cannot drift back into promising a guarantee this wide.
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\other.md", string.Empty, string.Empty,
+            DropTarget.Editable, DropTarget.Editable, false, false));
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", string.Empty, string.Empty,
+            DropTarget.Editable, DropTarget.ReadOnly, false, false));
     }
 
     [Fact]

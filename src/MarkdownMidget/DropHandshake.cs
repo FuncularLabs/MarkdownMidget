@@ -114,10 +114,22 @@ internal static class DropHandshake
     /// <list type="bullet">
     /// <item>The path. A different file (or an untitled document where a file was,
     /// or the reverse) is not the document that was routed.</item>
-    /// <item>The clean baseline, BY REFERENCE. <c>SetCleanBaselineAsync</c> assigns a
-    /// fresh instance even for identical text precisely so a reload, a save or a Keep
-    /// is detectable this way; a value comparison would miss all three. This is the
-    /// same pin <c>HandleExternalChangeAsync</c> takes across its own awaits.</item>
+    /// <item>The clean baseline, BY REFERENCE, the same pin
+    /// <c>HandleExternalChangeAsync</c> takes across its own awaits: a reassignment
+    /// to identical text is still a movement, and a value comparison would miss it.
+    /// <c>SetCleanBaselineAsync</c> is the writer that takes the trouble to build a
+    /// fresh instance, and an open or a reload goes through it. A SAVE does not —
+    /// <c>SaveToPathAsync</c> assigns <c>_cleanMarkdown</c> directly, as do the
+    /// encrypt and convert paths — and neither does a Keep, which is
+    /// <c>AcceptDiskAsBaseline</c> assigning <c>disk.Text</c>; both are fresh
+    /// instances because of where the string came from, not because anything makes
+    /// them so. And for an EMPTY document none of them is: <c>""</c> is interned, so
+    /// every route hands back the same <c>string.Empty</c> and a reassignment is
+    /// invisible here (<c>AnEmptyDocumentsBaselineMovesWithoutTheReferencePinSeeingIt</c>
+    /// pins it). The other three comparisons still guard that case, and an empty
+    /// document saved to its own path is the same document at the same path in the
+    /// same view, so it is left as it is rather than given a counter of its
+    /// own.</item>
     /// <item>What the window can take. Read Only turned on mid-wait, or the document
     /// closed, both change this and both mean the insert must not happen.</item>
     /// <item>Which VIEW is on screen. <c>InsertMarkdownFragment</c> routes by
