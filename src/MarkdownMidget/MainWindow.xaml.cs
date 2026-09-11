@@ -4134,7 +4134,18 @@ public partial class MainWindow : Window
         // drop 2. Handling drop 1 then cancelled drop 2's read — the newest drop, the
         // one the user is looking at — and waited on an editor whose counter had
         // already moved past drop 1, which answers all-null. (DropHandshake.)
-        if (DropHandshake.IsSuperseded(_newestDrop, message.Drop)) return;
+        //
+        // And it is said, not swallowed. This drop is the one being discarded, and
+        // HELP promises that dropping again says the earlier drop was replaced — a
+        // promise the OTHER ordering kept (AbandonDroppedRead below) and this one
+        // did not: the user saw a drop land on the page and absolutely nothing
+        // happen. The wording is right either way round; "this one" is whichever
+        // drop is being dropped.
+        if (DropHandshake.IsSuperseded(_newestDrop, message.Drop))
+        {
+            FlashStatus(DropHandshake.SupersededNotice);
+            return;
+        }
         _newestDrop = message.Drop;
 
         // This drop owns the window now, so whatever read the last one left
