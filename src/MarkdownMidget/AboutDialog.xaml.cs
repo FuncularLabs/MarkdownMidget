@@ -30,11 +30,20 @@ public partial class AboutDialog : Window
     // a control that does not exist for the reader.
     private readonly bool _hasApplyMenu;
 
+    // How to run the restart. The owning window wraps it so its already-open claim
+    // on the document is let go BEFORE the new process starts: the restart reopens
+    // the same file, and it starts while this process is still alive, so without
+    // the hand-off it would find its own predecessor holding the file, focus it,
+    // and quit (see MainWindow.StartHandingOffDocument).
+    private readonly Action<Action> _restart;
+
     public AboutDialog(string? currentDocumentPath = null, bool readOnly = false,
-                       bool sourceMode = false, bool hasApplyMenu = true)
+                       bool sourceMode = false, bool hasApplyMenu = true,
+                       Action<Action>? restart = null)
     {
         InitializeComponent();
         _hasApplyMenu = hasApplyMenu;
+        _restart = restart ?? (start => start());
         if (currentDocumentPath is not null) _relaunchArgs.Add(currentDocumentPath);
         if (readOnly) _relaunchArgs.Add("--readonly");
         if (sourceMode) _relaunchArgs.Add("--source");
@@ -191,11 +200,11 @@ public partial class AboutDialog : Window
             StatusText.Text = "Installing…";
             if (installed)
             {
-                UpdateService.ApplyInstalledAndRestart(file, _relaunchArgs);
+                _restart(() => UpdateService.ApplyInstalledAndRestart(file, _relaunchArgs));
             }
             else
             {
-                UpdateService.ApplyPortableAndRestart(file, release.AssetName ?? "MarkdownMidget.exe", _relaunchArgs);
+                _restart(() => UpdateService.ApplyPortableAndRestart(file, release.AssetName ?? "MarkdownMidget.exe", _relaunchArgs));
             }
             Application.Current.Shutdown();
         }

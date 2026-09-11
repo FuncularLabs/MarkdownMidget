@@ -152,8 +152,11 @@ public partial class MainWindow : Window
                 // once its process has exited. Consume the path so it isn't opened.
                 RegistrationService.FinishMove(args[++i]);
             }
-            else if (File.Exists(arg)) _pendingOpenPath ??= arg;
         }
+        // Which argument is the document is decided in one place, because
+        // App.OnStartup asks the same question before this window exists (the
+        // already-open check) and the two answers must not drift.
+        _pendingOpenPath = DocumentArgument(args);
 
         if (_isHelpWindow) MenuViewHelp.IsEnabled = MenuWhatsNew.IsEnabled = false; // no help-of-help
         else UpdateWhatsNewBadge();   // a help/changelog viewer doesn't get its own badge
@@ -162,6 +165,24 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await InitializeEditorAsync();
         Closing += MainWindow_Closing;
         UpdateTitle();
+    }
+
+    /// <summary>
+    /// The document path on a command line: the first argument that names an
+    /// existing file and is not the VALUE of --recover or --finish-move. The
+    /// latter's value is the downloaded exe, which exists and must not be opened as
+    /// a document. Mirrors the loop in the constructor, which consumes those values
+    /// the same way for its own purposes.
+    /// </summary>
+    internal static string? DocumentArgument(string[] args)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg is "--recover" or "--finish-move") { if (i + 1 < args.Length) i++; continue; }
+            if (File.Exists(arg)) return arg;
+        }
+        return null;
     }
 
     // ===== WebView2 / editor bootstrap =====
@@ -853,8 +874,12 @@ public partial class MainWindow : Window
 
     private async Task OpenThenApplyStartupViewAsync(string path)
     {
-        await OpenPathAsync(path);
-        if (_startInSource && !_closed)
+        // startup: this process exists only to open this file, so if the file turns
+        // out to be open in another window (and that window can be focused) the
+        // right outcome is for this one to close - in which case the source-view
+        // flag is not applied to a window that is about to go.
+        await OpenPathAsync(path, startup: true);
+        if (_startInSource && !_closed && !_yieldingToOtherWindow)
         {
             _startInSource = false;
             await SetSourceModeAsync(true);
@@ -1031,8 +1056,40 @@ public partial class MainWindow : Window
         await OpenPathAsync(picked);
     }
 
-    private async Task OpenPathAsync(string path)
+    private async Task OpenPathAsync(string path, bool startup = false)
     {
+        // Before a byte is read: is this file open in another window? Every open
+        // route lands here (the chokepoint comment below lists them), so this is
+        // the one place to ask. Reloads of the document this window already shows
+        // call LoadDocumentAsync directly and never come through - correctly, since
+        // the claim is already this window's.
+        var previousClaim = _openGuard.HeldPath;
+        var verdict = ClaimDocument(path);
+        var heldElsewhere = false;
+        if (verdict.Verdict == Instances.OpenVerdict.FocusOther)
+        {
+            var focused = Instances.OpenGuard.TryFocusWindow(verdict.HolderHwnd);
+            switch (Instances.OpenGuardDecision.AfterFocus(focused, startup))
+            {
+                case Instances.OpenFallback.Yield:
+                    FlashStatus($"{Path.GetFileName(path)} is already open in another window");
+                    return;
+                case Instances.OpenFallback.Exit:
+                    // Launched only to open this file, and the window that has it is
+                    // now in front: there is nothing for this process to show. Queued
+                    // rather than Close() here: at startup this runs synchronously
+                    // inside the editor's 'ready' message handler, and the WebView2
+                    // must not be torn down from inside its own event. One hop lets
+                    // that handler unwind; MainWindow_Closing then runs as usual.
+                    _yieldingToOtherWindow = true;
+                    _ = Dispatcher.BeginInvoke(new Action(Close), DispatcherPriority.Normal);
+                    return;
+                default:
+                    heldElsewhere = true;   // nothing to focus: open here, read-only
+                    break;
+            }
+        }
+        var loaded = false;
         ShowBusy($"Opening {Path.GetFileName(path)}…");
         try
         {
@@ -1059,6 +1116,7 @@ public partial class MainWindow : Window
                         var text = await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(bytes, pw));
                         ShowBusy($"Opening {Path.GetFileName(path)}…");
                         await LoadDocumentAsync(text, path, pw);
+                        loaded = true;
                         break;
                     }
                     catch (Secure.SecureMarkdownException ex)
@@ -1079,7 +1137,9 @@ public partial class MainWindow : Window
                 // Same BOM-detecting decode File.ReadAllTextAsync used before.
                 using var reader = new StreamReader(new MemoryStream(bytes));
                 await LoadDocumentAsync(await reader.ReadToEndAsync(), path);
+                loaded = true;
             }
+            if (heldElsewhere) OpenedReadOnlyBecauseHeld(path);
             AddRecent(path);
             await FocusDocumentAsync();   // same reason as New: don't eat the first keystroke
         }
@@ -1088,7 +1148,35 @@ public partial class MainWindow : Window
             MessageBox.Show($"Couldn't open the file:\n{ex.Message}", "Markdown Midget",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        finally { HideBusy(); }
+        finally
+        {
+            HideBusy();
+            // A cancelled password prompt, an unreadable file, an editor that threw:
+            // the window still shows what it showed before, so the claim goes back
+            // to that (or to nothing) rather than staying on a file never opened.
+            if (!loaded) RestoreClaim(previousClaim);
+        }
+    }
+
+    /// <summary>
+    /// The read-only fallback: the file is open in another window that couldn't be
+    /// brought forward (no usable handle, or Windows declined). Opened here without
+    /// a claim - the other window has it - and read-only, so the two can't save
+    /// over each other, and said out loud because a document that won't take
+    /// keystrokes with no explanation reads as a broken app.
+    /// </summary>
+    private void OpenedReadOnlyBecauseHeld(string path)
+    {
+        ReleaseDocumentClaim();   // whatever this window showed before is gone
+        SetReadOnly(true);
+        FlashStatus("Already open in another window; opened read-only here");
+        HideBusy();   // the message shouldn't sit under a busy overlay
+        MessageBox.Show(this,
+            $"{Path.GetFileName(path)} is open in another Markdown Midget window, " +
+            "which couldn't be brought to the front.\n\n" +
+            "It has been opened read-only here so the two windows can't save over " +
+            "each other. Close it in the other window to edit it here.",
+            "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     /// <summary>Loads markdown into the editor and resets the clean baseline + history.
@@ -1431,6 +1519,7 @@ public partial class MainWindow : Window
         _ = Dispatcher.BeginInvoke(new Action(() => _suppressWatcher = false), DispatcherPriority.Background);
         var pathChanged = !string.Equals(_currentPath, path, StringComparison.OrdinalIgnoreCase);
         _currentPath = path;
+        if (pathChanged) RekeyDocumentClaim(path);   // the document lives at the new path now
         // Format transition bookkeeping. Saving an encrypted doc as plaintext makes
         // THIS WINDOW a plaintext editor of the new file (the .mdenc on disk keeps
         // its own life); saving plaintext as .mdenc adopts the just-set password.
@@ -1523,6 +1612,7 @@ public partial class MainWindow : Window
         _dirty = false;
         UpdateTitle();
         StartWatching(target);
+        RekeyDocumentClaim(target);   // the .md claim goes with the .md
         SetClosed(false);
         AddRecent(target);
         DiscardBackup();   // takes the pre-encryption plaintext snapshot with it
@@ -1617,6 +1707,7 @@ public partial class MainWindow : Window
         _dirty = false;
         UpdateTitle();
         StartWatching(target);
+        RekeyDocumentClaim(target);   // the .mdenc claim goes with the .mdenc
         AddRecent(target);
         DiscardBackup();
         _ = Dispatcher.BeginInvoke(new Action(() => _suppressWatcher = false), DispatcherPriority.Background);
@@ -1712,7 +1803,81 @@ public partial class MainWindow : Window
             }
         }
         catch { /* a landing state that failed must not also cost them recovery */ }
+        if (_yieldingToOtherWindow) return;   // closing; the next launch will recover
         await RecoverAsync();   // swallows its own failures
+    }
+
+    // ===== Already-open guard (issue #1) =====
+
+    // This window's claim on the document it shows, held for as long as it shows
+    // it, so a second window opening the same file finds this one instead of making
+    // a copy that would save over it. One per window; every window is a process.
+    private readonly Instances.OpenGuard _openGuard = new(Instances.OpenGuard.DefaultDirectory);
+
+    // Set when this window was launched only to open a file that another window
+    // already has, and that window has been brought forward. The close is queued
+    // (see OpenPathAsync), and the rest of the landing state - the source view,
+    // crash recovery - must not start in a window that is on its way out: recovery
+    // adopting a snapshot here would make the queued close prompt about unsaved work.
+    private bool _yieldingToOtherWindow;
+
+    private long GuardHandle() => new WindowInteropHelper(this).Handle.ToInt64();
+
+    /// <summary>
+    /// Claim <paramref name="path"/> for this window. The handle recorded with the
+    /// claim is what another window will bring to the front; it is 0 only before
+    /// OnSourceInitialized, and a holder recorded as 0 reads to that other window
+    /// as "cannot focus", so it falls back to opening read-only.
+    /// </summary>
+    private Instances.OpenGuardDecision ClaimDocument(string path) =>
+        Instances.OpenGuardDecision.Decide(
+            _openGuard.Acquire(path, Environment.ProcessId, GuardHandle()), Environment.ProcessId);
+
+    /// <summary>
+    /// The document moved to <paramref name="path"/> (Save As, Encrypt, Convert to
+    /// Unencrypted, a recovered snapshot's file): the claim follows it. Best effort
+    /// only: if another window holds the new path this window ends up unguarded
+    /// there, which is honest - the write has happened - and is said in the status
+    /// bar.
+    /// </summary>
+    private void RekeyDocumentClaim(string path)
+    {
+        var probe = _openGuard.Rekey(path, Environment.ProcessId, GuardHandle());
+        if (probe.State == Instances.OpenGuard.ProbeState.Held && probe.HolderPid != Environment.ProcessId)
+            FlashStatus($"{Path.GetFileName(path)} is also open in another window");
+    }
+
+    private void ReleaseDocumentClaim() => _openGuard.Release();
+
+    /// <summary>
+    /// Put the claim back where it was after an open that didn't happen: the window
+    /// still shows what it showed before. A claim that never moved (the open was
+    /// refused, or it was this window's own document) is left exactly as it is,
+    /// rather than released and re-taken with a gap another window could slip into.
+    /// </summary>
+    private void RestoreClaim(string? previous)
+    {
+        if (string.Equals(_openGuard.HeldPath, previous, StringComparison.Ordinal)) return;
+        if (previous is null) ReleaseDocumentClaim();
+        else RekeyDocumentClaim(previous);
+    }
+
+    /// <summary>
+    /// Run a relaunch that reopens this document (Apply update, the "move" install,
+    /// the About dialog's update). The new process starts while this one is still
+    /// alive, so it would find this window holding the file, focus it, and quit -
+    /// and then this window would shut down, leaving nothing open. Let go first;
+    /// if the start fails and this window is staying, take the claim back.
+    /// </summary>
+    private void StartHandingOffDocument(Action start)
+    {
+        ReleaseDocumentClaim();
+        try { start(); }
+        catch
+        {
+            if (_currentPath is not null) RekeyDocumentClaim(_currentPath);
+            throw;
+        }
     }
 
     // ===== Crash recovery (periodic backup of unsaved work) =====
@@ -1938,6 +2103,9 @@ public partial class MainWindow : Window
     private async Task LoadRecoveredAsync(Backup.BackupSnapshot mine, string markdown)
     {
         await LoadDocumentAsync(markdown, mine.Path);
+        // The snapshot's file is open in this window now, so it is claimed like any
+        // other document: a double-click on it must find this window.
+        if (mine.Path is not null) RekeyDocumentClaim(mine.Path);
         // Everything above treats a freshly loaded document as clean. This one isn't:
         // it's unsaved work that never reached the file.
         _cleanMarkdown = mine.Path is not null && File.Exists(mine.Path)
@@ -2010,6 +2178,7 @@ public partial class MainWindow : Window
                 return;
             }
             await LoadDocumentAsync(text, meta.Path, pw);
+            if (meta.Path is not null) RekeyDocumentClaim(meta.Path);   // same as LoadRecoveredAsync
             // The clean baseline is what the FILE decrypts to — recovered content
             // is unsaved work on top of it. A file that is missing or no longer
             // opens with this password baselines to empty, so everything reads as
@@ -2108,6 +2277,7 @@ public partial class MainWindow : Window
         UpdateTitle();
         SetClosed(true);
         DiscardBackup();   // the user was asked and chose to let it go
+        ReleaseDocumentClaim();   // nothing is open here any more for another window to find
     }
 
     private void SetClosed(bool on)
@@ -2577,6 +2747,7 @@ public partial class MainWindow : Window
         {
             // Already on disk with inMemory content; load + retarget.
             await LoadDocumentAsync(inMemory, picked, _docEncrypted ? _docPassword : null);
+            RekeyDocumentClaim(picked);   // a Save As by another name: the claim moves too
         }
         else
         {
@@ -2624,7 +2795,7 @@ public partial class MainWindow : Window
                 psi.ArgumentList.Add("--finish-move");
                 psi.ArgumentList.Add(download);
                 if (_currentPath is not null) psi.ArgumentList.Add(_currentPath);
-                Process.Start(psi);
+                StartHandingOffDocument(() => Process.Start(psi));
                 _dirty = false; // handled above; don't let Closing re-prompt
                 Application.Current.Shutdown();
                 return;
@@ -3368,6 +3539,7 @@ public partial class MainWindow : Window
                 // Asked and answered: they either saved it or chose to let it go, so
                 // there is nothing left for a crash copy to rescue.
                 EndBackup();
+                ReleaseDocumentClaim();
                 // NOT a direct Close(): on "Don't Save" the await above completed
                 // synchronously (a modal MessageBox returns on the same stack, and
                 // that branch awaits nothing else), so this continuation is still
@@ -3385,6 +3557,7 @@ public partial class MainWindow : Window
         }
         StopWatching();
         EndBackup();
+        ReleaseDocumentClaim();   // the kernel would do it at exit; this is just sooner
     }
 
     /// <summary>
@@ -3751,6 +3924,7 @@ public partial class MainWindow : Window
             await ApplyDocBaseAsync(null); // dropped content has no folder context
             await SetDocumentMarkdownAsync(content);
             _currentPath = null;
+            ReleaseDocumentClaim();   // the file this window showed is no longer open here
             _displayName = name;
             _suppressDirty = false;
             // Dropped content exists nowhere but in this window — there is no file to
@@ -3904,8 +4078,11 @@ public partial class MainWindow : Window
     private void About_Click(object sender, RoutedEventArgs e)
     {
         // Hand over this window's place so an update started from the dialog can
-        // reopen the same document in the same view after its restart.
-        new AboutDialog(_currentPath, _readOnly, _sourceMode, hasApplyMenu: !_isHelpWindow) { Owner = this }.ShowDialog();
+        // reopen the same document in the same view after its restart - and the
+        // claim on the document goes with it, or the restart would find this
+        // window still holding the file (see StartHandingOffDocument).
+        new AboutDialog(_currentPath, _readOnly, _sourceMode, hasApplyMenu: !_isHelpWindow,
+                        restart: StartHandingOffDocument) { Owner = this }.ShowDialog();
     }
 
     // ===== Help ▸ Apply vX.Y.Z update =====
@@ -3985,7 +4162,7 @@ public partial class MainWindow : Window
 
         try
         {
-            Process.Start(psi);
+            StartHandingOffDocument(() => Process.Start(psi));
         }
         catch (Exception ex)
         {

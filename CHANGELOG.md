@@ -9,6 +9,15 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+- **Opening a file that is already open brings that window forward.** Every
+  window is its own process, so until now a second File ▸ Open, Open Recent, drop
+  or Explorer double-click on a file you already had open gave you a second copy,
+  and the two saved over each other. Now the window that has the file comes to the
+  front instead, and a double-click never flashes a second window. If that window
+  can't be brought forward, the file opens read-only in the new one, with a note
+  saying where it is open. (#1)
+
 ## [0.10.0-beta1] - 2026-09-10
 
 The source view gets colour — and, if you want it, a theme of its own — plus the

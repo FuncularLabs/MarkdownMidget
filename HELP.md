@@ -366,6 +366,11 @@ line with `--readonly`.
 - **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,
   rather than replacing what's in the current one — so there's never a prompt
   about unsaved changes. The window you clicked New from is untouched.
+- **A file that is already open in another Markdown Midget window is not opened
+  twice:** opening it again (File ▸ Open, Open Recent, a drop, or a double-click in
+  Explorer) brings the window that has it to the front instead. If that window
+  can't be brought forward, the file opens **read-only** here and a message says
+  where it is open, so two windows never save over each other.
 
 ## What's new
 

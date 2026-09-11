@@ -91,6 +91,34 @@ public partial class App : Application
         Exit += (_, _) => Picker.FilePickerService.NoteShuttingDown();
         SessionEnding += (_, _) => Picker.FilePickerService.NoteShuttingDown();
 
+        // A double-click on a file that is already open in another window should
+        // bring that window forward, and nothing else - not even a second window
+        // that appears and then closes. So the question is asked here, before any
+        // window exists, with a read-only probe of the same lock the windows hold.
+        // Only a successful focus ends the launch; anything else (nobody holds it,
+        // the holder can't be focused, the guard itself failed) falls through to a
+        // normal start, where OpenPathAsync asks again with the real claim and has
+        // the read-only fallback. After the picker branch, so its arguments are
+        // never mistaken for a document.
+        try
+        {
+            if (MarkdownMidget.MainWindow.DocumentArgument(args) is { } document)   // the class, not Application.MainWindow
+            {
+                var probe = Instances.OpenGuard.Peek(Instances.OpenGuard.DefaultDirectory, document);
+                var decision = Instances.OpenGuardDecision.Decide(probe, Environment.ProcessId);
+                if (decision.Verdict == Instances.OpenVerdict.FocusOther
+                    && Instances.OpenGuard.TryFocusWindow(decision.HolderHwnd))
+                {
+                    Shutdown();
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("OpenGuard.Startup", ex);   // logged, then start normally
+        }
+
         // The editor window, created explicitly rather than by StartupUri (see
         // above). Everything it needs comes from the command line it reads itself.
         new MainWindow().Show();
