@@ -339,19 +339,53 @@ public class DropHandshakeTests
     // and applied AFTER it comes back — a gap of up to ReadTimeout (10–90 s), with
     // no busy overlay over it. Everything the user can reach in that gap changes
     // what the plan was decided against: File ▸ Open, File ▸ New, File ▸ Close,
-    // Edit ▸ Read Only, and a drop on the toolbar. So the three things the plan
-    // depended on are pinned before the request and compared after it, the same
-    // three-part pin HandleExternalChangeAsync uses across its own awaits.
+    // Edit ▸ Read Only, Ctrl+E, and a drop on the toolbar. So the four things the
+    // plan depended on are pinned before the request and compared after it, an
+    // extension of the pin HandleExternalChangeAsync takes across its own awaits.
 
     [Fact]
     public void APlanStillAppliesWhenNothingAboutTheDocumentMoved()
     {
         var clean = new string("# Notes".AsSpan());
         Assert.True(DropHandshake.StillApplies(
-            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable));
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.Editable, DropTarget.Editable, false, false));
         // An untitled document has no path, and two nulls are the same document.
         Assert.True(DropHandshake.StillApplies(
-            null, null, clean, clean, DropTarget.Editable, DropTarget.Editable));
+            null, null, clean, clean, DropTarget.Editable, DropTarget.Editable, false, false));
+        // The source view is a document state like any other, and a drop that
+        // started there and is still there applies.
+        Assert.True(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.Editable, DropTarget.Editable, true, true));
+    }
+
+    [Fact]
+    public void AViewSwitchedWhileTheDropWasBeingReadTakesNothing()
+    {
+        // NF-2. The pin held the path, the baseline and the target, and NOT which
+        // view was on screen — so Ctrl+E during the wait was invisible to it and
+        // the insertion went ahead into the wrong half of the window, silently:
+        //
+        //   entering source: SetSourceModeAsync awaits TryGetDocumentMarkdownAsync
+        //   with _sourceMode still false, so the fragment went into the WYSIWYG
+        //   document — and was then overwritten by `SourceBox.Text = latest`, which
+        //   is the markdown fetched BEFORE the insertion.
+        //
+        //   leaving source: it awaits SetDocumentMarkdownAsync(SourceBox.Text) and
+        //   then getMarkdown() with _sourceMode still true, so the fragment went
+        //   into the source box — which is hidden a few lines later and never read
+        //   again.
+        //
+        // Either way the picture was gone with nothing said. Both directions are
+        // pinned: neither is the view the plan was made for.
+        var clean = new string("# Notes".AsSpan());
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.Editable, DropTarget.Editable, sourceThen: false, sourceNow: true));
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.Editable, DropTarget.Editable, sourceThen: true, sourceNow: false));
     }
 
     [Fact]
@@ -364,7 +398,8 @@ public class DropHandshakeTests
         // target half of the pin is what catches it.
         var clean = new string("# Notes".AsSpan());
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.NoDocument));
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.Editable, DropTarget.NoDocument, false, false));
     }
 
     [Fact]
@@ -374,12 +409,14 @@ public class DropHandshakeTests
         // picture vanished with nothing said. Now the drop says so.
         var clean = new string("# Notes".AsSpan());
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.ReadOnly));
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.Editable, DropTarget.ReadOnly, false, false));
         // And the other way round: a window that became editable mid-wait is not the
         // window the plan was made for either — that plan set the picture aside as
         // "not inserted", and its notice has already said so.
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.ReadOnly, DropTarget.Editable));
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean,
+            DropTarget.ReadOnly, DropTarget.Editable, false, false));
     }
 
     [Fact]
@@ -387,13 +424,14 @@ public class DropHandshakeTests
     {
         var clean = new string("# Notes".AsSpan());
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", @"C:\a\other.md", clean, clean, DropTarget.Editable, DropTarget.Editable));
+            @"C:\a\notes.md", @"C:\a\other.md", clean, clean,
+            DropTarget.Editable, DropTarget.Editable, false, false));
         // A file opened where there was an untitled document, and a document that
         // lost its path, are both a different document from the one routed.
         Assert.False(DropHandshake.StillApplies(
-            null, @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable));
+            null, @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable, false, false));
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", null, clean, clean, DropTarget.Editable, DropTarget.Editable));
+            @"C:\a\notes.md", null, clean, clean, DropTarget.Editable, DropTarget.Editable, false, false));
     }
 
     [Fact]
@@ -408,7 +446,8 @@ public class DropHandshakeTests
         Assert.Equal(then, now);
         Assert.False(ReferenceEquals(then, now));
         Assert.False(DropHandshake.StillApplies(
-            @"C:\a\notes.md", @"C:\a\notes.md", then, now, DropTarget.Editable, DropTarget.Editable));
+            @"C:\a\notes.md", @"C:\a\notes.md", then, now,
+            DropTarget.Editable, DropTarget.Editable, false, false));
     }
 
     // ===== what the user is told =====

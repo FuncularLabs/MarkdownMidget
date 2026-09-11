@@ -88,9 +88,10 @@ internal static class DropHandshake
 
     /// <summary>What the status line says when the DOCUMENT moved while the drop was
     /// being read — a different file opened, the document closed, Read Only turned
-    /// on, or a save that reset the baseline. Not "a newer drop replaced this one":
-    /// no newer drop exists, the window the drop was routed for simply stopped being
-    /// the window on screen. Names opening as well as inserting, because the content
+    /// on, a save or reload that reset the baseline, or Ctrl+E, which moves the
+    /// insertion to the other view. Not "a newer drop replaced this one": no newer
+    /// drop exists, the window the drop was routed for simply stopped being the
+    /// window on screen. Names opening as well as inserting, because the content
     /// route reads a dropped DOCUMENT's bytes through the same wait.</summary>
     public const string DocumentChangedNotice =
         "The document changed while the drop was being read; nothing from it was inserted or opened.";
@@ -108,7 +109,7 @@ internal static class DropHandshake
     /// <c>_closed</c> on the insert path — into a closed document, which the user
     /// cannot see and which is now dirty.
     ///
-    /// Three things are compared, and they are the three the plan depended on:
+    /// Four things are compared, and they are the four the plan depended on:
     ///
     /// <list type="bullet">
     /// <item>The path. A different file (or an untitled document where a file was,
@@ -119,6 +120,14 @@ internal static class DropHandshake
     /// same pin <c>HandleExternalChangeAsync</c> takes across its own awaits.</item>
     /// <item>What the window can take. Read Only turned on mid-wait, or the document
     /// closed, both change this and both mean the insert must not happen.</item>
+    /// <item>Which VIEW is on screen. <c>InsertMarkdownFragment</c> routes by
+    /// <c>_sourceMode</c>, and <c>SetSourceModeAsync</c> yields twice with
+    /// <c>_sourceMode</c> still at its old value, so a drop continuation landing in
+    /// either gap inserted into the half of the window that was about to be
+    /// discarded — into a hidden source box on the way out, or into the WYSIWYG
+    /// document on the way in, where <c>SourceBox.Text = latest</c> then overwrote
+    /// it with markdown fetched before the insertion. Nothing was said either
+    /// time.</item>
     /// </list>
     ///
     /// A window that became MORE permissive mid-wait fails too, and deliberately: a
@@ -129,10 +138,12 @@ internal static class DropHandshake
     public static bool StillApplies(
         string? pathThen, string? pathNow,
         string? cleanThen, string? cleanNow,
-        DropTarget targetThen, DropTarget targetNow) =>
+        DropTarget targetThen, DropTarget targetNow,
+        bool sourceThen, bool sourceNow) =>
         string.Equals(pathThen, pathNow, StringComparison.Ordinal)
         && ReferenceEquals(cleanThen, cleanNow)
-        && targetThen == targetNow;
+        && targetThen == targetNow
+        && sourceThen == sourceNow;
 
     /// <summary>
     /// Whether a <c>fileDrop</c> message that has just arrived is older than one

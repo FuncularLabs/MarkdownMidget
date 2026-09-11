@@ -4043,19 +4043,25 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// What a drop plan is decided against, captured BEFORE the drop's first await
-    /// so it can be compared with the same three values afterwards
+    /// so it can be compared with the same four values afterwards
     /// (<see cref="DropHandshake.StillApplies"/>). Every await in a drop — a path
     /// read, and the content route's whole round trip to the editor — leaves the
-    /// menus live, so all three can move underneath one.
+    /// menus live, so all four can move underneath one.
+    ///
+    /// The fourth is the VIEW. InsertMarkdownFragment routes by _sourceMode, and
+    /// SetSourceModeAsync yields twice with _sourceMode still at its old value, so
+    /// an insertion landing in either gap went into the half of the window that was
+    /// about to be thrown away — and neither half says anything when it is.
     /// </summary>
-    private (string? Path, string Clean, DropTarget Target) DropPin() =>
-        (_currentPath, _cleanMarkdown, DropTargetNow());
+    private (string? Path, string Clean, DropTarget Target, bool Source) DropPin() =>
+        (_currentPath, _cleanMarkdown, DropTargetNow(), _sourceMode);
 
     /// <summary>Whether the window is still the one <paramref name="then"/> was taken
     /// from. False means the plan made against it is stale and nothing from the drop
     /// may be applied.</summary>
-    private bool DropStillApplies((string? Path, string Clean, DropTarget Target) then) =>
-        DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown, then.Target, DropTargetNow());
+    private bool DropStillApplies((string? Path, string Clean, DropTarget Target, bool Source) then) =>
+        DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown,
+            then.Target, DropTargetNow(), then.Source, _sourceMode);
 
     /// <summary>
     /// Embed the pictures a drop plan chose, as ONE insertion into whichever view is
@@ -4071,7 +4077,7 @@ public partial class MainWindow : Window
     /// both routes' insertions go through, so the last word on whether the insertion
     /// still applies is taken here.</param>
     private async Task InsertDroppedPicturesAsync(
-        DropPlan plan, Func<int, Task<byte[]>> bytesOf, (string? Path, string Clean, DropTarget Target) then)
+        DropPlan plan, Func<int, Task<byte[]>> bytesOf, (string? Path, string Clean, DropTarget Target, bool Source) then)
     {
         if (plan.Insert.Count == 0) return;
         var fragments = new List<string>(plan.Insert.Count);
