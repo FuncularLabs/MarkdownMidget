@@ -10,7 +10,8 @@ namespace MarkdownMidget.Tests;
 /// state (dirty tracking) and the file as it was last read from or written to
 /// disk. They differ whenever the editor normalises - a setext heading comes back
 /// ATX - so a tool that rewrites the file with identical bytes must be judged
-/// against the disk baseline, not the editor's.
+/// against the disk baseline as well as the editor's: equal to either is not a
+/// change.
 /// </summary>
 public class ExternalChangeTests
 {

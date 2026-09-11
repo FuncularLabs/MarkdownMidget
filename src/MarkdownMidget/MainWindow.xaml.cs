@@ -2490,10 +2490,11 @@ public partial class MainWindow : Window
         // unsaved-work check below would cheerfully call it "nothing to lose".
         if (!PassValid()) { RecheckExternalChange(path); return; }
 
-        // Judged against the DISK baseline, not the editor's serialisation of it
-        // (issue #4): the two differ for any file the editor normalises, so a tool
-        // that rewrote identical bytes used to prompt about a file that had not
-        // changed. ExternalChange says which baseline means what.
+        // Judged against the DISK baseline as well as the editor's serialisation
+        // of it (issue #4): the two differ for any file the editor normalises, and
+        // only the latter used to be consulted, so a tool that rewrote identical
+        // bytes prompted about a file that had not changed. Equal to either is not
+        // a change; ExternalChange says which baseline means what.
         if (!ExternalChange.IsRealChange(newContent, _cleanMarkdown, _diskBaseline))
         {
             // The same document, possibly re-encoded - dos2unix ran, a tool added
