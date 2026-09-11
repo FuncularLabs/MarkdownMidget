@@ -2729,7 +2729,10 @@ public partial class MainWindow : Window
     /// typed, so by the time Replace All is pressed the selection the user made is
     /// gone; this is it. A selection that is Find's own — the current match — is not
     /// taken as a new range (what was kept stays, so Ctrl+F to bring the dialog back
-    /// changes nothing); a caret drops it. Source view: two anchors follow the range
+    /// changes nothing), and that is asked FIRST, because Find's selection of a
+    /// zero-width match is itself a caret; any other caret drops what was kept.
+    /// The decision is <see cref="FindEngine.CaptureDecision"/>, which the formatted
+    /// view follows too. Source view: two anchors follow the range
     /// through the replacements made here, and any other edit drops it. Formatted
     /// view: the editor keeps it, under the same rules (find.js findCaptureScope).
     /// </summary>
@@ -3027,9 +3030,11 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// The Replace All scope in the source view: selected text is the scope — unless
-    /// it is Find's own selection of the current match, in which case the selection
-    /// kept when the dialog opened is (<see cref="CaptureReplaceScope"/>). A caret,
-    /// or nothing kept, means the whole document.
+    /// it is Find's own selection of the current match (a caret, when that match has
+    /// no width), in which case the selection kept when the dialog opened is
+    /// (<see cref="CaptureReplaceScope"/>). A caret of the user's own, or nothing
+    /// kept, means the whole document. The decision is
+    /// <see cref="FindEngine.ResolveScope"/>, which the formatted view follows too.
     /// </summary>
     private (int Start, int Length)? SourceReplaceScope()
     {
