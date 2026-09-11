@@ -44,11 +44,13 @@ order of risk:
 - **Dropping an image file on the editor opens it as text** (after the discard
   prompt, when there are unsaved changes).
   Insert it as a picture instead; refuse other non-markdown drops with a
-  message. Pasting an image into the *source* view does nothing today; it should
-  insert the same data-URI markdown the formatted view produces (Markdown Monster
-  accepts pasted images in its text editor too, though it saves them as files — our
-  embed model is the consistent answer). Pasting into the formatted view already
-  works.
+  message.
+  ~~Pasting an image into the *source* view does nothing.~~ **Done 2026-09-11
+  (unreleased, #7)**: Ctrl+V with an image and no text on the clipboard inserts the
+  same data-URI markdown the formatted view produces — `![](data:image/png;base64,…)`
+  at the caret (over any selection), in one undo step (Markdown Monster accepts
+  pasted images in its text editor too, though it saves them as files — our embed
+  model is the consistent answer). Pasting into the formatted view already worked.
 - ~~**The same file open in two windows silently overwrites.**~~ **Done 2026-09-10
   (unreleased, #1)**: the per-path lock — focus the window that has it, else open
   read-only with a message — described in full where the multi-window list strikes

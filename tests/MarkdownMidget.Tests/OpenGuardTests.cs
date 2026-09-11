@@ -655,7 +655,7 @@ public class OpenGuardTests : IDisposable
     public void LiftingReadOnlyStaysReadOnlyWhileHeld()
     {
         // W1 holds the document; this window opened it read-only, with no claim. The
-        // user un-checks View ▸ Read Only while W1 still has it: the claim fails, so
+        // user un-checks Edit ▸ Read Only while W1 still has it: the claim fails, so
         // the checkbox goes back and W1 is the window to send them to.
         var path = Doc("held.md");
         var w1 = New();
@@ -721,7 +721,7 @@ public class OpenGuardTests : IDisposable
         Assert.False(imposed.Imposed);
         Assert.False(imposed.Clear());    // nothing imposed, nothing to lift
 
-        // ...unless read-only was the user's own before the fallback (View ▸ Read
+        // ...unless read-only was the user's own before the fallback (Edit ▸ Read
         // Only, --readonly): the fallback imposed nothing on top of it, so a later
         // open leaves it on. The un-check still goes through a claim meanwhile.
         var theirs = new ImposedReadOnly();

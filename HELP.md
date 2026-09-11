@@ -377,7 +377,7 @@ line with `--readonly`.
   twice:** opening it again (File ▸ Open, Open Recent, a drop, or a double-click in
   Explorer) brings the window that has it to the front instead. If that window
   can't be brought forward, the file opens **read-only** here and a message says
-  where it is open. Once it is closed there, turn off **View ▸ Read Only** to edit
+  where it is open. Once it is closed there, turn off **Edit ▸ Read Only** to edit
   it here: the file is claimed again first, so it stays read-only while another
   window still has it.
 

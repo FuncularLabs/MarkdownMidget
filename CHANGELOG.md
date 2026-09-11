@@ -16,7 +16,7 @@ changes between alpha tags.
   and the two saved over each other. Now the window that has the file comes to the
   front instead, and a double-click never flashes a second window. If that window
   can't be brought forward, the file opens read-only in the new one, with a note
-  saying where it is open; turning View ▸ Read Only off again claims the file
+  saying where it is open; turning Edit ▸ Read Only off again claims the file
   first, so it stays read-only while the other window still has it. Applying an
   update from a window in that state restarts it without carrying that read-only
   over: the new window asks for the file again, as any open does. (#1)

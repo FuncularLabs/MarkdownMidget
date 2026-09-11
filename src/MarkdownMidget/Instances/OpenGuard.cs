@@ -257,11 +257,13 @@ internal sealed class OpenGuard : IDisposable
     /// unparseable content is reported as held by nobody in particular (0/0), which
     /// HolderIsLive refuses outright: the lock IS held, but by nothing that can be
     /// shown to be a window of ours, and there is no window to send them to. But
-    /// the holder writes AFTER it opens (Take), and a reader can land in that gap -
-    /// or an AV scanner's exclusive open right after the create can make the
-    /// holder's own write fail for the moment - so a first look that yields 0/0
-    /// waits HolderWriteGraceMs and looks once more before the holder is refused. A
-    /// second 0/0 stands: the guard does not sit polling a lock a backup tool holds.
+    /// the holder writes AFTER it opens (Take), and a reader can land in that gap,
+    /// so a first look that yields 0/0 waits HolderWriteGraceMs and looks once more
+    /// before the holder is refused. That gap is all the grace heals: a holder whose
+    /// write fails does not retry - Take disposes the handle and DeleteOnClose takes
+    /// the file with it - so no second look can turn up a holder that never finished
+    /// writing. A second 0/0 stands: the guard does not sit polling a lock a backup
+    /// tool holds.
     /// </summary>
     private static Probe ReadHolder(string lockPath, Action<int> wait)
     {
@@ -502,7 +504,7 @@ internal readonly record struct OpenGuardDecision(OpenVerdict Verdict, int Holde
     }
 }
 
-/// <summary>What View ▸ Read Only turning OFF does.</summary>
+/// <summary>What Edit ▸ Read Only turning OFF does.</summary>
 internal enum ReadOnlyLift
 {
     /// <summary>Editable: the read-only state was the user's own, or the document is
@@ -515,7 +517,7 @@ internal enum ReadOnlyLift
 
 /// <summary>
 /// The read-only state the already-open fallback imposes, kept apart from the
-/// read-only the user chooses (View ▸ Read Only, --readonly). The fallback shows a
+/// read-only the user chooses (Edit ▸ Read Only, --readonly). The fallback shows a
 /// document another window holds, with no claim of its own, so turning read-only
 /// off again is not a checkbox but a claim attempt: only a claim that succeeds (or
 /// finds the document already this window's) may edit, or the un-check would hand

@@ -1210,7 +1210,7 @@ public partial class MainWindow : Window
     /// a claim - the other window has it, and the commit let this window's old one
     /// go - and read-only, so this window can't save over that one; said out loud,
     /// because a document that won't take keystrokes with no explanation reads as a
-    /// broken app. The way out is View ▸ Read Only, which claims the file again
+    /// broken app. The way out is Edit ▸ Read Only, which claims the file again
     /// before it lets anyone edit (ReadOnly_Click).
     /// </summary>
     private void OpenedReadOnlyBecauseHeld(string path)
@@ -1223,7 +1223,7 @@ public partial class MainWindow : Window
             $"{Path.GetFileName(path)} is open in another Markdown Midget window, " +
             "which couldn't be brought to the front.\n\n" +
             "It has been opened read-only here. Once it is closed in the other " +
-            "window, turn off View ▸ Read Only to edit it here.",
+            "window, turn off Edit ▸ Read Only to edit it here.",
             "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
