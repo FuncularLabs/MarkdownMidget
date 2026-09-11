@@ -1,7 +1,10 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Editing;
@@ -49,6 +52,19 @@ public class SourceEditor : TextEditor
         // assigns a new Document, so this subscription follows every edit. (If a future
         // change does reassign Document, it must re-wire this.)
         Document.Changed += OnDocumentChanged;
+
+        // An image on the clipboard never reaches AvalonEdit's paste. Its Paste
+        // command is enabled only while the clipboard holds text (CanPaste checks
+        // Clipboard.ContainsText), and WPF re-runs that gate before executing a
+        // command binding, so the DataObject.Pasting event is never raised for a
+        // picture — there is nothing downstream to hook. The hook therefore sits on
+        // the command itself, in the tunnelling phase, on this editor: the TextArea
+        // that owns the command lives inside its template, so every way in (Ctrl+V,
+        // Shift+Insert, Edit ▸ Paste) passes here before the TextArea's own binding
+        // gets a say. A paste that is not a picture is left unhandled and takes
+        // AvalonEdit's path untouched.
+        CommandManager.AddPreviewCanExecuteHandler(this, OnPreviewCanPaste);
+        CommandManager.AddPreviewExecutedHandler(this, OnPreviewPaste);
     }
 
     /// <summary>
@@ -60,6 +76,71 @@ public class SourceEditor : TextEditor
 
     private void OnDocumentChanged(object? sender, DocumentChangeEventArgs e) =>
         TextEdited?.Invoke(e.Offset, e.InsertionLength, e.RemovalLength);
+
+    // ===== pasting a picture =====
+
+    /// <summary>
+    /// Where the paste handlers read the clipboard. The app leaves this on the real
+    /// clipboard; tests point it at an in-memory DataObject so the Paste command can
+    /// be driven end to end without touching the clipboard. Null means "nothing to
+    /// look at", which is also the answer when another process has the clipboard
+    /// locked — the same ExternalException AvalonEdit swallows in its own paste.
+    /// </summary>
+    internal Func<IDataObject?> ClipboardSource { get; set; } = ReadClipboard;
+
+    private static IDataObject? ReadClipboard()
+    {
+        try { return Clipboard.GetDataObject(); }
+        catch (ExternalException) { return null; }
+    }
+
+    private void OnPreviewCanPaste(object sender, CanExecuteRoutedEventArgs e)
+    {
+        if (e.Command != ApplicationCommands.Paste) return;
+        var data = ClipboardSource();
+        if (data is null || !WantsImage(data)) return;
+        e.CanExecute = true;
+        e.Handled = true;
+    }
+
+    private void OnPreviewPaste(object sender, ExecutedRoutedEventArgs e)
+    {
+        if (e.Command != ApplicationCommands.Paste) return;
+        var data = ClipboardSource();
+        if (data is not null && TryPasteImage(data)) e.Handled = true;
+    }
+
+    /// <summary>
+    /// True when this paste is ours: the editor can take an insertion at the caret —
+    /// read-only mode wins here exactly as it does for text, being the same gate
+    /// AvalonEdit's CanPaste applies — and the data is a picture without text. The
+    /// OS synthesises CF_BITMAP from a CF_DIB, so a DIB-only clipboard reads as a
+    /// Bitmap too.
+    /// </summary>
+    private bool WantsImage(IDataObject data) =>
+        TextArea.ReadOnlySectionProvider.CanInsert(TextArea.Caret.Offset)
+        && ImagePaste.ShouldHandle(
+            hasText: data.GetDataPresent(DataFormats.UnicodeText) || data.GetDataPresent(DataFormats.Text),
+            hasImage: data.GetDataPresent(DataFormats.Bitmap));
+
+    /// <summary>
+    /// Paste <paramref name="data"/> as a picture if it is one: the image is encoded
+    /// as PNG and its markdown replaces the selection (or goes in at the caret) as a
+    /// single undo step, the caret landing after it, as a text paste would. Returns
+    /// false — and touches nothing — when the data carries text, has no image, or the
+    /// editor is read-only, so the caller can let the ordinary paste proceed.
+    /// </summary>
+    internal bool TryPasteImage(IDataObject data)
+    {
+        if (!WantsImage(data)) return false;
+        if (data.GetData(DataFormats.Bitmap, autoConvert: true) is not BitmapSource image) return false;
+        var md = ImagePaste.MarkdownFor(ImagePaste.EncodePng(image));
+        // The selection's own replace runs inside one document update, so the
+        // removal and the insertion undo together; an empty selection is one insert.
+        TextArea.Selection.ReplaceSelectionWithText(md);
+        TextArea.Caret.BringCaretToView();
+        return true;
+    }
 
     // ===== TextBox property shims =====
 

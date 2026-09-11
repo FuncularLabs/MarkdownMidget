@@ -61,7 +61,9 @@ or drop your selection.
   first line to insert a paragraph above.
 - **Links** show styled, with the URL as a hover tooltip.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
-  in the editor and travel with the file. **Right-click a picture ▸ Resize…** to
+  in the editor and travel with the file. Pasting a picture from the clipboard — a
+  screenshot, say — works in the Markdown source view too, and embeds it the same
+  way. **Right-click a picture ▸ Resize…** to
   scale it (the aspect ratio stays locked to the original); a resized picture is
   stored as inline HTML `<img …>` so the size persists.
 - **Underline** has no markdown equivalent, so it is stored as inline `<u>…</u>`.

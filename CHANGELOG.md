@@ -17,6 +17,11 @@ changes between alpha tags.
   front instead, and a double-click never flashes a second window. If that window
   can't be brought forward, the file opens read-only in the new one, with a note
   saying where it is open. (#1)
+- **Pasting a picture into the Markdown source view embeds it.** Ctrl+V with an
+  image on the clipboard — a screenshot, a picture copied from somewhere — used to
+  do nothing in the source view, silently. It now inserts the picture at the caret
+  as the same base64 data URI Insert ▸ Picture and the formatted view produce, in
+  one undo step. A paste that carries text still pastes the text. (#7)
 
 ## [0.10.0-beta1] - 2026-09-10
 
