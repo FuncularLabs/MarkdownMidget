@@ -154,6 +154,30 @@ public class EmbeddedReaderDocsTests
     }
 
     [Fact]
+    public void TheChangelogStatesTheSameWaitTheHelpDoes()
+    {
+        // NF-6. AR-4 struck "gets no answer within a few seconds" from HELP and
+        // pinned the real numbers there — and left the same sentence standing in the
+        // CHANGELOG entry, which is the copy most people read (Help ▸ What's New
+        // opens it, and it is what a release note is built from). Both documents are
+        // now pinned to the one function that produces the numbers, so neither can
+        // drift from the code or from the other.
+        var changelog = Read("CHANGELOG.md");
+        var floor = (int)DropHandshake.ReadTimeout(0).TotalSeconds;
+        var onePicture = (int)DropHandshake.ReadTimeout(DropRouting.MaxPictureBytes).TotalSeconds;
+
+        Assert.Contains($"{floor} seconds plus a second for every 8 MB", changelog, StringComparison.Ordinal);
+        Assert.Contains($"{onePicture} seconds for one picture", changelog, StringComparison.Ordinal);
+        Assert.DoesNotContain("within a few seconds", changelog, StringComparison.Ordinal);
+
+        // And the refusal AR-2 added, which the entry never mentioned at all: a drop
+        // can also end because the document moved under it, which is a different
+        // outcome with a different message and is the one a user is most likely to
+        // hit by accident.
+        Assert.Contains("while a drop is being read", changelog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheHelpNamesTheMenuTheReadOnlyItemIsActuallyUnder()
     {
         // NF-1 (HOUSE-RULE). The item is MenuReadOnly, and it sits under

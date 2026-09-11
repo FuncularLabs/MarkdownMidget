@@ -38,8 +38,12 @@ changes between alpha tags.
   dropped with them is not opened. A markdown file dropped on the formatted view
   now also keeps its byte-order mark, as one opened with File ▸ Open does.
   Dropping again before a drop has finished replaces it rather than mixing the
-  two, and a drop on the formatted view that gets no answer back from the editor
-  within a few seconds says so in the status bar instead of waiting. A picture
+  two, and if the document changes while a drop is being read — another file
+  opened, this one closed or turned read-only, the view switched — nothing is
+  inserted and the status bar says so. A drop on the formatted view that gets no
+  answer back from the editor gives up rather than waiting, and says so in the
+  status bar: the wait is 10 seconds plus a second for every 8 MB it asked for,
+  18 seconds for one picture at the size limit, capped at ten minutes. A picture
   another program is still writing is read rather than refused, and the bytes that
   come back are checked before anything is inserted — a file cut short or grown
   past the size limit in between is named rather than embedded as a picture
