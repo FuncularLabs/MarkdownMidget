@@ -373,6 +373,36 @@ public class FindEngineTests
         Assert.Equal(expected, FindEngine.ExpandTemplate(template, m));
     }
 
+    // ===== The two scope decisions the host makes, lifted out of the window (#5 F-5, F-14) =====
+
+    [Fact]
+    public void CtrlFKeepsTheRangeItHasWhenTheSelectionIsFindsOwn()
+    {
+        // Find's own selection of a ZERO-WIDTH match is a caret. Asking "is it empty?"
+        // before "is it Find's own?" read that as the user deselecting and threw the
+        // kept Replace All range away (#5 F-5).
+        Assert.Equal(FindEngine.ScopeCapture.Keep, FindEngine.CaptureDecision(0, isFindSelection: true));
+        Assert.Equal(FindEngine.ScopeCapture.Keep, FindEngine.CaptureDecision(3, isFindSelection: true));
+        Assert.Equal(FindEngine.ScopeCapture.Drop, FindEngine.CaptureDecision(0, isFindSelection: false));
+        Assert.Equal(FindEngine.ScopeCapture.Take, FindEngine.CaptureDecision(3, isFindSelection: false));
+    }
+
+    [Fact]
+    public void ReplaceAllScopeIsTheUsersSelectionOrTheRangeKeptForThem()
+    {
+        // The user's own selection is the scope.
+        Assert.Equal((4, 7), FindEngine.ResolveScope(4, 7, isFindSelection: false, captured: null));
+        // A caret of the user's own is no scope: the whole document.
+        Assert.Null(FindEngine.ResolveScope(4, 0, isFindSelection: false, captured: (1, 9)));
+        // Find's selection is not the user's: the range kept when the dialog opened is.
+        Assert.Equal((1, 9), FindEngine.ResolveScope(4, 3, isFindSelection: true, captured: (1, 9)));
+        // …including when Find's selection is a caret on a zero-width match.
+        Assert.Equal((1, 9), FindEngine.ResolveScope(4, 0, isFindSelection: true, captured: (1, 9)));
+        // Nothing kept, or a kept range edited away to nothing: the whole document.
+        Assert.Null(FindEngine.ResolveScope(4, 3, isFindSelection: true, captured: null));
+        Assert.Null(FindEngine.ResolveScope(4, 3, isFindSelection: true, captured: (1, 0)));
+    }
+
     // ===== Which constructs Find accepts at all (#5 F-6) =====
     //
     // The source view runs .NET's Regex, the formatted view JavaScript's. A pattern

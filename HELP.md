@@ -170,6 +170,16 @@ for `café` or `٤٢` they do not. Spell the class out — `[A-Za-z0-9_]`, `[0-9
 it matters. For the same reason `.` matches one emoji in the formatted view and
 half of one in the source view.
 
+#### Matches of no width
+
+A pattern can match a *position* rather than a run of text — `^`, `$`, `(?=cat)`.
+Find shows one as a blinking caret, and **Replace** inserts there rather than
+replacing anything; `^` with `> ` in **Replace All** is the "prefix every line"
+idiom, and it works in both views. What `^` means differs, though: the source view
+searches the markdown, so `^` is the start of every line, while the formatted view
+searches the document's text — what you see, with no line breaks between
+paragraphs — so there `^` is the start of the whole document and matches once.
+
 ### Replace
 
 The dialog has a **Replace with** box under **Find what**, and two buttons:

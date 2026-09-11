@@ -37,6 +37,11 @@ changes between alpha tags.
   the formatted one. `\p{L}` and `\p{Lu}` work in both now; they used not to work
   in the formatted view at all. Help lists the whole set under *Find ▸ Regular
   expression*. (#5)
+- **A pattern that matches a position rather than text now replaces in the
+  formatted view too.** `^`, `$` and `(?=…)` match no characters; the formatted
+  view used to skip them, so `^` with `> ` — the "prefix every line" idiom that
+  has always worked in the source view — did nothing at all there. Find shows
+  such a match as a caret and Replace inserts at it, in both views. (#5)
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
   list directly follows another, the second is written with `*` bullets (it was
   `-`): with the same marker, CommonMark would read the two as one list. (#2)

@@ -2747,8 +2747,11 @@ public partial class MainWindow : Window
         }
         var start = SourceBox.SelectionStart;
         var length = SourceBox.SelectionLength;
-        if (length <= 0) { _sourceReplaceScope = null; return; }   // deselected: nothing to keep
-        if (IsSourceFindSelection()) return;                        // Find's own: keep what was kept
+        switch (FindEngine.CaptureDecision(length, IsSourceFindSelection()))
+        {
+            case FindEngine.ScopeCapture.Keep: return;              // Find's own: keep what was kept
+            case FindEngine.ScopeCapture.Drop: _sourceReplaceScope = null; return;
+        }
         var doc = SourceBox.Document;
         var s = doc.CreateAnchor(start);
         s.MovementType = ICSharpCode.AvalonEdit.Document.AnchorMovementType.BeforeInsertion;
@@ -3028,12 +3031,11 @@ public partial class MainWindow : Window
     /// </summary>
     private (int Start, int Length)? SourceReplaceScope()
     {
-        var length = SourceBox.SelectionLength;
-        if (length <= 0) return null;
-        if (!IsSourceFindSelection()) return (SourceBox.SelectionStart, length);
-        if (_sourceReplaceScope is { } a && a.End.Offset > a.Start.Offset)
-            return (a.Start.Offset, a.End.Offset - a.Start.Offset);
-        return null;
+        var kept = _sourceReplaceScope is { } a && a.End.Offset > a.Start.Offset
+            ? ((int Start, int Length)?)(a.Start.Offset, a.End.Offset - a.Start.Offset)
+            : null;
+        return FindEngine.ResolveScope(
+            SourceBox.SelectionStart, SourceBox.SelectionLength, IsSourceFindSelection(), kept);
     }
 
     /// <summary>The count, in the status bar and in the dialog.</summary>

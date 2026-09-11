@@ -306,6 +306,24 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     assert.equal(findReplaceAll(ed.view(), 'dog', true).inSelection, false);
   });
 
+  test('a zero-width current match does not read as "deselected" and drop the kept range', () => {
+    // Find's own selection of an empty match is a caret. Testing "empty" before
+    // "is this Find's own?" threw the user's kept range away the moment Ctrl+F was
+    // pressed on one, and scoped the next Replace All to the whole document (#5 F-5).
+    load('cat one\n\ncat two\n\ncat three');
+    const two = blockRange('cat two');
+    ed.selectText(two.from, two.to);
+    findCaptureScope(ed.view());
+    scan('(?=cat)');
+    findNext(true);
+    const one = blockRange('cat one');
+    ed.selectText(one.from, one.from);                // the caret Find leaves on match 1
+    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from, to: two.to });
+    const r = findReplaceAll(ed.view(), 'X', true);
+    assert.deepEqual({ replaced: r.replaced, inSelection: r.inSelection }, { replaced: 1, inSelection: true });
+    assert.equal(md(), 'cat one\n\nXcat two\n\ncat three');
+  });
+
   test('capturing again keeps the range while the selection is Find’s, and drops it for a caret', () => {
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
@@ -436,6 +454,50 @@ describe('TheReplacementTemplateSubsetIsTheSameInBothEngines', () => {
     scan('(?<first>a)(b)');
     findReplaceAll(ed.view(), '$1-$2', false);
     assert.equal(md(), 'XXb-aYY');
+  });
+});
+
+describe('ZeroWidthMatchesInsert', () => {
+  // The source view replaces an empty match by inserting at it — that is how "^"
+  // with "> " prefixes every line, pinned by FindEngineTests.ReplaceAllOfAnEmptyMatchInserts.
+  // This view used to skip empty matches outright, so the same query did nothing at
+  // all (#5 F-5).
+  test('a lookahead is indexed at each position and Replace All inserts there', () => {
+    load('cat one cat');
+    assert.equal(scan('(?=cat)').total, 2);
+    const r = findReplaceAll(ed.view(), 'X', true);
+    assert.equal(r.replaced, 2);
+    assert.equal(md(), 'Xcat one Xcat');
+  });
+
+  test('^ inserts at the start of the text, the way it does in the source view', () => {
+    // The index this view searches is the document's text with no line breaks
+    // between blocks, so ^ is the start of that text and matches once. HELP says so.
+    load('abc');
+    assert.equal(scan('^', 'gm').total, 1);
+    assert.equal(findReplaceAll(ed.view(), 'X', true).replaced, 1);
+    assert.equal(md(), 'Xabc');
+  });
+
+  test('the highlight on a zero-width match is a caret, not a run of text', () => {
+    load('cat');
+    scan('(?=cat)');
+    assert.deepEqual(findNext(true), { total: 1, current: 1 });
+    assert.equal(highlighted(), '');
+  });
+
+  test('Replace on a zero-width match moves past it instead of finding it again', () => {
+    load('cat one cat');
+    scan('(?=cat)');
+    findNext(true);
+    const r = findReplace(ed.view(), 'X', true, true);
+    assert.equal(r.replaced, 1);
+    assert.equal(md(), 'Xcat one cat');
+    // Two matches again — before the X and before the second cat — and the cursor is
+    // on the SECOND. Resuming at the replacement's end would land on the first again
+    // and Replace would insert for ever, which is why the source view resumes
+    // strictly after an empty match.
+    assert.deepEqual({ total: r.total, current: r.current }, { total: 2, current: 2 });
   });
 });
 

@@ -124,18 +124,31 @@ function reindex() {
   const { text, nodes } = buildIndex();
   if (!text) return;
 
-  // Guard against zero-width matches infinite looping.
+  // The safety counter bounds the loop whatever the pattern does.
   let m;
   let safety = 0;
   while ((m = re.exec(text)) !== null) {
     if (safety++ > 50000) break;
     const start = m.index;
     const end = m.index + m[0].length;
-    if (m[0].length === 0) { re.lastIndex = end + 1; continue; }
+    const empty = end === start;
+    // A zero-width match — '^', '(?=cat)' — is a position, not a run: its range is
+    // [pos, pos), its Replace inserts there and its highlight is a caret. That is
+    // what the source view does with one, and skipping them here meant the same
+    // query did nothing at all in this view (#5 F-5).
     const a = locate(nodes, start, true);
-    const b = locate(nodes, end, false);
+    const b = empty ? a : locate(nodes, end, false);
     if (a && b) matches.push({ startNode: a.node, startOffset: a.offset, endNode: b.node, endOffset: b.offset, start, end, exec: m });
+    // Step past an empty match or exec would return it for ever — by a whole code
+    // point, since the regex carries the unicode flag.
+    if (empty) re.lastIndex = end + codeUnitsAt(text, end);
   }
+}
+
+// 2 when `text` holds a surrogate pair at `i`, otherwise 1 (including past the end).
+function codeUnitsAt(text, i) {
+  const c = text.charCodeAt(i);
+  return c >= 0xd800 && c <= 0xdbff && i + 1 < text.length ? 2 : 1;
 }
 
 function applySelection(match) {
@@ -239,8 +252,12 @@ function afterChange(view, tr) {
 // caret, a node selection, or nothing captured means the whole document.
 function resolveScope(view) {
   const sel = view.state.selection;
-  if (sel.empty || sel.node) return null;
-  if (!isCurrentMatch(view, sel)) return { from: sel.from, to: sel.to };
+  if (sel.node) return null;
+  // "Is this Find's own?" first: its selection of a zero-width match is a caret,
+  // and testing `sel.empty` first read that as the user having no selection and
+  // widened Replace All to the whole document (#5 F-5). Mirrors the host's
+  // FindEngine.ResolveScope.
+  if (!isCurrentMatch(view, sel)) return sel.empty ? null : { from: sel.from, to: sel.to };
   if (capturedScope && capturedScope.doc === view.state.doc)
     return { from: capturedScope.from, to: capturedScope.to };
   return null;
@@ -254,12 +271,14 @@ function resolveScope(view) {
 export function findCaptureScope(view) {
   if (!view) { capturedScope = null; return null; }
   const sel = view.state.selection;
-  if (sel.empty || sel.node) { capturedScope = null; return null; }
+  if (sel.node) { capturedScope = null; return null; }
+  // Find's own selection first, empty or not — see resolveScope (#5 F-5).
   if (isCurrentMatch(view, sel)) {
     return capturedScope && capturedScope.doc === view.state.doc
       ? { from: capturedScope.from, to: capturedScope.to }
       : null;
   }
+  if (sel.empty) { capturedScope = null; return null; }
   capturedScope = { from: sel.from, to: sel.to, doc: view.state.doc };
   return { from: sel.from, to: sel.to };
 }
@@ -388,9 +407,12 @@ export function findReplace(view, replacement, literal, wrap) {
   afterChange(view, tr);
 
   // Resume at the end of the replacement: the text before the match is as it
-  // was, so its index offset still holds in the rebuilt index.
+  // was, so its index offset still holds in the rebuilt index. Past it when the
+  // match was empty, or the same empty match would be found there again for ever
+  // — the rule the source view follows too (#5 F-5).
   const resume = m.start + text.length;
-  cursor = matches.findIndex((x) => x.start >= resume);
+  const strictlyAfter = m.end === m.start;
+  cursor = matches.findIndex((x) => (strictlyAfter ? x.start > resume : x.start >= resume));
   if (cursor < 0 && wrap && matches.length) cursor = 0;
   if (cursor >= 0) applySelection(matches[cursor]);
   return { replaced: 1, skipped: 0, total: matches.length, current: cursor + 1 };

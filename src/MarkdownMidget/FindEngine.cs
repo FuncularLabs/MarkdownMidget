@@ -289,6 +289,38 @@ public static class FindEngine
     /// by Replace, which refuses the same patterns and applies nothing.</summary>
     public const string InvalidPatternMessage = "Invalid pattern.";
 
+    /// <summary>What Ctrl+F does with the selection it finds: <see cref="Take"/> it as
+    /// the Replace All scope, <see cref="Keep"/> whatever was already kept, or
+    /// <see cref="Drop"/> it.</summary>
+    public enum ScopeCapture { Drop, Keep, Take }
+
+    /// <summary>
+    /// The decision behind MainWindow.CaptureReplaceScope and find.js's
+    /// findCaptureScope, in one place so both views make it the same way.
+    ///
+    /// "Is this Find's own selection?" is asked FIRST: Find's selection of a
+    /// zero-width match is a caret, and asking "is it empty?" first read that as the
+    /// user having deselected and threw the kept range away (#5 F-5).
+    /// </summary>
+    public static ScopeCapture CaptureDecision(int selectionLength, bool isFindSelection)
+        => isFindSelection ? ScopeCapture.Keep
+         : selectionLength <= 0 ? ScopeCapture.Drop
+         : ScopeCapture.Take;
+
+    /// <summary>
+    /// The Replace All scope: the user's own selected text, or — when the selection is
+    /// Find's own, which it is as soon as a search has run — the range kept when the
+    /// dialog opened. Null means the whole document. Same reason as
+    /// <see cref="CaptureDecision"/> for the order of the tests.
+    /// </summary>
+    public static (int Start, int Length)? ResolveScope(
+        int selectionStart, int selectionLength, bool isFindSelection, (int Start, int Length)? captured)
+    {
+        if (!isFindSelection)
+            return selectionLength > 0 ? (selectionStart, selectionLength) : null;
+        return captured is { Length: > 0 } c ? c : null;
+    }
+
     /// <summary>One replacement: the <see cref="Length"/> characters at
     /// <see cref="Index"/> become <see cref="Text"/>. Indices are into the text the
     /// edits were planned for; a view applies them last to first so earlier indices
