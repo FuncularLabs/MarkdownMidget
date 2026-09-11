@@ -166,6 +166,12 @@ npm run build    # writes src/MarkdownMidget/wwwroot/editor.bundle.{js,css}
 
 `npm run watch` rebuilds on change during development.
 
+To try an installed copy of a local build, publish a single-file build first
+(see [Distribution](#distribution-single-file-builds)) and run
+**File ▸ Windows Integration ▸ Register as .md editor…** from the exe it writes.
+Register refuses a plain `dotnet build` or `dotnet run` output: that exe needs
+the files beside it, and a copy of it on its own would not start.
+
 ## Distribution (single-file builds)
 
 The **framework-dependent** profile is the standard distributable — a single ~6.5 MB

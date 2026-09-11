@@ -13,8 +13,8 @@ namespace MarkdownMidget.Tests;
 /// exe is only the .NET apphost: copied without MarkdownMidget.dll beside it, it
 /// cannot start, and with Move checked the app handed off to that copy and
 /// vanished. These pin the decision that refuses such an exe, the refusal's text,
-/// the refusal inside the copy itself, and that the text's command and folder match
-/// the repository.
+/// the refusal inside the copy itself, that the text's command and folder match
+/// the repository, and that the README tells a developer the same thing first.
 ///
 /// Nothing here touches the real install or the registry: the decision takes its
 /// file probe as a parameter, and the copy is driven through the overload that
@@ -294,5 +294,24 @@ public class InstallGuardTests : IDisposable
         // developer there.
         var (_, profileFile) = WhatTheCommandNames();
         Assert.Equal("true", PubxmlProperty(profileFile, "PublishSingleFile"), ignoreCase: true);
+    }
+
+    // ===== the README says it first =====
+
+    [Fact]
+    public void TheReadmesBuildSectionSaysToPublishBeforeRegistering()
+    {
+        // A developer should read this before meeting the refusal, not after.
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot(), "README.md"));
+        var start = Array.FindIndex(lines, l => l.StartsWith("## Build & run", StringComparison.Ordinal));
+        Assert.True(start >= 0, "README has no \"## Build & run\" section.");
+        var end = Array.FindIndex(lines, start + 1, l => l.StartsWith("## ", StringComparison.Ordinal));
+        // Every run of whitespace becomes one space, so a wrapped sentence reads whole.
+        var section = string.Join(" ", string.Join(" ", lines[start..(end < 0 ? lines.Length : end)])
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+        Assert.Contains("publish a single-file build first", section);
+        Assert.Contains("Register as .md editor", section);
+        Assert.Contains("Register refuses a plain `dotnet build`", section);
     }
 }
