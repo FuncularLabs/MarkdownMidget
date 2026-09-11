@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readBase64, readHeads, readFull, HEAD_BYTES } from '../src/file-drop.js';
+import { readBase64, readHeads, readFull, planDroppedRead, HEAD_BYTES } from '../src/file-drop.js';
 
 // A FileReader stand-in that takes the outcome it should produce. Real readers are
 // asynchronous, so these are too: a reader that called back synchronously would
@@ -171,4 +171,64 @@ test('readFull answers null for a file whose read fails, without losing the othe
     { index: 0, base64: null },
     { index: 1, base64: 'Qg==' },
   ]);
+});
+
+// ===== the generation token (review finding NF-5): which drop a request is about
+//
+// This decision used to live inline in main.js's readDroppedFiles, where nothing
+// could reach it: the whole handshake needed a WebView, a host and a real drop. It
+// is the decision that stops a request about drop 1 being answered with drop 2's
+// files, so it is the one that most needs a test.
+
+test('planDroppedRead reads the files of the drop the request names', async () => {
+  assert.deepEqual(planDroppedRead(3, 3, [1, 0]), { stale: false, indices: [1, 0] });
+});
+
+test('planDroppedRead calls a request about an older drop stale, and reads nothing', async () => {
+  // The host asked about drop 1; the user has since dropped again, so droppedFiles
+  // now holds drop 2's files and index 0 is a DIFFERENT file. Reading it would hand
+  // the host bytes it never asked for, under drop 1's name.
+  assert.deepEqual(planDroppedRead(2, 1, [0, 1]), { stale: true, indices: [0, 1] });
+  // The indices survive the staleness: the answer still needs one entry per index
+  // asked for, each of them null, or the host is left waiting for entries that
+  // never come.
+});
+
+test('planDroppedRead calls a request about a drop that has not happened stale', async () => {
+  // A drop number ahead of the counter is not this editor's drop either — a
+  // malformed or replayed request, and reading for it is as wrong as reading for a
+  // superseded one.
+  assert.deepEqual(planDroppedRead(1, 2, [0]), { stale: true, indices: [0] });
+  // And drop 0 is what the host parses when a message did not say which drop it is;
+  // the counter starts at 1, so it matches nothing.
+  assert.deepEqual(planDroppedRead(1, 0, [0]), { stale: true, indices: [0] });
+});
+
+test('planDroppedRead asks for a duplicated index once', async () => {
+  // Twice would read the file twice and answer twice — two entries with the same
+  // key, which is one base64 copy of a picture more than the host needs in memory.
+  assert.deepEqual(planDroppedRead(1, 1, [0, 1, 0, 1, 0]), { stale: false, indices: [0, 1] });
+});
+
+test('planDroppedRead drops an index that is not a whole number', async () => {
+  // files[1.5], files["0"], files[null] are not the file the host meant, and
+  // files[NaN] is undefined. None of them is answered with a guess.
+  assert.deepEqual(planDroppedRead(1, 1, [0, 1.5, '1', null, undefined, NaN, 2]),
+    { stale: false, indices: [0, 2] });
+});
+
+test('planDroppedRead treats a missing or non-array request as asking for nothing', async () => {
+  // ExecuteScriptAsync can only hand this whatever the host serialised; a shape
+  // that is not a list is answered with an empty list rather than a throw the host
+  // never hears about.
+  for (const bad of [undefined, null, 'nope', 7, {}]) {
+    assert.deepEqual(planDroppedRead(1, 1, bad), { stale: false, indices: [] });
+  }
+});
+
+test('planDroppedRead leaves an index that is not in the drop to readFull', async () => {
+  // Not filtered here: readFull already answers null for an index with no file, and
+  // the answer must carry an entry for every index the host asked about — including
+  // the ones that name nothing — so it can tell "could not read" from "no answer".
+  assert.deepEqual(planDroppedRead(1, 1, [0, 9, -1]), { stale: false, indices: [0, 9, -1] });
 });

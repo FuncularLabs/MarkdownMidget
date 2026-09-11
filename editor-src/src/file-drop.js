@@ -87,6 +87,40 @@ export function readHeads(files, makeReader = newFileReader) {
 }
 
 /**
+ * Which drop a phase-two request is about, and what it actually asks for.
+ *
+ * The generation token. `dropSeq` is the editor's counter for the drop whose File
+ * objects are currently held; `drop` is the counter the host's request names. They
+ * differ whenever the user dropped again while the host was routing — and then
+ * index 3 no longer means the file the host routed, it means whatever is third in
+ * the NEW drop. Reading it would hand the host a file it never routed, embedded
+ * under a name from the drop before. So a request about any other drop is `stale`
+ * and reads nothing; the host still gets one null entry per index it named, so it
+ * can tell "could not read" from "no answer at all".
+ *
+ * `indices` is sanitised, not trusted: whole numbers only (files[1.5] and
+ * files[NaN] are not files), each one once (a duplicate would read the file and
+ * base64 it twice), in the order asked. An index that names no file is left in —
+ * readFull answers null for it, and the host needs that entry.
+ *
+ * Pure, and separate from main.js for exactly that reason: the rest of the
+ * handshake needs a WebView, a host and a real drop, and this is the part of it
+ * that decides whether a user's picture or someone else's goes into the document.
+ */
+export function planDroppedRead(dropSeq, drop, indices) {
+  const seen = new Set();
+  const asked = [];
+  if (Array.isArray(indices)) {
+    for (const index of indices) {
+      if (!Number.isInteger(index) || seen.has(index)) continue;
+      seen.add(index);
+      asked.push(index);
+    }
+  }
+  return { stale: drop !== dropSeq, indices: asked };
+}
+
+/**
  * Phase two: the full bytes of the files the host chose, by their index in the
  * phase-one array.
  *

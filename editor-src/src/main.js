@@ -26,7 +26,7 @@ import { SEPARATOR } from './spell-separator.js';
 import { htmlRender } from './html-render.js';
 import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
-import { readHeads, readFull } from './file-drop.js';
+import { readHeads, readFull, planDroppedRead } from './file-drop.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 
 import {
@@ -703,14 +703,17 @@ const MDM = {
    * nothing on screen to say why.
    */
   readDroppedFiles(drop, indices) {
-    const list = Array.isArray(indices) ? indices : [];
     const answer = (files) => postToHost({ type: 'droppedFileBytes', drop, files });
-    // A drop that has been superseded: the files it names are gone, so every index
-    // answers null rather than reading whatever is at that position now.
-    if (drop !== dropSeq) return Promise.resolve(answer(list.map((index) => ({ index, base64: null }))));
-    return readFull(droppedFiles, list)
+    // Which drop this is about, and what it really asks for: planDroppedRead, which
+    // is where that decision is tested (file-drop.js). A stale request — the user
+    // dropped again while the host was routing — answers null for every index it
+    // named rather than reading whatever is at that position in the NEW drop.
+    const { stale, indices: wanted } = planDroppedRead(dropSeq, drop, indices);
+    const allNull = () => wanted.map((index) => ({ index, base64: null }));
+    if (stale) return Promise.resolve(answer(allNull()));
+    return readFull(droppedFiles, wanted)
       .then(answer)
-      .catch(() => answer(list.map((index) => ({ index, base64: null }))));
+      .catch(() => answer(allNull()));
   },
 
   // flush=true rebuilds editor state, clearing undo history — used when loading a
