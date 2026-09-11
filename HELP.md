@@ -378,8 +378,12 @@ line with `--readonly`.
     current document is untitled and unmodified) or in a **new window**. Dropped on
     the **formatted editing area**, its text opens as a new untitled document —
     the OS doesn't reveal a dropped file's path to the editor, so **Save** will
-    prompt for a location — and that area opens one document per drop. A text
-    file named `.png` is neither a picture nor markdown, and is refused.
+    prompt for a location — and that area opens one document per drop; the one
+    exception is an encrypted `.mdenc`, which that area redirects to **File ▸
+    Open** with a message, since there is no path there to prompt for the
+    password from (dropped on the toolbar, menu bar or source view it opens
+    normally, password prompt and all). A text file named `.png` is neither a
+    picture nor markdown, and is refused.
   - **Anything else** is refused: the status bar names the file, and nothing
     changes.
   - Drop pictures and a markdown file **together** and the pictures are inserted;
