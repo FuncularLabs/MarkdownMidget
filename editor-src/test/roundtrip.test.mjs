@@ -313,6 +313,15 @@ describe('IntrawordUnderscoreSurvives', () => {
     // `a\\_b` in the file is a backslash then an underscore; both survive.
     assert.equal(ed.roundTrip('a\\\\_b'), 'a\\\\\\_b\n');
   });
+
+  test('guard: an underscore in image alt text stays escaped', () => {
+    // The image handler escapes its alt through state.safe itself; the text
+    // handler, and so the rule above, never see it. HELP says an underscore in
+    // an image's alt text is written `\_` — this is that claim's case: the
+    // escape is written, and the written form is stable.
+    assert.equal(ed.roundTrip('![alt_text](x.png)'), '![alt\\_text](x.png)\n');
+    unchanged('![alt\\_text](x.png)');
+  });
 });
 
 describe('EmphasisBesidePunctuationSurvives', () => {
