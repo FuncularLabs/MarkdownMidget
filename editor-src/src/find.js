@@ -106,9 +106,10 @@ export function findReset(source, flags, view) {
   if (view) boundView = view;
   const f = withUnicode(flags);
   if (view && source && source === indexed.source && f === indexed.flags && view.state.doc === indexed.doc)
-    return { total: matches.length, current: cursor + 1 };
+    return withTruncation({ total: matches.length, current: cursor + 1 });
   matches = [];
   cursor = -1;
+  truncated = false;
   indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
   if (!source) return { total: 0, current: 0 };
   let re;
@@ -116,24 +117,51 @@ export function findReset(source, flags, view) {
   catch { return { total: 0, current: 0, error: 'Invalid pattern' }; }
   indexed = { source, flags: f, doc: view ? view.state.doc : null, regex: re, groupMap: dotnetGroupMap(source) };
   reindex();
-  return { total: matches.length, current: 0 };
+  return withTruncation({ total: matches.length, current: 0 });
+}
+
+// The most matches one scan will index. A pattern that matches at every position —
+// `x*`, `\b` — would otherwise build a list as long as the document. Reaching it
+// means the index describes PART of the document, and the two things that must not
+// then happen quietly are a count the user reads as "all of them" and a Replace All
+// that changes only what the index reached: so the flag travels out with every
+// answer that carries a count, the host says so in the status line, and Replace All
+// refuses (#5 NF-10). FindEngine.WysiwygMatchLimit is the host's copy of the number,
+// for the message it shows.
+const MATCH_LIMIT = 50000;
+let matchLimit = MATCH_LIMIT;
+let truncated = false;   // the last scan stopped at matchLimit
+
+/// Lower the cap so a test can reach the truncation path without a document of
+/// 50 000 matches. Returns the limit that was in force — pass that back (or
+/// nothing) to restore it. Nothing in the app calls this.
+export function findMatchLimit(limit) {
+  const was = matchLimit;
+  matchLimit = typeof limit === 'number' && limit > 0 ? limit : MATCH_LIMIT;
+  return was;
+}
+
+// Every answer that carries a count says when the index behind it is short.
+function withTruncation(result) {
+  return truncated ? { ...result, truncated: true } : result;
 }
 
 // Rebuild the match list from the DOM with the indexed regex. Leaves cursor at -1.
 function reindex() {
   matches = [];
   cursor = -1;
+  truncated = false;
   const re = indexed.regex;
   if (!re) return;
   re.lastIndex = 0;
   const { text, nodes } = buildIndex();
   if (!text) return;
 
-  // The safety counter bounds the loop whatever the pattern does.
+  // The cap bounds the loop whatever the pattern does, and says so when it bites.
   let m;
   let safety = 0;
   while ((m = re.exec(text)) !== null) {
-    if (safety++ > 50000) break;
+    if (++safety > matchLimit) { truncated = true; break; }
     const start = m.index;
     const end = m.index + m[0].length;
     const empty = end === start;
@@ -205,7 +233,7 @@ export function findNext(wrap) {
   cursor = cursor + 1;
   if (cursor >= matches.length) cursor = wrap ? 0 : matches.length - 1;
   applySelection();
-  return { total: matches.length, current: cursor + 1 };
+  return withTruncation({ total: matches.length, current: cursor + 1 });
 }
 
 export function findPrev(wrap) {
@@ -213,12 +241,13 @@ export function findPrev(wrap) {
   cursor = cursor - 1;
   if (cursor < 0) cursor = wrap ? matches.length - 1 : 0;
   applySelection();
-  return { total: matches.length, current: cursor + 1 };
+  return withTruncation({ total: matches.length, current: cursor + 1 });
 }
 
 export function findClear() {
   matches = [];
   cursor = -1;
+  truncated = false;
   indexed = { source: null, flags: null, doc: null, regex: null, groupMap: null };
   capturedScope = null;
   boundView = null;
@@ -457,7 +486,9 @@ export function findReplace(view, replacement, literal, wrap) {
   cursor = matches.findIndex((x) => (strictlyAfter ? x.start > resume : x.start >= resume));
   if (cursor < 0 && wrap && matches.length) cursor = 0;
   if (cursor >= 0) applySelection();
-  return { replaced: 1, skipped: 0, total: matches.length, current: cursor + 1 };
+  // Replace changes the match Find is ON, which a short index still knows about, so
+  // it runs; the flag goes with the count beside it (#5 NF-10).
+  return withTruncation({ replaced: 1, skipped: 0, total: matches.length, current: cursor + 1 });
 }
 
 /// Replace every match — within the scope (see resolveScope) — in ONE
@@ -466,10 +497,18 @@ export function findReplace(view, replacement, literal, wrap) {
 /// apart (#5 F-10): `skipped` ran from one block into the next, which a
 /// replacement would have to join; `moved` is no longer where the search left it,
 /// which is a different thing and is worded as one.
+///
+/// Refused outright — { replaced: 0, …, truncated: true } — when the index stopped
+/// at the cap: "every match" is not what a part of the document can promise.
 export function findReplaceAll(view, replacement, literal) {
   if (!view) return { replaced: 0, skipped: 0, moved: 0, total: matches.length, inSelection: false, error: 'no editor' };
   ensureFresh(view);
   const total = matches.length;
+  // An index that stopped at the cap describes the start of the document and
+  // nothing past it. Working from it changed that much and reported the number as
+  // though it were all of them (#5 NF-10); the host turns this into a refusal the
+  // user can act on.
+  if (truncated) return { replaced: 0, skipped: 0, moved: 0, total, inSelection: false, truncated: true };
   const { state } = view;
   const selWasFinds = isCurrentMatch(view, state.selection);
   const scope = resolveScope(view);

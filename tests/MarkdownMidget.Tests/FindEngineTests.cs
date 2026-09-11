@@ -620,6 +620,32 @@ public class FindEngineTests
     }
 
     [Fact]
+    public void ReportsTruncatedReadsTheEditorsCap()
+    {
+        // find.js stops indexing at 50 000 matches and says so on every answer that
+        // carries a count. Nothing read that field: Find reported "Match 1 of 50001"
+        // and Replace All changed the part of the document the index reached and
+        // called it "Replaced 50001 occurrences" (#5 NF-10).
+        Assert.True(FindEngine.ReportsTruncated("{\"total\":50000,\"current\":1,\"truncated\":true}"));
+        Assert.True(FindEngine.ReportsTruncated(
+            "{\"replaced\":0,\"skipped\":0,\"moved\":0,\"total\":50000,\"inSelection\":false,\"truncated\":true}"));
+        Assert.False(FindEngine.ReportsTruncated("{\"total\":3,\"current\":1}"));
+        Assert.False(FindEngine.ReportsTruncated("{\"total\":3,\"current\":1,\"truncated\":false}"));
+        Assert.False(FindEngine.ReportsTruncated(null));
+        Assert.False(FindEngine.ReportsTruncated(""));
+        Assert.False(FindEngine.ReportsTruncated("not json at all"));
+
+        // Both messages name the cap, so the number the user is told to narrow below
+        // is the number the editor actually applied.
+        Assert.Equal(50000, FindEngine.WysiwygMatchLimit);
+        Assert.Contains("50000", FindEngine.TruncatedFindNote);
+        Assert.Contains("50000", FindEngine.TruncatedReplaceAllMessage);
+        Assert.Contains("Nothing was replaced", FindEngine.TruncatedReplaceAllMessage);
+        // It follows "Match m of n", which ends without a full stop.
+        Assert.StartsWith(" — ", FindEngine.TruncatedFindNote);
+    }
+
+    [Fact]
     public void TheSubsetIsWhatReplaceApplies()
     {
         // Not only ExpandTemplate in isolation: the Replace path runs through it too,

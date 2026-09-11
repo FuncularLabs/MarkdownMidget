@@ -222,6 +222,10 @@ The dialog has a **Replace with** box under **Find what**, and two buttons:
 - **Replace All** changes every match as **one undo step** — Ctrl+Z puts the
   whole document back. When part of the document is selected, only matches lying
   entirely inside the selection are changed; a caret means the whole document.
+  In the WYSIWYG view a search stops after 50 000 matches — a pattern like `\b` or
+  `x*` matches at every position — and Find says so beside the count. Replace All
+  then refuses and changes nothing, rather than changing the part of the document
+  the search reached and reporting it as all of them; narrow the search.
   Find moves the selection onto each match as you type, so what counts is the
   selection *you* made: the one there when you opened the dialog (or pressed
   Ctrl+F again), or one you make afterwards. The status bar reports how many

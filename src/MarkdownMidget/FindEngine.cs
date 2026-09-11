@@ -286,6 +286,44 @@ public static class FindEngine
         catch { return false; }
     }
 
+    /// <summary>
+    /// The most matches the formatted view indexes in one scan — find.js's own cap,
+    /// repeated here for the two messages that report it. A pattern matching at every
+    /// position (<c>x*</c>, <c>\b</c>) would otherwise build a list as long as the
+    /// document. The source view has no such cap: it searches the markdown directly.
+    /// </summary>
+    public const int WysiwygMatchLimit = 50000;
+
+    /// <summary>Appended to Find's status when the editor's index stopped at the cap:
+    /// the count beside it is of the matches it reached, not of the document. Written
+    /// to follow "Match m of n", which carries no full stop of its own.</summary>
+    public static string TruncatedFindNote => $" — stopped after {WysiwygMatchLimit} matches";
+
+    /// <summary>What Replace All says when it refuses to work from a truncated index.
+    /// Changing the part of the document the index reached and reporting the number as
+    /// though it were all of them is the outcome this exists to prevent (#5 NF-10).</summary>
+    public static string TruncatedReplaceAllMessage =>
+        $"Too many matches — the search stopped after {WysiwygMatchLimit}. " +
+        "Nothing was replaced; narrow the search and try again.";
+
+    /// <summary>
+    /// True when the formatted view answered that its index stopped at the cap. Every
+    /// answer carrying a count carries the flag, so whichever call the status is being
+    /// built from is the one to ask.
+    /// </summary>
+    public static bool ReportsTruncated(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return false;
+        try
+        {
+            using var d = JsonDocument.Parse(json);
+            return d.RootElement.ValueKind == JsonValueKind.Object
+                && d.RootElement.TryGetProperty("truncated", out var t)
+                && t.ValueKind == JsonValueKind.True;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Documentation for tooltips. Kept in code so it stays in sync.</summary>
     public const string ExtendedTooltip =
         "Treats the query as a literal string, but interprets these C-style escapes:\n" +

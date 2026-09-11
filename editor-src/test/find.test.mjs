@@ -15,7 +15,7 @@ import { mountEditor } from './jsdom-editor.mjs';
 import { settleDocument } from '../src/settle.js';
 import {
   findReset, findNext, findClear, findReplace, findReplaceAll, findCaptureScope,
-  expandTemplate, dotnetGroupMap,
+  findMatchLimit, expandTemplate, dotnetGroupMap,
 } from '../src/find.js';
 
 // The one table both engines answer to (#5 F-1, F-4, F-13). FindEngineTests.cs reads
@@ -870,6 +870,43 @@ describe('WhatTheHostAcceptsThisViewCanRun', () => {
       load('cat');
       assert.deepEqual(scan(p), { total: 0, current: 0, error: 'Invalid pattern' }, p);
     }
+  });
+});
+
+describe('AnIndexThatStoppedAtTheCapSaysSo', () => {
+  // A pattern that matches at every position — `x*`, `\b` — would build a match list
+  // as long as the document, so the scan stops at a cap. It used to stop silently:
+  // Replace All then changed the part of the document the index reached and reported
+  // "Replaced 50001 occurrences", which reads as all of them (#5 NF-10). The cap is
+  // lowered here rather than building a document of 50 000 matches.
+  test('Find says the index is short, and Replace All refuses to work from it', () => {
+    const was = findMatchLimit(3);
+    try {
+      load('cat cat cat cat cat');
+      assert.deepEqual(scan('cat'), { total: 3, current: 0, truncated: true });
+      assert.deepEqual(findNext(true), { total: 3, current: 1, truncated: true });
+      assert.deepEqual(findReplaceAll(ed.view(), 'dog', true),
+        { replaced: 0, skipped: 0, moved: 0, total: 3, inSelection: false, truncated: true });
+      assert.equal(md(), 'cat cat cat cat cat', 'nothing replaced, not three of five');
+
+      // A single Replace still works — it changes the match Find is on, which the
+      // index does know about — and passes the flag on so the host can say the count
+      // beside it is short.
+      const r = findReplace(ed.view(), 'dog', true, true);
+      assert.equal(r.replaced, 1);
+      assert.equal(r.truncated, true);
+      assert.equal(md(), 'dog cat cat cat cat');
+    } finally { findMatchLimit(was); }
+  });
+
+  test('an index that reached the end of the document says nothing', () => {
+    const was = findMatchLimit(3);
+    try {
+      load('cat cat cat');            // exactly the cap, and the scan still finished
+      assert.deepEqual(scan('cat'), { total: 3, current: 0 });
+      assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 3);
+      assert.equal(md(), 'dog dog dog');
+    } finally { findMatchLimit(was); }
   });
 });
 

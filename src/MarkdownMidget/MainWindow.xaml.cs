@@ -2935,10 +2935,14 @@ public partial class MainWindow : Window
             using var d = JsonDocument.Parse(json);
             var total = d.RootElement.TryGetProperty("total", out var t) ? t.GetInt32() : 0;
             var current = d.RootElement.TryGetProperty("current", out var c) ? c.GetInt32() : 0;
+            // A count from an index that stopped at the cap is a count of what it
+            // reached, not of the document; say so rather than let it read as all of
+            // them (#5 NF-10).
+            var note = FindEngine.ReportsTruncated(json) ? FindEngine.TruncatedFindNote : "";
             if (total == 0)
                 _findDialog?.SetStatus(req.LiveTyping ? "No matches." : "No matches found.");
             else
-                _findDialog?.SetStatus($"Match {current} of {total}");
+                _findDialog?.SetStatus($"Match {current} of {total}{note}");
         }
         catch { _findDialog?.SetStatus("No matches."); }
     }
@@ -3108,9 +3112,13 @@ public partial class MainWindow : Window
             var skipped = JsonInt(d, "skipped");
             var total = JsonInt(d, "total");
             var current = JsonInt(d, "current");
+            // Replace works from a truncated index — it changes the match Find is on,
+            // which that index does know about — but the count beside it is short, so
+            // it is reported as short (#5 NF-10).
+            var note = FindEngine.ReportsTruncated(json) ? FindEngine.TruncatedFindNote : "";
             var place = total == 0 ? "No more matches."
                       : current == 0 ? "No further matches."
-                      : $"Match {current} of {total}";
+                      : $"Match {current} of {total}{note}";
             _findDialog?.SetStatus(
                 replaced > 0 ? $"Replaced. {place}"
                 : skipped > 0 ? $"Left alone — that match spans paragraphs. {place}"
@@ -3130,6 +3138,16 @@ public partial class MainWindow : Window
         if (FindEngine.ReportsInvalidPattern(json))
         {
             _findDialog?.SetStatus(FindEngine.InvalidPatternMessage);
+            return;
+        }
+        // The editor refuses Replace All from an index that stopped at its cap: that
+        // index describes the start of the document and nothing past it, so working
+        // from it would change that much and report the number as though it were every
+        // match (#5 NF-10). Nothing has been applied.
+        if (FindEngine.ReportsTruncated(json))
+        {
+            FlashStatus(FindEngine.TruncatedReplaceAllMessage);
+            _findDialog?.SetStatus(FindEngine.TruncatedReplaceAllMessage);
             return;
         }
         try
