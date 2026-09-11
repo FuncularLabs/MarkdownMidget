@@ -62,16 +62,32 @@ public static class FindEngine
     /// quantifiers; Unicode blocks and long category names in <c>\p{…}</c>; and the
     /// loose <c>{</c>, <c>}</c> and <c>]</c> that .NET reads as literal characters and
     /// JavaScript reads as errors.
+    ///
+    /// Also refused: a <c>\1</c>-style backreference in a pattern where a NAMED group
+    /// is written before an unnamed one. Both engines compile such a pattern and each
+    /// reads the number as a different group — .NET numbers the unnamed groups first
+    /// and the named ones after, JavaScript numbers them all in source order — so
+    /// <c>(?&lt;a&gt;x)(y)\1</c> matches "xyy" in the source view and "xyx" in the
+    /// formatted one. <c>\k&lt;name&gt;</c> names the same group in both and stays
+    /// allowed; so does <c>\1</c> in a pattern whose named groups all come after its
+    /// unnamed ones, where the two numberings agree (#5 NF-1). This is the pattern-side
+    /// half of what <c>dotnetGroupMap</c> does for replacement templates.
     /// </summary>
     public static bool JsCompatible(string pattern)
     {
         var inClass = false;
+        // The two facts that together make a number mean different groups in the two
+        // engines. Collected in this one scan rather than a second pass of the same
+        // escape/character-class rules, which would be a copy to keep in step.
+        var sawNamedGroup = false;
+        var namedBeforeUnnamed = false;
+        var sawNumberedBackreference = false;
         for (var i = 0; i < pattern.Length; i++)
         {
             var c = pattern[i];
             if (c == '\\')
             {
-                if (!EscapeIsShared(pattern, ref i, inClass)) return false;
+                if (!EscapeIsShared(pattern, ref i, inClass, ref sawNumberedBackreference)) return false;
                 continue;
             }
             if (inClass)
@@ -100,16 +116,23 @@ public static class FindEngine
                     if (i + 1 < pattern.Length && pattern[i + 1] == '+') return false;
                     break;
                 case '(':
-                    if (!GroupOpeningIsShared(pattern, ref i)) return false;
+                    if (!GroupOpeningIsShared(pattern, ref i, ref sawNamedGroup, ref namedBeforeUnnamed))
+                        return false;
                     break;
             }
         }
+        // A number written for a group the two engines number differently (#5 NF-1).
+        // Checked at the end because the backreference may be written before the
+        // groups that make it ambiguous — "\1(?<a>x)(y)" is the same divergence.
+        if (sawNumberedBackreference && namedBeforeUnnamed) return false;
         return !inClass;
     }
 
     /// <summary>The escape starting at <paramref name="i"/> (which points at the
-    /// backslash), advanced past. False when the two engines do not share it.</summary>
-    private static bool EscapeIsShared(string pattern, ref int i, bool inClass)
+    /// backslash), advanced past. False when the two engines do not share it.
+    /// <paramref name="sawNumberedBackreference"/> is set when the escape is a
+    /// <c>\1</c>-style group number.</summary>
+    private static bool EscapeIsShared(string pattern, ref int i, bool inClass, ref bool sawNumberedBackreference)
     {
         if (i + 1 >= pattern.Length) return false;     // a trailing backslash: invalid in both
         var e = pattern[i + 1];
@@ -151,6 +174,7 @@ public static class FindEngine
                 {
                     if (inClass) return false;
                     while (i + 1 < pattern.Length && char.IsAsciiDigit(pattern[i + 1])) i++;
+                    sawNumberedBackreference = true;
                     return true;
                 }
                 return false;                           // \A \Z \z \G \a \e \Q … — .NET's own
@@ -219,10 +243,17 @@ public static class FindEngine
     /// <summary>The '(' at <paramref name="i"/> and whatever '?' form follows it.
     /// Ordinary groups, <c>(?:</c>, <c>(?=</c>, <c>(?!</c>, <c>(?&lt;=</c>,
     /// <c>(?&lt;!</c> and <c>(?&lt;name&gt;</c> are shared; every other <c>(?</c>
-    /// form is .NET's own.</summary>
-    private static bool GroupOpeningIsShared(string pattern, ref int i)
+    /// form is .NET's own. Records the capture order the two engines disagree about:
+    /// <paramref name="sawNamedGroup"/> once a named capture has been opened, and
+    /// <paramref name="namedBeforeUnnamed"/> when an unnamed one follows it — the
+    /// arrangement that makes .NET's group numbers differ from JavaScript's.</summary>
+    private static bool GroupOpeningIsShared(string pattern, ref int i, ref bool sawNamedGroup, ref bool namedBeforeUnnamed)
     {
-        if (i + 1 >= pattern.Length || pattern[i + 1] != '?') return true;   // a plain capture
+        if (i + 1 >= pattern.Length || pattern[i + 1] != '?')
+        {
+            if (sawNamedGroup) namedBeforeUnnamed = true;  // a plain capture after a named one
+            return true;
+        }
         if (i + 2 >= pattern.Length) return false;
         var k = pattern[i + 2];
         if (k is ':' or '=' or '!') { i += 2; return true; }
@@ -230,7 +261,9 @@ public static class FindEngine
         var after = i + 3 < pattern.Length ? pattern[i + 3] : '\0';
         if (after is '=' or '!') { i += 3; return true; } // lookbehind
         i += 1;                                           // at '?', so '<' is next
-        return TakeGroupName(pattern, ref i, '<', '>');
+        if (!TakeGroupName(pattern, ref i, '<', '>')) return false;
+        sawNamedGroup = true;
+        return true;
     }
 
     /// <summary>
@@ -281,7 +314,9 @@ public static class FindEngine
         ".NET-only constructs are refused as Invalid pattern, because the formatted\n" +
         "view would read them differently: \\A \\Z \\z \\G, (?>…), inline options\n" +
         "(?i), (?#comments), (?'name'…), \\k'name', class subtraction [a-z-[aeiou]],\n" +
-        "possessive quantifiers, and Unicode blocks like \\p{IsGreek}.";
+        "possessive quantifiers, and Unicode blocks like \\p{IsGreek}. So is \\1 in a\n" +
+        "pattern that writes a named group before an unnamed one — the two views\n" +
+        "number the groups differently there; \\k<name> works everywhere.";
 
     // ===== Replace (#5) =====
 

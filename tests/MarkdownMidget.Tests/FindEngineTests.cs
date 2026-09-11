@@ -547,6 +547,32 @@ public class FindEngineTests
     }
 
     [Fact]
+    public void ANumberedBackreferenceIsRefusedWhereTheTwoEnginesNumberGroupsDifferently()
+    {
+        // .NET numbers the unnamed groups first and the named ones after; JavaScript
+        // numbers them all in source order. Only a named group written BEFORE an
+        // unnamed one reorders anything — and then a number means a different group in
+        // each view: "(?<a>x)(y)\1" matches "xyy" in the source view and "xyx" in the
+        // formatted one. Both engines compile it, so nothing but this refuses it, and
+        // the same renumbering dotnetGroupMap handles for replacement templates was
+        // missed on the pattern side (#5 NF-1).
+        Assert.False(FindEngine.JsCompatible(@"(?<a>x)(y)\1"));
+        Assert.False(FindEngine.JsCompatible(@"\1(?<a>x)(y)"));      // the number may be written first
+        Assert.False(FindEngine.JsCompatible(@"(a)(?<b>x)(c)\3"));   // a named group in the middle counts
+        Assert.False(FindEngine.JsCompatible(@"(?<a>x)(y)\12"));     // two digits, same story
+
+        // Arrangements the two engines number the same way stay allowed.
+        Assert.True(FindEngine.JsCompatible(@"(x)(?<b>y)\1"));       // every named group comes last
+        Assert.True(FindEngine.JsCompatible(@"(?<a>x)\1"));          // nothing unnamed to reorder
+        Assert.True(FindEngine.JsCompatible(@"(?<a>x)(?<b>y)\2"));   // all named, source order in both
+        Assert.True(FindEngine.JsCompatible(@"(?<a>x)(y)\k<a>"));    // \k<name> is one group in both
+        Assert.True(FindEngine.JsCompatible(@"(?<a>x)(?:y)\1"));     // (?: captures nothing
+
+        // And Build — the one gate both views go through — says no.
+        Assert.Null(FindEngine.Build(@"(?<a>x)(y)\1", FindEngine.Mode.Regex, matchCase: true, wholeWord: false));
+    }
+
+    [Fact]
     public void ReportsInvalidPatternReadsTheEditorsRefusal()
     {
         // findReset answers { total: 0, current: 0, error: 'Invalid pattern' } for a

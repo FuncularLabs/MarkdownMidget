@@ -137,9 +137,11 @@ Like Normal, but with two wildcards:
 
 Regex syntax. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`, `(foo|bar)`. Groups —
 named (`(?<year>\d{4})`) and numbered — backreferences (`\1`, `\k<year>`),
-lookahead (`(?=…)`, `(?!…)`) and lookbehind (`(?<=…)`, `(?<!…)`) all work.
-**Wrap around** lets the search loop from the end back to the start when **Find
-Next** runs off the bottom.
+lookahead (`(?=…)`, `(?!…)`) and lookbehind (`(?<=…)`, `(?<!…)`) all work, with
+one exception: `\1` is refused in a pattern that writes a named group *before*
+an unnamed one, because the two views number the groups differently there — use
+`\k<name>`, which names the same group in both. **Wrap around** lets the search
+loop from the end back to the start when **Find Next** runs off the bottom.
 
 #### Patterns that must mean the same in both views
 
@@ -158,7 +160,8 @@ other does not are refused outright, with the same *Invalid pattern.* message:
 | `(?(…)…\|…)`                              | conditional — .NET only                         |
 | `(?'name'…)` `\k'name'`                   | .NET's quoted spellings; `(?<name>…)` and `\k<name>` are fine |
 | `(?<a-b>…)`                               | balancing group — .NET only                     |
-| `[a-z-[aeiou]]`                           | class subtraction; the browser reads it as a union |
+| `[a-z-[aeiou]]`                           | class subtraction; .NET subtracts, and the browser refuses the pattern outright |
+| `\1` after `(?<name>…)` and before `(…)`  | the two engines number the groups differently there — write `\k<name>` |
 | `a++` `a*+` `a?+` `a{1,2}+`               | possessive quantifiers — .NET only              |
 | `\p{IsGreek}` `\p{Letter}`                | Unicode blocks and long category names; `\p{L}` and `\p{Lu}` work |
 | a loose `{`, `}` or `]`                   | literal in .NET, a syntax error in the browser — write `\{`, `\}`, `\]` |

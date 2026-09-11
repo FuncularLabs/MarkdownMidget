@@ -689,6 +689,19 @@ describe('WhatTheHostAcceptsThisViewCanRun', () => {
     });
   }
 
+  test('a number after a named group means a different group here than in .NET', () => {
+    // The measurement behind the refused row "(?<a>x)(y)\1" (#5 NF-1). JavaScript
+    // numbers every capture in source order, so \1 is (?<a>x) and the pattern reads
+    // x-y-x; .NET numbers the unnamed groups first, so \1 is (y) there and the same
+    // pattern reads x-y-y. Both engines compile it, which is why FindEngine.JsCompatible
+    // has to refuse it before either view sees it — proved in FindEngineTests, since
+    // the gate is host-side. This pins the half of the divergence this engine owns.
+    load('xyy and xyx');
+    assert.equal(scan('(?<a>x)(y)\\1').total, 1);
+    findNext(true);
+    assert.equal(highlighted(), 'xyx');
+  });
+
   test('every refused row says which engine refuses it', () => {
     // Without this a new row with no refusedBy would take the 'host' branch above and
     // assert nothing at all.
