@@ -48,7 +48,7 @@ changes between alpha tags.
   saved only there is written back as typed. Once the formatted view has changed
   the document, the source view shows the editor's version of it, because that is
   then the only copy of your work. (#2)
-- **A file's line endings and byte-order mark are kept as found.** A CRLF file
+- **A file's line endings and UTF-8 byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view
   writes LF between blocks but keeps whatever was inside fenced, indented and
   HTML blocks — and a file that began with a UTF-8 byte-order mark lost it on
