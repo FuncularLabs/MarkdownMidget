@@ -445,6 +445,8 @@ release, with infrastructure riding along with whatever needs it.
 ## Won't unless asked (known limits, parked deliberately)
 
 Filled from the 2026-09-10 audit. These are stated, not hidden; each is a choice.
+The user-facing statement of them is HELP's **Known limits** section, which says
+what each one costs a reader and what to do instead; this list is the decision.
 
 - **Spell check is en-US only, and the UI is English only.** Language selection
   is under Later; localisation is not planned.
@@ -458,9 +460,11 @@ Filled from the 2026-09-10 audit. These are stated, not hidden; each is a choice
 - **One document per window, no tabs, no Window menu.** Deliberate SDI; see the
   cross-instance registry under Someday.
 - **A document that passes through the formatted view is saved in the app's
-  markdown conventions.** After 1.0 those are pinned and documented;
-  reference-style links become inline, setext headings become ATX, indented code
-  becomes fenced, tight bullet lists become loose unless 1.0 pins them tight. A
+  markdown conventions.** Pinned and documented since #2: reference-style links
+  become inline, setext headings become ATX, indented code becomes fenced, an
+  underscore in an image's alt text is escaped — and emphasis that opens or
+  closes on punctuation touching an emoji keeps its text but may lose its marks.
+  (Tight lists no longer loosen; that one was fixed rather than parked.) A
   document opened and saved entirely in the source view is written back as typed.
   Preserving each document's own style would be a second serialiser to test and
   is not planned.
