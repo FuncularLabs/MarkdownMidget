@@ -289,10 +289,21 @@ public class DropHandshakeTests
         // a malformed message took the process down.
         Assert.Equal(TimeSpan.FromSeconds(600), DropHandshake.ReadTimeout(long.MaxValue));
 
-        // The clamp is well clear of any honest drop. Ten pictures at the 64 MB
-        // ceiling is 640 MB — the largest total the routing can actually produce for
-        // an insertion — and that is 90 s, nowhere near ten minutes.
+        // Ten pictures at the 64 MB ceiling is 640 MB, which is 90 s — nowhere near
+        // ten minutes.
         Assert.Equal(TimeSpan.FromSeconds(90), DropHandshake.ReadTimeout(10 * DropRouting.MaxPictureBytes));
+
+        // But 640 MB is NOT "the largest total the routing can actually produce"
+        // (NF-5): the ceiling is per picture, and nothing caps how many are dropped
+        // at once. The clamp is reachable honestly, and this is where — 73 pictures
+        // at the ceiling stays inside it, 74 reaches it. Said with the real number
+        // rather than "no picture could reach it", which was simply untrue.
+        Assert.True(DropHandshake.ReadTimeout(73 * DropRouting.MaxPictureBytes) < TimeSpan.FromSeconds(600));
+        Assert.Equal(TimeSpan.FromSeconds(600), DropHandshake.ReadTimeout(74 * DropRouting.MaxPictureBytes));
+
+        // Which is the point of the clamp, not an argument against it: a drop of 74
+        // pictures is a mis-drag, and the wait it buys is bounded either way.
+        Assert.Equal(TimeSpan.FromSeconds(594), DropHandshake.ReadTimeout(73 * DropRouting.MaxPictureBytes));
     }
 
     [Fact]

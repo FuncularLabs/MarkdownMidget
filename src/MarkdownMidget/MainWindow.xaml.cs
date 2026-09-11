@@ -4234,10 +4234,11 @@ public partial class MainWindow : Window
         // Pinned before the request goes out and checked after it comes back. The
         // await below is bounded by ReadTimeout, not by anything the user is stopped
         // from doing in the meantime: there is no busy overlay, so File ▸ Open,
-        // File ▸ New, File ▸ Close, Edit ▸ Read Only and a drop on the toolbar are
-        // all reachable for however long it lasts — 10 s at the floor, 90 s for ten
-        // pictures at the ceiling, and up to the ten-minute clamp for a stated size
-        // no picture could reach.
+        // File ▸ New, File ▸ Close, Edit ▸ Read Only, Ctrl+E and a drop on the
+        // toolbar are all reachable for however long it lasts — 10 s at the floor,
+        // 90 s for ten pictures at the ceiling, and the ten-minute clamp for about
+        // 74 of them (the ceiling is per picture; nothing caps the count) or for a
+        // stated size no honest drop produces.
         // After the supersede check above, so an out-of-order fileDrop that is NOT
         // the newest drop does not claim the window on its way out.
         var then = DropPin(++_dropGeneration);

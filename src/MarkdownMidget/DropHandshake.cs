@@ -294,8 +294,11 @@ internal static class DropHandshake
     /// reaches <see cref="BytesRequested"/> unchanged. Unclamped, that is past
     /// TimeSpan's own range, and the OverflowException lands inside
     /// <c>async void HandleDroppedFiles</c>, where nothing catches it: a malformed
-    /// message would take the process down. Ten minutes is far above any honest
-    /// drop — ten pictures at the ceiling is 640 MB, which is 90 s.
+    /// message would take the process down. Ten minutes is far above any ORDINARY
+    /// drop — ten pictures at the ceiling is 640 MB, which is 90 s — but it is not
+    /// out of honest reach: the ceiling is per picture and nothing caps the count,
+    /// so about 74 pictures at it get there for real. That is a mis-drag rather
+    /// than a malformed message, and the clamp is what bounds both.
     /// </summary>
     public static TimeSpan ReadTimeout(long bytesRequested) =>
         TimeSpan.FromSeconds(Math.Min(600, 10 + Math.Max(0, bytesRequested) / (8.0 * 1024 * 1024)));
