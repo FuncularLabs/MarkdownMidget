@@ -13,8 +13,39 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <!-- Line-coverage measurement for the test-first house rule (>=85% on touched files):
-         "dotnet test /collect:XPlat Code Coverage" writes cobertura XML per run. -->
+    <!-- Line coverage for the test-first house rule (>=85% on touched files).
+
+         Measure it with the Microsoft collector (Microsoft.CodeCoverage, which
+         Microsoft.NET.Test.Sdk brings in). From the repo root:
+           dotnet test tests/MarkdownMidget.Tests/MarkdownMidget.Tests.csproj
+             -collect:"Code Coverage;Format=cobertura" -results-directory FOLDER
+         Type both options with TWO leading hyphens. An XML comment cannot hold a double
+         hyphen (MSBuild then refuses to load this file, MSB4025); typed with one, dotnet test
+         stops with MSB1001 "Unknown switch". README.md (Build & run) has the line ready to
+         paste. Put FOLDER outside the repo; the default TestResults folder is not
+         git-ignored. The report is written to
+         FOLDER\<guid>\<user>_<machine>_<date>.<time>.cobertura.xml.
+
+         Reading it: the report also lists this test assembly and Konscious.*, so its root
+         line-rate is not the app's; the app is package "MarkdownMidget". One source file is
+         split across several <class> elements (nested types, lambdas, async state machines),
+         so a file's line rate is the union over every <class> with that filename: distinct
+         <line> numbers with hits > 0, divided by distinct <line> numbers.
+
+         coverlet (this package; "XPlat Code Coverage") cannot measure the app. Its run
+         passes and writes a cobertura file with <packages /> and lines-valid="0", and its
+         diag log (dotnet test -d FILE) says why:
+           [coverlet]Unable to instrument module: ...\MarkdownMidget.dll
+           Mono.Cecil.ResolutionException: Failed to resolve System.Windows.Input.ModifierKeys
+         Cecil looks WindowsBase up by simple name among the assemblies of the process it
+         runs in (the test platform's datacollector, or MSBuild for coverlet.msbuild), and
+         both run on Microsoft.NETCore.App alone. That framework's WindowsBase.dll (16 KB) has
+         no ModifierKeys; the WPF one is in Microsoft.WindowsDesktop.App. Reproduced 2026-09-11
+         with coverlet.collector 6.0.2 and 10.0.1 (newest), with a runsettings IncludeDirectory
+         aimed at the WPF framework, and with coverlet.msbuild 10.0.1 (-p:CollectCoverage=true).
+         Copying WPF's WindowsBase.dll beside the module does make coverlet work (upstream
+         coverlet issue 1355), but that is a workaround and is not done here. The package
+         stays referenced: the command above runs with it in place. -->
     <PackageReference Include="coverlet.collector" Version="6.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

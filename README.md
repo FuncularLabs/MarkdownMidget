@@ -172,6 +172,18 @@ To try an installed copy of a local build, publish a single-file build first
 Register refuses a plain `dotnet build` or `dotnet run` output: that exe needs
 the files beside it, and a copy of it on its own would not start.
 
+To measure line coverage, use the Microsoft collector that `Microsoft.NET.Test.Sdk`
+brings in, with a results folder outside the repo (the default `TestResults` folder
+is not git-ignored):
+
+```sh
+dotnet test tests/MarkdownMidget.Tests/MarkdownMidget.Tests.csproj --collect:"Code Coverage;Format=cobertura" --results-directory <folder outside the repo>
+```
+
+coverlet's `XPlat Code Coverage` passes but reports nothing for the app. The
+comment in `tests/MarkdownMidget.Tests/MarkdownMidget.Tests.csproj` says why, and
+how to read one file's line rate from the report.
+
 ## Distribution (single-file builds)
 
 The **framework-dependent** profile is the standard distributable — a single ~6.5 MB

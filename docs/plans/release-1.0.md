@@ -134,8 +134,9 @@ view driven against a real editor in jsdom (`find.test.mjs`), and the source
 view's edit application through AvalonEdit (`SourceEditorTests`, STA). The
 **host wiring in `MainWindow.xaml.cs`** — roughly 190 lines that read the dialog,
 choose a view, marshal to the editor and write the status line — is covered by
-**inspection and dogfooding only**: coverlet cannot instrument a WPF app on
-.NET 10, so those lines are not merely untested but unmeasurable. Where a host
+**inspection and dogfooding only**. (Coverage of those lines can be measured:
+coverlet cannot instrument the app assembly, but the Microsoft collector can;
+the test project file has the command.) Where a host
 decision could be lifted out and tested it has been (`FindEngine.ResolveScope`,
 `CaptureDecision`, `ReplaceAllStatus`, `ReportsInvalidPattern`); what is left in
 the window is plumbing between them.
