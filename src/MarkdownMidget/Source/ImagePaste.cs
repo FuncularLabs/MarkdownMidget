@@ -70,7 +70,8 @@ internal static class ImagePaste
     /// whose DIB WPF hands over as a <see cref="BitmapSource"/>. The bitmap goes
     /// through <see cref="ForEncoding"/> first, so a 32-bit DIB whose fourth byte is
     /// padding, zero on every pixel as a screenshot tool leaves it, comes out opaque
-    /// rather than invisible. PNG is lossless, which suits the screenshots that are
+    /// rather than invisible, and one whose alpha is real keeps it, with the colours
+    /// the formatted view shows. PNG is lossless, which suits the screenshots that are
     /// the usual case, and every renderer of the document reads it.
     /// </summary>
     public static byte[] EncodePng(BitmapSource image)
@@ -83,11 +84,27 @@ internal static class ImagePaste
     }
 
     /// <summary>
-    /// The bitmap to encode for <paramref name="image"/>: <paramref name="image"/>
-    /// itself, or, when its alpha channel does not hold real alpha
+    /// The bitmap to encode for <paramref name="image"/>, read the way Chromium reads a
+    /// 32-bit bitmap from the clipboard, so the source view pastes the picture the
+    /// formatted view shows (I2). One of three things:
+    /// <list type="bullet">
+    /// <item>When its alpha channel does not hold real alpha
     /// (<see cref="MustBeMadeOpaque"/> decides), an opaque copy: the colour kept
-    /// exactly, the alpha set to full, the pixel format unchanged. A format without an
-    /// alpha channel (Bgr32, Bgr24, grey, indexed…) is returned as it is.
+    /// exactly, the alpha set to full, the pixel format unchanged.</item>
+    /// <item>When a Bgra32 bitmap keeps its alpha, the same bytes labelled Pbgra32, in a
+    /// frozen copy with the same size, stride and DPI. No colour byte exceeds its
+    /// alpha, so the bytes are valid premultiplied alpha, and premultiplied is how
+    /// Chromium's clipboard code (<c>ui/base/clipboard/clipboard_win.cc</c>, as cited;
+    /// its comment gives Windows' premultiplied alpha as the reason) reads a 32-bit
+    /// DIB. The PNG encoder then un-premultiplies them, so a semi-transparent pixel
+    /// gets the colour the formatted view shows: 60,40,20 at alpha 128 comes out about
+    /// 120,80,40 at alpha 128, where WPF's own label, Bgra32, straight alpha, would
+    /// give 60,40,20, half as bright. A fully opaque bitmap encodes to the same pixels
+    /// either way: at alpha 255 straight and premultiplied are the same bytes.</item>
+    /// <item>Otherwise <paramref name="image"/> itself: Pbgra32 that keeps its alpha
+    /// (already premultiplied), the wide formats that keep theirs, and every format
+    /// without an alpha channel (Bgr32, Bgr24, grey, indexed…).</item>
+    /// </list>
     ///
     /// This is what makes a pasted screenshot visible. A screenshot tool (Windows'
     /// Snipping Tool, for one) leaves a 32-bit BI_RGB DIB whose fourth byte is
@@ -109,13 +126,23 @@ internal static class ImagePaste
         var stride = checked(image.PixelWidth * slot.PixelBytes);
         var pixels = new byte[checked(stride * image.PixelHeight)];
         image.CopyPixels(pixels, stride, 0);
-        if (!MustBeMadeOpaque(pixels, image.Format)) return image;
+        if (!MustBeMadeOpaque(pixels, image.Format))
+            return image.Format == PixelFormats.Bgra32 ? Frozen(image, PixelFormats.Pbgra32, pixels, stride) : image;
         for (var p = slot.Offset; p < pixels.Length; p += slot.PixelBytes)
             slot.Full.CopyTo(pixels, p);
-        var opaque = BitmapSource.Create(image.PixelWidth, image.PixelHeight, image.DpiX, image.DpiY,
-            image.Format, null, pixels, stride);
-        opaque.Freeze();
-        return opaque;
+        return Frozen(image, image.Format, pixels, stride);
+    }
+
+    /// <summary><paramref name="pixels"/>, rows <paramref name="stride"/> bytes apart, as
+    /// a frozen bitmap in <paramref name="format"/> with <paramref name="image"/>'s size
+    /// and DPI. A relabelling, not a conversion: the bytes are taken as they
+    /// are.</summary>
+    private static BitmapSource Frozen(BitmapSource image, PixelFormat format, byte[] pixels, int stride)
+    {
+        var copy = BitmapSource.Create(image.PixelWidth, image.PixelHeight, image.DpiX, image.DpiY,
+            format, null, pixels, stride);
+        copy.Freeze();
+        return copy;
     }
 
     /// <summary>
@@ -126,8 +153,10 @@ internal static class ImagePaste
     /// spare bits hold, they are not alpha.
     ///
     /// <para><b>Bgra32 and Pbgra32</b> are judged by Chromium's test: opaque when any
-    /// pixel has a blue, green or red byte greater than its alpha byte, otherwise left
-    /// alone. Bgra32 is the format WPF reads a 32-bit clipboard DIB back as; Pbgra32
+    /// pixel has a blue, green or red byte greater than its alpha byte; otherwise the
+    /// alpha is real and kept, and <see cref="ForEncoding"/> reads kept Bgra32 bytes as
+    /// premultiplied, as Chromium does. Bgra32 is the format WPF reads a 32-bit
+    /// clipboard DIB back as; Pbgra32
     /// has the same four bytes a pixel and is judged the same way. The test is cited
     /// from Chromium's <c>ui/base/clipboard/clipboard_win.cc</c> (the
     /// premultiplied-validity check, <c>BitmapHasInvalidPremultipliedColors</c>, which

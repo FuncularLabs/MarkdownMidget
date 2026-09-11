@@ -525,19 +525,97 @@ public class SourceEditorTests
         return opaque;
     }
 
-    [Fact]
-    public void PastedPictureWithRealTransparencyKeepsItsAlpha()
+    /// <summary>Pixels the same but for rounding: every alpha byte exactly, every colour
+    /// byte within 1.</summary>
+    private static void AssertWithinOne(byte[] expected, byte[] actual)
     {
-        // Real alpha survives exactly: every colour byte at or below its pixel's
-        // alpha (valid premultiplied, which Chromium keeps too), the transparent
-        // pixels black, alpha from 0 to 255, and several colour bytes equal to their
-        // alpha, where "above" and "at or above" part company.
-        byte[] picture =
-        [
-            0x00, 0x00, 0x00, 0x00,   0x10, 0x40, 0x20, 0x40,   0x80, 0x00, 0x7F, 0x80,
-            0x30, 0xC0, 0x60, 0xC0,   0xFF, 0x80, 0x10, 0xFF,   0x00, 0x00, 0x00, 0x00,
-        ];
-        Assert.Equal(picture, PasteDib(picture));
+        Assert.Equal(expected.Length, actual.Length);
+        for (var i = 0; i < expected.Length; i++)
+        {
+            var close = i % 4 == 3 ? expected[i] == actual[i] : Math.Abs(expected[i] - actual[i]) <= 1;
+            Assert.True(close,
+                $"byte {i} (pixel {i / 4}, {"BGRA"[i % 4]}): expected {expected[i]}, got {actual[i]}\n" +
+                $"expected [{string.Join(", ", expected)}]\ngot      [{string.Join(", ", actual)}]");
+        }
+    }
+
+    /// <summary>The straight colours that premultiplied BGRA bytes stand for: each
+    /// colour byte times 255 over its alpha, rounded, and black where the alpha is
+    /// 0.</summary>
+    private static byte[] Unpremultiplied(byte[] pbgra)
+    {
+        var straight = (byte[])pbgra.Clone();
+        for (var i = 0; i < straight.Length; i += 4)
+        {
+            var alpha = pbgra[i + 3];
+            for (var c = 0; c < 3; c++)
+                straight[i + c] = alpha == 0 ? (byte)0 : (byte)Math.Round(pbgra[i + c] * 255.0 / alpha);
+        }
+        return straight;
+    }
+
+    /// <summary>A 3×2 picture with real transparency: every colour byte at or below its
+    /// pixel's alpha, alpha from 0 to 255, transparent pixels black, and several colour
+    /// bytes equal to their alpha, where "above" and "at or above" part company.</summary>
+    private static readonly byte[] RealTransparency =
+    [
+        60, 40, 20, 128,          0x10, 0x40, 0x20, 0x40,   0x80, 0x00, 0x7F, 0x80,
+        0x30, 0xC0, 0x60, 0xC0,   0xFF, 0x80, 0x10, 0xFF,   0x00, 0x00, 0x00, 0x00,
+    ];
+
+    [Fact]
+    public void PastedPictureWithRealTransparencyKeepsItsAlphaAndGetsChromiumsColours()
+    {
+        // Real alpha survives exactly, and the colour is read as premultiplied, which
+        // is how Chromium's clipboard code reads a 32-bit DIB, so the two views paste
+        // the same picture: 60,40,20 at alpha 128 stands for about 120,80,40 at alpha
+        // 128. WPF labels the DIB Bgra32, straight alpha, and encoding the bytes under
+        // that label would paste 60,40,20, a picture half as bright as the formatted
+        // view's. Colour within 1, for rounding.
+        var pasted = PasteDib(RealTransparency);
+
+        AssertWithinOne([120, 80, 40, 128], pasted[..4]);
+        AssertWithinOne(Unpremultiplied(RealTransparency), pasted);
+    }
+
+    [Fact]
+    public void PastedOpaquePictureIsByteForByteTheSame()
+    {
+        // Full alpha: straight and premultiplied are the same bytes, so reading a kept
+        // Bgra32 bitmap as premultiplied must not move a single colour. Every byte value
+        // appears in every colour channel, 0 and 255 included.
+        var picture = new byte[16 * 16 * 4];
+        for (var i = 0; i < 256; i++)
+        {
+            picture[i * 4] = (byte)i;
+            picture[i * 4 + 1] = (byte)(255 - i);
+            picture[i * 4 + 2] = (byte)(i * 7);
+            picture[i * 4 + 3] = 0xFF;
+        }
+        var pasted = On(ed =>
+        {
+            var data = new DataObject();
+            data.SetImage(ClipboardFixtures.Dib(16, 16, picture));
+            Assert.True(ed.TryPasteImage(data));
+            return DecodeToBgra(PastedBytes(ed.Text, ""));
+        }, "", laidOut: false);
+
+        Assert.Equal(picture, pasted);
+    }
+
+    [Fact]
+    public void Pbgra32WithTheSameBytesEncodesToTheSamePicture()
+    {
+        // The bytes above labelled Pbgra32, which ForEncoding leaves as they are: the
+        // encoder un-premultiplies them, and the Bgra32 paste of the same bytes must
+        // come out exactly the same, since it is read as premultiplied too.
+        var pasted = PasteDib(RealTransparency);
+        var encoded = On(_ => DecodeToBgra(ImagePaste.EncodePng(
+            BitmapSource.Create(3, 2, 96, 96, PixelFormats.Pbgra32, null, RealTransparency, 12))),
+            "", laidOut: false);
+
+        AssertWithinOne(Unpremultiplied(RealTransparency), encoded);
+        Assert.Equal(encoded, pasted);
     }
 
     [Fact]
@@ -946,30 +1024,57 @@ public class SourceEditorTests
         Assert.Equal(Opaque(pixels), result);
     }
 
-    [Theory]
-    [InlineData("Pbgra32")]
-    [InlineData("Bgra32")]
-    public void ForEncodingLeavesValidPremultipliedAlphaAlone(string name)
+    /// <summary>Four pixels whose colour never exceeds their alpha, by name: "valid"
+    /// (alpha 0, 0x40, 0x80 and 0xFE, several colour bytes equal to their alpha, where
+    /// "above" and "at or above" part company), "black" (every byte zero: the case
+    /// Chromium's own comment names as the one its test gets wrong, kept transparent
+    /// here as there, where the all-zero rule would make it opaque black) and "opaque"
+    /// (alpha 255 everywhere, colour from 0 to 255).</summary>
+    private static byte[] KeptPixels(string name) => name switch
     {
-        // Every colour byte at or below its alpha, alpha 0, 0x40, 0x80 and 0xFE: valid
-        // premultiplied, as Chromium reads the bytes, so Chromium keeps it and the
-        // bitmap comes back as it is, the same instance. Several colour bytes equal
-        // their alpha, where "above" and "at or above" part company.
-        byte[] pixels = [0x00, 0x00, 0x00, 0x00, 0x40, 0x20, 0x10, 0x40, 0x7F, 0x80, 0x01, 0x80, 0xFE, 0x01, 0xFE, 0xFE];
-        var (format, size, _, _) = AlphaFormat(name);
-        Assert.True(Prepared(format, size, pixels).Same);
+        "valid" => [0x00, 0x00, 0x00, 0x00, 0x40, 0x20, 0x10, 0x40, 0x7F, 0x80, 0x01, 0x80, 0xFE, 0x01, 0xFE, 0xFE],
+        "black" => new byte[16],
+        "opaque" => [0x00, 0x01, 0xFE, 0xFF, 0x10, 0x80, 0xF0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x40, 0x20, 0xFF],
+        _ => throw new ArgumentOutOfRangeException(nameof(name)),
+    };
+
+    [Theory]
+    [InlineData("valid")]
+    [InlineData("black")]
+    [InlineData("opaque")]
+    public void ForEncodingLeavesPbgra32ThatKeepsItsAlphaAlone(string pixels)
+    {
+        // No colour above its alpha, so Chromium's test keeps the alpha, and the format
+        // already says premultiplied: the bitmap comes back as it is, the same instance.
+        Assert.True(Prepared(PixelFormats.Pbgra32, 4, KeptPixels(pixels)).Same);
     }
 
     [Theory]
-    [InlineData("Bgra32")]
-    [InlineData("Pbgra32")]
-    public void ForEncodingLeavesABitmapBlackAndTransparentEverywhereAlone(string name)
+    [InlineData("valid")]
+    [InlineData("black")]
+    [InlineData("opaque")]
+    public void ForEncodingRelabelsBgra32ThatKeepsItsAlphaAsPbgra32(string pixels)
     {
-        // Every byte zero: no colour above its alpha, so Chromium's test keeps the
-        // transparency, and so does ForEncoding. (The all-zero rule, which the wide
-        // formats keep, would make it opaque black.)
-        var (format, size, _, _) = AlphaFormat(name);
-        Assert.True(Prepared(format, size, new byte[4 * size]).Same);
+        // No colour above its alpha, so the alpha is kept, and the bytes are read as
+        // premultiplied, as Chromium reads a 32-bit clipboard DIB: the same bytes,
+        // labelled Pbgra32, in a frozen copy of the same size and DPI. Not made opaque,
+        // and not converted (a conversion to Pbgra32 would premultiply them again).
+        var source = KeptPixels(pixels);
+        var (same, format, bytes, geometry, frozen) = On(_ =>
+        {
+            var image = BitmapSource.Create(2, 2, 120, 144, PixelFormats.Bgra32, null, source, 8);
+            var prepared = ImagePaste.ForEncoding(image);
+            var copied = new byte[16];
+            prepared.CopyPixels(copied, 8, 0);
+            return (ReferenceEquals(prepared, image), prepared.Format, copied,
+                (prepared.PixelWidth, prepared.PixelHeight, prepared.DpiX, prepared.DpiY), prepared.IsFrozen);
+        }, "", laidOut: false);
+
+        Assert.False(same);
+        Assert.Equal(PixelFormats.Pbgra32, format);
+        Assert.Equal(source, bytes);
+        Assert.Equal((2, 2, 120.0, 144.0), geometry);
+        Assert.True(frozen);
     }
 
     [Theory]
