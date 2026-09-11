@@ -18,16 +18,16 @@ The 2026-09-10 readiness audit, planned in detail in
 breadth, one hole that would embarrass a 1.0, a few that read as unfinished". In
 order of risk:
 
-- **Saving rewrites your markdown conventions, invisibly.** Measured on the shipped
-  bundle: a 39-line README-style file came back with 30 lines changed and no edit
-  made — setext headings to `#`, `+` bullets to `*`, `1)` to `1.`, reference links
-  inlined with their definition deleted, indented code fenced, two-space hard breaks
-  to `\`, `snake_case_word` to `snake\_case\_word`, tight bullet lists loosened. It is
-  invisible because, in the formatted view, the clean baseline after Open is the
-  editor's re-serialisation, not the file; the source view saves as typed. The
-  README's "not a lossy import/export" is true in content and false in form. 1.0
-  pins and documents the conventions, builds the round-trip harness that keeps them
-  pinned, and stops escaping intraword underscores if that can be done safely.
+- ~~**Saving rewrites your markdown conventions, invisibly.**~~ **Done 2026-09-11
+  (unreleased, #2)**: the conventions the formatted view saves in are pinned in
+  `editor-src/src/conventions.js`, kept pinned by a round-trip harness that runs the
+  shipped editor in jsdom (one named case per convention), and written down in Help
+  under *Modified state, undo, and saving ▸ Markdown conventions*; intraword
+  underscores are no longer escaped, tight lists stay tight, and emphasis that
+  touches punctuation survives the trip. One limit is accepted and stated: emphasis
+  opening or closing on punctuation that directly touches an emoji keeps its text
+  whole but may come back as the literal `*…*` text. Was: a 39-line README-style
+  file came back with 30 lines changed and no edit made.
 - ~~**Line endings are mangled and the BOM is dropped.**~~ **Done 2026-09-10
   (unreleased, #3)**: the file's line ending (by majority) and UTF-8 BOM are detected
   on open, every ending is folded in memory, and Save re-applies the detected

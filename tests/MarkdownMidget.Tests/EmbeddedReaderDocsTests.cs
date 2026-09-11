@@ -81,6 +81,7 @@ public class EmbeddedReaderDocsTests
 
     [Theory]
     [InlineData(1, "0.10.0")]
+    [InlineData(2, "0.10.0")]
     [InlineData(3, "0.10.0")]
     [InlineData(4, "0.10.0")]
     [InlineData(7, "0.10.0")]
