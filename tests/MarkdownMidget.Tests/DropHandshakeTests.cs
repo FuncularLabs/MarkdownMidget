@@ -271,6 +271,23 @@ public class DropHandshakeTests
     }
 
     [Fact]
+    public void TheWaitIsClampedSoNoStatedSizeCanOverflowIt()
+    {
+        // AR-3. Only PICTURES have a ceiling — a dropped document is opened, and
+        // File ▸ Open has never capped what it opens — so BytesRequested can return
+        // any long a fileDrop message cares to state. TimeSpan.FromSeconds of
+        // long.MaxValue / 8 MB is past TimeSpan's own range, and the OverflowException
+        // is thrown inside `async void HandleDroppedFiles`, where nothing catches it:
+        // a malformed message took the process down.
+        Assert.Equal(TimeSpan.FromSeconds(600), DropHandshake.ReadTimeout(long.MaxValue));
+
+        // The clamp is well clear of any honest drop. Ten pictures at the 64 MB
+        // ceiling is 640 MB — the largest total the routing can actually produce for
+        // an insertion — and that is 90 s, nowhere near ten minutes.
+        Assert.Equal(TimeSpan.FromSeconds(90), DropHandshake.ReadTimeout(10 * DropRouting.MaxPictureBytes));
+    }
+
+    [Fact]
     public void TheWaitIsSizedFromTheFilesActuallyAskedFor()
     {
         var files = new List<DroppedFile>

@@ -242,9 +242,19 @@ internal static class DropHandshake
     /// The shape is grace plus throughput, not a flat number: 8 MB/s is far slower
     /// than any disk, so a big picture behind a slow read is never cut off, while a
     /// bridge that has stopped answering costs a pause rather than a hang.
+    ///
+    /// And clamped at <b>ten minutes</b>, because the total is not bounded by
+    /// anything. Only PICTURES have a ceiling (<see cref="DropRouting.MaxPictureBytes"/>);
+    /// a dropped document is opened, and File ▸ Open has never capped what it opens,
+    /// so a <c>fileDrop</c> message stating a document of <c>long.MaxValue</c> bytes
+    /// reaches <see cref="BytesRequested"/> unchanged. Unclamped, that is past
+    /// TimeSpan's own range, and the OverflowException lands inside
+    /// <c>async void HandleDroppedFiles</c>, where nothing catches it: a malformed
+    /// message would take the process down. Ten minutes is far above any honest
+    /// drop — ten pictures at the ceiling is 640 MB, which is 90 s.
     /// </summary>
     public static TimeSpan ReadTimeout(long bytesRequested) =>
-        TimeSpan.FromSeconds(10) + TimeSpan.FromSeconds(Math.Max(0, bytesRequested) / (8.0 * 1024 * 1024));
+        TimeSpan.FromSeconds(Math.Min(600, 10 + Math.Max(0, bytesRequested) / (8.0 * 1024 * 1024)));
 
     /// <summary>What the status line says when the editor never answered: not about
     /// one file — the message may never have crossed the bridge — and it names the
