@@ -414,6 +414,87 @@ public class OpenGuardTests : IDisposable
         Assert.Equal(a, guard.HeldPath);
     }
 
+    [Fact]
+    public void AReentrantOpenCommitsOnlyItsOwnPath()
+    {
+        // Open1 begins b; Open2 begins c before Open1 has landed (displacing b's
+        // pending claim, above); Open1 lands first and commits b. The pending claim
+        // is c's, not b's, and must not be promoted: the window would show b while
+        // holding c, and a cancelled Open2 would then leave it holding a document it
+        // never showed. What is true instead: b is on screen with its claim
+        // displaced, so - like a Begin that found its path held - b is shown
+        // unguarded; a is no longer shown, so its claim goes; c stays pending for
+        // Open2 to commit or abandon.
+        var a = Doc("shown.md");
+        var b = Doc("first-open.md");
+        var c = Doc("second-open.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(c, Me, hwnd: 1).State);
+        guard.Commit(b);
+        Assert.Null(guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(a));
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(b));
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));   // still pending
+
+        // Open2 lands: its own path, so its claim is promoted as usual - and the path
+        // is matched by identity, not spelling (KeyFor), like every other comparison.
+        guard.Commit(c.ToUpperInvariant());
+        Assert.Equal(c, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));
+
+        // The other order: Open2 lands first, then Open1. c is promoted; b's commit
+        // then finds nothing pending and c held, and c is not what the window shows
+        // any more, so it goes. b is shown unguarded, as above.
+        var d = Doc("shown-2.md");
+        var e = Doc("first-open-2.md");
+        var f = Doc("second-open-2.md");
+        var g2 = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Acquire(d, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Begin(e, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Begin(f, Me, hwnd: 1).State);
+        g2.Commit(f);
+        Assert.Equal(f, g2.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(d));
+        g2.Commit(e);
+        Assert.Null(g2.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(f));
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(e));
+    }
+
+    [Fact]
+    public void AReentrantOpenAbandonsOnlyItsOwnPath()
+    {
+        // Open1 begins b, Open2 begins c, and Open1 fails (an unreadable file, an
+        // editor that threw) while Open2 is still in flight. Open1 lets go of ITS
+        // pending claim - which the second Begin already displaced - and must leave
+        // c's alone, or Open2 would commit with nothing pending and show c unguarded.
+        var a = Doc("shown.md");
+        var b = Doc("first-open.md");
+        var c = Doc("second-open.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(c, Me, hwnd: 1).State);
+        guard.Abandon(b);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));   // Open2's claim is untouched
+        Assert.Equal(a, guard.HeldPath);
+        guard.Commit(c);
+        Assert.Equal(c, guard.HeldPath);
+
+        // Its own pending claim it does let go of, however the path is spelled; and
+        // with nothing pending there is nothing to do.
+        var d = Doc("cancelled.md");
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(d, Me, hwnd: 1).State);
+        guard.Abandon(d.ToUpperInvariant());
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(d));
+        Assert.Equal(c, guard.HeldPath);
+        guard.Abandon(d);
+        Assert.Equal(c, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(c));
+    }
+
     // ---- F3: a held lock proves a process has the file open, not that it is a window of ours ----
 
     [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();

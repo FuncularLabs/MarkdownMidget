@@ -113,7 +113,12 @@ internal sealed class OpenGuard : IDisposable
     /// until Commit says the new one is on screen. Abandon (a cancelled prompt, a
     /// failed read) lets the new handle go, and the old claim was never released.
     /// On a Held or Unavailable answer nothing is pending; Commit then decides what
-    /// becomes of the old claim.
+    /// becomes of the old claim. Only one open can be pending: a second Begin
+    /// while the first is still in flight (Ctrl+O and the Alt menu are not gated
+    /// by the busy overlay) displaces the first's pending claim - or its handle
+    /// would leak, and its path read as held until the collector closed it - and
+    /// the first open then commits its document unguarded, or abandons only what
+    /// is still its own (the path forms of Commit and Abandon).
     /// </summary>
     public Probe Begin(string path, int pid, long hwnd)
     {
@@ -128,15 +133,19 @@ internal sealed class OpenGuard : IDisposable
     }
 
     /// <summary>
-    /// The document at <paramref name="path"/> is on screen now. A pending claim
-    /// replaces the current one. Without one, Begin found the path held: by this
-    /// guard (the same document opened again) the claim simply stays; by anyone else,
-    /// or with the guard unable to answer, the old document is no longer what this
-    /// window shows, so its claim is released and the new one is shown unguarded.
+    /// The document at <paramref name="path"/> is on screen now. A pending claim on
+    /// that path replaces the current one. Without one, either Begin found the path
+    /// held - by this guard (the same document opened again) the claim simply
+    /// stays; by anyone else, or with the guard unable to answer, the old document
+    /// is no longer what this window shows, so its claim is released and the new
+    /// one is shown unguarded - or a later open displaced this one's pending claim
+    /// (see Begin). That open's claim is not this document's and is left pending
+    /// for it; this document is shown unguarded, as after a Begin that found it
+    /// held, and the old claim goes the same way.
     /// </summary>
     public void Commit(string path)
     {
-        if (_pending is not null)
+        if (_pendingPath is not null && SamePath(_pendingPath, path))
         {
             Release();
             _lock = _pending;
@@ -144,19 +153,30 @@ internal sealed class OpenGuard : IDisposable
             _pending = null;
             _pendingPath = null;
         }
-        else if (_heldPath is null || !string.Equals(KeyFor(_heldPath), KeyFor(path), StringComparison.Ordinal))
+        else if (_heldPath is null || !SamePath(_heldPath, path))
         {
             Release();
         }
     }
 
-    /// <summary>The open didn't happen: let the pending claim go. The current claim
-    /// was never touched. Safe to call when nothing is pending.</summary>
+    /// <summary>The open didn't happen: let the pending claim go, whatever it is on.
+    /// The current claim was never touched. Safe to call when nothing is pending.
+    /// For Begin (the previous pending claim is displaced) and Dispose; an open that
+    /// failed uses the path form, so that it lets go of its own claim only.</summary>
     public void Abandon()
     {
         try { _pending?.Dispose(); } catch { }
         _pending = null;
         _pendingPath = null;
+    }
+
+    /// <summary>The open of <paramref name="path"/> didn't happen: let its pending
+    /// claim go. A pending claim on another path is a later open still in flight
+    /// (see Begin), and is left for that open to commit or abandon. Safe to call
+    /// when nothing is pending.</summary>
+    public void Abandon(string path)
+    {
+        if (_pendingPath is not null && SamePath(_pendingPath, path)) Abandon();
     }
 
     /// <summary>
@@ -251,6 +271,10 @@ internal sealed class OpenGuard : IDisposable
     /// </summary>
     public static string KeyFor(string path) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Normalize(path).ToUpperInvariant())));
+
+    /// <summary>The same document, by KeyFor's identity rather than by spelling.</summary>
+    private static bool SamePath(string a, string b) =>
+        string.Equals(KeyFor(a), KeyFor(b), StringComparison.Ordinal);
 
     /// <summary>
     /// Full path, relative segments resolved, trailing separators trimmed, and 8.3

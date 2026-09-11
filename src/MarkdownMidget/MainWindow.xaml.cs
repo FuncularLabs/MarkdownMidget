@@ -1160,8 +1160,10 @@ public partial class MainWindow : Window
             // A cancelled password prompt, an unreadable file, an editor that threw:
             // the window still shows what it showed before, and that document's
             // claim was never let go of. Only the one begun on the file that never
-            // opened is released.
-            if (!loaded) _openGuard.Abandon();
+            // opened is released - by path, so that a second open started while
+            // this one was in flight (Ctrl+O is not gated by the busy overlay)
+            // keeps its own pending claim for its own commit.
+            if (!loaded) _openGuard.Abandon(path);
         }
     }
 
