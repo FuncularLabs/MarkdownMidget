@@ -255,4 +255,50 @@ public class SourceEditorTests
         Assert.Equal("second", l1);
         Assert.Equal("", outOfRange);
     }
+
+    // ===== Replace All (#5 F4): the planned edits land as one undo unit =====
+
+    [Fact]
+    public void ReplaceAllIsOneUndoUnit()
+    {
+        const string original = "cat one cat two cat";
+        var (after, count, afterUndo, canUndo, afterRedo) = On(ed =>
+        {
+            var spec = FindEngine.Prepare("cat", FindEngine.Mode.Normal, false, false, "tiger");
+            var n = ed.ApplyEdits(spec!.ReplaceAllEdits(ed.Text));
+            var replaced = ed.Text;
+            ed.Undo();                       // ONE undo
+            var undone = ed.Text;
+            var more = ed.CanUndo;           // nothing left of the replace to undo
+            ed.Redo();
+            return (replaced, n, undone, more, ed.Text);
+        }, original, laidOut: false);
+
+        Assert.Equal("tiger one tiger two tiger", after);
+        Assert.Equal(3, count);
+        Assert.Equal(original, afterUndo);
+        Assert.False(canUndo);
+        Assert.Equal("tiger one tiger two tiger", afterRedo);
+    }
+
+    [Fact]
+    public void ApplyEditsHandlesGrowingShrinkingAndEmptyPlans()
+    {
+        // Edits are planned against the text as it was: a longer first replacement
+        // must not shift the later ones (they are applied last to first), and an
+        // empty plan touches neither the text nor the undo stack.
+        var (mixed, emptyCount, emptyCanUndo) = On(ed =>
+        {
+            var spec = FindEngine.Prepare(@"(\w+)@", FindEngine.Mode.Regex, false, false, "[$1]");
+            ed.ApplyEdits(spec!.ReplaceAllEdits(ed.Text));
+            var text = ed.Text;
+            ed.Undo();
+            var n = ed.ApplyEdits(System.Array.Empty<FindEngine.Edit>());
+            return (text, n, ed.CanUndo);
+        }, "a@ bb@ c", laidOut: false);
+
+        Assert.Equal("[a] [bb] c", mixed);
+        Assert.Equal(0, emptyCount);
+        Assert.False(emptyCanUndo);
+    }
 }

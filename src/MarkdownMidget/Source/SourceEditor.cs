@@ -215,6 +215,35 @@ public class SourceEditor : TextEditor
         return snapToText ? doc.TextLength : -1;
     }
 
+    // ===== Replace All (#5) =====
+
+    /// <summary>
+    /// Applies planned replacements as ONE undo unit: the document is put into an
+    /// update (<see cref="TextDocument.BeginUpdate"/>, which opens an undo group
+    /// that <see cref="TextDocument.EndUpdate"/> closes), and the edits go in last
+    /// to first so each index — planned against the text as it was — is still
+    /// right when its turn comes. Per-edit replacement rather than one rewrite of
+    /// the span keeps the untouched text untouched, so the squiggle tracker only
+    /// shifts around the words that changed. Returns the number applied. An empty
+    /// plan touches nothing and leaves no undo entry behind.
+    /// </summary>
+    public int ApplyEdits(IReadOnlyList<FindEngine.Edit> edits)
+    {
+        if (edits.Count == 0) return 0;
+        var doc = Document;
+        doc.BeginUpdate();
+        try
+        {
+            for (var i = edits.Count - 1; i >= 0; i--)
+            {
+                var e = edits[i];
+                doc.Replace(e.Index, e.Length, e.Text);
+            }
+        }
+        finally { doc.EndUpdate(); }
+        return edits.Count;
+    }
+
     // ===== the background-renderer hook the squiggles draw through =====
 
     /// <summary>Add a background renderer to the text view — the AvalonEdit-native
