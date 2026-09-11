@@ -19,25 +19,6 @@ changes between alpha tags.
   saying where it is open; turning View ▸ Read Only off again claims the file
   first, so it stays read-only while the other window still has it. (#1)
 
-## [0.10.0] - 2026-09-10
-
-First stable release on the 0.10 line — the beta's content with the prerelease
-flag dropped, after dogfooding. Everything new on this line:
-
-- **The Markdown source view is syntax-highlighted and follows the theme.**
-  Ctrl+E now shows coloured markdown — headings, emphasis, code, links, quotes,
-  list markers and rules — from the same palette the formatted view uses, on the
-  same page background. Underneath, an AvalonEdit editor replaced the plain text
-  box; editing, spell check, find, word wrap and the caret behave as before.
-- **The source view can have its own theme.** **View ▸ Theme ▸ Same Theme for
-  Both Views** is on by default. Turn it off and View ▸ Theme changes only the
-  view you're in, so the source view can run dark under a light document. The
-  menu ticks the theme of whichever view is showing; both choices are remembered.
-- **Fixed:** Alt menu shortcuts and an Alt tap work with a document open, and
-  AltGr on international keyboards types its character without opening the menu.
-
-See the beta notes below for the full detail.
-
 ### Fixed
 - **A file's line endings and byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view
@@ -56,6 +37,25 @@ See the beta notes below for the full detail.
   was last read or written, and if a program only re-encodes the file — line
   endings or the byte-order mark, text unchanged — the window quietly adopts that
   convention for its next save. (#4)
+
+## [0.10.0] - 2026-09-10
+
+First stable release on the 0.10 line — the beta's content with the prerelease
+flag dropped, after dogfooding. Everything new on this line:
+
+- **The Markdown source view is syntax-highlighted and follows the theme.**
+  Ctrl+E now shows coloured markdown — headings, emphasis, code, links, quotes,
+  list markers and rules — from the same palette the formatted view uses, on the
+  same page background. Underneath, an AvalonEdit editor replaced the plain text
+  box; editing, spell check, find, word wrap and the caret behave as before.
+- **The source view can have its own theme.** **View ▸ Theme ▸ Same Theme for
+  Both Views** is on by default. Turn it off and View ▸ Theme changes only the
+  view you're in, so the source view can run dark under a light document. The
+  menu ticks the theme of whichever view is showing; both choices are remembered.
+- **Fixed:** Alt menu shortcuts and an Alt tap work with a document open, and
+  AltGr on international keyboards types its character without opening the menu.
+
+See the beta notes below for the full detail.
 
 ## [0.10.0-beta1] - 2026-09-10
 

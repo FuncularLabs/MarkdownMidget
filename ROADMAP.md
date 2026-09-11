@@ -49,10 +49,10 @@ order of risk:
   accepts pasted images in its text editor too, though it saves them as files — our
   embed model is the consistent answer). Pasting into the formatted view already
   works.
-- **The same file open in two windows silently overwrites.** A per-path lock: focus
-  the window that has it, else open read-only with a message. The minimal form of
-  the cross-instance registry below — and first in the work order, because it is
-  felt daily and stands alone.
+- ~~**The same file open in two windows silently overwrites.**~~ **Done 2026-09-10
+  (unreleased, #1)**: the per-path lock — focus the window that has it, else open
+  read-only with a message — described in full where the multi-window list strikes
+  the same item further down.
 - **No installer.** Decided 2026-09-10: portable-only 1.0, stated in README/HELP;
   the installer is the 1.1 headline (#8, closed).
 

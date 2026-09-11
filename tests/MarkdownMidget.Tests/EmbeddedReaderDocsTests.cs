@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.IO;
 using System.Reflection;
@@ -76,6 +77,39 @@ public class EmbeddedReaderDocsTests
         var hasUnreleased = Regex.IsMatch(text, @"^## \[Unreleased\]", RegexOptions.Multiline);
         Assert.True(hasOwnHeading || hasUnreleased,
             $"CHANGELOG.md has no [{version}] heading and no [Unreleased] section");
+    }
+
+    [Theory]
+    [InlineData(1, "0.10.0")]
+    [InlineData(3, "0.10.0")]
+    [InlineData(4, "0.10.0")]
+    public void AnIssueIsCreditedToOneSectionNewerThanTheReleaseThatLackedIt(int issue, string lastReleaseWithout)
+    {
+        // A conflict-free merge once filed a branch's [Unreleased] ### Fixed block
+        // under [0.10.0]: git anchored the block to the [0.10.0-beta1] heading,
+        // which the release merge had just pushed below a new [0.10.0] section, and
+        // two fixes were credited to a binary that does not contain them - in
+        // What's New, which shows this file as embedded, and in the release notes,
+        // which release.yml cuts by section. So every issue this line ships is
+        // pinned to exactly one section, and that section must be newer than the
+        // last release that went out without it. Add a row when an issue merges;
+        // the row stays true through the rename of [Unreleased] at the cut.
+        var sections = Regex.Split(Read("CHANGELOG.md"), @"(?m)^(?=## \[)")
+            .Where(s => s.StartsWith("## [", StringComparison.Ordinal))
+            .ToList();
+        var owners = sections
+            .Where(s => s.Contains($"(#{issue})"))
+            .Select(s => Regex.Match(s, @"^## \[(.+?)\]").Groups[1].Value)
+            .ToList();
+        var owner = Assert.Single(owners);
+        if (owner == "Unreleased") return;
+
+        var floor = UpdateVersion.Parse(lastReleaseWithout);
+        var got = UpdateVersion.Parse(owner);
+        Assert.NotNull(floor);
+        Assert.NotNull(got);
+        Assert.True(got!.CompareTo(floor!) > 0,
+            $"(#{issue}) is credited to [{owner}], which is not newer than {lastReleaseWithout} - the entry is filed under the wrong release");
     }
 
     private static string Read(string resourceName)
