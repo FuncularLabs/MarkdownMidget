@@ -390,8 +390,7 @@ public partial class MainWindow : Window
                     RequestSpellCheckSoon();
                 }
                 // Edits invalidate the WYSIWYG find index — force a re-scan on next find.
-                _lastFindSource = "";
-                _lastFindFlags = "";
+                ForgetWysiwygFindIndex();
                 break;
             case "selection":
                 // Reflect what's at the cursor: block type in the Style dropdown,
@@ -862,6 +861,9 @@ public partial class MainWindow : Window
             var settled = await RunEditorAsync("window.MDM.getMarkdown()");
             if (settled is not null) markdown = settled;
         }
+        // A new document is not the one the find index was built from, and installing
+        // it raises no change message to say so (#5 NF-9, the same invariant).
+        ForgetWysiwygFindIndex();
         SourceBox.Text = markdown;
         // Count here rather than in each caller: installing content doesn't raise a
         // 'change' message, so a freshly opened document would otherwise show no
@@ -2856,6 +2858,27 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Forget which pattern the editor's find index was built from, so the next Find
+    /// or Replace rebuilds it instead of trusting what is there.
+    ///
+    /// <see cref="EnsureWysiwygIndexAsync"/> skips findReset when the pattern and
+    /// options are the ones it last sent, which is what lets F3 advance the match
+    /// cursor rather than starting at match 1 every time. That shortcut is only true
+    /// while the index it remembers still exists and still describes THIS document —
+    /// so every place that empties the index or replaces the document has to say so
+    /// here. Closing the Find dialog empties it (#5 NF-9: the dialog reopens with the
+    /// last query, so without this the answer came back from an empty index —
+    /// "Nothing to replace." on a document full of matches); loading a document
+    /// replaces what the index describes, and unlike an edit it raises no change
+    /// message to clear the cache the other way.
+    /// </summary>
+    private void ForgetWysiwygFindIndex()
+    {
+        _lastFindSource = "";
+        _lastFindFlags = "";
+    }
+
+    /// <summary>
     /// Pass the regex source + flags to JS (which builds a JS RegExp from it) when
     /// the pattern OR options changed, so explicit Find Next / Find Previous advance
     /// the match cursor rather than rebuilding from match 1. The editor keeps its
@@ -2922,6 +2945,8 @@ public partial class MainWindow : Window
 
     private async Task ClearWysiwygFindAsync()
     {
+        // The cached pattern describes the index this is about to empty (#5 NF-9).
+        ForgetWysiwygFindIndex();
         if (_editorReady)
             await RunEditorAsync("window.MDM.findClear()");
     }
