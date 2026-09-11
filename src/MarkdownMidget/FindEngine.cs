@@ -436,7 +436,7 @@ public static class FindEngine
             if (n == '{')
             {
                 var end = template.IndexOf('}', i + 2);
-                if (end > i + 2 && TryGroup(m, template[(i + 2)..end], groupCount, out var named))
+                if (end > i + 2 && TryGroup(m, template.AsSpan(i + 2, end - i - 2), groupCount, out var named))
                 {
                     sb.Append(named);
                     i = end;
