@@ -84,6 +84,7 @@ public class EmbeddedReaderDocsTests
     [InlineData(2, "0.10.0")]
     [InlineData(3, "0.10.0")]
     [InlineData(4, "0.10.0")]
+    [InlineData(5, "0.10.0")]
     [InlineData(7, "0.10.0")]
     [InlineData(9, "0.10.0")]
     public void AnIssueIsCreditedToOneSectionNewerThanTheReleaseThatLackedIt(int issue, string lastReleaseWithout)

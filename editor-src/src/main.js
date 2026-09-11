@@ -12,7 +12,11 @@ import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
 import { setSpellRanges, beginSpellCheck, misspellingAt } from './spell-decorate.js';
 import { extractSpellText } from './spell-extract.js';
 import { SEPARATOR } from './spell-separator.js';
-import { findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear } from './find.js';
+import {
+  findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear,
+  findReplace as fReplace, findReplaceAll as fReplaceAll, findCaptureScope as fCaptureScope,
+} from './find.js';
+import { settleDocument } from './settle.js';
 import { NodeSelection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 
@@ -434,6 +438,13 @@ const MDM = {
     });
 
     editorView = editor.ctx.get(editorViewCtx);
+    // Same reason as setMarkdown: an initial document that does not end in a
+    // paragraph gains the trailing plugin's empty one here rather than on the
+    // reader's first click (settle.js). Suppressed, because installing a document
+    // is not a change to report. The host opens with an empty document today, so
+    // this is the other door rather than the one the bug came through.
+    suppressChange = true;
+    try { settleDocument(editorView); } finally { suppressChange = false; }
     installContextMenus(editorView);
     installFileDrop();
     postHistory();
@@ -463,11 +474,17 @@ const MDM = {
     suppressChange = true;
     try {
       editor.action(replaceAll(md || '', flush));
+      if (flush) editorView = editor.ctx.get(editorViewCtx); // state was recreated
+      // Inside the suppressed window on purpose: settling is part of installing the
+      // document, not a change to report. See settle.js — without it the trailing
+      // plugin's empty paragraph arrives on whatever the reader does first, and the
+      // host, whose clean baseline was taken a moment earlier, calls the document
+      // modified (#5 NF-5).
+      settleDocument(editorView);
     } finally {
       // markdownUpdated fires synchronously during the action above.
       suppressChange = false;
     }
-    if (flush) editorView = editor.ctx.get(editorViewCtx); // state was recreated
     postHistory();
   },
 
@@ -618,10 +635,15 @@ const MDM = {
 
   // Find (WYSIWYG view). The host hands us a regex (source + flags) it built from
   // its FindEngine, so the four search modes stay consistent between views.
-  findReset(source, flags) { return fReset(source, flags); },
+  findReset(source, flags) { return fReset(source, flags, editorView); },
   findNext(wrap) { return fNext(!!wrap); },
   findPrev(wrap) { return fPrev(!!wrap); },
   findClear() { fClear(); },
+  // Replace (#5): the host hands over the replacement prepared for the search
+  // mode and says whether it is literal text or a Regex-mode template.
+  findReplace(replacement, literal, wrap) { return fReplace(editorView, replacement || '', !!literal, !!wrap); },
+  findReplaceAll(replacement, literal) { return fReplaceAll(editorView, replacement || '', !!literal); },
+  findCaptureScope() { return fCaptureScope(editorView); },
 
   // Apply width/height (px) to the currently selected image node.
   setImageSize(width, height) {

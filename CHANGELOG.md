@@ -10,6 +10,24 @@ changes between alpha tags.
 ## [Unreleased]
 
 ### Added
+- **Find has Replace.** The Find dialog (Ctrl+F) has a *Replace with* box and
+  **Replace** / **Replace All** buttons, in both views and in all four search
+  modes. Replace changes the match Find is on and moves to the next one (with
+  nothing found yet it is Find Next); Replace All changes every match as one
+  undo step — or every match inside the selected text, when some is selected —
+  and the status bar reports the count. In Regular expression mode the
+  replacement can name groups — `$$`, `$&`, `$0`, `$1`…`$99` and `${name}`, with
+  every other `$` form left as typed, and the same in both views; in Extended
+  mode it takes the same `\n`, `\t`, `\r`, `\\` escapes the query does; in
+  Normal and Wildcards mode it goes in as typed. In the formatted view a
+  replacement takes the formatting of the first character it replaces, and a
+  match that runs from one paragraph into the next is left alone. A pattern that
+  does not compile is refused with the message Find shows, and nothing is
+  changed. In the formatted view a search stops after 50000 matches — `\b` or
+  `x*` matches at every position — and says so beside the count; Replace All
+  then refuses rather than changing the part of the document the search reached.
+  Replace is greyed while the document is read-only, and the dialog reopens with
+  the last query and replacement. (#5)
 - **Opening a file that is already open brings that window forward.** Every
   window is its own process, so until now a second File ▸ Open, Open Recent, drop
   or Explorer double-click on a file you already had open gave you a second copy,
@@ -34,11 +52,35 @@ changes between alpha tags.
   it. (#9)
 
 ### Changed
+- **A Regular-expression pattern has to mean the same thing in both views.** The
+  two views run different regex engines, so a handful of constructs one has and
+  the other does not — `\A`, `\Z`, `\z`, `\G`, `(?>…)`, inline options like
+  `(?i)`, `(?#comments)`, `(?'name'…)`, `\k'name'`, class subtraction
+  `[a-z-[aeiou]]`, possessive quantifiers, Unicode blocks like `\p{IsGreek}`,
+  and a loose `{`, `}` or `]` — are now refused outright with *Invalid pattern.*
+  rather than searching one thing in the source view and another (or nothing) in
+  the formatted one. So is `\1` in a pattern that writes a named group before an
+  unnamed one, where the two views number the groups differently: write
+  `\k<name>`, which means the same group in both. `\p{L}` and `\p{Lu}` work in
+  both now; they used not to work in the formatted view at all. Help lists the
+  whole set under *Find ▸ Regular expression*. (#5)
+- **A pattern that matches a position rather than text now replaces in the
+  formatted view too.** `^`, `$` and `(?=…)` match no characters; the formatted
+  view used to skip them, so `^` with `> ` — the "prefix every line" idiom that
+  has always worked in the source view — did nothing at all there. Find shows
+  such a match as a caret and Replace inserts at it, in both views. (#5)
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
   list directly follows another, the second is written with `*` bullets (it was
   `-`): with the same marker, CommonMark would read the two as one list. (#2)
 
 ### Fixed
+- **A document ending in anything but a paragraph or heading is no longer called
+  modified the moment you click in it.** A list, a table, a code block, a
+  blockquote, a thematic break: the formatted view adds an empty paragraph after
+  such a document, and did it on the first thing you did — a click, or F3 — so
+  the title gained its `*`, a crash copy was written and closing asked to save,
+  for a document nobody had edited. That paragraph is now added as the document
+  is opened, where it belongs, and Undo is unaffected. (#5)
 - **Ctrl+E straight after opening shows the file as it is on disk.** The Markdown
   source view was filled from the formatted editor, so a file written with setext
   headings or reference-style links arrived in it already rewritten into Markdown

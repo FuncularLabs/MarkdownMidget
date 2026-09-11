@@ -94,9 +94,10 @@ and heading ends, **↵** at manual line breaks, and **→** for tabs.
 
 ## Find
 
-**Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find dialog. **F3** jumps to
-the next match, **Shift+F3** to the previous. The status line shows
-**`Match m of n`**. Find works in either the WYSIWYG or the Markdown source view.
+**Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find and Replace dialog.
+**F3** jumps to the next match, **Shift+F3** to the previous. The status line
+shows **`Match m of n`**. Find works in either the WYSIWYG or the Markdown source
+view, and so does Replace (below).
 
 The dialog has four **Search modes**:
 
@@ -136,9 +137,135 @@ Like Normal, but with two wildcards:
 
 ### Regular expression
 
-.NET regex syntax — full power. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`,
-`(foo|bar)`. **Wrap around** lets the search loop from the end back to the
-start when **Find Next** runs off the bottom.
+Regex syntax. Examples: `^Title`, `\b\d{4}\b`, `[Hh]ello`, `(foo|bar)`. Groups —
+named (`(?<year>\d{4})`) and numbered — backreferences (`\1`, `\k<year>`),
+lookahead (`(?=…)`, `(?!…)`) and lookbehind (`(?<=…)`, `(?<!…)`) all work, with
+one exception: `\1` is refused in a pattern that writes a named group *before*
+an unnamed one, because the two views number the groups differently there — use
+`\k<name>`, which names the same group in both. **Wrap around** lets the search
+loop from the end back to the start when **Find Next** runs off the bottom.
+
+#### Patterns that must mean the same in both views
+
+The two views run different regex engines — the source view .NET's, the formatted
+view the browser's. Rather than let a pattern quietly mean one thing in one view
+and something else in the other, a handful of constructs one engine has and the
+other does not are refused outright, with the same *Invalid pattern.* message:
+
+| Refused                                   | Why                                             |
+| ----------------------------------------- | ----------------------------------------------- |
+| `\A` `\Z` `\z` `\G`                       | .NET anchors the browser has no spelling for    |
+| `\a` `\e`                                 | .NET's bell and escape characters               |
+| `(?>…)`                                   | atomic group — .NET only                        |
+| `(?i)` `(?i:…)` `(?-i:…)`                 | inline options — they would change the search behind your back |
+| `(?#…)`                                   | comment group — .NET only                       |
+| `(?(…)…\|…)`                              | conditional — .NET only                         |
+| `(?'name'…)` `\k'name'`                   | .NET's quoted spellings; `(?<name>…)` and `\k<name>` are fine |
+| `(?<a-b>…)`                               | balancing group — .NET only                     |
+| `[a-z-[aeiou]]`                           | class subtraction; .NET subtracts, and the browser refuses the pattern outright |
+| `\1` in a pattern with `(?<name>…)` before `(…)` | the two engines number the groups differently there — write `\k<name>` |
+| `a++` `a*+` `a?+` `a{1,2}+`               | possessive quantifiers — .NET only              |
+| `\p{IsGreek}` `\p{Letter}`                | Unicode blocks and long category names; `\p{L}` and `\p{Lu}` work |
+| a loose `{`, `}` or `]`                   | literal in .NET, a syntax error in the browser — write `\{`, `\}`, `\]` |
+
+One difference is **not** refused, because refusing it would take most of regex
+mode with it: `\w`, `\d` and `\b` cover all Unicode letters and digits in the
+source view and only ASCII in the formatted view. For English text they agree; for
+`café` or `٤٢` they do not. Spell the class out — `[A-Za-z0-9_]`, `[0-9]` — if it
+matters. (`\s` agrees in both on every ordinary space, tab and newline; it differs
+only on a couple of rare control characters.) And `.` matches one emoji in the
+formatted view and half of one in the source view, for the same kind of reason.
+
+Two smaller ones are left alone as well. A pattern that gives two groups the same
+name — `(?<a>x)(?<a>y)` — compiles in the source view and is refused as *Invalid
+pattern.* in the formatted one, so use distinct names. And `^`/`$` treat a
+carriage return, U+2028 and U+2029 as line endings in the formatted view only; the
+source view counts a line feed and nothing else.
+
+#### Matches of no width
+
+A pattern can match a *position* rather than a run of text — `^`, `$`, `(?=cat)`.
+Find shows one as a blinking caret, and **Replace** inserts there rather than
+replacing anything.
+
+What `^` and `$` mean differs between the views. The source view searches the
+markdown, so `^` is the start of every line and `$` the end of every line — in
+`one`, a blank line, `two`, `$` matches three times. The formatted view searches
+the document's text — what you see, with no line breaks between paragraphs — so
+there `^` is the start of the whole document and `$` its end, once each. The
+exception is a **code block**, whose text keeps its own line breaks: inside a
+three-line fence the formatted view's `^` matches three times, once per line, and
+`$` likewise.
+
+So `^` with `> ` in **Replace All** — the "prefix every line" idiom — is a
+*source view* idiom. It works there because what you insert is markdown: every
+line gains a `> ` and becomes a quote. The formatted view inserts **characters**,
+not syntax, so the same replacement puts a literal `>` at the start of the
+document's first paragraph — and the markdown that comes back out writes it as
+`\>`, escaped, because a real `>` there would mean a quote nobody asked for.
+Anything meant to change structure — quoting, list markers, headings — belongs in
+the markdown source view.
+
+A position on the boundary between two blocks is the *same* position in the
+formatted view: the index runs the blocks together with nothing between them, so
+the end of one and the start of the next cannot be told apart. In `end`, blank
+line, `start`, both `(?<=end)` and `(?=start)` insert in the second block —
+`end`, blank line, `Xstart`. The source view, which has the line breaks, puts the
+first one where you would expect: `endX`.
+
+### Replace
+
+The dialog has a **Replace with** box under **Find what**, and two buttons:
+
+- **Replace** changes the match Find is currently on and moves to the next one.
+  With nothing found yet it simply finds the next match, so it is safe to press
+  first. Past the last match it goes round to the first when **Wrap around** is
+  on, and stops when it is off.
+- **Replace All** changes every match as **one undo step** — Ctrl+Z puts the
+  whole document back. When part of the document is selected, only matches lying
+  entirely inside the selection are changed; a caret means the whole document.
+  In the WYSIWYG view a search stops after 50000 matches — a pattern like `\b` or
+  `x*` matches at every position — and Find says so beside the count. Replace All
+  then refuses and changes nothing, rather than changing the part of the document
+  the search reached and reporting it as all of them; narrow the search.
+  Find moves the selection onto each match as you type, so what counts is the
+  selection *you* made: the one there when you opened the dialog (or pressed
+  Ctrl+F again), or one you make afterwards. The status bar reports how many
+  were replaced.
+
+The replacement follows the search mode:
+
+| Mode                 | Replacement                                                     |
+| -------------------- | --------------------------------------------------------------- |
+| Normal, Wildcards    | Inserted as typed; a `$` is a dollar sign.                       |
+| Extended             | The same escapes as the query — `\n`, `\r`, `\t`, `\0`, `\\`, `\xNN`, `\uNNNN` — and any other `\c` is `c`; otherwise as typed. |
+| Regular expression   | A replacement template — see below. |
+
+In **Regular expression** mode the replacement understands exactly these forms, and
+the same ones in both views:
+
+| Form            | Meaning                                                          |
+| --------------- | ---------------------------------------------------------------- |
+| `$$`            | a dollar sign                                                     |
+| `$&` or `$0`    | the whole match                                                   |
+| `$1` … `$99`    | a capture group. Two digits when they name a group that exists, otherwise one digit and the rest of the number as typed — with two groups, `$12` is group 1 followed by a `2` |
+| `${name}`       | a named group — `(?<name>…)` — or a group number written in braces |
+
+Anything else after a `$` is left as typed, including `` $` ``, `$'`, `$+`, `$_`,
+`$<name>` and a `$` at the end of the box. Group **numbers** count the unnamed
+groups first, in the order they are written, and then the named ones: in
+`(?<first>a)(b)`, `$1` is `b` and `$2` is `a` (`${first}` is `a` too). A group that
+did not take part in the match is replaced by nothing.
+
+A pattern that does not compile is refused with *Invalid pattern.* and nothing
+is changed. In the formatted view the replacement takes the formatting of the
+first character it replaces — a match that starts in plain text and runs into
+bold comes out plain; one inside a link or inline code stays in it — and a match
+that runs from the end of one paragraph into the next is left as it is: Replace
+never joins blocks, and Replace All says how many it left alone and why —
+*it spans paragraphs*, or *the text moved*, if the document changed under the
+search. Replace and Replace All are greyed while the document is read-only. The
+dialog reopens with the last query and replacement.
 
 ## Printing & PDF export
 
@@ -594,6 +721,14 @@ into and what to do instead.
 - **There is no password recovery for an encrypted document.** Not a hidden one,
   not a support channel — see
   [Secure Markdown](#secure-markdown-encrypted-documents).
+- **A regular-expression search is not quite the same search in both views.** The
+  source view runs .NET's engine over the markdown and the formatted view the
+  browser's over the text you see, so constructs only one of them understands are
+  refused outright with *Invalid pattern.* rather than searched differently in
+  each, and a match of no width — `^`, `$`, a lookaround — can land in a
+  different place in each view; see [Patterns that must mean the same in both
+  views](#patterns-that-must-mean-the-same-in-both-views) and [Matches of no
+  width](#matches-of-no-width).
 
 <!-- #5/#6 limits land with their merges -->
 
