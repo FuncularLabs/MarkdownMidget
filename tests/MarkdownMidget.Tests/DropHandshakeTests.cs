@@ -583,6 +583,129 @@ public class DropHandshakeTests
         Assert.NotEqual(DropHandshake.DocumentChangedNotice, plan.Notice());
     }
 
+    // ===== the chokepoint's own decision (F-D, round 5) =====
+    //
+    // The finding: the HOST half of NF-3/NF-7 was unguarded. Forcing every
+    // `return false` in InsertDroppedPicturesAsync to `true` passed 1000/0, and so
+    // did flipping the empty-plan early return to `false` — which would stop every
+    // dropped markdown file opening, on both surfaces. The sequence of gates was
+    // ordinary statements in an `async void`-adjacent UI member that no test can
+    // reach.
+    //
+    // So the sequence is lifted here: DecideInsert names the arm, StatusFor says
+    // what the arm tells the user, and CallerFinishesTheDrop says whether the
+    // caller may go on to open documents and flash plan.Notice(). What is left in
+    // MainWindow is the fetching of bytes and four lines of wiring.
+
+    [Fact]
+    public void ADropAlreadyReplacedWhenTheInsertionStartsDoesNothingAtAll()
+    {
+        // The entry check, which is the case AbandonDroppedRead cannot reach: a
+        // path-route drop that started after CompleteDroppedFileRead cleared the
+        // waiter but before this continuation ran. It is asked BEFORE the empty-plan
+        // arm on purpose — a drop that wants no pictures can still open a document,
+        // and that open belongs to the drop that has been replaced.
+        foreach (var pictures in new[] { 0, 1 })
+            Assert.Equal(DropInsertOutcome.Superseded, DropHandshake.DecideInsert(
+                currentAtEntry: false, picturesWanted: pictures, readFailed: false,
+                currentAfterRead: true, stillApplies: true));
+
+        Assert.Equal(DropHandshake.SupersededNotice, DropHandshake.StatusFor(DropInsertOutcome.Superseded));
+        Assert.False(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.Superseded));
+    }
+
+    [Fact]
+    public void ADropThatWantsNoPicturesStillLetsItsCallerOpenTheDocument()
+    {
+        // The mutation the finding named: flipping this arm to "stop" would stop
+        // every dropped markdown file from opening, on both surfaces — Window_Drop's
+        // loop over plan.Open and HandleDroppedFiles' HandleDroppedContentAsync both
+        // sit behind the chokepoint's answer. Nothing is said, either: the drop's own
+        // plan.Notice() is what speaks for it.
+        Assert.Equal(DropInsertOutcome.NothingToInsert, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 0, readFailed: false,
+            currentAfterRead: true, stillApplies: true));
+        Assert.True(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.NothingToInsert));
+        Assert.Null(DropHandshake.StatusFor(DropInsertOutcome.NothingToInsert));
+    }
+
+    [Fact]
+    public void AFileThatCouldNotBeReadIsNotADocumentThatMoved()
+    {
+        // A failed read is one file, not a window that changed underneath: the modal
+        // names the file, the drop is still live, and the caller finishes it as it
+        // always has. Nothing goes to the status line — the drop's own plan.Notice()
+        // is still to come.
+        Assert.Equal(DropInsertOutcome.ReadFailed, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 2, readFailed: true,
+            currentAfterRead: true, stillApplies: true));
+        Assert.True(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.ReadFailed));
+        Assert.Null(DropHandshake.StatusFor(DropInsertOutcome.ReadFailed));
+
+        // And it is answered BEFORE the two post-read gates, because that is where
+        // the catch block's own return put it: a drop that lost the window while a
+        // file was failing to read ends in the modal, not in an abandonment notice.
+        Assert.Equal(DropInsertOutcome.ReadFailed, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 2, readFailed: true,
+            currentAfterRead: false, stillApplies: false));
+    }
+
+    [Fact]
+    public void ADropReplacedWhileItsBytesWereFetchedInsertsNothingAndStopsTheCaller()
+    {
+        // NF-7's second ask, after the await that fetches the bytes: the path route's
+        // DropFiles.ReadAllAsync has no waiter anyone can complete, so a drop on the
+        // formatted view during it is invisible until here. Two drops about the same
+        // unchanged document match on path, baseline, target and view, so this is the
+        // only gate that separates them.
+        Assert.Equal(DropInsertOutcome.Superseded, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 1, readFailed: false,
+            currentAfterRead: false, stillApplies: true));
+        Assert.False(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.Superseded));
+    }
+
+    [Fact]
+    public void ADocumentThatMovedUnderTheFetchTakesNothingAndStopsTheCaller()
+    {
+        // NF-3. False here is what stops Window_Drop opening documents against a
+        // stale plan and then flashing plan.Notice() — which ASSIGNS — over the top
+        // of the notice the user needs to read.
+        Assert.Equal(DropInsertOutcome.DocumentChanged, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 1, readFailed: false,
+            currentAfterRead: true, stillApplies: false));
+
+        Assert.Equal(DropHandshake.DocumentChangedNotice, DropHandshake.StatusFor(DropInsertOutcome.DocumentChanged));
+        Assert.False(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.DocumentChanged));
+    }
+
+    [Fact]
+    public void AliveDropOnAnUnmovedDocumentInsertsAndSaysNothing()
+    {
+        // The only arm that touches the document, and the only one where the caller
+        // both inserts and carries on. Nothing is flashed: plan.Notice() is the
+        // drop's own account of what it did and did not take.
+        Assert.Equal(DropInsertOutcome.Insert, DropHandshake.DecideInsert(
+            currentAtEntry: true, picturesWanted: 1, readFailed: false,
+            currentAfterRead: true, stillApplies: true));
+        Assert.True(DropHandshake.CallerFinishesTheDrop(DropInsertOutcome.Insert));
+        Assert.Null(DropHandshake.StatusFor(DropInsertOutcome.Insert));
+    }
+
+    [Fact]
+    public void EveryChokepointArmHasAnAnswerToBothQuestions()
+    {
+        // The enum is the whole vocabulary: a sixth arm added later without deciding
+        // what it says and whether the caller goes on fails here rather than
+        // defaulting into one of the answers by accident.
+        foreach (var outcome in Enum.GetValues<DropInsertOutcome>())
+        {
+            var stops = !DropHandshake.CallerFinishesTheDrop(outcome);
+            // Exactly the arms that stop the caller are the arms that say why.
+            Assert.Equal(stops, DropHandshake.StatusFor(outcome) is not null);
+        }
+        Assert.Equal(5, Enum.GetValues<DropInsertOutcome>().Length);
+    }
+
     // ===== what the user is told =====
 
     [Fact]

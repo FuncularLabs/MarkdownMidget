@@ -11,9 +11,12 @@ namespace MarkdownMidget.Tests;
 /// rules live in <see cref="DropRouting"/> and are tested there; what is tested
 /// here is everything these two methods decide on their own — how tolerant the
 /// open is of whoever else has the file, what a head is when the file is short or
-/// unreadable, the size reported for a path that will not open, the bound on a
-/// full read, and that a malformed path is refused rather than thrown at an
-/// `async void` handler.
+/// unreadable, the size reported for a path that will not open, the picture
+/// ceiling as this route meets it (end to end from a real file on disk, which the
+/// message route cannot do), the bound on a full read and the one
+/// byte over it that lets a grown file be refused, what becomes of a file that
+/// changed between the sniff and the read, and that a malformed path is refused
+/// rather than thrown at an `async void` handler.
 /// </summary>
 public class DropFilesTests : IDisposable
 {

@@ -30,6 +30,36 @@ internal enum DropReply
     Discard,
 }
 
+/// <summary>What the insertion chokepoint (<c>InsertDroppedPicturesAsync</c>) does
+/// with one drop plan once its bytes are in hand. Five arms, and every one of them
+/// answers both of the questions the chokepoint exists to answer:
+/// <see cref="DropHandshake.StatusFor"/> (what the user is told) and
+/// <see cref="DropHandshake.CallerFinishesTheDrop"/> (whether the caller may go on
+/// to open documents and flash its own notice).</summary>
+internal enum DropInsertOutcome
+{
+    /// <summary>A newer drop owns the window. Nothing is inserted, nothing is
+    /// opened, and the caller stops.</summary>
+    Superseded,
+
+    /// <summary>The plan chose no pictures — a lone markdown file, or a drop the
+    /// window cannot take. Nothing is inserted and nothing is said, and the caller
+    /// carries on: this is the arm a dropped .md opens through.</summary>
+    NothingToInsert,
+
+    /// <summary>One of the chosen pictures could not be read, or arrived changed.
+    /// None of them go in, the modal says which, and the drop is still live — so
+    /// the caller finishes it.</summary>
+    ReadFailed,
+
+    /// <summary>The document moved while the bytes were being fetched. Nothing is
+    /// inserted, nothing is opened, and the caller stops.</summary>
+    DocumentChanged,
+
+    /// <summary>The only arm that touches the document.</summary>
+    Insert,
+}
+
 /// <summary>
 /// What one <c>droppedFileBytes</c> answer amounts to.
 /// </summary>
@@ -173,6 +203,86 @@ internal static class DropHandshake
         && ReferenceEquals(cleanThen, cleanNow)
         && targetThen == targetNow
         && viewThen == viewNow;
+
+    /// <summary>
+    /// The insertion chokepoint's whole decision, in the order it is asked
+    /// (<c>InsertDroppedPicturesAsync</c> keeps only the fetching of bytes and the
+    /// wiring). Both drop routes end here, so this is the last word on whether a
+    /// picture reaches the document and on what the user is told if it does not.
+    ///
+    /// The order is the decision. Each gate is here because it was once missing:
+    ///
+    /// <list type="number">
+    /// <item><paramref name="currentAtEntry"/> is asked BEFORE
+    /// <paramref name="picturesWanted"/>, because a drop that wants no pictures can
+    /// still OPEN a document, and an open belongs to the drop that has been
+    /// replaced as much as an insertion does. This is the case
+    /// <c>AbandonDroppedRead</c> cannot reach.</item>
+    /// <item>A plan with no pictures returns at once, and says nothing: the drop's
+    /// own <c>plan.Notice()</c> speaks for it. The caller carries on — this is the
+    /// arm a dropped markdown file opens through, on both surfaces.</item>
+    /// <item><paramref name="readFailed"/> before the two post-fetch gates, which is
+    /// where the <c>catch</c> block's own return put it: a failed read is ONE FILE,
+    /// not a window that moved, so the modal names the file, nothing is said in the
+    /// status line, and the drop is still the caller's to finish — even if the window
+    /// moved while that file was failing to read.</item>
+    /// <item><paramref name="currentAfterRead"/>, asked again because fetching the
+    /// bytes is an await. For the PATH route it is the ask that matters: its
+    /// <c>DropFiles.ReadAllAsync</c> has no waiter anyone can complete, so a drop on
+    /// the formatted view during it is invisible until here — and two drops about
+    /// the same unchanged document match on path, baseline, target and view.</item>
+    /// <item><paramref name="stillApplies"/> last (<see cref="StillApplies"/>): a
+    /// different failure with a different notice, since no newer drop exists — the
+    /// window the drop was routed for simply stopped being the window on screen.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="currentAtEntry">Whether the drop still owned the window when the
+    /// chokepoint was entered (<see cref="StillTheCurrentDrop"/>).</param>
+    /// <param name="picturesWanted">How many pictures the plan chose.</param>
+    /// <param name="readFailed">Whether fetching those pictures' bytes threw, or
+    /// they came back no longer the picture the plan routed.</param>
+    /// <param name="currentAfterRead">Whether the drop still owns the window now
+    /// that the bytes are in hand.</param>
+    /// <param name="stillApplies">Whether the document is the one the plan was made
+    /// against (<see cref="StillApplies"/>).</param>
+    public static DropInsertOutcome DecideInsert(
+        bool currentAtEntry, int picturesWanted, bool readFailed,
+        bool currentAfterRead, bool stillApplies)
+    {
+        if (!currentAtEntry) return DropInsertOutcome.Superseded;
+        if (picturesWanted == 0) return DropInsertOutcome.NothingToInsert;
+        if (readFailed) return DropInsertOutcome.ReadFailed;
+        if (!currentAfterRead) return DropInsertOutcome.Superseded;
+        if (!stillApplies) return DropInsertOutcome.DocumentChanged;
+        return DropInsertOutcome.Insert;
+    }
+
+    /// <summary>
+    /// Whether the caller of the insertion chokepoint may finish the drop it
+    /// started — open the documents its plan chose, flash <c>plan.Notice()</c>, and
+    /// in <c>Window_Drop</c>'s case <c>Activate()</c>.
+    ///
+    /// False for exactly the two arms that abandon the drop, and for those the
+    /// notice is already on screen: <c>FlashStatus</c> ASSIGNS, so a caller that
+    /// carried on would put <c>plan.Notice()</c> — a line about files that were
+    /// never going in — straight over the line about the ones that were.
+    /// </summary>
+    public static bool CallerFinishesTheDrop(DropInsertOutcome outcome) =>
+        outcome is not (DropInsertOutcome.Superseded or DropInsertOutcome.DocumentChanged);
+
+    /// <summary>
+    /// What the status line says about an outcome, or null when the chokepoint says
+    /// nothing — because the drop's own <c>plan.Notice()</c> is about to
+    /// (<see cref="DropInsertOutcome.NothingToInsert"/>,
+    /// <see cref="DropInsertOutcome.Insert"/>), or because the modal already has
+    /// (<see cref="DropInsertOutcome.ReadFailed"/>).
+    /// </summary>
+    public static string? StatusFor(DropInsertOutcome outcome) => outcome switch
+    {
+        DropInsertOutcome.Superseded => SupersededNotice,
+        DropInsertOutcome.DocumentChanged => DocumentChangedNotice,
+        _ => null,
+    };
 
     /// <summary>
     /// Whether a <c>fileDrop</c> message that has just arrived is older than one

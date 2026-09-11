@@ -4152,72 +4152,94 @@ public partial class MainWindow : Window
     /// both routes' insertions go through, so the last word on whether the insertion
     /// still applies is taken here.</param>
     /// <returns>
-    /// Whether the drop is still the window's to act on. False means the plan went
-    /// stale while the bytes were being fetched and the status line already says so
-    /// — so the CALLER must stop too. This used to be void, and Window_Drop carried
-    /// on: it opened documents against the stale plan and then flashed
-    /// <c>plan.Notice()</c>, which ASSIGNS, straight over the abandonment notice.
-    /// The content route returns on the same condition, so both routes now tell the
-    /// user the same thing about the same failure. A failed READ is not this: the
-    /// modal has spoken, the drop is still live, and the caller carries on as it
-    /// always has.
+    /// Whether the drop is still the window's to act on
+    /// (<see cref="DropHandshake.CallerFinishesTheDrop"/>). False means the drop was
+    /// abandoned and the status line already says so — so the CALLER must stop too.
+    /// This used to be void, and Window_Drop carried on: it opened documents against
+    /// the stale plan and then flashed <c>plan.Notice()</c>, which ASSIGNS, straight
+    /// over the abandonment notice. The content route returns on the same condition,
+    /// so both routes now tell the user the same thing about the same failure. A
+    /// failed READ is not this: the modal has spoken, the drop is still live, and
+    /// the caller carries on as it always has.
     /// </returns>
+    /// <remarks>
+    /// The ORDER of the gates, what each arm says, and which arms stop the caller
+    /// are <see cref="DropHandshake.DecideInsert"/>, <see cref="DropHandshake.StatusFor"/>
+    /// and <see cref="DropHandshake.CallerFinishesTheDrop"/> — pure, and pinned
+    /// arm by arm. They were statements here, in a member no test can reach without
+    /// a window and a real mouse, and F-D measured what that cost: before the lift,
+    /// forcing every `return false` in this method to `true` passed the whole suite,
+    /// and so did flipping the empty-plan early return to `false` — which would have
+    /// stopped every dropped markdown file from opening, on both surfaces. What is
+    /// left here is the fetching of the bytes and the acting-out.
+    /// </remarks>
     private async Task<bool> InsertDroppedPicturesAsync(
         DropPlan plan, Func<int, Task<byte[]>> bytesOf,
         (string? Path, string Clean, DropTarget Target, long View, long Generation) then)
     {
-        // Before the empty check, not after: a drop that wants no pictures can still
-        // open a document (the content route) or flash a notice, and neither belongs
-        // to a drop the user has already replaced. This is the case AbandonDroppedRead
-        // cannot reach — a path-route drop starting after CompleteDroppedFileRead has
-        // cleared the waiter but before this continuation runs.
-        if (!DropIsStillCurrent(then)) { FlashStatus(DropHandshake.SupersededNotice); return false; }
-        if (plan.Insert.Count == 0) return true;
+        // Asked before the bytes are fetched — and, in DecideInsert, before the
+        // empty-plan arm: a drop that wants no pictures can still open a document,
+        // and that open belongs to the drop the user has already replaced. This is
+        // the case AbandonDroppedRead cannot reach — a path-route drop starting
+        // after CompleteDroppedFileRead has cleared the waiter but before this
+        // continuation runs.
+        var currentAtEntry = DropIsStillCurrent(then);
         var fragments = new List<string>(plan.Insert.Count);
-        try
+        Exception? readFailure = null;
+        // Nothing is fetched for a drop that has already lost the window, or for a
+        // plan that chose no pictures; both are decided below on these same values.
+        if (currentAtEntry && plan.Insert.Count > 0)
         {
-            foreach (var picture in plan.Insert)
+            try
             {
-                var name = plan.Files[picture.Index].Name;
-                var bytes = await bytesOf(picture.Index);
-                // What goes into the document is what actually arrived, so that is
-                // what is measured — the plan's ceiling and format came from a head
-                // and a size that are a sniff or a round trip old. The case the drop
-                // widened its sharing mode for (a screenshot tool still flushing the
-                // PNG you dragged in) is the very case where the file changes in
-                // between, and a truncated picture embeds as a data URI no viewer can
-                // decode, silently. The size the plan routed on is passed in because
-                // the signature alone cannot see a truncation BELOW it: eight bytes
-                // of PNG magic still sniff as a PNG. Both routes state a size — a
-                // path from the handle it read the head through, the editor from
-                // File.size — and -1 (neither said) skips only the length half.
-                if (!DropRouting.PictureSurvivedTheRead(bytes, picture.Mime, plan.Files[picture.Index].Size))
-                    throw new IOException($"{name} changed while it was being read — nothing was inserted.");
-                fragments.Add(DropRouting.PictureMarkdown(name, picture.Mime, bytes));
+                foreach (var picture in plan.Insert)
+                {
+                    var name = plan.Files[picture.Index].Name;
+                    var bytes = await bytesOf(picture.Index);
+                    // What goes into the document is what actually arrived, so that is
+                    // what is measured — the plan's ceiling and format came from a head
+                    // and a size that are a sniff or a round trip old. The case the drop
+                    // widened its sharing mode for (a screenshot tool still flushing the
+                    // PNG you dragged in) is the very case where the file changes in
+                    // between, and a truncated picture embeds as a data URI no viewer can
+                    // decode, silently. The size the plan routed on is passed in because
+                    // the signature alone cannot see a truncation BELOW it: eight bytes
+                    // of PNG magic still sniff as a PNG. Both routes state a size — a
+                    // path from the handle it read the head through, the editor from
+                    // File.size — and -1 (neither said) skips only the length half.
+                    if (!DropRouting.PictureSurvivedTheRead(bytes, picture.Mime, plan.Files[picture.Index].Size))
+                        throw new IOException($"{name} changed while it was being read — nothing was inserted.");
+                    fragments.Add(DropRouting.PictureMarkdown(name, picture.Mime, bytes));
+                }
             }
+            // One file that could not be read, not a document that moved. None of
+            // the pictures go in — the all-or-nothing a failed path read has always
+            // had — and the drop itself is still live.
+            catch (Exception ex) { readFailure = ex; }
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, $"Couldn't read the image:\n{ex.Message}", "Markdown Midget",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            // The drop itself is still live — this is one file that could not be
-            // read, not a document that moved — so the caller finishes it.
-            return true;
-        }
-        // Last thing before the document is touched: the bytes took an await to
-        // fetch, and the window was live throughout it. A plan made against a
-        // different document — or against one that has since closed, which nothing
-        // downstream tests for — must not reach InsertMarkdownFragment.
+
+        // The two gates that belong AFTER the read are evaluated here whatever
+        // happened above, and DecideInsert consults them only on the arms they
+        // belong to: both are plain reads of window state with nothing to undo, and
+        // every earlier arm is reached without either of them mattering.
         //
-        // Asked again here, and this is the ask that matters for the path route: its
-        // await is DropFiles.ReadAllAsync, right above, and a drop on the formatted
-        // view during it cannot end it — there is no waiter to complete. Two drops
-        // inserting into the same unchanged document look identical to the four
-        // values below, so only the generation separates them.
-        if (!DropIsStillCurrent(then)) { FlashStatus(DropHandshake.SupersededNotice); return false; }
-        if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return false; }
-        InsertMarkdownFragment(DropRouting.Markdown(fragments));
-        return true;
+        // DropIsStillCurrent is asked a SECOND time because fetching the bytes is an
+        // await, and for the path route that is the ask that matters: its
+        // DropFiles.ReadAllAsync has no waiter a newer drop can complete, and two
+        // drops about the same unchanged document match on path, baseline, target
+        // and view, so only the generation separates them. DropStillApplies is the
+        // last word on the document itself — including one that has since CLOSED,
+        // which nothing downstream tests for.
+        var outcome = DropHandshake.DecideInsert(
+            currentAtEntry, plan.Insert.Count, readFailure is not null,
+            DropIsStillCurrent(then), DropStillApplies(then));
+
+        if (DropHandshake.StatusFor(outcome) is { } notice) FlashStatus(notice);
+        if (outcome == DropInsertOutcome.ReadFailed)
+            MessageBox.Show(this, $"Couldn't read the image:\n{readFailure!.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        if (outcome == DropInsertOutcome.Insert) InsertMarkdownFragment(DropRouting.Markdown(fragments));
+        return DropHandshake.CallerFinishesTheDrop(outcome);
     }
 
     /// <summary>
