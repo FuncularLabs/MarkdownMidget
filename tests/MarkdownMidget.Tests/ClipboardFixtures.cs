@@ -84,15 +84,18 @@ internal static class ClipboardFixtures
     /// <summary>
     /// Only the COM face of <paramref name="inner"/>. Wrapped in a WPF
     /// <see cref="DataObject"/>, it is read the way WPF reads another program's
-    /// clipboard data: through its OLE converter, each format fetched into an
-    /// HGLOBAL and handed back from there. No clipboard is involved.
+    /// clipboard data: through its OLE converter, each format fetched in the medium
+    /// WPF asks for and converted from there. On .NET 10 that is an HGLOBAL for "PNG"
+    /// (handed back as a MemoryStream) and a GDI bitmap handle for Bitmap (handed back
+    /// as an InteropBitmap); a "PNG" fetch that fails is asked for once more, as an
+    /// IStream. No clipboard is involved.
     ///
-    /// With <paramref name="failing"/> named, fetching that format fails the way
-    /// the clipboard fails a format its owner could not render: GetData throws the
-    /// COMException the runtime makes of CLIPBRD_E_BAD_DATA, while the format is
-    /// still advertised (QueryGetData and EnumFormatEtc answer as
-    /// <paramref name="inner"/> does). Every other format is fetched from
-    /// <paramref name="inner"/>.
+    /// With <paramref name="failing"/> named, fetching that format fails, in whichever
+    /// medium it is asked for, the way the clipboard fails a format its owner could not
+    /// render: GetData and GetDataHere throw the COMException the runtime makes of
+    /// CLIPBRD_E_BAD_DATA, while the format is still advertised (QueryGetData and
+    /// EnumFormatEtc answer as <paramref name="inner"/> does). Every other format is
+    /// fetched from <paramref name="inner"/>.
     /// </summary>
     public sealed class ComOnly(ComDataObject inner, string? failing = null) : ComDataObject
     {

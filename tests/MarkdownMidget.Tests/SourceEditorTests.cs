@@ -630,6 +630,24 @@ public class SourceEditorTests
     }
 
     [Fact]
+    public void PastedOnePixelScreenshotIsOpaque()
+    {
+        // A screenshot one pixel big, its colour above the padding byte's 0. The only
+        // pixel there is proves the fourth byte is not alpha, so the answer depends on
+        // the scan judging the first pixel; skip it and this pastes blank, #7 again.
+        byte[] shot = [10, 20, 30, 0];
+        var pasted = On(ed =>
+        {
+            var data = new DataObject();
+            data.SetImage(ClipboardFixtures.Dib(1, 1, shot));
+            Assert.True(ed.TryPasteImage(data));
+            return DecodeToBgra(PastedBytes(ed.Text, ""));
+        }, "", laidOut: false);
+
+        Assert.Equal(new byte[] { 10, 20, 30, 0xFF }, pasted);
+    }
+
+    [Fact]
     public void PastedPictureBlackAndTransparentEverywhereStaysTransparent()
     {
         // Black and alpha 0 on every pixel: no colour is above its alpha, so Chromium
@@ -1024,6 +1042,30 @@ public class SourceEditorTests
         Assert.Equal(Opaque(pixels), result);
     }
 
+    [Theory]
+    [InlineData("Bgra32")]
+    [InlineData("Pbgra32")]
+    public void ForEncodingMakesOpaqueWhenOnlyTheFirstPixelHasColourAboveItsAlpha(string name)
+    {
+        // Two pixels, and only the first proves the alpha is not real (blue 1 above an
+        // alpha of 0); the second, black and transparent, proves nothing. So the answer
+        // depends on the scan judging the first pixel.
+        byte[] pixels = [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        var format = AlphaFormat(name).Format;
+        var (same, outFormat, result) = On(_ =>
+        {
+            var image = BitmapSource.Create(2, 1, 96, 96, format, null, pixels, 8);
+            var prepared = ImagePaste.ForEncoding(image);
+            var bytes = new byte[8];
+            prepared.CopyPixels(bytes, 8, 0);
+            return (ReferenceEquals(prepared, image), prepared.Format, bytes);
+        }, "", laidOut: false);
+
+        Assert.False(same);
+        Assert.Equal(format, outFormat);
+        Assert.Equal(Opaque(pixels), result);
+    }
+
     /// <summary>Four pixels whose colour never exceeds their alpha, by name: "valid"
     /// (alpha 0, 0x40, 0x80 and 0xFE, several colour bytes equal to their alpha, where
     /// "above" and "at or above" part company), "black" (every byte zero: the case
@@ -1170,6 +1212,7 @@ public class SourceEditorTests
         byte[] screenshot = [0x10, 0x20, 0x30, 0x00, 0xFF, 0xFF, 0xFF, 0x00];   // alpha zero everywhere
         byte[] strayByte = [0x10, 0x20, 0x30, 0x01, 0xFF, 0xFF, 0xFF, 0x00];    // one alpha byte of 1
         byte[] lastRed = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x81, 0x80];      // one red byte one above, last pixel
+        byte[] firstBlue = [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];    // one blue byte one above, first pixel only
         byte[] black = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];        // black and transparent
         byte[] atAlpha = [0x40, 0x40, 0x40, 0x40, 0xFF, 0xFF, 0xFF, 0xFF];      // every colour byte equal to its alpha
         foreach (var format in new[] { PixelFormats.Bgra32, PixelFormats.Pbgra32 })
@@ -1177,6 +1220,7 @@ public class SourceEditorTests
             Assert.True(ImagePaste.MustBeMadeOpaque(screenshot, format));
             Assert.True(ImagePaste.MustBeMadeOpaque(strayByte, format));
             Assert.True(ImagePaste.MustBeMadeOpaque(lastRed, format));
+            Assert.True(ImagePaste.MustBeMadeOpaque(firstBlue, format));
             Assert.False(ImagePaste.MustBeMadeOpaque(black, format));
             Assert.False(ImagePaste.MustBeMadeOpaque(atAlpha, format));
         }
