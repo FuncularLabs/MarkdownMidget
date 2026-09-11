@@ -103,7 +103,7 @@ release after it, and the portable exe will stay available either way.
 ## Layout
 
 ```
-MarkdownMidget.sln
+MarkdownMidget.slnx
 src/MarkdownMidget/         WPF app (net10.0-windows)
   MainWindow.xaml(.cs)      Menu, toolbar, WebView2 host, source toggle, file I/O
   wwwroot/                  Built editor bundle (served to WebView2) — generated
