@@ -267,9 +267,22 @@ test('postAnswer reports that nothing got through when even the small message fa
   assert.equal(postAnswer(() => false, 4, [{ index: 0, base64: 'AAA' }]), false);
 });
 
-test('postAnswer does not retry a post that threw rather than returned', async () => {
+test('postAnswer treats a post that threw as one that did not go, and still tries the small message', async () => {
   // postToHost catches its own throw and reports false; a post function that throws
   // outright must not escape into readDroppedFiles' promise, where the host would
-  // hear nothing at all.
-  assert.equal(postAnswer(() => { throw new Error('bridge gone'); }, 4, []), false);
+  // hear nothing at all. A throw is a post that did not go, so it is followed by the
+  // small failure message exactly as a post that returned false is — the host has to
+  // hear SOMETHING, and the small one is the message that can still fit.
+  //
+  // (AR-5. This test used to be called "does not retry a post that threw" and
+  // asserted only the return value, so the call count — two, not one — could
+  // contradict its own name with nothing to catch it.)
+  const tried = [];
+  const post = (m) => { tried.push(m); throw new Error('bridge gone'); };
+
+  assert.equal(postAnswer(post, 4, []), false);
+
+  assert.equal(tried.length, 2);
+  assert.deepEqual(tried[0], { type: 'droppedFileBytes', drop: 4, files: [] });
+  assert.deepEqual(tried[1], { type: 'droppedFileBytes', drop: 4, files: null, error: 'post-failed' });
 });
