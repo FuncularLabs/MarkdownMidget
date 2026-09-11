@@ -246,6 +246,53 @@ describe('ReplaceAllIsOneUndoStep', () => {
   });
 });
 
+describe('ReplaceAllAppliesItsPlanLastToFirst', () => {
+  // Every position in the plan is measured against the document as it is now, so
+  // the steps have to be added from the end backwards; adding them front to back
+  // shifts every later position by the difference in length (#5 F-2).
+  test('a longer replacement does not shift the matches after it', () => {
+    load('cat one cat two cat');
+    scan('cat');
+    assert.equal(findReplaceAll(ed.view(), 'tiger', true).replaced, 3);
+    // First to last would give 'tiger ontigerat tiger cat'.
+    assert.equal(md(), 'tiger one tiger two tiger');
+  });
+
+  test('nor does a shorter one', () => {
+    load('cat one cat two cat');
+    scan('cat');
+    assert.equal(findReplaceAll(ed.view(), 'x', true).replaced, 3);
+    assert.equal(md(), 'x one x two x');
+  });
+});
+
+describe('AnEditBehindTheIndexIsReScannedBeforeAnythingIsReplaced', () => {
+  // The host re-issues findReset on every change message, but a change it has not
+  // seen yet — or one made by something else entirely — leaves this module holding
+  // offsets into a document that no longer exists. ensureFresh re-takes the index
+  // first (#5 F-3).
+  test('Replace All re-scans rather than replacing at the offsets it remembers', () => {
+    load('one cat two');
+    scan('cat');
+    const v = ed.view();
+    v.dispatch(v.state.tr.insertText('ZZZZZZ', 1, 1));     // no re-scan after it
+    assert.equal(findReplaceAll(v, 'dog', true).replaced, 1);
+    // Without ensureFresh the remembered offset 4 is read against the new text and
+    // the document comes back 'ZZZZdogne cat two'.
+    assert.equal(md(), 'ZZZZZZone dog two');
+  });
+
+  test('Replace on a document edited behind the index replaces nothing', () => {
+    load('one cat two');
+    scan('cat');
+    findNext(true);
+    const v = ed.view();
+    v.dispatch(v.state.tr.insertText('ZZZZZZ', 1, 1));
+    assert.equal(findReplace(v, 'dog', true, true).replaced, 0);
+    assert.equal(md(), 'ZZZZZZone cat two');
+  });
+});
+
 describe('ReplaceAllIsScopedToTheSelection', () => {
   test('only matches wholly inside the selected text are replaced', () => {
     load('cat one\n\ncat two\n\ncat three');
@@ -255,6 +302,44 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     const r = findReplaceAll(ed.view(), 'dog', true);
     assert.deepEqual(r, { replaced: 1, skipped: 0, total: 3, inSelection: true });
     assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
+  });
+
+  test('a match that ends one character past the scope is outside it', () => {
+    // The edge itself: '>' rather than '>=', or a stray +1 on the scope end, lets
+    // a match that overruns the selection by exactly one character through (#5 F-8).
+    load('catx');
+    const p = blockRange('catx');
+    ed.selectText(p.from, p.from + 2);           // 'ca' — the match runs one past it
+    scan('cat');
+    assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 0);
+    assert.equal(md(), 'catx');
+
+    // One character more of selection and the same match is inside.
+    findClear();
+    load('catx');
+    const q = blockRange('catx');
+    ed.selectText(q.from, q.from + 3);
+    scan('cat');
+    assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 1);
+    assert.equal(md(), 'dogx');
+  });
+
+  test('the kept range follows a replacement far longer than the match', () => {
+    // The existing pin shifts the document by two characters, which a scope that
+    // was never mapped still covers. Seventeen does not (#5 F-7).
+    load('cat one\n\ncat two\n\ncat three');
+    const two = blockRange('cat two');
+    ed.selectText(two.from, two.to);
+    findCaptureScope(ed.view());
+    scan('cat');
+    findNext(true);
+    findReplace(ed.view(), 'ELEPHANTINEQUADRUPED', true, true);   // 20 characters for 3
+    const shifted = blockRange('cat two');
+    assert.equal(shifted.from, two.from + 17);
+    ed.selectText(shifted.from, shifted.from + 3);   // Find's selection of what is now match 1
+    const r = findReplaceAll(ed.view(), 'dog', true);
+    assert.deepEqual({ replaced: r.replaced, inSelection: r.inSelection }, { replaced: 1, inSelection: true });
+    assert.equal(md(), 'ELEPHANTINEQUADRUPED one\n\ndog two\n\ncat three');
   });
 
   test('a match the selection cuts through is outside it', () => {

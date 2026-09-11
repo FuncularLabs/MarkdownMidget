@@ -273,6 +273,17 @@ public class FindEngineTests
     }
 
     [Fact]
+    public void AMatchThatEndsOneCharacterPastTheScopeIsOutsideIt()
+    {
+        // The edge itself. '>=' instead of '>', or a stray +1 on the scope end, lets a
+        // match that overruns the selection by exactly one character through — and the
+        // case above, where the matches overrun by more, never notices (#5 F-8).
+        Assert.Equal("catx", ReplaceAll("catx", "cat", FindEngine.Mode.Normal, "dog", scopeStart: 0, scopeLength: 2));
+        // One character more of scope and the same match is inside it.
+        Assert.Equal("dogx", ReplaceAll("catx", "cat", FindEngine.Mode.Normal, "dog", scopeStart: 0, scopeLength: 3));
+    }
+
+    [Fact]
     public void ReplaceAllEditsAreInDocumentOrderWithTheMatchedLength()
     {
         var spec = FindEngine.Prepare("cat", FindEngine.Mode.Normal, false, false, "tiger");
