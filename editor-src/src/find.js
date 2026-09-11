@@ -229,13 +229,18 @@ function resolveScope(view) {
 
 /// Remember the current selection as the Replace All scope for this dialog
 /// session (the host calls this when the Find dialog opens or is refocused).
-/// Returns the range kept, or null when there is no selected text to keep — a
-/// caret, a selected node, or the selection Find itself made.
+/// A caret or a selected node drops what was kept; the selection Find itself
+/// made keeps it (bringing the dialog back with Ctrl+F changes nothing). Returns
+/// the range kept, or null.
 export function findCaptureScope(view) {
-  capturedScope = null;
-  if (!view) return null;
+  if (!view) { capturedScope = null; return null; }
   const sel = view.state.selection;
-  if (sel.empty || sel.node || isCurrentMatch(view, sel)) return null;
+  if (sel.empty || sel.node) { capturedScope = null; return null; }
+  if (isCurrentMatch(view, sel)) {
+    return capturedScope && capturedScope.doc === view.state.doc
+      ? { from: capturedScope.from, to: capturedScope.to }
+      : null;
+  }
   capturedScope = { from: sel.from, to: sel.to, doc: view.state.doc };
   return { from: sel.from, to: sel.to };
 }

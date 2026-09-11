@@ -295,6 +295,29 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     assert.equal(findReplaceAll(ed.view(), 'dog', true).inSelection, false);
   });
 
+  test('capturing again keeps the range while the selection is Find’s, and drops it for a caret', () => {
+    load('cat one\n\ncat two\n\ncat three');
+    const two = blockRange('cat two');
+    ed.selectText(two.from, two.to);
+    findCaptureScope(ed.view());
+    scan('cat');
+    findNext(true);
+    const one = blockRange('cat one');
+    ed.selectText(one.from, one.from + 3);       // Find's selection of match 1
+    // Ctrl+F again with Find's selection: the kept range is still the answer.
+    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from, to: two.to });
+    assert.equal(findReplaceAll(ed.view(), 'dog', true).inSelection, true);
+    assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
+
+    // Ctrl+F again after clicking in the document (a caret): nothing is kept.
+    ed.selectText(one.from, one.from);
+    assert.equal(findCaptureScope(ed.view()), null);
+    scan('cat');
+    findNext(true);
+    ed.selectText(one.from, one.from + 3);
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, total: 2, inSelection: false });
+  });
+
   test('a caret is no selection: the whole document', () => {
     load('cat one\n\ncat two');
     const { from } = blockRange('cat two');
