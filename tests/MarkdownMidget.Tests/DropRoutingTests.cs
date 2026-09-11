@@ -313,15 +313,30 @@ public class DropRoutingTests
         Assert.Equal(Png, files[0].Head);
         Assert.Null(files[1].Head);
         Assert.Null(files[2].Head);
-        Assert.NotNull(files[3].Head);
-        Assert.Empty(files[3].Head);
+        var empty = files[3].Head;
+        Assert.NotNull(empty);
+        Assert.Empty(empty);
     }
 
     [Fact]
     public void MessageWithoutFilesIsEmpty()
     {
-        using var doc = JsonDocument.Parse("{\"type\":\"fileDrop\"}");
-        Assert.Empty(DropRouting.ParseMessage(doc.RootElement));
+        using var none = JsonDocument.Parse("{\"type\":\"fileDrop\"}");
+        Assert.Empty(DropRouting.ParseMessage(none.RootElement));
+        using var notAnArray = JsonDocument.Parse("{\"type\":\"fileDrop\",\"files\":\"photo.png\"}");
+        Assert.Empty(DropRouting.ParseMessage(notAnArray.RootElement));
+    }
+
+    [Fact]
+    public void MessageFileWithoutANameStillArrives()
+    {
+        // A File always has a name in the browser; if one ever arrived without, the
+        // bytes are still routed (a picture is still a picture) under a placeholder.
+        using var doc = JsonDocument.Parse("{\"files\":[{\"base64\":\"\"}]}");
+        var file = Assert.Single(DropRouting.ParseMessage(doc.RootElement));
+        Assert.Equal("Dropped", file.Name);
+        Assert.NotNull(file.Head);
+        Assert.Empty(file.Head);
     }
 
     // ===== ImageMarkdown's share =====

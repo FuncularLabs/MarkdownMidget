@@ -307,7 +307,8 @@ public partial class MainWindow : Window
 
         // The WebView covers the window centre, so let it accept drops; the editor
         // intercepts file drops and posts them to the host (see the 'fileDrop'
-        // message). Drops on the toolbar/menu are still handled by Window_Drop.
+        // message). Drops on the toolbar/menu, and on the source view, are still
+        // handled by Window_Drop; both routes decide by DropRouting.
         Web.AllowExternalDrop = true;
 
         Web.ZoomFactorChanged += OnZoomChanged;
@@ -513,9 +514,8 @@ public partial class MainWindow : Window
             case "fileDrop":
                 {
                     using var d = JsonDocument.Parse(e.WebMessageAsJson);
-                    var name = d.RootElement.TryGetProperty("name", out var nv) ? nv.GetString() ?? "Dropped.md" : "Dropped.md";
-                    var content = d.RootElement.TryGetProperty("content", out var cv) ? cv.GetString() ?? "" : "";
-                    Dispatcher.BeginInvoke(() => HandleDroppedContent(name, content));
+                    var files = DropRouting.ParseMessage(d.RootElement);
+                    Dispatcher.BeginInvoke(() => HandleDroppedFiles(files));
                 }
                 break;
         }
@@ -3970,7 +3970,17 @@ public partial class MainWindow : Window
         WrapToggle.IsChecked = _sourceMode && _wordWrap;
     }
 
-    // ===== Drag & drop: open in this instance if idle, else launch a new one =====
+    // ===== Drag & drop: pictures go in, markdown opens, anything else is refused =====
+    //
+    // Two surfaces receive drops. The WPF window — toolbar, menu bar, status bar,
+    // the closed-document splash, and the source view: AvalonEdit's TextArea takes
+    // only text drags (its handler marks nothing handled for a file drag) and lets a
+    // file drop bubble up to Window_Drop, with the file's path. The formatted view
+    // is a WebView2, a separate HWND that takes its own drops and posts them as the
+    // 'fileDrop' message, with each file's bytes but no path (HandleDroppedFiles).
+    // Both hand their files to DropRouting and act on its plan, so the rules are in
+    // one place and tested there; what differs here is only how a picture's bytes
+    // are fetched and how a document opens.
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
@@ -3978,34 +3988,111 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void Window_Drop(object sender, DragEventArgs e)
+    private async void Window_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        // Only the first bytes of each file are read to route it; a picture's bytes
+        // are read in full below, and a document's by OpenPathAsync.
+        var files = paths.Select(p => new DroppedFile(Path.GetFileName(p), ReadHead(p))).ToList();
+        var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: false);
 
-        // Open the first file here only if this window holds an untitled, unmodified
-        // document; otherwise (a file is open, or there are unsaved edits) keep it and
-        // open everything in fresh instances.
+        await InsertDroppedPicturesAsync(plan, i => File.ReadAllBytesAsync(paths[i]));
+
+        // Documents open as a drop here always opened them: the first in this window
+        // only if it holds an untitled, unmodified document; otherwise (a file is
+        // open, or there are unsaved edits) keep it and open everything in fresh
+        // instances. The plan leaves this list empty when a picture went in.
         var openHere = _currentPath is null && !_dirty;
-        for (var i = 0; i < files.Length; i++)
+        for (var n = 0; n < plan.Open.Count; n++)
         {
-            if (i == 0 && openHere) _ = OpenPathAsync(files[0]);
-            else OpenInNewInstance(files[i]);
+            if (n == 0 && openHere) _ = OpenPathAsync(paths[plan.Open[0]]);
+            else OpenInNewInstance(paths[plan.Open[n]]);
         }
+        if (plan.Notice() is { } notice) FlashStatus(notice);
         Activate();
     }
 
     /// <summary>
-    /// Opens a file dropped onto the editor area. Web content can't see the file
-    /// path, so this loads the dropped text as an untitled document named after the
+    /// The first <see cref="DropRouting.SniffLength"/> bytes of a dropped path, for
+    /// routing. A file that can't be read (locked, gone, a folder) gives an EMPTY
+    /// head rather than a null one: routing then goes by the name, so a markdown
+    /// name still reaches OpenPathAsync and its own "Couldn't open the file" — as
+    /// a drop always did — and any other name is refused.
+    /// </summary>
+    private static byte[] ReadHead(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var head = new byte[DropRouting.SniffLength];
+            var read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
+            return head[..read];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>What the window can do with a dropped picture right now: the same
+    /// two states that gate every other edit (SetReadOnly, SetClosed).</summary>
+    private DropTarget DropTargetNow() =>
+        _closed ? DropTarget.NoDocument : _readOnly ? DropTarget.ReadOnly : DropTarget.Editable;
+
+    /// <summary>
+    /// Embed the pictures a drop plan chose, as ONE insertion into whichever view is
+    /// active — through InsertMarkdownFragment, the path Insert ▸ Picture takes, so a
+    /// dropped photo.png and a picked photo.png land as the same markdown at the
+    /// caret. <paramref name="bytesOf"/> fetches a picture's bytes by its index in
+    /// the plan (a path read, or the bytes the editor already sent). A read that
+    /// fails inserts none of the pictures, with Insert ▸ Picture's message.
+    /// </summary>
+    private async Task InsertDroppedPicturesAsync(DropPlan plan, Func<int, Task<byte[]>> bytesOf)
+    {
+        if (plan.Insert.Count == 0) return;
+        var fragments = new List<string>(plan.Insert.Count);
+        try
+        {
+            foreach (var picture in plan.Insert)
+                fragments.Add(DropRouting.PictureMarkdown(plan.Files[picture.Index].Name, picture.Mime, await bytesOf(picture.Index)));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Couldn't read the image:\n{ex.Message}", "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        InsertMarkdownFragment(DropRouting.Markdown(fragments));
+    }
+
+    /// <summary>
+    /// A drop on the formatted view, which arrives as content: the editor read every
+    /// dropped file's bytes, because web content never sees a dropped file's path.
+    /// Pictures embed through the same path as Window_Drop's; a markdown file opens
+    /// as an untitled document named after the file — one per drop, since there is
+    /// no path to hand a new window (the plan names any others).
+    /// </summary>
+    private async void HandleDroppedFiles(IReadOnlyList<DroppedFile> files)
+    {
+        var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: true);
+        // Head is the whole file on this route, and never null for a file the plan
+        // chose: an unreadable file is refused before it can be chosen.
+        await InsertDroppedPicturesAsync(plan, i => Task.FromResult(files[i].Head!));
+        if (plan.Open.Count > 0) await HandleDroppedContentAsync(files[plan.Open[0]].Name, files[plan.Open[0]].Head!);
+        if (plan.Notice() is { } notice) FlashStatus(notice);
+    }
+
+    /// <summary>
+    /// Opens a file dropped onto the formatted view. Web content can't see the file
+    /// path, so this loads the dropped bytes as an untitled document named after the
     /// file (Save will prompt for a location).
     /// </summary>
-    private async void HandleDroppedContent(string name, string content)
+    private async Task HandleDroppedContentAsync(string name, byte[] bytes)
     {
-        // The drop path reads files as TEXT in the browser, which mangles binary
-        // containers — and the sniff still works because the magic is ASCII. Refuse
-        // with directions rather than corrupt: every text-based route is unsafe
-        // for a .mdenc, so this isn't a prompt, it's a redirect.
-        if (Secure.SecureUi.IsEncryptedPath(name) || content.StartsWith("MDMSEC", StringComparison.Ordinal))
+        // The container is sniffed by content, as OpenPathAsync sniffs it — but the
+        // password prompt lives on the path route, and this route has no path to
+        // reopen from, so this isn't a prompt, it's a redirect.
+        if (Secure.SecureUi.IsEncryptedPath(name) || Secure.SecureMarkdownFormat.LooksLikeContainer(bytes))
         {
             MessageBox.Show(this,
                 "Encrypted documents can't be opened by dropping them here — use " +
@@ -4026,13 +4113,13 @@ public partial class MainWindow : Window
             DiscardBackup();
             _backupDirty = false;
             await ApplyDocBaseAsync(null); // dropped content has no folder context
-            // The browser read the file as text: its byte-order mark is gone before
-            // we see it, but its line endings are intact, and they are the convention
-            // the eventual Save As writes.
-            var dropped = DocumentText.Detect(content);
+            // The editor hands the file's bytes over, so its line ending and
+            // byte-order mark are detected exactly as File ▸ Open detects them, and
+            // both are the convention the eventual Save As writes back.
+            var dropped = DocumentText.Detect(bytes);
             await SetDocumentMarkdownAsync(dropped.Text);
             _lineEnding = dropped.Ending;
-            _hadBom = false;
+            _hadBom = dropped.HadBom;
             _currentPath = null;
             ReleaseDocumentClaim();   // the file this window showed is no longer open here
             _displayName = name;

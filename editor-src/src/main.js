@@ -388,7 +388,11 @@ function installContextMenus(view) {
 }
 
 // Make the editor area a file drop target. The OS doesn't expose dropped-file
-// paths to web content, so we read the text and hand the host the name + content.
+// paths to web content, so we read every dropped file and hand the host its name
+// and bytes (base64) — bytes, not text, because the host routes each file by what
+// it is (a picture is embedded, markdown opens, anything else is refused), and a
+// picture read as text is unrecoverable. A read that fails — a dropped folder —
+// reports null, which the host refuses by name.
 function installFileDrop() {
   const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
   window.addEventListener('dragover', (e) => {
@@ -400,11 +404,22 @@ function installFileDrop() {
     if (!hasFiles(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => postToHost({ type: 'fileDrop', name: file.name, content: String(reader.result) });
-    reader.readAsText(file);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    const readBase64 = (file) => new Promise((resolve) => {
+      const reader = new FileReader();
+      // A data URL is "data:<type>;base64,<payload>"; only the payload travels. An
+      // empty file can come back as a bare "data:" with no comma: that is an empty
+      // payload, not an unreadable file.
+      reader.onload = () => {
+        const s = String(reader.result);
+        const comma = s.indexOf(',');
+        resolve({ name: file.name, base64: comma < 0 ? '' : s.slice(comma + 1) });
+      };
+      reader.onerror = () => resolve({ name: file.name, base64: null });
+      reader.readAsDataURL(file);
+    });
+    Promise.all(files.map(readBase64)).then((read) => postToHost({ type: 'fileDrop', files: read }));
   }, true);
 }
 
