@@ -52,7 +52,7 @@ public partial class MainWindow : Window
     /// apply a decision taken earlier — so a stale value cannot outlive its decision.
     ///
     /// One exception, and it routes CONTENT: <c>Picture_Click</c> awaits
-    /// <c>File.ReadAllBytesAsync</c> and then calls <c>InsertMarkdownFragment</c>,
+    /// <c>PickedPicture.ReadAsync</c> (the picked file's read) and then calls <c>InsertMarkdownFragment</c>,
     /// which routes on <see cref="_sourceMode"/>. A Ctrl+E during that read can land
     /// the picture in the half being discarded, because the flag does not turn over
     /// until the bottom of <see cref="SetSourceModeAsync"/>. Left untracked on
@@ -4332,14 +4332,15 @@ public partial class MainWindow : Window
         });
         if (picked is null) return;
 
-        string md;
+        PickedPictureResult picture;
         try
         {
             // Embedded as a base64 data URI — ImageMarkdown says why, and a picture
             // pasted into the source view or dropped on either view takes the same
             // shape from the same place (a dropped file gets this alt text too).
-            var bytes = await File.ReadAllBytesAsync(picked);
-            md = ImageMarkdown.Fragment(ImageMarkdown.AltText(picked), ImageMarkdown.MimeForImage(picked), bytes);
+            // PickedPicture applies the one picture ceiling on the way: to the size
+            // on disk before anything is read, and to what the bounded read returns.
+            picture = await PickedPicture.ReadAsync(picked);
         }
         catch (Exception ex)
         {
@@ -4347,7 +4348,14 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        InsertMarkdownFragment(md);
+        // Past the ceiling: nothing is inserted, and the status bar says so in the
+        // words a refused drop uses.
+        if (picture.Notice is { } notice)
+        {
+            FlashStatus(notice);
+            return;
+        }
+        InsertMarkdownFragment(picture.Markdown!);
     }
 
     private void CodeBlock_Click(object sender, RoutedEventArgs e)

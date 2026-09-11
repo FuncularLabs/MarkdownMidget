@@ -78,6 +78,21 @@ public class DropFilesTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAllTakesTheSharingItIsGiven()
+    {
+        // Insert ▸ Picture reuses this bounded read with FileShare.Read — the sharing
+        // File.ReadAllBytesAsync gave it — while the drop keeps the tolerant default.
+        // The parameter is the whole difference between the two routes' reads.
+        var bytes = new byte[Png.Length + 100];
+        Png.CopyTo(bytes, 0);
+        var path = Write("held.png", bytes);
+        using var writer = HeldByAWriter(path);
+
+        Assert.Equal(bytes, await DropFiles.ReadAllAsync(path));
+        await Assert.ThrowsAsync<IOException>(() => DropFiles.ReadAllAsync(path, share: FileShare.Read));
+    }
+
+    [Fact]
     public void HeadIsAtMostSniffLengthBytes()
     {
         var path = Write("long.png", Encoding.ASCII.GetBytes(new string('x', DropRouting.SniffLength * 4)));

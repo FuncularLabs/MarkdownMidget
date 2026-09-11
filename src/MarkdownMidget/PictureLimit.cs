@@ -16,7 +16,7 @@ namespace MarkdownMidget;
 /// with <see cref="Notice"/>, so no two routes can disagree about where the line is
 /// or how the refusal is worded: a picture file dropped on either view
 /// (<see cref="DropRouting"/>, whose MaxPictureBytes is this constant under the
-/// drop's own name).
+/// drop's own name), and Insert ▸ Picture (<see cref="PickedPicture"/>).
 ///
 /// Only PICTURES are capped. A dropped markdown or text file is opened, and
 /// File ▸ Open has never capped what it opens.

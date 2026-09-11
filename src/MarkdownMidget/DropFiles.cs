@@ -8,7 +8,8 @@ namespace MarkdownMidget;
 /// Reading a dropped PATH off disk, for the route that gets paths (the WPF
 /// window). Separate from <see cref="DropRouting"/>, which is pure and decides
 /// where a file goes, and separate from the window, so the sharing mode these
-/// opens use is testable without one.
+/// opens use is testable without one. The bounded full read is Insert ▸ Picture's
+/// too (<see cref="PickedPicture"/>), with that route's own sharing.
 /// </summary>
 internal static class DropFiles
 {
@@ -67,10 +68,17 @@ internal static class DropFiles
     /// the caller must ask it.
     /// </summary>
     /// <param name="limit">Take no more than this many bytes; defaults to the picture
-    /// ceiling plus one. Takes a value so the bound is testable without a 64 MB file.</param>
-    public static async Task<byte[]> ReadAllAsync(string path, long limit = DropRouting.MaxPictureBytes + 1)
+    /// ceiling (<see cref="PictureLimit.MaxBytes"/>) plus one. Takes a value so the
+    /// bound is testable without a 64 MB file, and so Insert ▸ Picture can bound its
+    /// read by the ceiling it was given.</param>
+    /// <param name="share">What other handles may do while this one reads. The
+    /// drop's default tolerates a writer (<see cref="Open"/> says why); Insert ▸
+    /// Picture passes FileShare.Read, the sharing it has always read with
+    /// (<see cref="PickedPicture.ReadBoundedAsync"/> says why).</param>
+    public static async Task<byte[]> ReadAllAsync(string path, long limit = PictureLimit.MaxBytes + 1,
+        FileShare share = Tolerant)
     {
-        using var stream = Open(path, useAsync: true);
+        using var stream = Open(path, useAsync: true, share);
         // Only a capacity hint — a file being written can report one length and yield
         // another, so what is returned is what actually read, never this.
         var length = stream.CanSeek ? stream.Length : 0;
@@ -103,7 +111,15 @@ internal static class DropFiles
     /// and pays for it at the other end, where
     /// <see cref="DropRouting.PictureSurvivedTheRead"/> checks what actually arrived
     /// before any of it reaches the document.
+    ///
+    /// <paramref name="share"/> is that tolerance unless a caller asks for less, and
+    /// only one does: Insert ▸ Picture, which reuses <see cref="ReadAllAsync"/> for
+    /// its bound and checks nothing but the ceiling on what arrives.
     /// </summary>
-    private static FileStream Open(string path, bool useAsync = false) =>
-        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, bufferSize: 4096, useAsync);
+    private static FileStream Open(string path, bool useAsync = false, FileShare share = Tolerant) =>
+        new(path, FileMode.Open, FileAccess.Read, share, bufferSize: 4096, useAsync);
+
+    /// <summary>The sharing a drop reads with: every other handle may read, write or
+    /// delete (<see cref="Open"/> says why).</summary>
+    private const FileShare Tolerant = FileShare.ReadWrite | FileShare.Delete;
 }
