@@ -214,7 +214,8 @@ new name appears in the menu without restarting the app.
 
 Two folders, and the difference matters:
 
-- **`themes\`** holds the seven built-ins. They are rewritten from the app whenever
+- **`themes\`** holds the six built-in theme files — the seventh theme, Default, is
+  the app's own palette and has no file. They are rewritten from the app whenever
   you update, so that a fix to one reaches you — which also means **edits to them
   are lost**.
 - **`themes\custom\`** is yours. Nothing there is ever overwritten. A custom file
@@ -583,7 +584,7 @@ into and what to do instead.
 - **Mermaid ships inside the editor bundle whether a document uses it or not.**
   Diagrams work with nothing to install; the cost is download size, and there is
   no way to leave it out.
-- **Edits to the seven built-in theme files are lost when you update.** They are
+- **Edits to the six built-in theme files are lost when you update.** They are
   rewritten from the app so that a fix reaches you. Keep your own colours in
   `themes\custom\`, where nothing is ever overwritten — see [Writing your
   own](#writing-your-own).
