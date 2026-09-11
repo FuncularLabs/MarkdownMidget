@@ -86,6 +86,54 @@ internal static class DropHandshake
     /// dropped again before it finished. It used to say nothing at all.</summary>
     public const string SupersededNotice = "A newer drop replaced this one; nothing from it was inserted.";
 
+    /// <summary>What the status line says when the DOCUMENT moved while the drop was
+    /// being read — a different file opened, the document closed, Read Only turned
+    /// on, or a save that reset the baseline. Not "a newer drop replaced this one":
+    /// no newer drop exists, the window the drop was routed for simply stopped being
+    /// the window on screen. Names opening as well as inserting, because the content
+    /// route reads a dropped DOCUMENT's bytes through the same wait.</summary>
+    public const string DocumentChangedNotice =
+        "The document changed while the drop was being read; nothing from it was inserted or opened.";
+
+    /// <summary>
+    /// Whether a drop plan may still be applied to the document, after the wait for
+    /// the bytes it needs.
+    ///
+    /// A plan is made from <c>DropTargetNow()</c> BEFORE the request for bytes goes
+    /// out and applied AFTER the answer comes back — up to
+    /// <see cref="ReadTimeout"/> later, with no busy overlay over the window. Every
+    /// menu is live in that gap: File ▸ Open, File ▸ New, File ▸ Close, View ▸ Read
+    /// Only, and a drop on the toolbar. Applying a stale plan then put the picture
+    /// into whatever document had arrived in the meantime, or — with nothing testing
+    /// <c>_closed</c> on the insert path — into a closed document, which the user
+    /// cannot see and which is now dirty.
+    ///
+    /// Three things are compared, and they are the three the plan depended on:
+    ///
+    /// <list type="bullet">
+    /// <item>The path. A different file (or an untitled document where a file was,
+    /// or the reverse) is not the document that was routed.</item>
+    /// <item>The clean baseline, BY REFERENCE. <c>SetCleanBaselineAsync</c> assigns a
+    /// fresh instance even for identical text precisely so a reload, a save or a Keep
+    /// is detectable this way; a value comparison would miss all three. This is the
+    /// same pin <c>HandleExternalChangeAsync</c> takes across its own awaits.</item>
+    /// <item>What the window can take. Read Only turned on mid-wait, or the document
+    /// closed, both change this and both mean the insert must not happen.</item>
+    /// </list>
+    ///
+    /// A window that became MORE permissive mid-wait fails too, and deliberately: a
+    /// plan made against a read-only window set its pictures aside as "not inserted"
+    /// and already said so in the status line, so letting them in afterwards would
+    /// contradict the notice the user just read.
+    /// </summary>
+    public static bool StillApplies(
+        string? pathThen, string? pathNow,
+        string? cleanThen, string? cleanNow,
+        DropTarget targetThen, DropTarget targetNow) =>
+        string.Equals(pathThen, pathNow, StringComparison.Ordinal)
+        && ReferenceEquals(cleanThen, cleanNow)
+        && targetThen == targetNow;
+
     /// <summary>
     /// Whether a <c>fileDrop</c> message that has just arrived is older than one
     /// already handled, and so must be ignored.

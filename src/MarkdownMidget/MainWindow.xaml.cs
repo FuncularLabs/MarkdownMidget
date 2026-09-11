@@ -4003,12 +4003,19 @@ public partial class MainWindow : Window
     private async void Window_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        // This drop owns the window now, so a read the formatted view left
+        // outstanding ends here — the same thing a second drop on the formatted view
+        // does. Without it, a toolbar drop during a content-route wait let that wait
+        // finish and insert its own picture on top of this one.
+        if (AbandonDroppedRead()) FlashStatus(DropHandshake.SupersededNotice);
+
         // Only the first bytes of each file are read to route it (DropFiles.Read); a
         // picture's bytes are read in full below, and a document's by OpenPathAsync.
         var files = paths.Select(DropFiles.Read).ToList();
-        var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: false);
+        var then = DropPin();
+        var plan = DropRouting.Plan(files, then.Target, oneDocument: false);
 
-        await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]));
+        await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]), then);
 
         // Documents open as a drop here always opened them: the first in this window
         // only if it holds an untitled, unmodified document; otherwise (a file is
@@ -4030,6 +4037,22 @@ public partial class MainWindow : Window
         _closed ? DropTarget.NoDocument : _readOnly ? DropTarget.ReadOnly : DropTarget.Editable;
 
     /// <summary>
+    /// What a drop plan is decided against, captured BEFORE the drop's first await
+    /// so it can be compared with the same three values afterwards
+    /// (<see cref="DropHandshake.StillApplies"/>). Every await in a drop — a path
+    /// read, and the content route's whole round trip to the editor — leaves the
+    /// menus live, so all three can move underneath one.
+    /// </summary>
+    private (string? Path, string Clean, DropTarget Target) DropPin() =>
+        (_currentPath, _cleanMarkdown, DropTargetNow());
+
+    /// <summary>Whether the window is still the one <paramref name="then"/> was taken
+    /// from. False means the plan made against it is stale and nothing from the drop
+    /// may be applied.</summary>
+    private bool DropStillApplies((string? Path, string Clean, DropTarget Target) then) =>
+        DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown, then.Target, DropTargetNow());
+
+    /// <summary>
     /// Embed the pictures a drop plan chose, as ONE insertion into whichever view is
     /// active — through InsertMarkdownFragment, the path Insert ▸ Picture takes, so a
     /// dropped photo.png and a picked photo.png land as the same markdown at the
@@ -4037,7 +4060,13 @@ public partial class MainWindow : Window
     /// the plan (a path read, or the bytes the editor already sent). A read that
     /// fails inserts none of the pictures, with Insert ▸ Picture's message.
     /// </summary>
-    private async Task InsertDroppedPicturesAsync(DropPlan plan, Func<int, Task<byte[]>> bytesOf)
+    /// <param name="then">What the plan was decided against, taken before the
+    /// caller's first await. Fetching the bytes is itself an await, so the document
+    /// can move between the plan and the insertion here too; this is the chokepoint
+    /// both routes' insertions go through, so the last word on whether the insertion
+    /// still applies is taken here.</param>
+    private async Task InsertDroppedPicturesAsync(
+        DropPlan plan, Func<int, Task<byte[]>> bytesOf, (string? Path, string Clean, DropTarget Target) then)
     {
         if (plan.Insert.Count == 0) return;
         var fragments = new List<string>(plan.Insert.Count);
@@ -4069,6 +4098,11 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        // Last thing before the document is touched: the bytes took an await to
+        // fetch, and the window was live throughout it. A plan made against a
+        // different document — or against one that has since closed, which nothing
+        // downstream tests for — must not reach InsertMarkdownFragment.
+        if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return; }
         InsertMarkdownFragment(DropRouting.Markdown(fragments));
     }
 
@@ -4109,7 +4143,13 @@ public partial class MainWindow : Window
         if (AbandonDroppedRead()) FlashStatus(DropHandshake.SupersededNotice);
 
         var files = message.Files;
-        var plan = DropRouting.Plan(files, DropTargetNow(), oneDocument: true);
+        // Pinned before the request goes out and checked after it comes back. The
+        // await below is bounded by ReadTimeout, not by anything the user is stopped
+        // from doing in the meantime: there is no busy overlay, so File ▸ Open,
+        // File ▸ New, File ▸ Close, View ▸ Read Only and a drop on the toolbar are
+        // all reachable for the whole 10–90 seconds of it.
+        var then = DropPin();
+        var plan = DropRouting.Plan(files, then.Target, oneDocument: true);
         // The chosen pictures AND the one document that opens: this route has no
         // path, so the document's bytes have to come from the editor too.
         var wanted = plan.Insert.Select(p => p.Index).Concat(plan.Open.Take(1)).ToList();
@@ -4119,6 +4159,14 @@ public partial class MainWindow : Window
         // and it has already said so.
         if (reply.Outcome == DropReply.Discard) return;
 
+        // The document the plan was made for is not necessarily the one on screen
+        // now. Checked before ANY of the outcomes are acted on, because none of them
+        // is about this document any more: a picture would go into a file that never
+        // received the drop (or into a closed one, which nothing downstream tests
+        // for), a dropped .md would replace a document the user has since opened, and
+        // "Couldn't read a.png" would be said about a drop that is no longer live.
+        if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return; }
+
         if (reply.Outcome == DropReply.Apply)
         {
             // Every index asked for has bytes here (that is what Apply means); the
@@ -4126,7 +4174,7 @@ public partial class MainWindow : Window
             // failed path read has always had.
             await InsertDroppedPicturesAsync(plan, i => reply.Bytes.TryGetValue(i, out var b)
                 ? Task.FromResult(b)
-                : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")));
+                : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")), then);
 
             if (plan.Open.Count > 0 && reply.Bytes.TryGetValue(plan.Open[0], out var content))
                 await HandleDroppedContentAsync(files[plan.Open[0]].Name, content);

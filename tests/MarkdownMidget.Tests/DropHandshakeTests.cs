@@ -310,6 +310,84 @@ public class DropHandshakeTests
         Assert.Equal("Couldn't read the dropped file(s) — try Insert ▸ Picture.", DropHandshake.TimedOutNotice);
     }
 
+    // ===== AR-2: the plan is re-validated against the document after the wait =====
+    //
+    // The plan is made from DropTargetNow() BEFORE the request for bytes goes out
+    // and applied AFTER it comes back — a gap of up to ReadTimeout (10–90 s), with
+    // no busy overlay over it. Everything the user can reach in that gap changes
+    // what the plan was decided against: File ▸ Open, File ▸ New, File ▸ Close,
+    // View ▸ Read Only, and a drop on the toolbar. So the three things the plan
+    // depended on are pinned before the request and compared after it, the same
+    // three-part pin HandleExternalChangeAsync uses across its own awaits.
+
+    [Fact]
+    public void APlanStillAppliesWhenNothingAboutTheDocumentMoved()
+    {
+        var clean = new string("# Notes".AsSpan());
+        Assert.True(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable));
+        // An untitled document has no path, and two nulls are the same document.
+        Assert.True(DropHandshake.StillApplies(
+            null, null, clean, clean, DropTarget.Editable, DropTarget.Editable));
+    }
+
+    [Fact]
+    public void ADocumentClosedWhileTheDropWasBeingReadTakesNothing()
+    {
+        // The case nothing guarded: File ▸ Close during the wait leaves _closed
+        // true, and InsertMarkdownFragment tests _readOnly but not _closed — so the
+        // fragment went into the collapsed WebView and marked a closed document
+        // dirty. DropTargetNow() reports NoDocument for exactly that state, so the
+        // target half of the pin is what catches it.
+        var clean = new string("# Notes".AsSpan());
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.NoDocument));
+    }
+
+    [Fact]
+    public void AWindowMadeReadOnlyWhileTheDropWasBeingReadTakesNothing()
+    {
+        // InsertMarkdownFragment returns silently in a read-only window, so the
+        // picture vanished with nothing said. Now the drop says so.
+        var clean = new string("# Notes".AsSpan());
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.ReadOnly));
+        // And the other way round: a window that became editable mid-wait is not the
+        // window the plan was made for either — that plan set the picture aside as
+        // "not inserted", and its notice has already said so.
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", clean, clean, DropTarget.ReadOnly, DropTarget.Editable));
+    }
+
+    [Fact]
+    public void ADifferentFileOpenedWhileTheDropWasBeingReadDoesNotReceiveIt()
+    {
+        var clean = new string("# Notes".AsSpan());
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\other.md", clean, clean, DropTarget.Editable, DropTarget.Editable));
+        // A file opened where there was an untitled document, and a document that
+        // lost its path, are both a different document from the one routed.
+        Assert.False(DropHandshake.StillApplies(
+            null, @"C:\a\notes.md", clean, clean, DropTarget.Editable, DropTarget.Editable));
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", null, clean, clean, DropTarget.Editable, DropTarget.Editable));
+    }
+
+    [Fact]
+    public void TheSameFileReloadedToIdenticalTextIsStillAChange()
+    {
+        // The baseline is pinned by REFERENCE, exactly as HandleExternalChangeAsync
+        // pins it: SetCleanBaselineAsync assigns a FRESH instance even when the text
+        // is identical, so a save, a reload or a Keep that landed during the wait is
+        // visible here. A value comparison would miss every one of them.
+        var then = new string("# Notes".AsSpan());
+        var now = new string("# Notes".AsSpan());
+        Assert.Equal(then, now);
+        Assert.False(ReferenceEquals(then, now));
+        Assert.False(DropHandshake.StillApplies(
+            @"C:\a\notes.md", @"C:\a\notes.md", then, now, DropTarget.Editable, DropTarget.Editable));
+    }
+
     // ===== what the user is told =====
 
     [Fact]
@@ -321,6 +399,11 @@ public class DropHandshakeTests
         // happened.
         Assert.Equal("A newer drop replaced this one; nothing from it was inserted.",
             DropHandshake.SupersededNotice);
+        // And the one for a document that moved under the read rather than a drop
+        // that replaced it: it names both things the drop could have done, because
+        // the content route reads a document's bytes through the same wait.
+        Assert.Equal("The document changed while the drop was being read; nothing from it was inserted or opened.",
+            DropHandshake.DocumentChangedNotice);
         Assert.Equal("Couldn't read photo.png.", DropHandshake.UnreadableNotice(["photo.png"]));
         Assert.Equal("Couldn't read a.png, b.png.", DropHandshake.UnreadableNotice(["a.png", "b.png"]));
     }
