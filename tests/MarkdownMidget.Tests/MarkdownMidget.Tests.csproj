@@ -22,8 +22,8 @@
          Type both options with TWO leading hyphens. An XML comment cannot hold a double
          hyphen (MSBuild then refuses to load this file, MSB4025); typed with one, dotnet test
          stops with MSB1001 "Unknown switch". README.md (Build & run) has the line ready to
-         paste. Put FOLDER outside the repo; the default TestResults folder is not
-         git-ignored. The report is written to
+         paste. Put FOLDER outside the repo. Without -results-directory, FOLDER is the
+         TestResults folder beside this file, which is git-ignored. The report is written to
          FOLDER\<guid>\<user>_<machine>_<date>.<time>.cobertura.xml.
 
          Reading it: the report also lists this test assembly and Konscious.*, so its root

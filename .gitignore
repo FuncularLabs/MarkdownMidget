@@ -3,6 +3,9 @@
 [Oo]bj/
 *.user
 
+# Test results (dotnet test's default results folder; coverage reports land here too)
+TestResults/
+
 # Node / editor bundle deps
 node_modules/
 

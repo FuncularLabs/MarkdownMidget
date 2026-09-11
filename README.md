@@ -173,8 +173,8 @@ Register refuses a plain `dotnet build` or `dotnet run` output: that exe needs
 the files beside it, and a copy of it on its own would not start.
 
 To measure line coverage, use the Microsoft collector that `Microsoft.NET.Test.Sdk`
-brings in, with a results folder outside the repo (the default `TestResults` folder
-is not git-ignored):
+brings in. The report goes under the folder you name; without `--results-directory`,
+it goes under the test project's `TestResults` folder, which is git-ignored:
 
 ```sh
 dotnet test tests/MarkdownMidget.Tests/MarkdownMidget.Tests.csproj --collect:"Code Coverage;Format=cobertura" --results-directory <folder outside the repo>
