@@ -171,6 +171,22 @@ public class DropRoutingTests
     }
 
     [Fact]
+    public void DroppedPictureMarkdownCarriesTheSniffedMimeNotTheNamesMime()
+    {
+        // The case where the two disagree, which is the whole point of sniffing: a PNG
+        // named photo.md. The data URI must say image/png — what the bytes ARE — and
+        // not what the extension claims (MimeForImage(".md") is application/octet-stream,
+        // which no browser renders). Without this case, PictureMarkdown could ignore the
+        // sniffed mime entirely and every other test would still pass.
+        var (kind, mime) = DropRouting.Classify("photo.md", Png);
+        Assert.Equal(DropKind.Picture, kind);
+        Assert.Equal("application/octet-stream", ImageMarkdown.MimeForImage("photo.md"));  // the wrong answer
+        var md = DropRouting.PictureMarkdown("photo.md", mime!, Png);
+        Assert.StartsWith("![photo](data:image/png;base64,", md);
+        Assert.Equal($"![photo](data:image/png;base64,{Convert.ToBase64String(Png)})", md);
+    }
+
+    [Fact]
     public void SinglePictureHasNoSeparator()
     {
         var one = DropRouting.PictureMarkdown("a.png", "image/png", Png);
