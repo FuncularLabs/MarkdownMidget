@@ -161,8 +161,33 @@ public class DropFilesTests : IDisposable
         // Read what is there — no throw, no padding to the length the sniff saw.
         Assert.Equal(4, bytes.Length);
         Assert.NotEqual(sniffed.Size, bytes.Length);
-        // And refused, because four bytes are not the PNG the plan routed.
-        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png"));
+        // And refused, because four bytes are not the PNG the plan routed. The size
+        // the window passes is the one the plan routed on, which is this file's.
+        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png", sniffed.Size));
+    }
+
+    [Fact]
+    public async Task AFileTruncatedToItsSignatureIsRefusedByTheSizeTheDropRouted()
+    {
+        // AR-1. The truncation above is caught by the sniff alone, because it cuts
+        // THROUGH the eight-byte PNG magic. This one does not: the writer reset the
+        // file to its signature plus a byte, which still sniffs as a PNG. Only the
+        // length the drop stated separates it from a whole picture.
+        var whole = new byte[5L * 1024 * 1024];
+        Png.CopyTo(whole, 0);
+        var path = Write("shot.png", whole);
+        var sniffed = DropFiles.Read(path);
+        Assert.Equal(DropKind.Picture, DropRouting.Classify(sniffed.Name, sniffed.Head, sniffed.Size).Kind);
+        Assert.Equal(5L * 1024 * 1024, sniffed.Size);
+
+        using (var writer = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+            writer.SetLength(9);
+
+        var bytes = await DropFiles.ReadAllAsync(path);
+        Assert.Equal(9, bytes.Length);
+        // Nine bytes of a 5 MB picture, and they sniff as a PNG all the same.
+        Assert.Equal("image/png", DropRouting.SniffImageMime(bytes));
+        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png", sniffed.Size));
     }
 
     [Fact]
@@ -197,7 +222,9 @@ public class DropFilesTests : IDisposable
         var bytes = await DropFiles.ReadAllAsync(path);
         Assert.Equal(grown.Length, bytes.Length);
         Assert.True(bytes.Length > sniffed.Size);
-        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png"));
+        // And accepted: growth past the stated size is the case the tolerant open
+        // exists for, so only SHRINKING is a truncation.
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", sniffed.Size));
     }
 
     [Fact]

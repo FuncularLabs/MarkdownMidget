@@ -394,17 +394,23 @@ public class DropRoutingTests
         // and nothing else when the drop routed it. What is embedded is what actually
         // arrived, so what actually arrived is checked — the cheapest honest check
         // being that it still starts the way its format does.
-        Assert.True(DropRouting.PictureSurvivedTheRead(Png, "image/png"));
+        Assert.True(DropRouting.PictureSurvivedTheRead(Png, "image/png", Png.LongLength));
         // Truncated below its own signature: eight bytes are the whole PNG magic, so
         // four of them are not a PNG any viewer will decode from the data URI.
-        Assert.False(DropRouting.PictureSurvivedTheRead(Png[..4], "image/png"));
+        Assert.False(DropRouting.PictureSurvivedTheRead(Png[..4], "image/png", Png.LongLength));
         // Read as nothing at all — the file was reset between the sniff and the read.
-        Assert.False(DropRouting.PictureSurvivedTheRead([], "image/png"));
+        Assert.False(DropRouting.PictureSurvivedTheRead([], "image/png", Png.LongLength));
         // Still a picture, but not the one that was routed: the alt text, the MIME in
         // the data URI and the bytes would disagree.
-        Assert.False(DropRouting.PictureSurvivedTheRead(Jpeg, "image/png"));
+        Assert.False(DropRouting.PictureSurvivedTheRead(Jpeg, "image/png", Jpeg.LongLength));
         // And text where a picture was: refused rather than embedded as garbage.
-        Assert.False(DropRouting.PictureSurvivedTheRead(Text, "image/png"));
+        Assert.False(DropRouting.PictureSurvivedTheRead(Text, "image/png", Text.LongLength));
+        // Each of those is refused on the SNIFF, not on the length: state -1, the
+        // "drop did not say" that turns the length half off, and they still are.
+        Assert.False(DropRouting.PictureSurvivedTheRead(Png[..4], "image/png", -1));
+        Assert.False(DropRouting.PictureSurvivedTheRead([], "image/png", -1));
+        Assert.False(DropRouting.PictureSurvivedTheRead(Jpeg, "image/png", -1));
+        Assert.False(DropRouting.PictureSurvivedTheRead(Text, "image/png", -1));
     }
 
     [Fact]
@@ -416,8 +422,41 @@ public class DropRoutingTests
         // allocating 64 MB; the default is the real one, pinned below.
         var bytes = new byte[64];
         Png.CopyTo(bytes, 0);
-        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", ceiling: 64));
-        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png", ceiling: 63));
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", statedSize: 64, ceiling: 64));
+        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png", statedSize: 64, ceiling: 63));
+        // And the grown case the ceiling is FOR: the plan let a 32-byte file through,
+        // 64 arrived. Under the ceiling that is a picture; over it, it is not.
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", statedSize: 32, ceiling: 64));
+        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png", statedSize: 32, ceiling: 63));
+    }
+
+    [Fact]
+    public void ASignatureWithNothingBehindItIsRefusedWhenTheDropStatedAWholeFile()
+    {
+        // AR-1. Sniffing the arrived bytes catches a cut THROUGH the signature and
+        // nothing else: eight bytes of PNG magic with one byte after them still
+        // sniff as a PNG, so a 5 MB screenshot whose read came back nine bytes long
+        // was embedded as a data URI no viewer can decode — the very case the check
+        // was written for. The length the drop STATED is the only length there is to
+        // measure the read against, so the read is measured against it.
+        const long stated = 5L * 1024 * 1024;
+        var signatureOnly = Png[..9];
+        Assert.Equal("image/png", DropRouting.SniffImageMime(signatureOnly));   // still a PNG to the sniff
+        Assert.False(DropRouting.PictureSurvivedTheRead(signatureOnly, "image/png", stated));
+
+        // The whole file arrived: as long as the drop said, and still a PNG.
+        var whole = new byte[stated];
+        Png.CopyTo(whole, 0);
+        Assert.True(DropRouting.PictureSurvivedTheRead(whole, "image/png", stated));
+
+        // A file that GREW is fine up to the ceiling: the drop tolerates a writer
+        // that is still going (DropFiles.Open), and more bytes than stated is what
+        // that looks like. Only SHRINKING is a truncation.
+        Assert.True(DropRouting.PictureSurvivedTheRead(whole, "image/png", stated - 1));
+
+        // -1 is "the drop did not say" — the same unknown Classify applies no
+        // ceiling for. No stated length, so no length comparison.
+        Assert.True(DropRouting.PictureSurvivedTheRead(signatureOnly, "image/png", -1));
     }
 
     [Fact]
@@ -426,10 +465,13 @@ public class DropRoutingTests
         // Two ceilings that could drift apart is one ceiling too many: a picture the
         // plan allowed must not be refused by the read, or refused by the plan and
         // allowed by the read.
+        // The stated size matches what arrived, so only the ceiling is in play here —
+        // a size that disagreed would refuse the file for the OTHER reason and prove
+        // nothing about the ceiling.
         var bytes = new byte[16];
         Png.CopyTo(bytes, 0);
-        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png"));
-        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", DropRouting.MaxPictureBytes));
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", statedSize: 16));
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", statedSize: 16, ceiling: DropRouting.MaxPictureBytes));
         // The classify side of the same boundary, so the pair is visible in one test.
         Assert.Equal(DropKind.Picture, DropRouting.Classify("ok.png", Png, DropRouting.MaxPictureBytes).Kind);
         Assert.Equal(DropKind.TooLarge, DropRouting.Classify("over.png", Png, DropRouting.MaxPictureBytes + 1).Kind);

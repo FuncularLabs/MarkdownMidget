@@ -4053,8 +4053,12 @@ public partial class MainWindow : Window
                 // widened its sharing mode for (a screenshot tool still flushing the
                 // PNG you dragged in) is the very case where the file changes in
                 // between, and a truncated picture embeds as a data URI no viewer can
-                // decode, silently.
-                if (!DropRouting.PictureSurvivedTheRead(bytes, picture.Mime))
+                // decode, silently. The size the plan routed on is passed in because
+                // the signature alone cannot see a truncation BELOW it: eight bytes
+                // of PNG magic still sniff as a PNG. Both routes state a size — a
+                // path from the handle it read the head through, the editor from
+                // File.size — and -1 (neither said) skips only the length half.
+                if (!DropRouting.PictureSurvivedTheRead(bytes, picture.Mime, plan.Files[picture.Index].Size))
                     throw new IOException($"{name} changed while it was being read — nothing was inserted.");
                 fragments.Add(DropRouting.PictureMarkdown(name, picture.Mime, bytes));
             }

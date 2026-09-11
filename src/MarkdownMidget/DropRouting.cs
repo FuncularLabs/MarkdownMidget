@@ -238,18 +238,38 @@ internal static class DropRouting
     /// changes in between. A picture goes into the document as a data URI, and a
     /// truncated one is a data URI no viewer can decode, embedded silently.
     ///
-    /// So what arrived is measured again: not empty, not past
-    /// <paramref name="ceiling"/> (it may have GROWN past it), and still starting the
-    /// way <paramref name="mime"/> starts — the cheapest honest check that the file
-    /// is the picture the plan routed rather than a header with nothing behind it.
-    /// It cannot prove the tail is intact; nothing short of decoding can, and
-    /// decoding a 64 MB picture to refuse it costs more than the refusal is worth.
+    /// So what arrived is measured again, on three counts:
+    ///
+    /// <list type="bullet">
+    /// <item>It still starts the way <paramref name="mime"/> starts — which catches a
+    /// cut THROUGH the signature, and an entirely different file swapped in under the
+    /// same name. An empty read fails here too: no bytes sniff as anything.</item>
+    /// <item>It is no SHORTER than <paramref name="statedSize"/>, the length the drop
+    /// said the file had. Sniffing alone would pass a PNG signature with one byte
+    /// behind it, which is exactly the shape a writer mid-flush leaves; only this
+    /// catches it. A read LONGER than stated is fine — the drop deliberately
+    /// tolerates a writer that is still going, and growth is what that looks
+    /// like.</item>
+    /// <item>It is not past <paramref name="ceiling"/>: it may have grown past the
+    /// size the plan allowed.</item>
+    /// </list>
+    ///
+    /// What it still cannot prove is that the bytes BETWEEN the signature and the end
+    /// are the picture's own — a file of the right length whose middle was rewritten
+    /// passes. Nothing short of decoding would catch that, and decoding a 64 MB
+    /// picture to refuse it costs more than the refusal is worth.
     /// </summary>
+    /// <param name="statedSize">The length the drop stated for this file
+    /// (<see cref="DroppedFile.Size"/>, the same value Classify weighed against the
+    /// ceiling), or -1 when it did not say — and then there is no length to compare
+    /// against and none is compared, exactly as no ceiling is applied.</param>
     /// <param name="ceiling">Takes a value only so the boundary is testable without
     /// allocating 64 MB; it is <see cref="MaxPictureBytes"/>, the same ceiling
     /// Classify applied.</param>
-    public static bool PictureSurvivedTheRead(byte[] bytes, string mime, long ceiling = MaxPictureBytes) =>
-        bytes.LongLength > 0 && bytes.LongLength <= ceiling && SniffImageMime(bytes) == mime;
+    public static bool PictureSurvivedTheRead(byte[] bytes, string mime, long statedSize, long ceiling = MaxPictureBytes) =>
+        SniffImageMime(bytes) == mime
+        && bytes.LongLength <= ceiling
+        && (statedSize < 0 || bytes.LongLength >= statedSize);
 
     /// <summary>The markdown for one dropped picture: Insert ▸ Picture's fragment,
     /// with the same alt text it would give the file (its name without the
