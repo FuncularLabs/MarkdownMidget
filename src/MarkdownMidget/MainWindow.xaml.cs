@@ -3846,14 +3846,14 @@ public partial class MainWindow : Window
         });
         if (picked is null) return;
 
-        var alt = Path.GetFileNameWithoutExtension(picked);
         string md;
         try
         {
             // Embedded as a base64 data URI — ImageMarkdown says why, and a picture
-            // pasted into the source view takes the same shape from the same place.
+            // pasted into the source view or dropped on either view takes the same
+            // shape from the same place (a dropped file gets this alt text too).
             var bytes = await File.ReadAllBytesAsync(picked);
-            md = ImageMarkdown.Fragment(alt, MimeForImage(picked), bytes);
+            md = ImageMarkdown.Fragment(ImageMarkdown.AltText(picked), ImageMarkdown.MimeForImage(picked), bytes);
         }
         catch (Exception ex)
         {
@@ -3863,17 +3863,6 @@ public partial class MainWindow : Window
         }
         InsertMarkdownFragment(md);
     }
-
-    private static string MimeForImage(string path) => Path.GetExtension(path).ToLowerInvariant() switch
-    {
-        ".png" => "image/png",
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".gif" => "image/gif",
-        ".webp" => "image/webp",
-        ".bmp" => "image/bmp",
-        ".svg" => "image/svg+xml",
-        _ => "application/octet-stream",
-    };
 
     private void CodeBlock_Click(object sender, RoutedEventArgs e)
     {
