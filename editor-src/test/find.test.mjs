@@ -668,6 +668,36 @@ describe('WhatTheHostAcceptsThisViewCanRun', () => {
     });
   }
 
+  // The refused half of the same table. It was written but never read, and reading
+  // it showed the note's claim — "a refused row must be one JavaScript will not
+  // compile" — was false of four rows: EITHER engine can be the one that refuses,
+  // and two of them are refused by the host alone (#5 NF-6). Each row now says
+  // which, and this is the half a browser engine can answer for.
+  for (const row of constructTable.refused) {
+    test(`refused: ${row.pattern}`, () => {
+      load('cat one');
+      const refusedHere = scan(row.pattern).error === 'Invalid pattern';
+      if (row.refusedBy === 'javascript')
+        assert.ok(refusedHere, `${row.pattern} should not compile here — ${row.why}`);
+      else if (row.refusedBy === 'dotnet')
+        assert.ok(!refusedHere,
+          `${row.pattern} is JavaScript's own and compiles here; only the host refuses it — ${row.why}`);
+      else
+        // 'host': both engines may compile it, and FindEngineTests is the only place
+        // the refusal can be proved. Nothing to measure here beyond the row being read.
+        assert.equal(row.refusedBy, 'host', `${row.pattern} — unknown refusedBy`);
+    });
+  }
+
+  test('every refused row says which engine refuses it', () => {
+    // Without this a new row with no refusedBy would take the 'host' branch above and
+    // assert nothing at all.
+    assert.ok(constructTable.refused.length >= 20);
+    for (const row of constructTable.refused)
+      assert.ok(['javascript', 'dotnet', 'host'].includes(row.refusedBy),
+        `${row.pattern}: refusedBy is ${JSON.stringify(row.refusedBy)}`);
+  });
+
   test('the unicode flag is on whether or not the host asked for it', () => {
     load('café and cat');
     // \p{L} is a Unicode category only under the unicode flag; without it the escape

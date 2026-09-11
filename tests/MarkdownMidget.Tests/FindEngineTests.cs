@@ -442,7 +442,9 @@ public class FindEngineTests
     // that means one thing in one and something else — or nothing — in the other is
     // refused outright, with the message Find already shows for a malformed pattern.
     // editor-src/test/fixtures/regex-constructs.json is the list, and find.test.mjs
-    // reads the same file to check the accepted ones really do compile over there.
+    // reads the same file to check the accepted ones really do compile over there —
+    // and, since #5 NF-6, that each refused row behaves in the browser engine the way
+    // its "refusedBy" says it does.
 
     private static JsonElement Constructs()
     {
@@ -480,6 +482,18 @@ public class FindEngineTests
         Assert.True(root.GetProperty("accepted").GetArrayLength() >= 20, "accepted rows");
         Assert.True(root.GetProperty("refused").GetArrayLength() >= 20, "refused rows");
         Assert.True(root.GetProperty("literals").GetArrayLength() >= 8, "literal rows");
+
+        // Every refused row says which engine refuses it — "javascript", "dotnet", or
+        // "host" for one both engines compile and only FindEngine.JsCompatible stops.
+        // find.test.mjs asserts the browser half against this field, and a row without
+        // it would assert nothing over there (#5 NF-6).
+        foreach (var row in root.GetProperty("refused").EnumerateArray())
+        {
+            var pattern = row.GetProperty("pattern").GetString();
+            Assert.True(row.TryGetProperty("refusedBy", out var by), $"{pattern}: no refusedBy");
+            Assert.True(by.GetString() is "javascript" or "dotnet" or "host",
+                $"{pattern}: refusedBy is {by.GetString()}");
+        }
     }
 
     [Theory]
