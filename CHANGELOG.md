@@ -26,6 +26,11 @@ changes between alpha tags.
   as the same base64 data URI Insert ▸ Picture and the formatted view produce, in
   one undo step. A paste that carries text still pastes the text. (#7)
 
+### Changed
+- **Bullet lists are saved with `-` bullets; they were `*`.** And where one
+  list directly follows another, the second is written with `*` bullets (it was
+  `-`): with the same marker, CommonMark would read the two as one list. (#2)
+
 ### Fixed
 - **A file's line endings and byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view
@@ -44,6 +49,18 @@ changes between alpha tags.
   was last read or written, and if a program only re-encodes the file — line
   endings or the byte-order mark, text unchanged — the window quietly adopts that
   convention for its next save. (#4)
+- **Saving from the formatted view keeps tight lists tight, `snake_case_word` as
+  written, and emphasis that touches punctuation as emphasis.** A document that
+  passed through the formatted view came back with a blank line between every
+  bullet, with `snake\_case\_word`, and — for emphasis opening on an underscore,
+  `a*_b*` say — with text that no longer read as emphasis the next time the file
+  was opened. All three now survive a save. The one exception is emphasis of that
+  kind — opening or closing on punctuation — that directly touches an emoji (or
+  any other character UTF-16 stores as a pair): the text is kept whole, the
+  emphasis may come back as plain text. The rest of what the formatted view
+  does to a file's style — `1.` numbering, `#` headings, fenced code, inline
+  links — is unchanged, pinned by tests, and listed in Help under
+  *Modified state, undo, and saving ▸ Markdown conventions*. (#2)
 
 ## [0.10.0] - 2026-09-10
 
