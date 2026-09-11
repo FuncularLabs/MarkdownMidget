@@ -16,7 +16,8 @@ namespace MarkdownMidget;
 /// git touching a checkout - raised a change event, failed the comparison, and
 /// prompted the user about a file that had not changed. The second baseline,
 /// <c>_diskBaseline</c>, is the file as it was last read from or written to disk,
-/// folded to LF like everything in memory, and it is the one this decision uses.
+/// folded to LF like everything in memory. This decision consults BOTH: a file
+/// equal to either baseline has nothing to report.
 /// </summary>
 internal static class ExternalChange
 {

@@ -47,9 +47,9 @@ public partial class MainWindow : Window
     // The file as it was last read from or written to disk, folded to LF - the
     // second baseline (issue #4). _cleanMarkdown is the EDITOR's serialisation of
     // that state and differs from it whenever the editor normalises, so "did the
-    // file change on disk?" is asked of this one and never of _cleanMarkdown (see
-    // ExternalChange). Set wherever _cleanMarkdown is set from disk: load, save,
-    // reload, Keep.
+    // file change on disk?" is asked of this one AS WELL AS _cleanMarkdown: a
+    // rewrite equal to either is not a change (see ExternalChange). Set wherever
+    // _cleanMarkdown is set from disk: load, save, reload, Keep.
     private string _diskBaseline = string.Empty;
     // What the open file's bytes looked like, so Save writes them back the same way
     // (issue #3): its line-ending convention and whether it began with a UTF-8

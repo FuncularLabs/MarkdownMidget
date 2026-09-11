@@ -348,8 +348,10 @@ line with `--readonly`.
 
 - Native format is Markdown (`.md`). Plain text is also fine.
 - A file's line endings (CRLF or LF — by majority, for a mixed file) and its
-  UTF-8 byte-order mark are kept as found: the document is saved with the
-  convention it was opened with, and a new document saves LF.
+  UTF-8 byte-order mark are kept as found: Save writes the file's own convention
+  back, and if another program re-encodes the file while it is open (a
+  `dos2unix`, a mark added or removed) without changing the text, the window
+  adopts that too. A new document saves LF.
 - **File ▸ Open Recent** lists the files you last opened or saved (10 by default;
   change it in **Edit ▸ Settings…**), with a **Clear Recent** option.
 - **File ▸ Close** (Ctrl+W) closes the current document and shows a gray "drop a

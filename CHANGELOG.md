@@ -33,7 +33,9 @@ changes between alpha tags.
   prompt — or a silent reload — because the disk was compared against the
   editor's own serialisation of the document, which differs from the file for
   anything the editor normalises. The comparison is now against the file as it
-  was last read or written. (#4)
+  was last read or written, and if a program only re-encodes the file — line
+  endings or the byte-order mark, text unchanged — the window quietly adopts that
+  convention for its next save. (#4)
 
 ## [0.10.0-beta1] - 2026-09-10
 
