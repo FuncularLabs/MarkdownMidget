@@ -383,6 +383,58 @@ public class DropRoutingTests
         Assert.Equal("Too large to insert (over 64 MB): huge.png", plan.Notice());
     }
 
+    // ===== the bytes that actually arrived (review finding NF-11) =====
+
+    [Fact]
+    public void BytesThatNoLongerSniffAsThePictureTheyRoutedAsAreRefused()
+    {
+        // The ceiling and the format are decided from a HEAD and a SIZE that are a
+        // sniff (or a round trip) old. F-8's own motivating case is a file another
+        // process is still writing: a screenshot tool that had flushed its PNG header
+        // and nothing else when the drop routed it. What is embedded is what actually
+        // arrived, so what actually arrived is checked — the cheapest honest check
+        // being that it still starts the way its format does.
+        Assert.True(DropRouting.PictureSurvivedTheRead(Png, "image/png"));
+        // Truncated below its own signature: eight bytes are the whole PNG magic, so
+        // four of them are not a PNG any viewer will decode from the data URI.
+        Assert.False(DropRouting.PictureSurvivedTheRead(Png[..4], "image/png"));
+        // Read as nothing at all — the file was reset between the sniff and the read.
+        Assert.False(DropRouting.PictureSurvivedTheRead([], "image/png"));
+        // Still a picture, but not the one that was routed: the alt text, the MIME in
+        // the data URI and the bytes would disagree.
+        Assert.False(DropRouting.PictureSurvivedTheRead(Jpeg, "image/png"));
+        // And text where a picture was: refused rather than embedded as garbage.
+        Assert.False(DropRouting.PictureSurvivedTheRead(Text, "image/png"));
+    }
+
+    [Fact]
+    public void BytesOverTheCeilingAreRefusedEvenThoughTheSizeSaidOtherwise()
+    {
+        // The other direction: the file GREW past the ceiling while it was being
+        // written, so the size the plan allowed is not the size that arrived. The
+        // ceiling is a parameter here only so the boundary can be tested without
+        // allocating 64 MB; the default is the real one, pinned below.
+        var bytes = new byte[64];
+        Png.CopyTo(bytes, 0);
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", ceiling: 64));
+        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png", ceiling: 63));
+    }
+
+    [Fact]
+    public void TheCeilingOnBytesReadIsTheSameOneThePlanApplied()
+    {
+        // Two ceilings that could drift apart is one ceiling too many: a picture the
+        // plan allowed must not be refused by the read, or refused by the plan and
+        // allowed by the read.
+        var bytes = new byte[16];
+        Png.CopyTo(bytes, 0);
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png"));
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png", DropRouting.MaxPictureBytes));
+        // The classify side of the same boundary, so the pair is visible in one test.
+        Assert.Equal(DropKind.Picture, DropRouting.Classify("ok.png", Png, DropRouting.MaxPictureBytes).Kind);
+        Assert.Equal(DropKind.TooLarge, DropRouting.Classify("over.png", Png, DropRouting.MaxPictureBytes + 1).Kind);
+    }
+
     [Fact]
     public void NoticeNamesEveryReasonAtOnce()
     {

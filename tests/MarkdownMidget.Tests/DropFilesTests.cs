@@ -142,6 +142,65 @@ public class DropFilesTests : IDisposable
     }
 
     [Fact]
+    public async Task AFileTruncatedBetweenTheSniffAndTheReadIsRefused()
+    {
+        // NF-11. The head routes the file and the full read embeds it, and the two
+        // are separate opens of a file another process may still be writing — which
+        // is exactly the case F-8 widened the sharing mode FOR. Here the writer resets
+        // the file after the sniff: the head said PNG, the read gets four bytes, and
+        // without this check those four bytes go into the document as a data URI no
+        // viewer can decode, silently.
+        var path = Write("shot.png", Png);
+        var sniffed = DropFiles.Read(path);
+        Assert.Equal(DropKind.Picture, DropRouting.Classify(sniffed.Name, sniffed.Head, sniffed.Size).Kind);
+
+        using (var writer = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+            writer.SetLength(4);
+
+        var bytes = await DropFiles.ReadAllAsync(path);
+        // Read what is there — no throw, no padding to the length the sniff saw.
+        Assert.Equal(4, bytes.Length);
+        Assert.NotEqual(sniffed.Size, bytes.Length);
+        // And refused, because four bytes are not the PNG the plan routed.
+        Assert.False(DropRouting.PictureSurvivedTheRead(bytes, "image/png"));
+    }
+
+    [Fact]
+    public async Task ReadAllReadsAtMostOneByteOverTheLimitSoAGrownFileCanBeRefused()
+    {
+        // The read is bounded, or a file that grew to a gigabyte between the sniff and
+        // the read is a gigabyte in memory before anything can refuse it. One byte
+        // over the limit, so "too big" is still distinguishable from "exactly at it".
+        var bytes = new byte[64];
+        Png.CopyTo(bytes, 0);
+        var path = Write("grown.png", bytes);
+
+        Assert.Equal(17, (await DropFiles.ReadAllAsync(path, limit: 17)).Length);
+        Assert.Equal(64, (await DropFiles.ReadAllAsync(path, limit: 64)).Length);
+        Assert.Equal(64, (await DropFiles.ReadAllAsync(path, limit: 65)).Length);
+        // The default limit is the picture ceiling plus that one byte.
+        Assert.Equal(bytes, await DropFiles.ReadAllAsync(path));
+    }
+
+    [Fact]
+    public async Task ReadAllTakesTheLengthTheFileHasWhenItIsOpenedNotTheOneTheSniffSaw()
+    {
+        // The file grew after it was routed — the screenshot tool finished flushing.
+        // All of it is read, not the prefix the sniff's length would have allowed.
+        var path = Write("growing.png", Png);
+        var sniffed = DropFiles.Read(path);
+
+        var grown = new byte[Png.Length + 500];
+        Png.CopyTo(grown, 0);
+        File.WriteAllBytes(path, grown);
+
+        var bytes = await DropFiles.ReadAllAsync(path);
+        Assert.Equal(grown.Length, bytes.Length);
+        Assert.True(bytes.Length > sniffed.Size);
+        Assert.True(DropRouting.PictureSurvivedTheRead(bytes, "image/png"));
+    }
+
+    [Fact]
     public void AMalformedPathIsUnreadableRatherThanAThrow()
     {
         // Carried over from the previous round. The catch filter listed IOException

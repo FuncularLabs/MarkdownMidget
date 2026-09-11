@@ -50,12 +50,40 @@ internal static class DropFiles
         }
     }
 
-    /// <summary>All of a chosen picture's bytes, for embedding.</summary>
-    public static async Task<byte[]> ReadAllAsync(string path)
+    /// <summary>
+    /// All of a chosen picture's bytes, for embedding — but never more than
+    /// <paramref name="limit"/> of them.
+    ///
+    /// Bounded because it is unbounded time since the file was sniffed, and the file
+    /// may have grown: the plan let a 4 MB picture through, the writer kept writing,
+    /// and an uncapped read puts however much it became into memory before anything
+    /// can refuse it. The default stops ONE byte past the picture ceiling, which is
+    /// exactly enough for <see cref="DropRouting.PictureSurvivedTheRead"/> to tell a
+    /// file at the ceiling from one over it.
+    ///
+    /// This is a fresh open, so the length it reads is the length the file has NOW,
+    /// not the one the sniff saw. What comes back is what was there, short read and
+    /// all; whether that is still a picture is PictureSurvivedTheRead's question, and
+    /// the caller must ask it.
+    /// </summary>
+    /// <param name="limit">Take no more than this many bytes; defaults to the picture
+    /// ceiling plus one. Takes a value so the bound is testable without a 64 MB file.</param>
+    public static async Task<byte[]> ReadAllAsync(string path, long limit = DropRouting.MaxPictureBytes + 1)
     {
         using var stream = Open(path, useAsync: true);
-        using var all = new MemoryStream();
-        await stream.CopyToAsync(all);
+        // Only a capacity hint — a file being written can report one length and yield
+        // another, so what is returned is what actually read, never this.
+        var length = stream.CanSeek ? stream.Length : 0;
+        using var all = new MemoryStream(length > 0 && length <= limit ? (int)length : 0);
+        var buffer = new byte[81920];
+        long total = 0;
+        while (total < limit)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, limit - total)));
+            if (read == 0) break;
+            all.Write(buffer, 0, read);
+            total += read;
+        }
         return all.ToArray();
     }
 
@@ -67,6 +95,14 @@ internal static class DropFiles
     /// writer: a screenshot tool still flushing the PNG you dragged in the second it
     /// appeared, a sync client, a download in progress. Delete is allowed too, so a
     /// file marked for deletion still reads instead of failing the drop.
+    ///
+    /// The trade-off, stated plainly: tolerating that writer means the bytes read can
+    /// be a HALF-WRITTEN file — the header the sniff saw with nothing behind it, or
+    /// more than the length the sniff reported. The drop takes that trade (refusing
+    /// every file a writer holds would refuse the commonest dropped picture there is)
+    /// and pays for it at the other end, where
+    /// <see cref="DropRouting.PictureSurvivedTheRead"/> checks what actually arrived
+    /// before any of it reaches the document.
     /// </summary>
     private static FileStream Open(string path, bool useAsync = false) =>
         new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, bufferSize: 4096, useAsync);

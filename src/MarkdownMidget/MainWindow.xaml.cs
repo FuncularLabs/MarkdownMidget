@@ -4044,7 +4044,20 @@ public partial class MainWindow : Window
         try
         {
             foreach (var picture in plan.Insert)
-                fragments.Add(DropRouting.PictureMarkdown(plan.Files[picture.Index].Name, picture.Mime, await bytesOf(picture.Index)));
+            {
+                var name = plan.Files[picture.Index].Name;
+                var bytes = await bytesOf(picture.Index);
+                // What goes into the document is what actually arrived, so that is
+                // what is measured — the plan's ceiling and format came from a head
+                // and a size that are a sniff or a round trip old. The case the drop
+                // widened its sharing mode for (a screenshot tool still flushing the
+                // PNG you dragged in) is the very case where the file changes in
+                // between, and a truncated picture embeds as a data URI no viewer can
+                // decode, silently.
+                if (!DropRouting.PictureSurvivedTheRead(bytes, picture.Mime))
+                    throw new IOException($"{name} changed while it was being read — nothing was inserted.");
+                fragments.Add(DropRouting.PictureMarkdown(name, picture.Mime, bytes));
+            }
         }
         catch (Exception ex)
         {

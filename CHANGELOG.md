@@ -39,7 +39,11 @@ changes between alpha tags.
   byte-order mark, as one opened with File ▸ Open does. Dropping again before a
   drop has finished replaces it rather than mixing the two, and a drop on the
   formatted view that gets no answer back from the editor within a few seconds
-  says so in the status bar instead of waiting. **Note:** a *text* file
+  says so in the status bar instead of waiting. A picture another program is
+  still writing is read rather than refused, and the bytes that come back are
+  checked before anything is inserted — a file cut short or grown past the size
+  limit in between is named rather than embedded as a picture nothing can
+  display. **Note:** a *text* file
   without a markdown or `.txt` extension — `notes.json`, `app.log`, `Program.cs`
   — used to open when dropped and is now refused; the drop route is the only one
   that insists on a markdown or text extension, so those files still open

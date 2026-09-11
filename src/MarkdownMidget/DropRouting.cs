@@ -227,6 +227,30 @@ internal static class DropRouting
         return new DropPlan(files, target, insert, open, notInserted, notOpened, refused, tooLarge);
     }
 
+    /// <summary>
+    /// Whether the bytes that actually ARRIVED for a chosen picture may be embedded.
+    ///
+    /// <see cref="Classify"/> decides from a head and a size that are already stale
+    /// by the time the bytes turn up: on the path route by one more open, on the
+    /// editor route by a whole round trip. And the case that gap was widened for
+    /// (F-8: a file another process is still writing — a screenshot tool flushing the
+    /// PNG you dragged in the second it appeared) is exactly the case where the file
+    /// changes in between. A picture goes into the document as a data URI, and a
+    /// truncated one is a data URI no viewer can decode, embedded silently.
+    ///
+    /// So what arrived is measured again: not empty, not past
+    /// <paramref name="ceiling"/> (it may have GROWN past it), and still starting the
+    /// way <paramref name="mime"/> starts — the cheapest honest check that the file
+    /// is the picture the plan routed rather than a header with nothing behind it.
+    /// It cannot prove the tail is intact; nothing short of decoding can, and
+    /// decoding a 64 MB picture to refuse it costs more than the refusal is worth.
+    /// </summary>
+    /// <param name="ceiling">Takes a value only so the boundary is testable without
+    /// allocating 64 MB; it is <see cref="MaxPictureBytes"/>, the same ceiling
+    /// Classify applied.</param>
+    public static bool PictureSurvivedTheRead(byte[] bytes, string mime, long ceiling = MaxPictureBytes) =>
+        bytes.LongLength > 0 && bytes.LongLength <= ceiling && SniffImageMime(bytes) == mime;
+
     /// <summary>The markdown for one dropped picture: Insert ▸ Picture's fragment,
     /// with the same alt text it would give the file (its name without the
     /// extension) and the MIME type the bytes sniffed as.</summary>

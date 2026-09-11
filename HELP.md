@@ -398,6 +398,12 @@ line with `--readonly`.
     the editor, so a drop that gets no answer within a few seconds (a page that has
     stopped responding, or a picture too large for one message) ends with
     "Couldn't read the dropped file(s) — try Insert ▸ Picture" rather than waiting.
+  - **A picture still being written when you drop it** is read anyway — that is the
+    point, so a screenshot you drag in the instant it appears works — but the bytes
+    that come back are checked before anything is inserted. If the file changed
+    enough in between that it is no longer the picture it looked like (it was cut
+    short, emptied, or grew past the size limit), nothing is inserted and a message
+    says so. Drop it again once the other program has finished with it.
   - **Drop again before a drop has finished** and the newer drop wins: the status
     bar says the earlier one was replaced, and nothing from it is inserted.
 
