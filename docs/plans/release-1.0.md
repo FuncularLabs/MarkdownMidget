@@ -53,8 +53,11 @@ diff counts 18 lines altered and 4 inserted; either way it is most of the file.
 Why it is invisible: in the formatted view, `SetCleanBaselineAsync` takes the clean
 baseline from the editor's re-serialisation, not the file, so a freshly opened
 document shows no asterisk. The rewrite lands on the first save after any edit. (A
-document opened and saved entirely in the source view is written back as typed: the
-source view holds the raw text and never passes through the serialiser.) A second
+document opened and saved entirely in the source view is written back as typed —
+but only since the `SourceText` fix: the box used to be filled from
+`getMarkdown()`, so the file arrived in it already rewritten and the "as typed"
+promise was false wherever it was written. Entering the source view on an
+unmodified document now shows `_diskBaseline`, the file's own text.) A second
 consequence:
 `HandleExternalChangeAsync` compares the disk text to that normalised baseline, so a
 tool that rewrites the file with identical bytes reads as an external change.
@@ -152,7 +155,7 @@ at the formatted view, which is still better than today's silent nothing.
 | AC | Test |
 |---|---|
 | L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads; `DocAnchorLinksTests` pins that the section's own cross-references resolve |
-| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed; `DocAnchorLinksTests` pins that its link into HELP's conventions list lands on that heading |
+| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | `SourceTextTests` pins the "source view, written back as typed" half of it; `DocAnchorLinksTests` pins that its link into HELP's conventions list lands on that heading |
 | L3. README Status, Recent changes and the badge reflect 1.0; CHANGELOG has the promotion section | same shape as the 0.9.0 promote |
 
 ## The installer decision

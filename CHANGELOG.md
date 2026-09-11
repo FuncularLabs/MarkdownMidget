@@ -38,6 +38,15 @@ changes between alpha tags.
   `-`): with the same marker, CommonMark would read the two as one list. (#2)
 
 ### Fixed
+- **Ctrl+E straight after opening shows the file as it is on disk.** The Markdown
+  source view was filled from the formatted editor, so a file written with setext
+  headings or reference-style links arrived in it already rewritten into Markdown
+  Midget's conventions — and a save from there wrote the rewrite, having never
+  shown you your own file. The source view now opens on the file's own text while
+  the document is still the one you opened or saved, so a document edited and
+  saved only there is written back as typed. Once the formatted view has changed
+  the document, the source view shows the editor's version of it, because that is
+  then the only copy of your work. (#2)
 - **A file's line endings and byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view
   writes LF between blocks but keeps whatever was inside fenced, indented and

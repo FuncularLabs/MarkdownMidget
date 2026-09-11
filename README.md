@@ -21,8 +21,11 @@ view does change is *style* — a save writes Markdown Midget's own conventions
 (`-` bullets, `#` headings, fenced code, inline links in place of reference
 links), listed in [Markdown conventions](HELP.md#markdown-conventions) along with
 the one case where emphasis can come back as literal text, and pinned by a
-round-trip test suite. Edit in the Markdown source view instead and the file is
-written back exactly as typed.
+round-trip test suite. To keep a file's own style, press **Ctrl+E** before the
+formatted view changes anything: the Markdown source view opens on the file as it
+is on disk, and a document edited and saved only there is written back as typed.
+Once the formatted view has changed the document, the source view shows the
+editor's version of it — that is then the only copy of your work.
 
 ![Markdown Midget editing a document](https://raw.githubusercontent.com/FuncularLabs/MarkdownMidget/master/art/screenshot.png)
 

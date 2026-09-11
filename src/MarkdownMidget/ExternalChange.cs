@@ -18,6 +18,10 @@ namespace MarkdownMidget;
 /// <c>_diskBaseline</c>, is the file as it was last read from or written to disk,
 /// folded to LF like everything in memory. This decision consults BOTH: a file
 /// equal to either baseline has nothing to report.
+///
+/// <see cref="SourceText"/> is the same pair of baselines asked a different
+/// question — which of the two spellings the Markdown source view shows, and
+/// which of them count as "not an edit" while it is showing one.
 /// </summary>
 internal static class ExternalChange
 {

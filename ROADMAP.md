@@ -465,9 +465,11 @@ what each one costs a reader and what to do instead; this list is the decision.
   underscore in an image's alt text is escaped — and emphasis that opens or
   closes on punctuation touching an emoji keeps its text but may lose its marks.
   (Tight lists no longer loosen; that one was fixed rather than parked.) A
-  document opened and saved entirely in the source view is written back as typed.
-  Preserving each document's own style would be a second serialiser to test and
-  is not planned.
+  document opened and saved entirely in the source view is written back as typed:
+  since #2 the source view opens on the file's own text rather than the editor's
+  re-serialisation of it, so Ctrl+E before the formatted view changes anything is
+  the way round this limit. Preserving each document's own style *through the
+  formatted view* would be a second serialiser to test and is not planned.
 - **Mermaid ships in the bundle** whether or not a document uses it (lazy-load is
   under Later).
 

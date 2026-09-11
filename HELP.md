@@ -367,8 +367,14 @@ What is converted: a reference-style link (`[text][ref]` plus its definition lin
 becomes an inline link and the definition line is dropped; a setext heading
 (underlined with `===` or `---`) becomes a `#` heading; an indented code block
 becomes fenced; `## Heading ##` loses its trailing hashes; an underscore in an
-image's alt text is written `\_`. A `snake_case_word` is saved as written. A
-document opened and saved only in the source view is written back exactly as typed.
+image's alt text is written `\_`. A `snake_case_word` is saved as written.
+
+None of it applies to a document opened and saved only in the **Markdown source
+view**: press **Ctrl+E** before the formatted view has changed anything and the
+source view opens on the file as it is on disk, not on this list's version of it,
+so what you save is what you typed. After the formatted view has changed the
+document, the source view shows the editor's text and these conventions are
+already in it.
 
 ## Files & windows
 
@@ -523,9 +529,12 @@ into and what to do instead.
   ours — `-` bullets, `#` headings, fenced code, inline links in place of
   reference links, `\_` for an underscore in a picture's alt text. The whole list
   is in [Markdown conventions](#markdown-conventions) above. If a file has to come
-  back exactly as it was written, open it, press **Ctrl+E**, and work in the
-  Markdown source view: a document opened and saved only there is written back as
-  typed.
+  back exactly as it was written, open it, press **Ctrl+E** before you touch the
+  formatted view, and work in the Markdown source view: it opens on the file as it
+  is on disk, and a document edited and saved only there is written back as typed —
+  its line endings and byte-order mark included. Once the formatted view has
+  changed the document, the source view shows the editor's version of it, because
+  that is then the only copy of your work.
 - **Emphasis that touches an emoji can come back as plain text.** The one
   accepted loss in that list: emphasis opening or closing on punctuation that
   directly touches an emoji (or any other character UTF-16 stores as a pair) is
