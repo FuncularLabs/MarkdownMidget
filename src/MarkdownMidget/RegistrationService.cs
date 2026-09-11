@@ -352,19 +352,105 @@ internal static class RegistrationService
 
     // ===== AppData install + Start Menu =====
 
-    /// <summary>Copy the current exe to %LocalAppData%\Programs\MarkdownMidget.</summary>
-    public static string InstallToAppData()
+    /// <summary>
+    /// The name of the app's own assembly, whose <c>.dll</c> a development build's exe
+    /// needs beside it. Read from <see cref="App"/>'s assembly rather than written out,
+    /// so renaming the assembly moves it too. <c>GetName()</c> is safe in a single-file
+    /// bundle, where <c>Assembly.Location</c> would raise IL3000; and <c>typeof(App)</c>
+    /// rather than the entry assembly, which under a test host is the test host.
+    /// </summary>
+    internal static string AppAssemblyName =>
+        typeof(App).Assembly.GetName().Name
+        ?? throw new InvalidOperationException("The app's assembly has no name.");
+
+    /// <summary>
+    /// Whether the exe at <paramref name="exePath"/> needs files beside it to start, and
+    /// so cannot be installed by copying it on its own: true when the app's own assembly
+    /// file, <paramref name="appAssemblyName"/>.dll, is in the exe's folder.
+    /// </summary>
+    /// <remarks>
+    /// Why this test and not another:
+    /// <list type="bullet">
+    /// <item><description>It is exactly the condition the .NET apphost fails on. A
+    /// <c>dotnet build</c> output's exe is only the apphost, which starts the runtime on
+    /// that DLL from its own folder; a copy without it exits at once with "The
+    /// application to execute does not exist" (Application event log, .NET Runtime
+    /// 1023), with no window and no message.</description></item>
+    /// <item><description>A single-file bundle never has it: the assembly is inside the
+    /// exe. Even with <c>IncludeAllContentForSelfExtract</c>, extraction goes to a temp
+    /// folder, not beside the exe. The release workflow publishes the single-file
+    /// win-x64-fxdependent profile, so a release download is never refused.</description></item>
+    /// <item><description>Not <c>Assembly.Location</c>: it raises IL3000 under the
+    /// single-file analyzer, and under self-extract it returns the extracted copy's path,
+    /// which is not empty, so it cannot tell a bundle from a build output.</description></item>
+    /// </list>
+    /// It errs toward refusing: a bundle dropped into a folder that also holds a build's
+    /// DLL is refused too, which only a developer can arrange.
+    /// </remarks>
+    /// <param name="fileExists">The probe. The app passes <see cref="File.Exists(string)"/>;
+    /// a test can answer for paths that are not on disk.</param>
+    /// <exception cref="ArgumentException"><paramref name="exePath"/> is not a full path
+    /// with a folder (a relative one would be read against the working directory, which
+    /// is not the exe's folder), or <paramref name="appAssemblyName"/> is empty (which
+    /// would probe for ".dll", find nothing, and let every exe through).</exception>
+    public static bool NeedsFilesBesideIt(string exePath, string appAssemblyName, Func<string, bool> fileExists)
     {
-        Directory.CreateDirectory(AppDataInstallDir);
-        var source = CurrentExePath;
-        // If we're already running from the target location, skip the copy —
-        // the file is locked anyway.
-        if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(AppDataInstallExe),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            File.Copy(source, AppDataInstallExe, overwrite: true);
-        }
-        return AppDataInstallExe;
+        ArgumentException.ThrowIfNullOrEmpty(appAssemblyName);
+        var folder = Path.IsPathFullyQualified(exePath) ? Path.GetDirectoryName(exePath) : null;
+        if (string.IsNullOrEmpty(folder))
+            throw new ArgumentException($"Expected the full path of an exe, not \"{exePath}\".", nameof(exePath));
+        return fileExists(Path.Combine(folder, appAssemblyName + ".dll"));
+    }
+
+    /// <summary>The command <see cref="DevelopmentBuildRefusal"/> gives, run from the
+    /// repository root. InstallGuardTests pins its project and publish profile against
+    /// the repository.</summary>
+    internal const string PublishCommand =
+        "dotnet publish src/MarkdownMidget/MarkdownMidget.csproj -c Release -p:PublishProfile=win-x64-fxdependent";
+
+    /// <summary>Where <see cref="PublishCommand"/> writes the exe, from the repository
+    /// root: that profile's PublishDir under the project's folder (pinned by
+    /// InstallGuardTests).</summary>
+    internal const string PublishedExeFolder = @"src\MarkdownMidget\bin\Release\publish\framework-dependent\";
+
+    /// <summary>
+    /// What Register shows, and what <see cref="InstallToAppData()"/> throws, for an exe
+    /// that needs files beside it (<see cref="NeedsFilesBesideIt"/>). Only a developer
+    /// ever sees it, since a release download is a single file, so it speaks to one.
+    /// </summary>
+    public const string DevelopmentBuildRefusal =
+        "This is a development build. Its exe needs the files beside it, so it can't be installed on its own.\n\n" +
+        "To try an installed copy, publish a single-file build from the repository root:\n\n" +
+        PublishCommand + "\n\n" +
+        "Then run the exe it writes to " + PublishedExeFolder + " and register from there.";
+
+    /// <summary>Copy the current exe to %LocalAppData%\Programs\MarkdownMidget.</summary>
+    /// <exception cref="InvalidOperationException">The current exe is not the installed
+    /// copy and needs files beside it; the message is <see cref="DevelopmentBuildRefusal"/>.</exception>
+    public static string InstallToAppData() => InstallToAppData(CurrentExePath, AppDataInstallDir, File.Exists);
+
+    /// <summary>
+    /// Copy <paramref name="sourceExe"/> into <paramref name="installDir"/> as
+    /// MarkdownMidget.exe and return the installed path. Refused, before anything is
+    /// created or copied, when a copy would happen and the source needs files beside it
+    /// (<see cref="NeedsFilesBesideIt"/>): the copy would be an apphost with nothing to
+    /// start, and a Move would then launch it and exit, leaving no app and no message.
+    /// The Register click handler checks first and explains; this refusal is for any
+    /// caller that does not.
+    /// </summary>
+    internal static string InstallToAppData(string sourceExe, string installDir, Func<string, bool> fileExists)
+    {
+        var installExe = Path.Combine(installDir, ExeCanonicalName);
+        // Running from the target location already: no copy (the file is locked
+        // anyway), and so nothing to refuse.
+        var copies = !string.Equals(Path.GetFullPath(sourceExe), Path.GetFullPath(installExe),
+            StringComparison.OrdinalIgnoreCase);
+        if (copies && NeedsFilesBesideIt(sourceExe, AppAssemblyName, fileExists))
+            throw new InvalidOperationException(DevelopmentBuildRefusal);
+
+        Directory.CreateDirectory(installDir);
+        if (copies) File.Copy(sourceExe, installExe, overwrite: true);
+        return installExe;
     }
 
     public static void UninstallFromAppData()

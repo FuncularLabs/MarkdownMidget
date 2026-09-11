@@ -3024,10 +3024,25 @@ public partial class MainWindow : Window
 
     private async void RegisterMdEditor_Click(object sender, RoutedEventArgs e)
     {
+        var alreadyInstalled = RegistrationService.IsRunningFromAppDataInstall();
+
+        // A development build's exe is only the .NET apphost. Installed without the
+        // files beside it, it can't start; with Move checked, the hand-off below would
+        // launch it and shut the app down, and the app would simply vanish. So it
+        // is refused here, before the dialog: nothing is asked, copied, registered or
+        // handed off. Only when a copy would happen, since registering the installed
+        // copy in place copies nothing. InstallToAppData refuses the same exe itself.
+        if (!alreadyInstalled && RegistrationService.NeedsFilesBesideIt(
+                RegistrationService.CurrentExePath, RegistrationService.AppAssemblyName, File.Exists))
+        {
+            MessageBox.Show(this, RegistrationService.DevelopmentBuildRefusal, "Markdown Midget",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         var dlg = new RegisterDialog { Owner = this };
         if (dlg.ShowDialog() != true) return;
 
-        var alreadyInstalled = RegistrationService.IsRunningFromAppDataInstall();
         var willMove = dlg.MoveInsteadOfCopy && !alreadyInstalled;
 
         // A move restarts the app from the installed copy, so make sure unsaved
