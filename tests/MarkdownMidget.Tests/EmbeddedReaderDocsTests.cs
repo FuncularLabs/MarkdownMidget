@@ -127,6 +127,32 @@ public class EmbeddedReaderDocsTests
         Assert.Contains($"picture **larger than {megabytes} MB**", Read("HELP.md"), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheHelpStatesTheWaitTheDropActuallyAppliesAndWhichMessageEachFailureGives()
+    {
+        // AR-4. HELP said a drop "gets no answer within a few seconds (a page that
+        // has stopped responding, or a picture too large for one message)" and gave
+        // the timeout message for both. Neither half was true: the wait is 10 s at
+        // its floor and 18 s for one picture at the ceiling, and a picture too large
+        // to cross the bridge is the case the editor DOES answer — postAnswer follows
+        // the refused payload with a small post-failed message, which Decide turns
+        // into Refuse and the window reports by name. Two causes, two messages, and
+        // the numbers are pinned to the function that produces them the way the
+        // ceiling is pinned to MaxPictureBytes.
+        var help = Read("HELP.md");
+        var floor = (int)DropHandshake.ReadTimeout(0).TotalSeconds;
+        var onePicture = (int)DropHandshake.ReadTimeout(DropRouting.MaxPictureBytes).TotalSeconds;
+        var tenPictures = (int)DropHandshake.ReadTimeout(10 * DropRouting.MaxPictureBytes).TotalSeconds;
+
+        Assert.Contains($"**{floor} seconds plus a second for every 8 MB**", help, StringComparison.Ordinal);
+        Assert.Contains($"{onePicture} seconds for a single picture", help, StringComparison.Ordinal);
+        Assert.Contains($"{tenPictures} seconds for ten of them", help, StringComparison.Ordinal);
+
+        // Each cause quoted with the message it actually produces.
+        Assert.Contains(DropHandshake.TimedOutNotice, help, StringComparison.Ordinal);
+        Assert.Contains(DropHandshake.UnreadableNotice(["a.png", "b.png"]), help, StringComparison.Ordinal);
+    }
+
     private static string Read(string resourceName)
     {
         using var stream = App.GetManifestResourceStream(resourceName);

@@ -395,9 +395,18 @@ line with `--readonly`.
   - **If a dropped file can't be read**, the status bar names it and *none* of the
     drop's pictures go in — the same all-or-nothing you get if a file goes away
     mid-drop. On the **formatted editing area** the bytes have to come back from
-    the editor, so a drop that gets no answer within a few seconds (a page that has
-    stopped responding, or a picture too large for one message) ends with
-    "Couldn't read the dropped file(s) — try Insert ▸ Picture" rather than waiting.
+    the editor, and the two ways that can fail say different things. When the
+    editor answers but **can't hand the bytes over** — including a picture too
+    large to cross to the window in one message — the status bar names the files,
+    exactly as it does for any file that can't be read:
+    "Couldn't read a.png, b.png."
+    When **nothing comes back at all**, because the page has stopped responding or
+    the link to it is gone, the wait is
+    **10 seconds plus a second for every 8 MB** asked for —
+    18 seconds for a single picture at the 64 MB limit, and
+    90 seconds for ten of them, capped at ten minutes — and then the drop ends with
+    "Couldn't read the dropped file(s) — try Insert ▸ Picture."
+    rather than waiting on.
   - **A picture still being written when you drop it** is read anyway — that is the
     point, so a screenshot you drag in the instant it appears works — but the bytes
     that come back are checked before anything is inserted. If the file changed
