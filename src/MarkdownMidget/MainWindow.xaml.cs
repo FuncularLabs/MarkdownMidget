@@ -415,6 +415,11 @@ public partial class MainWindow : Window
         switch (type)
         {
             case "loaded":
+                // A fresh page carries a fresh dropSeq, which starts at 0 and numbers
+                // its first drop 1. The high-water mark has to start over with it, or
+                // every drop this page ever posts is older than one already handled
+                // and is discarded in silence. (See _newestDrop.)
+                _newestDrop = 0;
                 // Bridge is wired; hand the editor its initial (empty) document.
                 _ = RunEditorAsync($"window.MDM.create({JsLiteral(string.Empty)})");
                 break;
@@ -4199,8 +4204,21 @@ public partial class MainWindow : Window
     private long _droppedBytesDrop;
     private IReadOnlyList<int> _droppedBytesIndices = [];
 
-    /// <summary>The highest drop number handled so far, so a fileDrop message that
-    /// overtook a newer one is ignored rather than made to win.</summary>
+    /// <summary>
+    /// The highest drop number handled so far, so a fileDrop message that overtook a
+    /// newer one is ignored rather than made to win.
+    ///
+    /// Reset to 0 when the page loads, because the counter it tracks restarts there:
+    /// dropSeq is a module variable in main.js, so any reload of the editor (a
+    /// re-Navigate, a WebView2 process failure and recovery) numbers the next drop 1
+    /// again. A mark left where the previous page finished would make that drop — and
+    /// every drop after it, for the life of the window — look older than one already
+    /// handled, and every one of them would be discarded in silence. Today the page
+    /// is navigated once and nothing handles ProcessFailed, so the reset is unreachable
+    /// and cheap; it is here so that adding either does not quietly kill drag and
+    /// drop. (A read left outstanding by the vanished page is a separate thing, and it
+    /// already ends itself: the wait in RequestDroppedBytesAsync is bounded.)
+    /// </summary>
     private long _newestDrop;
 
     /// <summary>

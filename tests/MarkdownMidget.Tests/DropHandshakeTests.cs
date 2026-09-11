@@ -66,6 +66,12 @@ public class DropHandshakeTests
         Assert.False(DropHandshake.IsSuperseded(newestDrop: 1, arrivingDrop: 2));
         // Nothing handled yet: the mark starts at 0 and the editor's counter at 1.
         Assert.False(DropHandshake.IsSuperseded(newestDrop: 0, arrivingDrop: 1));
+        // AR-6, and the reason MainWindow returns the mark to 0 on "loaded":
+        // dropSeq is a module variable in the page, so a page reload restarts it and
+        // the next drop is numbered 1 again. A mark left where the old page finished
+        // makes that drop — and every drop after it, for the life of the window —
+        // look older than one already handled.
+        Assert.True(DropHandshake.IsSuperseded(newestDrop: 7, arrivingDrop: 1));
         // A repeat of the drop being handled is not OLDER, so it is not swallowed
         // here — it is the reply path that refuses a second answer.
         Assert.False(DropHandshake.IsSuperseded(newestDrop: 4, arrivingDrop: 4));
