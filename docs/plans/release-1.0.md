@@ -151,8 +151,8 @@ at the formatted view, which is still better than today's silent nothing.
 
 | AC | Test |
 |---|---|
-| L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads |
-| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed |
+| L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads; `DocAnchorLinksTests` pins that the section's own cross-references resolve |
+| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed; `DocAnchorLinksTests` pins that its link into HELP's conventions list lands on that heading |
 | L3. README Status, Recent changes and the badge reflect 1.0; CHANGELOG has the promotion section | same shape as the 0.9.0 promote |
 
 ## The installer decision
