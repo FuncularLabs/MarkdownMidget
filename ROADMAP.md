@@ -28,12 +28,17 @@ order of risk:
   README's "not a lossy import/export" is true in content and false in form. 1.0
   pins and documents the conventions, builds the round-trip harness that keeps them
   pinned, and stops escaping intraword underscores if that can be done safely.
-- **Line endings are mangled and the BOM is dropped.** Measured: structural line
-  endings become LF but endings inside code and HTML blocks stay as written, so a
-  CRLF file with one code block saves with mixed endings. A UTF-8 BOM is dropped.
-  Preserve both, end to end (fold every ending before re-applying the detected one).
-- **A file rewritten with identical bytes reads as an external change**, because the
-  watcher compares against that normalised baseline. Compare against the raw text.
+- ~~**Line endings are mangled and the BOM is dropped.**~~ **Done 2026-09-10
+  (unreleased, #3)**: the file's line ending (by majority) and UTF-8 BOM are detected
+  on open, every ending is folded in memory, and Save re-applies the detected
+  convention end to end; a re-encode on disk with the text unchanged is adopted.
+  Was: structural endings became LF but endings inside code and HTML blocks stayed as
+  written, so a CRLF file with one code block saved with mixed endings, and the BOM
+  was dropped.
+- ~~**A file rewritten with identical bytes reads as an external change.**~~ **Done
+  2026-09-10 (unreleased, #4)**: the watcher now keeps the disk text as a second
+  baseline and reports a change only when the file differs from both it and the
+  editor's own serialisation.
 - **Find has no Replace.** Replace / Replace All, both views, all four modes, scoped
   to the selection.
 - **Dropping an image file on the editor opens it as text** (after the discard
@@ -374,11 +379,13 @@ Concrete things that fall out of being N unrelated processes today:
   bespoke solutions to the same problem. A third shared thing will want a third.
   Worth deciding whether there should be one small "shared user state" layer
   before adding one.
-- **The same file can be open in two windows**, each with its own unsaved edits,
-  each happily saving over the other. The external-change watcher notices *after*
-  the fact and offers a merge-ish prompt; nothing notices *before*. Opening a
-  file already open elsewhere should at least surface that — ideally focus the
-  window that has it, the way most SDI editors do.
+- ~~**The same file can be open in two windows.**~~ **Done 2026-09-10 (unreleased,
+  #1)**: a per-file claim under `%LocalAppData%\MarkdownMidget\open` (one lock file
+  per normalised path, holding pid, window handle and path) lets a second open find
+  the window that has the file and bring it forward instead of opening a copy; when
+  that window can't be brought forward the file opens read-only with a note. This is
+  the first piece of the registry below. Was: each window saved over the other and
+  only the external-change watcher noticed, after the fact.
 - **No window list.** With six documents open there's no way to get from one to
   another except the taskbar. A Window menu listing the open documents (and
   focusing one) is the SDI answer to tabs, and needs the same cross-instance
