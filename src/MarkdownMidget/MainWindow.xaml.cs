@@ -1062,9 +1062,10 @@ public partial class MainWindow : Window
         // route lands here (the chokepoint comment below lists them), so this is
         // the one place to ask. Reloads of the document this window already shows
         // call LoadDocumentAsync directly and never come through - correctly, since
-        // the claim is already this window's.
-        var previousClaim = _openGuard.HeldPath;
-        var verdict = ClaimDocument(path);
+        // the claim is already this window's. The claim is BEGUN, not taken: the
+        // document this window still shows stays guarded through the read and the
+        // password prompt below, and only a load that completes commits the switch.
+        var verdict = BeginDocumentClaim(path);
         var heldElsewhere = false;
         if (verdict.Verdict == Instances.OpenVerdict.FocusOther)
         {
@@ -1139,7 +1140,12 @@ public partial class MainWindow : Window
                 await LoadDocumentAsync(await reader.ReadToEndAsync(), path);
                 loaded = true;
             }
+            // The new document is on screen: now, and not before, the old claim goes.
+            _openGuard.Commit(path);
             if (heldElsewhere) OpenedReadOnlyBecauseHeld(path);
+            // Read-only is window state: what the fallback imposed for the LAST
+            // document must not stick to this one, which opened normally.
+            else if (_imposedReadOnly.Clear()) SetReadOnly(false);
             AddRecent(path);
             await FocusDocumentAsync();   // same reason as New: don't eat the first keystroke
         }
@@ -1152,30 +1158,33 @@ public partial class MainWindow : Window
         {
             HideBusy();
             // A cancelled password prompt, an unreadable file, an editor that threw:
-            // the window still shows what it showed before, so the claim goes back
-            // to that (or to nothing) rather than staying on a file never opened.
-            if (!loaded) RestoreClaim(previousClaim);
+            // the window still shows what it showed before, and that document's
+            // claim was never let go of. Only the one begun on the file that never
+            // opened is released.
+            if (!loaded) _openGuard.Abandon();
         }
     }
 
     /// <summary>
     /// The read-only fallback: the file is open in another window that couldn't be
-    /// brought forward (no usable handle, or Windows declined). Opened here without
-    /// a claim - the other window has it - and read-only, so the two can't save
-    /// over each other, and said out loud because a document that won't take
-    /// keystrokes with no explanation reads as a broken app.
+    /// brought forward (no usable handle, or Windows declined). Shown here without
+    /// a claim - the other window has it, and the commit let this window's old one
+    /// go - and read-only, so this window can't save over that one; said out loud,
+    /// because a document that won't take keystrokes with no explanation reads as a
+    /// broken app. The way out is View ▸ Read Only, which claims the file again
+    /// before it lets anyone edit (ReadOnly_Click).
     /// </summary>
     private void OpenedReadOnlyBecauseHeld(string path)
     {
-        ReleaseDocumentClaim();   // whatever this window showed before is gone
+        _imposedReadOnly.Impose(readOnlyAlready: _readOnly);
         SetReadOnly(true);
         FlashStatus("Already open in another window; opened read-only here");
         HideBusy();   // the message shouldn't sit under a busy overlay
         MessageBox.Show(this,
             $"{Path.GetFileName(path)} is open in another Markdown Midget window, " +
             "which couldn't be brought to the front.\n\n" +
-            "It has been opened read-only here so the two windows can't save over " +
-            "each other. Close it in the other window to edit it here.",
+            "It has been opened read-only here. Once it is closed in the other " +
+            "window, turn off View ▸ Read Only to edit it here.",
             "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -1814,6 +1823,11 @@ public partial class MainWindow : Window
     // a copy that would save over it. One per window; every window is a process.
     private readonly Instances.OpenGuard _openGuard = new(Instances.OpenGuard.DefaultDirectory);
 
+    // Read-only imposed by the fallback (OpenedReadOnlyBecauseHeld), as distinct
+    // from read-only the user chose: lifting it is a claim attempt, and the next
+    // normal open clears it.
+    private readonly Instances.ImposedReadOnly _imposedReadOnly = new();
+
     // Set when this window was launched only to open a file that another window
     // already has, and that window has been brought forward. The close is queued
     // (see OpenPathAsync), and the rest of the landing state - the source view,
@@ -1824,14 +1838,28 @@ public partial class MainWindow : Window
     private long GuardHandle() => new WindowInteropHelper(this).Handle.ToInt64();
 
     /// <summary>
-    /// Claim <paramref name="path"/> for this window. The handle recorded with the
-    /// claim is what another window will bring to the front; it is 0 only before
-    /// OnSourceInitialized, and a holder recorded as 0 reads to that other window
-    /// as "cannot focus", so it falls back to opening read-only.
+    /// Claim <paramref name="path"/> for this window at once (the read-only lift;
+    /// see OpenGuard.Acquire). The handle recorded with the claim is what another
+    /// window will bring to the front; it is 0 only before OnSourceInitialized, and
+    /// a holder recorded as 0 reads to that other window as no live holder at all
+    /// (OpenGuard.HolderIsLive), so it opens the file as if the lock were stale.
+    /// The same check keeps a backup or AV tool holding a stale lock from sending
+    /// the user to a dead session's window handle.
     /// </summary>
     private Instances.OpenGuardDecision ClaimDocument(string path) =>
         Instances.OpenGuardDecision.Decide(
-            _openGuard.Acquire(path, Environment.ProcessId, GuardHandle()), Environment.ProcessId);
+            _openGuard.Acquire(path, Environment.ProcessId, GuardHandle()),
+            Environment.ProcessId, Instances.OpenGuard.HolderIsLive);
+
+    /// <summary>
+    /// OpenPathAsync's claim: begun on a second handle, so the document this window
+    /// still shows stays guarded until the new one has loaded (OpenGuard.Commit) or
+    /// hasn't (OpenGuard.Abandon). Same decision as ClaimDocument.
+    /// </summary>
+    private Instances.OpenGuardDecision BeginDocumentClaim(string path) =>
+        Instances.OpenGuardDecision.Decide(
+            _openGuard.Begin(path, Environment.ProcessId, GuardHandle()),
+            Environment.ProcessId, Instances.OpenGuard.HolderIsLive);
 
     /// <summary>
     /// The document moved to <paramref name="path"/> (Save As, Encrypt, Convert to
@@ -1848,19 +1876,6 @@ public partial class MainWindow : Window
     }
 
     private void ReleaseDocumentClaim() => _openGuard.Release();
-
-    /// <summary>
-    /// Put the claim back where it was after an open that didn't happen: the window
-    /// still shows what it showed before. A claim that never moved (the open was
-    /// refused, or it was this window's own document) is left exactly as it is,
-    /// rather than released and re-taken with a gap another window could slip into.
-    /// </summary>
-    private void RestoreClaim(string? previous)
-    {
-        if (string.Equals(_openGuard.HeldPath, previous, StringComparison.Ordinal)) return;
-        if (previous is null) ReleaseDocumentClaim();
-        else RekeyDocumentClaim(previous);
-    }
 
     /// <summary>
     /// Run a relaunch that reopens this document (Apply update, the "move" install,
@@ -3965,7 +3980,31 @@ public partial class MainWindow : Window
 
     // ===== Read-only mode =====
 
-    private void ReadOnly_Click(object sender, RoutedEventArgs e) => SetReadOnly(MenuReadOnly.IsChecked);
+    private void ReadOnly_Click(object sender, RoutedEventArgs e)
+    {
+        if (MenuReadOnly.IsChecked) { SetReadOnly(true); return; }
+        // Turning it OFF. Read-only the already-open fallback imposed is not lifted
+        // by the checkbox: this window holds no claim on the document, so it claims
+        // it first, and only a claim that is now this window's (or nobody's) may
+        // edit - otherwise the un-check would hand out an unguarded editor, and a
+        // double-click on the file a second one. Still held by a live window
+        // elsewhere: the checkbox goes back and that window comes forward.
+        if (!_imposedReadOnly.Imposed) { SetReadOnly(false); return; }
+        var claim = _currentPath is null
+            ? new Instances.OpenGuardDecision(Instances.OpenVerdict.Proceed, 0, 0)   // the held document is already gone from here
+            : ClaimDocument(_currentPath);
+        switch (_imposedReadOnly.Lift(claim))
+        {
+            case Instances.ReadOnlyLift.Edit:
+                SetReadOnly(false);
+                break;
+            case Instances.ReadOnlyLift.StayReadOnly:
+                SetReadOnly(true);   // the checkbox goes back
+                Instances.OpenGuard.TryFocusWindow(claim.HolderHwnd);
+                FlashStatus("Still open in another window");
+                break;
+        }
+    }
 
     private void SetReadOnly(bool on)
     {

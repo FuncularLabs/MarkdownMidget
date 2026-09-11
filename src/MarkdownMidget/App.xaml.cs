@@ -105,7 +105,8 @@ public partial class App : Application
             if (MarkdownMidget.MainWindow.DocumentArgument(args) is { } document)   // the class, not Application.MainWindow
             {
                 var probe = Instances.OpenGuard.Peek(Instances.OpenGuard.DefaultDirectory, document);
-                var decision = Instances.OpenGuardDecision.Decide(probe, Environment.ProcessId);
+                var decision = Instances.OpenGuardDecision.Decide(probe, Environment.ProcessId,
+                                                                  Instances.OpenGuard.HolderIsLive);
                 if (decision.Verdict == Instances.OpenVerdict.FocusOther
                     && Instances.OpenGuard.TryFocusWindow(decision.HolderHwnd))
                 {

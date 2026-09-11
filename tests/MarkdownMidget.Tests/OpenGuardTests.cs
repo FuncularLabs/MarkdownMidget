@@ -20,9 +20,13 @@ public class OpenGuardTests : IDisposable
     private readonly List<IDisposable> _cleanup = new();
 
     private static readonly int Me = Environment.ProcessId;
-    // Any pid that isn't ours. A held lock always belongs to a live process (the
-    // kernel releases a dead one's), so the tests write the holder's pid themselves.
+    // Any pid that isn't ours. One past a real pid is never a pid itself (Windows
+    // hands them out in multiples of 4), so the real liveness check calls it dead;
+    // tests that want the holder honoured vouch for it with Live instead.
     private static readonly int Other = Environment.ProcessId + 1;
+    // A liveness check that vouches for any holder: the decision's shape, tested
+    // apart from whether the recorded pid and window really exist.
+    private static readonly Func<int, long, bool> Live = (_, _) => true;
 
     private OpenGuard New()
     {
@@ -32,6 +36,11 @@ public class OpenGuardTests : IDisposable
     }
 
     private string Doc(string name) => Path.Combine(_dir, name);
+
+    // Held or free, without taking it: Peek conflicts with a holder in this process
+    // exactly as it would with one in another (share modes are per handle, not per
+    // process), and a probe that TOOK a free lock would hold it for the rest of the test.
+    private OpenGuard.ProbeState StateOf(string path) => OpenGuard.Peek(_dir, path).State;
 
     public OpenGuardTests() => Directory.CreateDirectory(_dir);
 
@@ -68,7 +77,7 @@ public class OpenGuardTests : IDisposable
         Assert.Equal(Other, probe.HolderPid);
         Assert.Equal(0x1234, probe.HolderHwnd);
 
-        var decision = OpenGuardDecision.Decide(probe, Me);
+        var decision = OpenGuardDecision.Decide(probe, Me, Live);
         Assert.Equal(OpenVerdict.FocusOther, decision.Verdict);
         Assert.Equal(Other, decision.HolderPid);
         Assert.Equal(0x1234, decision.HolderHwnd);
@@ -80,7 +89,7 @@ public class OpenGuardTests : IDisposable
     public void FocusFailureOpensReadOnly()
     {
         var held = new OpenGuard.Probe(OpenGuard.ProbeState.Held, Other, 0);
-        var decision = OpenGuardDecision.Decide(held, Me);
+        var decision = OpenGuardDecision.Decide(held, Me, Live);
         Assert.Equal(OpenVerdict.FocusOther, decision.Verdict);
 
         // A recorded handle of 0 (window not initialised when the holder acquired)
@@ -110,7 +119,7 @@ public class OpenGuardTests : IDisposable
 
         var probe = guard.Acquire(path, Me, hwnd: 9);
         Assert.Equal(OpenGuard.ProbeState.Free, probe.State);
-        Assert.Equal(OpenVerdict.Proceed, OpenGuardDecision.Decide(probe, Me).Verdict);
+        Assert.Equal(OpenVerdict.Proceed, OpenGuardDecision.Decide(probe, Me, Live).Verdict);
         // ...and the file now says who really holds it, not the dead session.
         var lines = ReadLock(guard.LockPathFor(path)).Split('\n');
         Assert.Equal(Me.ToString(), lines[0]);
@@ -168,7 +177,7 @@ public class OpenGuardTests : IDisposable
         var probe = New().Acquire(path, Me, hwnd: 5);
         Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
         Assert.Equal(Me, probe.HolderPid);
-        Assert.Equal(OpenVerdict.Own, OpenGuardDecision.Decide(probe, Me).Verdict);
+        Assert.Equal(OpenVerdict.Own, OpenGuardDecision.Decide(probe, Me, Live).Verdict);
     }
 
     // ---- W6 ----
@@ -233,9 +242,11 @@ public class OpenGuardTests : IDisposable
         Assert.StartsWith(Me + "\n", ReadLock(lockPath));
         guard.Dispose();
 
-        // Held garbage is "someone has it, no idea who": held by pid 0, which the
-        // decision turns into a FocusOther nobody can focus, so the caller falls
-        // back to read-only rather than opening a second editable copy.
+        // Held garbage is "someone has it, no idea who": held by pid 0, hwnd 0, which
+        // no liveness check can vouch for. The decision treats that as stale and the
+        // open proceeds - unguarded, since the claim itself failed - because a holder
+        // that can't be identified is a backup tool sitting on a stale file far more
+        // often than a window of ours, and there is no window to send them to anyway.
         using (var holder = new FileStream(lockPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read))
         {
             holder.Write("garbage"u8);
@@ -244,17 +255,18 @@ public class OpenGuardTests : IDisposable
             Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
             Assert.Equal(0, probe.HolderPid);
             Assert.Equal(0, probe.HolderHwnd);
-            var decision = OpenGuardDecision.Decide(probe, Me);
-            Assert.Equal(OpenVerdict.FocusOther, decision.Verdict);
-            Assert.False(OpenGuard.TryFocusWindow(decision.HolderHwnd));
+            var decision = OpenGuardDecision.Decide(probe, Me, OpenGuard.HolderIsLive);
+            Assert.Equal(OpenVerdict.Proceed, decision.Verdict);
+            Assert.False(OpenGuard.TryFocusWindow(probe.HolderHwnd));   // nothing to focus either way
         }
     }
 
     [Fact]
     public void AcquireOfAnotherPathSwapsTheLock()
     {
-        // OpenPathAsync's shape: the window opens a different file, so the one it
-        // was showing is released as part of taking the new one.
+        // The immediate swap (Rekey's shape, and the read-only lift's): taking a
+        // different path releases the one held. OpenPathAsync no longer swaps -
+        // see AcquireSecondKeepsFirstUntilCommitted.
         var a = Doc("first.md");
         var b = Doc("second.md");
         var guard = New();
@@ -293,7 +305,7 @@ public class OpenGuardTests : IDisposable
         Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
         Assert.Equal(Other, probe.HolderPid);
         Assert.Equal(77, probe.HolderHwnd);
-        Assert.Equal(OpenVerdict.FocusOther, OpenGuardDecision.Decide(probe, Me).Verdict);
+        Assert.Equal(OpenVerdict.FocusOther, OpenGuardDecision.Decide(probe, Me, Live).Verdict);
         // Peeking took nothing: the holder still holds it.
         Assert.Equal(OpenGuard.ProbeState.Held, New().Acquire(path, Me, hwnd: 1).State);
 
@@ -313,8 +325,239 @@ public class OpenGuardTests : IDisposable
         _cleanup.Add(guard);
         var probe = guard.Acquire(Doc("any.md"), Me, hwnd: 1);
         Assert.Equal(OpenGuard.ProbeState.Unavailable, probe.State);
-        Assert.Equal(OpenVerdict.Proceed, OpenGuardDecision.Decide(probe, Me).Verdict);
+        Assert.Equal(OpenVerdict.Proceed, OpenGuardDecision.Decide(probe, Me, Live).Verdict);
         Assert.Null(guard.HeldPath);
+    }
+
+    // ---- F4: the old claim is held until the new document is on screen ----
+
+    [Fact]
+    public void AcquireSecondKeepsFirstUntilCommitted()
+    {
+        // OpenPathAsync's shape. The window shows a and starts opening b: through the
+        // read and the password prompt it is still showing - and must still be
+        // guarding - a. Only once b is on screen does a's claim go.
+        var a = Doc("showing.md");
+        var b = Doc("opening.md");
+        var guard = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Acquire(a, Me, hwnd: 1).State);
+
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        Assert.Equal(a, guard.HeldPath);                          // still a
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(a));     // a is guarded
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(b));     // and so is b already
+
+        // The prompt was cancelled: b goes, a was never let go of.
+        guard.Abandon();
+        Assert.Equal(a, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(a));
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(b));
+
+        // This time it loads: the claim moves.
+        Assert.Equal(OpenGuard.ProbeState.Free, guard.Begin(b, Me, hwnd: 1).State);
+        guard.Commit(b);
+        Assert.Equal(b, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(a));
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(b));
+
+        // Opening the document already shown (Open Recent on the current file) trips
+        // over its own lock: nothing pending, and the commit keeps what it has.
+        var own = guard.Begin(b, Me, hwnd: 1);
+        Assert.Equal(OpenGuard.ProbeState.Held, own.State);
+        Assert.Equal(OpenVerdict.Own, OpenGuardDecision.Decide(own, Me, Live).Verdict);
+        guard.Commit(b);
+        Assert.Equal(b, guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(b));
+
+        // A path someone else holds, shown here anyway (the decision found the holder
+        // stale, or nothing could be focused): b is no longer what this window shows,
+        // so its claim goes, and c is shown unguarded.
+        var c = Doc("theirs.md");
+        var squatter = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, squatter.Acquire(c, Other, hwnd: 3).State);
+        Assert.Equal(OpenGuard.ProbeState.Held, guard.Begin(c, Me, hwnd: 1).State);
+        guard.Commit(c);
+        Assert.Null(guard.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(b));
+
+        // Abandon with nothing pending is a no-op; Dispose lets a pending claim go too.
+        guard.Abandon();
+        var d = Doc("disposed.md");
+        var e = Doc("pending.md");
+        var g2 = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Acquire(d, Me, hwnd: 1).State);
+        Assert.Equal(OpenGuard.ProbeState.Free, g2.Begin(e, Me, hwnd: 1).State);
+        g2.Dispose();
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(d));
+        Assert.Equal(OpenGuard.ProbeState.Free, StateOf(e));
+    }
+
+    // ---- F3: a held lock proves a process has the file open, not that it is a window of ours ----
+
+    [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [Fact]
+    public void AForeignOrDeadHolderIsNotHonoured()
+    {
+        // The two probes, injected: which pids are running, and which pid owns a
+        // window. Each case below fails exactly ONE probe, so that neither can stand
+        // in for the other: 0x9ABC is a window the table still credits to a pid
+        // that is not running, and 0x5678 is owned by a pid that is.
+        var running = new HashSet<int> { Other };
+        var owner = new Dictionary<long, int> { [0x1234] = Other, [0x5678] = Other + 4, [0x9ABC] = Other + 8 };
+        Func<int, bool> processIsRunning = pid => running.Contains(pid);
+        Func<long, int> windowOwnerPid = hwnd => owner.TryGetValue(hwnd, out var p) ? p : 0;
+        Func<int, long, bool> live = (pid, hwnd) => OpenGuard.HolderIsLive(pid, hwnd, processIsRunning, windowOwnerPid);
+
+        // Dead pid: a backup or AV tool holding a stale lock open. The open proceeds,
+        // and there is no holder to focus - even though the window table would have
+        // vouched for the handle.
+        var dead = new OpenGuard.Probe(OpenGuard.ProbeState.Held, Other + 8, 0x9ABC);
+        Assert.False(live(Other + 8, 0x9ABC));
+        var stale = OpenGuardDecision.Decide(dead, Me, live);
+        Assert.Equal(OpenVerdict.Proceed, stale.Verdict);
+        Assert.Equal(0, stale.HolderHwnd);
+
+        // Live pid, but the recorded handle now names another process's window
+        // (handles are recycled): not a window of ours either.
+        var recycled = new OpenGuard.Probe(OpenGuard.ProbeState.Held, Other, 0x5678);
+        Assert.False(live(Other, 0x5678));
+        Assert.Equal(OpenVerdict.Proceed, OpenGuardDecision.Decide(recycled, Me, live).Verdict);
+
+        // Both match: that IS a window of ours, and it is honoured.
+        var real = new OpenGuard.Probe(OpenGuard.ProbeState.Held, Other, 0x1234);
+        Assert.True(live(Other, 0x1234));
+        var decision = OpenGuardDecision.Decide(real, Me, live);
+        Assert.Equal(OpenVerdict.FocusOther, decision.Verdict);
+        Assert.Equal(Other, decision.HolderPid);
+        Assert.Equal(0x1234, decision.HolderHwnd);
+
+        // Unreadable content reads as 0/0. GetWindowThreadProcessId(0) fails and leaves
+        // the owner at 0 - which would "match" pid 0 - so 0/0 is refused before the
+        // probes are asked, even when something claims pid 0 is running.
+        running.Add(0);
+        Assert.False(live(0, 0));
+
+        // The check is never consulted for our own pid (Own is never a block) or for
+        // a lock nobody holds.
+        Assert.Equal(OpenVerdict.Own, OpenGuardDecision.Decide(new(OpenGuard.ProbeState.Held, Me, 0), Me, live).Verdict);
+        Assert.Equal(OpenVerdict.Proceed, OpenGuardDecision.Decide(new(OpenGuard.ProbeState.Free, 0, 0), Me, live).Verdict);
+
+        // The real probes. Other is one past a real pid, never a pid itself (Windows
+        // hands them out in multiples of 4), so it is dead. The shell window belongs
+        // to Explorer: to this process it is somebody else's window, to Explorer's
+        // pid it is a live holder.
+        Assert.False(OpenGuard.HolderIsLive(Other, 0x1234));
+        Assert.False(OpenGuard.HolderIsLive(0, 0));
+        var shell = GetShellWindow();
+        if (shell == IntPtr.Zero)
+        {
+            Console.WriteLine("no shell window in this session; the real-probe cases did not run");
+            return;
+        }
+        GetWindowThreadProcessId(shell, out var shellPid);
+        Assert.False(OpenGuard.HolderIsLive(Me, shell.ToInt64()));
+        Assert.True(OpenGuard.HolderIsLive((int)shellPid, shell.ToInt64()));
+    }
+
+    // ---- F1: the fallback's read-only is lifted by a claim, not by the checkbox ----
+
+    [Fact]
+    public void LiftingReadOnlyStaysReadOnlyWhileHeld()
+    {
+        // W1 holds the document; this window opened it read-only, with no claim. The
+        // user un-checks View ▸ Read Only while W1 still has it: the claim fails, so
+        // the checkbox goes back and W1 is the window to send them to.
+        var path = Doc("held.md");
+        var w1 = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, w1.Acquire(path, Other, hwnd: 0x1234).State);
+        var here = New();
+        var imposed = new ImposedReadOnly();
+        imposed.Impose(readOnlyAlready: false);
+        Assert.True(imposed.Imposed);
+
+        var claim = OpenGuardDecision.Decide(here.Acquire(path, Me, hwnd: 1), Me, Live);
+        Assert.Equal(OpenVerdict.FocusOther, claim.Verdict);
+        Assert.Equal(ReadOnlyLift.StayReadOnly, imposed.Lift(claim));
+        Assert.True(imposed.Imposed);             // still imposed: the next un-check asks again
+        Assert.Null(here.HeldPath);               // and nothing was taken
+        Assert.Equal(0x1234, claim.HolderHwnd);   // the window to focus
+
+        // Read-only the user chose is lifted by the checkbox alone: nothing was
+        // imposed, so the claim is not consulted.
+        Assert.Equal(ReadOnlyLift.Edit, new ImposedReadOnly().Lift(claim));
+    }
+
+    [Fact]
+    public void LiftingReadOnlyReclaimsWhenFree()
+    {
+        // W1 has since closed the document. Un-checking Read Only claims it for this
+        // window, so the edits that follow are guarded: a double-click on the file
+        // now finds this window rather than opening a second editable copy.
+        var path = Doc("released.md");
+        var w1 = New();
+        Assert.Equal(OpenGuard.ProbeState.Free, w1.Acquire(path, Other, hwnd: 0x1234).State);
+        var here = New();
+        var imposed = new ImposedReadOnly();
+        imposed.Impose(readOnlyAlready: false);
+        w1.Dispose();
+
+        var claim = OpenGuardDecision.Decide(here.Acquire(path, Me, hwnd: 1), Me, Live);
+        Assert.Equal(OpenVerdict.Proceed, claim.Verdict);
+        Assert.Equal(ReadOnlyLift.Edit, imposed.Lift(claim));
+        Assert.False(imposed.Imposed);
+        Assert.Equal(path, here.HeldPath);
+        Assert.Equal(OpenGuard.ProbeState.Held, StateOf(path));
+
+        // Own is as good as free: after a Save As this window already holds the
+        // document it is showing, and the claim attempt trips over its own lock.
+        var moved = new ImposedReadOnly();
+        moved.Impose(readOnlyAlready: false);
+        var own = OpenGuardDecision.Decide(here.Acquire(path, Me, hwnd: 1), Me, Live);
+        Assert.Equal(OpenVerdict.Own, own.Verdict);
+        Assert.Equal(ReadOnlyLift.Edit, moved.Lift(own));
+        Assert.False(moved.Imposed);
+        Assert.Equal(path, here.HeldPath);
+    }
+
+    [Fact]
+    public void ANormalOpenAfterTheFallbackClearsIt()
+    {
+        // Read-only is window state. After the fallback, the next document opened
+        // normally in this window must not land read-only with Save disabled and no
+        // message: the open clears what the fallback imposed...
+        var imposed = new ImposedReadOnly();
+        imposed.Impose(readOnlyAlready: false);
+        Assert.True(imposed.Clear());     // ...and the window turns read-only off
+        Assert.False(imposed.Imposed);
+        Assert.False(imposed.Clear());    // nothing imposed, nothing to lift
+
+        // ...unless read-only was the user's own before the fallback (View ▸ Read
+        // Only, --readonly): the fallback imposed nothing on top of it, so a later
+        // open leaves it on. The un-check still goes through a claim meanwhile.
+        var theirs = new ImposedReadOnly();
+        theirs.Impose(readOnlyAlready: true);
+        Assert.True(theirs.Imposed);
+        Assert.Equal(ReadOnlyLift.StayReadOnly, theirs.Lift(new OpenGuardDecision(OpenVerdict.FocusOther, Other, 0x1234)));
+        Assert.False(theirs.Clear());
+        Assert.False(theirs.Imposed);
+
+        // A failed un-check leaves the fallback's read-only imposed, and the next
+        // normal open still clears it.
+        var again = new ImposedReadOnly();
+        again.Impose(readOnlyAlready: false);
+        Assert.Equal(ReadOnlyLift.StayReadOnly, again.Lift(new OpenGuardDecision(OpenVerdict.FocusOther, Other, 0x1234)));
+        Assert.True(again.Imposed);
+        Assert.True(again.Clear());
+
+        // Two fallbacks in a row (a second held file opened into the same window):
+        // the window IS read-only when the second lands, but that is the first's
+        // doing, not the user's, and a normal open after both must still clear it.
+        var twice = new ImposedReadOnly();
+        twice.Impose(readOnlyAlready: false);
+        twice.Impose(readOnlyAlready: true);
+        Assert.True(twice.Clear());
     }
 
     [Fact]

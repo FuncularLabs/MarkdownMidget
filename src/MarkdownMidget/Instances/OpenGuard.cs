@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -21,10 +22,14 @@ namespace MarkdownMidget.Instances;
 /// window. The holder writes "pid\nhwnd\nfullpath\n" as soon as it has the handle.
 ///
 /// A dead holder's lock is released by the kernel however the process died, so the
-/// exclusive open simply succeeds and the stale file is overwritten: liveness is
-/// never inferred from a pid (ids get reused). DeleteOnClose removes the file on a
-/// clean exit; a power cut leaves it behind, harmlessly, until the next open of
-/// that document takes it over.
+/// exclusive open simply succeeds and the stale file is overwritten. DeleteOnClose
+/// removes the file on a clean exit; a power cut leaves it behind, harmlessly,
+/// until the next open of that document takes it over. A sharing violation only
+/// proves that SOME process has the file open, though: a backup or AV tool can sit
+/// on a stale one, and the pid and handle inside then belong to a dead session (the
+/// handle may since name an unrelated window). So before a holder is honoured,
+/// OpenGuardDecision asks HolderIsLive - the recorded pid must be running and the
+/// recorded window must belong to it - and treats anything else as stale.
 ///
 /// This is the minimal form of the cross-instance registry the roadmap wants: the
 /// same files, read by a Window menu later, list every open document.
@@ -51,6 +56,10 @@ internal sealed class OpenGuard : IDisposable
     private readonly string _dir;
     private FileStream? _lock;
     private string? _heldPath;
+    // An open in progress (Begin): the new document's claim, held on a second handle
+    // beside the current one until Commit or Abandon says which of the two survives.
+    private FileStream? _pending;
+    private string? _pendingPath;
 
     public OpenGuard(string directory) => _dir = directory;
 
@@ -65,10 +74,12 @@ internal sealed class OpenGuard : IDisposable
     public string LockPathFor(string path) => Path.Combine(_dir, KeyFor(path) + ".lock");
 
     /// <summary>
-    /// Try to claim <paramref name="path"/> for this window. On success any claim this
-    /// guard already held is released first, because the window is about to show a
-    /// different document. On failure the existing claim is kept: the open is not
-    /// going ahead, so the window keeps showing (and guarding) what it has.
+    /// Try to claim <paramref name="path"/> for this window, at once. On success any
+    /// claim this guard already held is released, because the window now shows a
+    /// different document; on failure the existing claim is kept. For the switches
+    /// that are already a fact when they are made: Rekey after a write, and the
+    /// read-only lift, whose target is the document already on screen. An open that
+    /// has a read and a password prompt still ahead of it uses Begin/Commit instead.
     /// </summary>
     public Probe Acquire(string path, int pid, long hwnd)
     {
@@ -93,6 +104,59 @@ internal sealed class OpenGuard : IDisposable
     {
         Release();
         return Acquire(path, pid, hwnd);
+    }
+
+    /// <summary>
+    /// The first half of an open. Claims <paramref name="path"/> on a second handle
+    /// and leaves the current claim exactly as it is: the window goes on showing -
+    /// and guarding - the old document through the read and the password prompt,
+    /// until Commit says the new one is on screen. Abandon (a cancelled prompt, a
+    /// failed read) lets the new handle go, and the old claim was never released.
+    /// On a Held or Unavailable answer nothing is pending; Commit then decides what
+    /// becomes of the old claim.
+    /// </summary>
+    public Probe Begin(string path, int pid, long hwnd)
+    {
+        Abandon();
+        var probe = Take(LockPathFor(path), pid, hwnd, path, out var taken);
+        if (probe.State == ProbeState.Free)
+        {
+            _pending = taken;
+            _pendingPath = path;
+        }
+        return probe;
+    }
+
+    /// <summary>
+    /// The document at <paramref name="path"/> is on screen now. A pending claim
+    /// replaces the current one. Without one, Begin found the path held: by this
+    /// guard (the same document opened again) the claim simply stays; by anyone else,
+    /// or with the guard unable to answer, the old document is no longer what this
+    /// window shows, so its claim is released and the new one is shown unguarded.
+    /// </summary>
+    public void Commit(string path)
+    {
+        if (_pending is not null)
+        {
+            Release();
+            _lock = _pending;
+            _heldPath = _pendingPath;
+            _pending = null;
+            _pendingPath = null;
+        }
+        else if (_heldPath is null || !string.Equals(KeyFor(_heldPath), KeyFor(path), StringComparison.Ordinal))
+        {
+            Release();
+        }
+    }
+
+    /// <summary>The open didn't happen: let the pending claim go. The current claim
+    /// was never touched. Safe to call when nothing is pending.</summary>
+    public void Abandon()
+    {
+        try { _pending?.Dispose(); } catch { }
+        _pending = null;
+        _pendingPath = null;
     }
 
     /// <summary>
@@ -124,10 +188,9 @@ internal sealed class OpenGuard : IDisposable
         try
         {
             Directory.CreateDirectory(_dir);
-            // OpenOrCreate, not Create: a stale file from a power cut is reused, and
-            // Create would fail on a read-only attribute that some backup or AV tools
-            // set on files they've seen. FileShare.Read is the contract (see the
-            // class comment) - a second window reads the holder out of this.
+            // OpenOrCreate: a stale file from a power cut is reused (and truncated
+            // below) rather than being an obstacle. FileShare.Read is the contract
+            // (see the class comment) - a second window reads the holder out of this.
             var fs = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite,
                                     FileShare.Read, 1, FileOptions.DeleteOnClose);
             try
@@ -153,9 +216,9 @@ internal sealed class OpenGuard : IDisposable
     /// Read pid and hwnd out of a lock somebody else holds. Delete must be in the
     /// share mode: the holder opened the file DeleteOnClose, and Windows refuses any
     /// later open of such a file that doesn't share delete. Unreadable or
-    /// unparseable content is reported as held by nobody in particular (0/0): the
-    /// lock IS held, so the caller must not open a second editable copy, but there
-    /// is no window to send them to.
+    /// unparseable content is reported as held by nobody in particular (0/0), which
+    /// HolderIsLive refuses outright: the lock IS held, but by nothing that can be
+    /// shown to be a window of ours, and there is no window to send them to.
     /// </summary>
     private static Probe ReadHolder(string lockPath)
     {
@@ -255,10 +318,60 @@ internal sealed class OpenGuard : IDisposable
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    // ---- is the holder one of ours? ----
+
+    /// <summary>
+    /// Is the holder a lock file names a live window of ours? True only when the
+    /// recorded pid is running AND the recorded window belongs to that pid. A
+    /// sharing violation proves that some process has the lock open, not which: a
+    /// backup or AV tool holding a stale file would otherwise send the user to a
+    /// dead session's pid and a handle that may since have been recycled to an
+    /// unrelated window. The decision treats a holder this refuses as stale.
+    /// </summary>
+    public static bool HolderIsLive(int pid, long hwnd) =>
+        HolderIsLive(pid, hwnd, ProcessIsRunning, WindowOwnerPid);
+
+    /// <summary>The pure form, with the two probes injected. 0/0 is refused before
+    /// either is asked: it is what unreadable content reads as, and
+    /// GetWindowThreadProcessId fails on handle 0 leaving the owner at 0, which
+    /// would "match" pid 0.</summary>
+    internal static bool HolderIsLive(int pid, long hwnd, Func<int, bool> processIsRunning, Func<long, int> windowOwnerPid)
+    {
+        if (pid <= 0 || hwnd == 0) return false;
+        if (!processIsRunning(pid)) return false;
+        return windowOwnerPid(hwnd) == pid;
+    }
+
+    /// <summary>GetProcessById throws for a pid that isn't running; HasExited can
+    /// throw for one that can't be queried. Neither is a window we can send the
+    /// user to, so both read as not live.</summary>
+    private static bool ProcessIsRunning(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch { return false; }
+    }
+
+    private static int WindowOwnerPid(long hwnd)
+    {
+        try
+        {
+            GetWindowThreadProcessId((IntPtr)hwnd, out var owner);
+            return (int)owner;
+        }
+        catch { return 0; }
+    }
+
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
     // ---- lifetime ----
 
     /// <summary>Let go of the claim. DeleteOnClose removes the file as the handle
-    /// closes. Safe to call when nothing is held.</summary>
+    /// closes. Safe to call when nothing is held. A pending Begin is not touched:
+    /// Commit moves it into place, Abandon or Dispose lets it go.</summary>
     public void Release()
     {
         try { _lock?.Dispose(); } catch { }
@@ -266,7 +379,11 @@ internal sealed class OpenGuard : IDisposable
         _heldPath = null;
     }
 
-    public void Dispose() => Release();
+    public void Dispose()
+    {
+        Abandon();
+        Release();
+    }
 }
 
 /// <summary>What OpenPathAsync should do with a probe.</summary>
@@ -300,10 +417,18 @@ internal enum OpenFallback
 /// </summary>
 internal readonly record struct OpenGuardDecision(OpenVerdict Verdict, int HolderPid, long HolderHwnd)
 {
-    public static OpenGuardDecision Decide(OpenGuard.Probe probe, int currentPid)
+    /// <summary>
+    /// <paramref name="holderIsLive"/> is asked about a holder that isn't this
+    /// process before it is honoured; a holder it refuses is treated as a stale lock
+    /// and the open proceeds - unguarded, since the claim itself failed, which is
+    /// the guard-as-convenience rule again. OpenGuard.HolderIsLive is the real
+    /// check; tests inject their own.
+    /// </summary>
+    public static OpenGuardDecision Decide(OpenGuard.Probe probe, int currentPid, Func<int, long, bool> holderIsLive)
     {
         if (probe.State != OpenGuard.ProbeState.Held) return new(OpenVerdict.Proceed, 0, 0);
         if (probe.HolderPid == currentPid) return new(OpenVerdict.Own, probe.HolderPid, probe.HolderHwnd);
+        if (!holderIsLive(probe.HolderPid, probe.HolderHwnd)) return new(OpenVerdict.Proceed, 0, 0);
         return new(OpenVerdict.FocusOther, probe.HolderPid, probe.HolderHwnd);
     }
 
@@ -313,5 +438,69 @@ internal readonly record struct OpenGuardDecision(OpenVerdict Verdict, int Holde
     {
         if (!focused) return OpenFallback.OpenReadOnly;
         return startup ? OpenFallback.Exit : OpenFallback.Yield;
+    }
+}
+
+/// <summary>What View ▸ Read Only turning OFF does.</summary>
+internal enum ReadOnlyLift
+{
+    /// <summary>Editable: the read-only state was the user's own, or the document is
+    /// now this window's (claimed just now, or held already) or nobody's.</summary>
+    Edit,
+    /// <summary>Still open in another live window: the checkbox goes back and that
+    /// window is the one to bring forward.</summary>
+    StayReadOnly,
+}
+
+/// <summary>
+/// The read-only state the already-open fallback imposes, kept apart from the
+/// read-only the user chooses (View ▸ Read Only, --readonly). The fallback shows a
+/// document another window holds, with no claim of its own, so turning read-only
+/// off again is not a checkbox but a claim attempt: only a claim that succeeds (or
+/// finds the document already this window's) may edit, or the un-check would hand
+/// out an unguarded editor and a double-click on the file a second one. And
+/// read-only is window state, so the next document opened here normally must not
+/// inherit what was imposed for the last one. Pure: the window feeds it the claim
+/// result and applies what it says.
+/// </summary>
+internal sealed class ImposedReadOnly
+{
+    private bool _imposed;
+    private bool _wasReadOnly;
+
+    /// <summary>True from the fallback until a lift or a normal open.</summary>
+    public bool Imposed => _imposed;
+
+    /// <summary>The fallback has landed. <paramref name="readOnlyAlready"/>: the window
+    /// was read-only before it, which a later open must not undo on the fallback's
+    /// behalf if that was the user's own choice. A second fallback on top of a first
+    /// keeps the first's answer: read-only "already" then is the first's doing.</summary>
+    public void Impose(bool readOnlyAlready)
+    {
+        if (!_imposed) _wasReadOnly = readOnlyAlready;
+        _imposed = true;
+    }
+
+    /// <summary>A normal open has landed, or the claim was regained. Returns true when
+    /// the window must turn read-only OFF: it was imposed, and it was not the user's
+    /// own beforehand.</summary>
+    public bool Clear()
+    {
+        var lift = _imposed && !_wasReadOnly;
+        _imposed = false;
+        _wasReadOnly = false;
+        return lift;
+    }
+
+    /// <summary>The user turned Read Only off. <paramref name="claim"/> is a fresh claim
+    /// on the document this window shows; it is only consulted while something is
+    /// imposed. FocusOther keeps read-only and leaves it imposed, so the next un-check
+    /// asks again; anything else lifts it.</summary>
+    public ReadOnlyLift Lift(OpenGuardDecision claim)
+    {
+        if (!_imposed) return ReadOnlyLift.Edit;
+        if (claim.Verdict == OpenVerdict.FocusOther) return ReadOnlyLift.StayReadOnly;
+        Clear();
+        return ReadOnlyLift.Edit;
     }
 }

@@ -16,7 +16,8 @@ changes between alpha tags.
   and the two saved over each other. Now the window that has the file comes to the
   front instead, and a double-click never flashes a second window. If that window
   can't be brought forward, the file opens read-only in the new one, with a note
-  saying where it is open. (#1)
+  saying where it is open; turning View ▸ Read Only off again claims the file
+  first, so it stays read-only while the other window still has it. (#1)
 
 ## [0.10.0-beta1] - 2026-09-10
 
