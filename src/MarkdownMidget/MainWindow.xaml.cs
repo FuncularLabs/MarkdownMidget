@@ -4186,6 +4186,11 @@ public partial class MainWindow : Window
         // caller ended it before the plan was even made.)
         if (indices.Count == 0) return DropHandshake.NothingToRead;
 
+        // A drop number this editor never issued (0 — the message did not say). Its
+        // answer would carry the same 0, which matches no outstanding read, so waiting
+        // for it could only ever end in the timeout. Refuse it at once instead.
+        if (!DropHandshake.CanBeAnswered(drop)) return DropHandshake.Unreadable(indices);
+
         // No editor, no answer — say so now rather than wait forever for a message
         // nothing will send. (A fileDrop can only have come FROM the editor, so this
         // is belt and braces.)

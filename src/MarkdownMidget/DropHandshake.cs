@@ -96,6 +96,19 @@ internal static class DropHandshake
     public static bool IsSuperseded(long newestDrop, long arrivingDrop) => arrivingDrop < newestDrop;
 
     /// <summary>
+    /// Whether a drop number is one the editor issued, and so one whose answer can
+    /// be matched to a request.
+    ///
+    /// The counter starts at 1. 0 is what <c>ParseMessage</c> reports for a message
+    /// that did not say which drop it is — and <see cref="Decide"/> reads 0 as "no
+    /// read outstanding", which is exactly what makes a duplicate answer harmless.
+    /// The other side of that: a request made under drop 0 could never be matched
+    /// either, so waiting for its answer only ever ends in <see cref="ReadTimeout"/>.
+    /// The caller refuses it up front instead.
+    /// </summary>
+    public static bool CanBeAnswered(long drop) => drop > 0;
+
+    /// <summary>
     /// What to do with one answer.
     /// </summary>
     /// <param name="outstandingDrop">The drop whose read is being waited on, or 0

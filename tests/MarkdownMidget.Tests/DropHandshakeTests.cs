@@ -224,6 +224,22 @@ public class DropHandshakeTests
     }
 
     [Fact]
+    public void ARequestForADropTheEditorNeverNumberedIsNotWorthWaitingFor()
+    {
+        // Found reviewing this round's own fix layer. Decide now treats 0 as "no read
+        // outstanding", which is what makes a duplicate answer harmless — but it also
+        // means a request made UNDER drop 0 can never be matched: the answer comes
+        // back carrying the same 0 and is discarded, and the drop sits there until the
+        // timeout. 0 is what the parser reports for a fileDrop that did not say which
+        // drop it is, so the request is refused up front instead.
+        Assert.True(DropHandshake.CanBeAnswered(1));
+        Assert.False(DropHandshake.CanBeAnswered(0));
+        Assert.False(DropHandshake.CanBeAnswered(-3));
+        // The reason, in the same test: an answer to such a request is discarded.
+        Assert.Equal(DropReply.Discard, DropHandshake.Decide(0, 0, [0], Answer(0, (0, Png))).Outcome);
+    }
+
+    [Fact]
     public void AReadThatCannotEvenBeAskedForIsRefusedByName()
     {
         // No WebView, so no answer will ever come: say so at once rather than wait
