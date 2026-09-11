@@ -18,6 +18,16 @@ changes between alpha tags.
   can't be brought forward, the file opens read-only in the new one, with a note
   saying where it is open. (#1)
 
+### Fixed
+- **A file's line endings and byte-order mark are kept as found.** A CRLF file
+  with a code block in it came back with mixed endings — the formatted view
+  writes LF between blocks but keeps whatever was inside fenced, indented and
+  HTML blocks — and a file that began with a UTF-8 byte-order mark lost it on
+  the first save. Now the file's convention is detected when it opens (by
+  majority, for a mixed file) and put back throughout on every Save, Save As,
+  encrypt, convert and timestamped `.bak`; the mark stays if it was there and is
+  never added if it wasn't. A new document saves LF. (#3)
+
 ## [0.10.0-beta1] - 2026-09-10
 
 The source view gets colour — and, if you want it, a theme of its own — plus the

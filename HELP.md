@@ -347,6 +347,9 @@ line with `--readonly`.
 ## Files & windows
 
 - Native format is Markdown (`.md`). Plain text is also fine.
+- A file's line endings (CRLF or LF — by majority, for a mixed file) and its
+  UTF-8 byte-order mark are kept as found: the document is saved with the
+  convention it was opened with, and a new document saves LF.
 - **File ▸ Open Recent** lists the files you last opened or saved (10 by default;
   change it in **Edit ▸ Settings…**), with a **Clear Recent** option.
 - **File ▸ Close** (Ctrl+W) closes the current document and shows a gray "drop a
