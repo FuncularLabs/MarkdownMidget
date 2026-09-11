@@ -77,11 +77,19 @@ function head(file) {
  * headBase64 null for a file that could not be read at all (a dropped folder),
  * which the host refuses by name. Drop order is the contract: the host answers in
  * indices into this array.
+ *
+ * `size` is -1 when the file will not say how big it is, never 0. The host reads a
+ * stated size as a real length — 0 is under every ceiling, and it sizes the wait
+ * for the bytes from it — so passing an unknown off as zero would sail a picture of
+ * any size past MaxPictureBytes and then wait as if it were empty. -1 is the host's
+ * own "the drop did not say" (DropRouting's SizeProperty and
+ * DropHandshake.BytesRequested): no ceiling applied, and the largest allowed
+ * assumed for the wait.
  */
 export function readHeads(files, makeReader = newFileReader) {
   return Promise.all(Array.from(files, async (file) => ({
     name: file.name,
-    size: typeof file.size === 'number' ? file.size : 0,
+    size: Number.isFinite(file.size) ? file.size : -1,
     headBase64: await readBase64(head(file), makeReader),
   })));
 }

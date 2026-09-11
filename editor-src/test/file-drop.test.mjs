@@ -122,6 +122,26 @@ test('readHeads reports a null head for a file that cannot be read', async () =>
   ]);
 });
 
+test('readHeads says -1, not 0, when the file will not say how big it is', async () => {
+  // AR-10. "Don't know" was converted into a stated zero, and the host reads a
+  // stated size as a real length: 0 is under every ceiling, so a picture of unknown
+  // size sailed past MaxPictureBytes, and BytesRequested sized the wait for it as if
+  // it were empty. -1 is the host's own "the drop did not say" (SizeProperty), which
+  // applies no ceiling and assumes the largest allowed when sizing the wait — the
+  // safe direction on both counts, and the one the host is already written for.
+  const make = loads('data:;base64,QUJD');
+
+  assert.deepEqual(await readHeads([{ name: 'mystery.png' }, { name: 'nan.png', size: NaN }], make), [
+    { name: 'mystery.png', size: -1, headBase64: 'QUJD' },
+    { name: 'nan.png', size: -1, headBase64: 'QUJD' },
+  ]);
+
+  // A real zero still travels as zero: an empty file is a length, not an unknown.
+  assert.deepEqual(await readHeads([fakeFile('empty.md', 0)], make), [
+    { name: 'empty.md', size: 0, headBase64: 'QUJD' },
+  ]);
+});
+
 test('readHeads on an empty drop is an empty list, not a hang', async () => {
   assert.deepEqual(await readHeads([], loads('data:')), []);
 });
