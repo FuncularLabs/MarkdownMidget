@@ -25,6 +25,17 @@ changes between alpha tags.
   do nothing in the source view, silently. It now inserts the picture at the caret
   as the same base64 data URI Insert ▸ Picture and the formatted view produce, in
   one undo step. A paste that carries text still pastes the text. (#7)
+- **A picture file dropped on the editor is inserted as a picture.** Dropping a
+  PNG, JPEG, GIF, WebP or BMP file on either view used to open it as a text
+  document — after the discard prompt, if you had unsaved changes — and fill the
+  editor with garbage. Now a dropped file is routed by what it is: a picture is
+  embedded at the caret exactly as Insert ▸ Picture embeds it (recognised by its
+  bytes, so a picture named `.md` is still a picture), a markdown or text file
+  opens as before, and anything else is refused with a note in the status bar
+  naming it — the document you have open is never replaced. Several pictures
+  are inserted in the order dropped; a markdown file dropped with them is not
+  opened. A markdown file dropped on the formatted view now also keeps its
+  byte-order mark, as one opened with File ▸ Open does. (#6)
 
 ### Fixed
 - **A file's line endings and byte-order mark are kept as found.** A CRLF file

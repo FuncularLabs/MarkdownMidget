@@ -63,7 +63,8 @@ or drop your selection.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
   in the editor and travel with the file. Pasting a picture from the clipboard — a
   screenshot, say — works in the Markdown source view too, and embeds it the same
-  way. **Right-click a picture ▸ Resize…** to
+  way; so does dropping a picture file onto either view (see *Files*).
+  **Right-click a picture ▸ Resize…** to
   scale it (the aspect ratio stays locked to the original); a resized picture is
   stored as inline HTML `<img …>` so the size persists.
 - **Underline** has no markdown equivalent, so it is stored as inline `<u>…</u>`.
@@ -364,12 +365,28 @@ line with `--readonly`.
   Version As…** (with a suggested name, then asks whether to switch to it or stay
   on the externally-modified file), or **Keep Current** (your next Save will
   overwrite the disk version).
-- **Drag a file onto the window** to open it. Dropping on the **toolbar or menu
-  bar** opens it in place (if the current document is untitled and unmodified) or
-  in a **new window**. Dropping on the **editing area** opens the file's text as a
-  new untitled document — the OS doesn't reveal a dropped file's path to the
-  editor, so **Save** will prompt for a location. You can also pass a file path
-  (and optional `--readonly`) on the command line.
+- **Drag a file onto the window.** What happens depends on what the file *is*,
+  not on what it is called:
+  - A **picture** (PNG, JPEG, GIF, WebP or BMP — recognised by its bytes, so a
+    PNG named `.md` is still a picture) is **inserted at the caret**, in either
+    view, exactly as **Insert ▸ Picture** would insert it. The document you have
+    open stays open. Several pictures go in one after another, each on its own
+    line. A read-only window, or one with no document open, takes no pictures and
+    says so in the status bar.
+  - A **markdown or text file** (`.md`, `.markdown`, `.txt`, `.mdenc`) **opens**.
+    Dropped on the **toolbar, menu bar or source view**, it opens in place (if the
+    current document is untitled and unmodified) or in a **new window**. Dropped on
+    the **formatted editing area**, its text opens as a new untitled document —
+    the OS doesn't reveal a dropped file's path to the editor, so **Save** will
+    prompt for a location — and that area opens one document per drop. A text
+    file named `.png` is neither a picture nor markdown, and is refused.
+  - **Anything else** is refused: the status bar names the file, and nothing
+    changes.
+  - Drop pictures and a markdown file **together** and the pictures are inserted;
+    the markdown file is not opened (the status bar says so) — drop it on its own
+    to open it.
+
+  You can also pass a file path (and optional `--readonly`) on the command line.
 - **File ▸ New** (Ctrl+N) always opens a **new window** with a blank document,
   rather than replacing what's in the current one — so there's never a prompt
   about unsaved changes. The window you clicked New from is untouched.

@@ -41,14 +41,15 @@ order of risk:
   editor's own serialisation.
 - **Find has no Replace.** Replace / Replace All, both views, all four modes, scoped
   to the selection.
-- **Dropping an image file on the editor opens it as text** (after the discard
-  prompt, when there are unsaved changes).
-  Insert it as a picture instead; refuse other non-markdown drops with a
-  message. Pasting an image into the *source* view does nothing today; it should
-  insert the same data-URI markdown the formatted view produces (Markdown Monster
-  accepts pasted images in its text editor too, though it saves them as files — our
-  embed model is the consistent answer). Pasting into the formatted view already
-  works.
+- ~~**Dropping an image file on the editor opens it as text**~~ **Done 2026-09-11
+  (unreleased, #6)**: a dropped file is routed by its content — a picture (PNG,
+  JPEG, GIF, WebP, BMP, recognised by its bytes, whatever its name) is embedded in
+  either view exactly as Insert ▸ Picture embeds it, a markdown or text file opens
+  as before, and anything else is refused by name and never replaces the document.
+  Was: any dropped file opened as text, after the discard prompt when there were
+  unsaved changes. The other half of this item — pasting an image into the *source*
+  view did nothing — was done 2026-09-11 (unreleased, #7): it inserts the same
+  data-URI markdown the formatted view produces.
 - ~~**The same file open in two windows silently overwrites.**~~ **Done 2026-09-10
   (unreleased, #1)**: the per-path lock — focus the window that has it, else open
   read-only with a message — described in full where the multi-window list strikes
