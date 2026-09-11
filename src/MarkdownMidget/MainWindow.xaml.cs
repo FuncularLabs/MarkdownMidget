@@ -44,6 +44,13 @@ public partial class MainWindow : Window
     // matches the last opened/saved markdown — so undoing back to that state clears
     // the modified flag, and undo past the Open state is impossible (history flushed).
     private string _cleanMarkdown = string.Empty;
+    // The file as it was last read from or written to disk, folded to LF - the
+    // second baseline (issue #4). _cleanMarkdown is the EDITOR's serialisation of
+    // that state and differs from it whenever the editor normalises, so "did the
+    // file change on disk?" is asked of this one and never of _cleanMarkdown (see
+    // ExternalChange). Set wherever _cleanMarkdown is set from disk: load, save,
+    // reload, Keep.
+    private string _diskBaseline = string.Empty;
     // What the open file's bytes looked like, so Save writes them back the same way
     // (issue #3): its line-ending convention and whether it began with a UTF-8
     // byte-order mark. In memory the document is always LF (DocumentText). Set on
@@ -1218,6 +1225,11 @@ public partial class MainWindow : Window
             _currentPath = path;
             _lineEnding = doc.Ending;
             _hadBom = doc.HadBom;
+            // Folded here rather than trusted: most callers hand over Detect's
+            // output, which already is, but the Save-As-after-external-change path
+            // hands over the editor's own text, and AvalonEdit's Enter can put CRLF
+            // in that (DocumentText.DefaultLineEnding says why).
+            _diskBaseline = DocumentText.Fold(doc.Text);
             _docEncrypted = password is not null;
             _docPassword = password;
             ClearBackupKey();   // the old document's cached backup key must not outlive it
@@ -1545,6 +1557,7 @@ public partial class MainWindow : Window
         if (newPassword is not null) { _docPassword = newPassword; ClearBackupKey(); }
         else if (!wantEncrypted && _docPassword is not null) { _docPassword = null; ClearBackupKey(); }
         _cleanMarkdown = markdown; // new clean baseline; undo history is left intact
+        _diskBaseline = DocumentText.Fold(markdown);   // what the file holds now, as Detect reads it back
         _dirty = false;
         UpdateTitle();
         if (pathChanged) StartWatching(path);
@@ -1629,6 +1642,7 @@ public partial class MainWindow : Window
         _docPassword = pw;
         ClearBackupKey();
         _cleanMarkdown = markdown;
+        _diskBaseline = DocumentText.Fold(markdown);
         _dirty = false;
         UpdateTitle();
         StartWatching(target);
@@ -1665,6 +1679,7 @@ public partial class MainWindow : Window
         _docPassword = pw;
         ClearBackupKey();
         _cleanMarkdown = markdown;
+        _diskBaseline = DocumentText.Fold(markdown);
         _dirty = false;
         UpdateTitle();
         DiscardBackup();
@@ -1725,6 +1740,7 @@ public partial class MainWindow : Window
         _docPassword = null;
         ClearBackupKey();
         _cleanMarkdown = markdown;
+        _diskBaseline = DocumentText.Fold(markdown);
         _dirty = false;
         UpdateTitle();
         StartWatching(target);
@@ -2135,8 +2151,10 @@ public partial class MainWindow : Window
         // other document: a double-click on it must find this window.
         if (mine.Path is not null) RekeyDocumentClaim(mine.Path);
         // Everything above treats a freshly loaded document as clean. This one isn't:
-        // it's unsaved work that never reached the file.
+        // it's unsaved work that never reached the file, so both baselines are the
+        // file, not the snapshot.
         _cleanMarkdown = disk.Text;
+        _diskBaseline = disk.Text;
         _displayName = mine.Path is null ? mine.DisplayName : null;
         _dirty = !string.Equals(markdown, _cleanMarkdown, StringComparison.Ordinal);
         UpdateTitle();
@@ -2214,6 +2232,7 @@ public partial class MainWindow : Window
             await LoadDocumentAsync(disk with { Text = text }, meta.Path, pw);
             if (meta.Path is not null) RekeyDocumentClaim(meta.Path);   // same as LoadRecoveredAsync
             _cleanMarkdown = disk.Text;
+            _diskBaseline = disk.Text;
             _displayName = meta.Path is null ? meta.DisplayName : null;
             _dirty = !string.Equals(text, _cleanMarkdown, StringComparison.Ordinal);
             UpdateTitle();
@@ -2301,6 +2320,7 @@ public partial class MainWindow : Window
             _currentPath = null;
             _displayName = null;
             _cleanMarkdown = string.Empty;
+            _diskBaseline = string.Empty;
             _lineEnding = DocumentText.DefaultLineEnding;   // nothing open; nothing to keep
             _hadBom = false;
             _dirty = false;
@@ -2470,7 +2490,21 @@ public partial class MainWindow : Window
         // unsaved-work check below would cheerfully call it "nothing to lose".
         if (!PassValid()) { RecheckExternalChange(path); return; }
 
-        if (string.Equals(newContent, _cleanMarkdown, StringComparison.Ordinal)) return;
+        // Judged against the DISK baseline, not the editor's serialisation of it
+        // (issue #4): the two differ for any file the editor normalises, so a tool
+        // that rewrote identical bytes used to prompt about a file that had not
+        // changed. ExternalChange says which baseline means what.
+        if (!ExternalChange.IsRealChange(newContent, _cleanMarkdown, _diskBaseline))
+        {
+            // The same document, possibly re-encoded - dos2unix ran, a tool added
+            // or stripped the mark. Nothing to reload or ask about, but the file's
+            // conventions are whatever it has NOW: "kept as found" means the next
+            // Save writes those, not the ones it had when it was opened.
+            _diskBaseline = newContent;
+            _lineEnding = fresh.Ending;
+            _hadBom = fresh.HadBom;
+            return;
+        }
 
         // Ask the editor what it actually holds rather than trusting `_dirty`, which
         // is a debounced cache: ScheduleDirtyCheck() RESTARTS a 250ms timer on every
@@ -2561,6 +2595,7 @@ public partial class MainWindow : Window
     private void AcceptDiskAsBaseline(DocumentText.Decoded disk)
     {
         _cleanMarkdown = disk.Text;
+        _diskBaseline = disk.Text;
         _lineEnding = disk.Ending;
         _hadBom = disk.HadBom;
     }
@@ -3980,6 +4015,7 @@ public partial class MainWindow : Window
             // unsaved from the outset: closing prompts, and the crash copy actually
             // covers it. Baselining it as "clean" made both of those silently skip it.
             _cleanMarkdown = string.Empty;
+            _diskBaseline = string.Empty;   // no file, so no disk baseline either
             _dirty = true;
             _backupDirty = true;
             UpdateTitle();

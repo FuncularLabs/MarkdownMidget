@@ -27,6 +27,13 @@ changes between alpha tags.
   majority, for a mixed file) and put back throughout on every Save, Save As,
   encrypt, convert and timestamped `.bak`; the mark stays if it was there and is
   never added if it wasn't. A new document saves LF. (#3)
+- **A file rewritten on disk with identical content is no longer reported as an
+  external change.** A formatter with nothing to do, a sync client, or a tool
+  that only changed the line endings raised the "modified by another program"
+  prompt — or a silent reload — because the disk was compared against the
+  editor's own serialisation of the document, which differs from the file for
+  anything the editor normalises. The comparison is now against the file as it
+  was last read or written. (#4)
 
 ## [0.10.0-beta1] - 2026-09-10
 
