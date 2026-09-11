@@ -86,8 +86,9 @@ internal sealed record DropPlan(
     {
         var parts = new List<string>(4);
         if (Refused.Count > 0) parts.Add("Not a picture or a markdown file: " + Names(Refused));
-        if (TooLarge.Count > 0)
-            parts.Add($"Too large to insert (over {DropRouting.MaxPictureBytes / (1024 * 1024)} MB): " + Names(TooLarge));
+        // The shared wording (PictureLimit), so every route that refuses a picture
+        // for its size says so in the same words.
+        if (TooLarge.Count > 0) parts.Add(PictureLimit.Notice(Names(TooLarge)));
         if (NotInserted.Count > 0)
             parts.Add((Target == DropTarget.NoDocument ? "No document open, so not inserted: " : "Read-only, so not inserted: ") + Names(NotInserted));
         if (NotOpened.Count > 0)
@@ -122,17 +123,15 @@ internal static class DropRouting
     public const int SniffLength = 32;
 
     /// <summary>
-    /// The largest picture a drop will embed. A picture goes into the document as
-    /// base64, so it costs about 4/3 its size in the markdown, again in the editor's
-    /// copy of it, and again in every save — 64 MB is already an 85 MB data URI in a
-    /// text file. Past this the picture is named in the status line instead, which
-    /// is a far better outcome than a wedged window.
+    /// The largest picture a drop will embed: <see cref="PictureLimit.MaxBytes"/>,
+    /// the one ceiling every route applies (PictureLimit says why there is one).
+    /// This is the drop's name for that constant, not a second number.
     ///
     /// Only PICTURES are capped. A dropped markdown or text file is opened, and
     /// File ▸ Open has never capped what it opens; capping it here would refuse a
     /// file the same user can open from the menu a second later.
     /// </summary>
-    public const long MaxPictureBytes = 64L * 1024 * 1024;
+    public const long MaxPictureBytes = PictureLimit.MaxBytes;
 
     /// <summary>
     /// The names that open as a document: the extensions File ▸ Open lists
@@ -184,7 +183,7 @@ internal static class DropRouting
     {
         if (head is null) return (DropKind.Refused, null);
         if (SniffImageMime(head) is { } mime)
-            return size > MaxPictureBytes ? (DropKind.TooLarge, null) : (DropKind.Picture, mime);
+            return PictureLimit.IsTooLarge(size) ? (DropKind.TooLarge, null) : (DropKind.Picture, mime);
         var ext = Path.GetExtension(name);
         return DocumentExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)
             ? (DropKind.Document, null)
@@ -268,7 +267,7 @@ internal static class DropRouting
     /// Classify applied.</param>
     public static bool PictureSurvivedTheRead(byte[] bytes, string mime, long statedSize, long ceiling = MaxPictureBytes) =>
         SniffImageMime(bytes) == mime
-        && bytes.LongLength <= ceiling
+        && !PictureLimit.IsTooLarge(bytes.LongLength, ceiling)
         && (statedSize < 0 || bytes.LongLength >= statedSize);
 
     /// <summary>The markdown for one dropped picture: Insert ▸ Picture's fragment,
