@@ -25,6 +25,12 @@ changes between alpha tags.
   do nothing in the source view, silently. It now inserts the picture at the caret
   as the same base64 data URI Insert ▸ Picture and the formatted view produce, in
   one undo step. A paste that carries text still pastes the text. (#7)
+- **Help gains a Known limits section.** The deliberate limits, in one place,
+  each with what you run into and what to do instead: no installer and no Add or
+  Remove Programs entry, the markdown conventions a save through the formatted
+  view writes (and the source view as the way round them), pictures embedded
+  rather than saved beside the document, US-English spell check, one document per
+  window, and the rest. **Help ▸ View Help**, at the end. (#9)
 
 ### Changed
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
