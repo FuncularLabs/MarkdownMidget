@@ -331,6 +331,28 @@ describe('AnEditBehindTheIndexIsReScannedBeforeAnythingIsReplaced', () => {
     assert.equal(findReplace(v, 'dog', true, true).replaced, 0);
     assert.equal(md(), 'ZZZZZZone cat two');
   });
+
+  test('...even when the edit left the current match alone', () => {
+    // The case above passes for a second reason as well: the edit is in front of the
+    // match, so F-9's "is the caret still on the match?" guard says no whatever the
+    // index holds, and the count comes back fresh because Find Next re-indexes when
+    // it lands. Neither says whether ensureFresh ran.
+    //
+    // An edit in a LATER block does: the current match is exactly where it was and
+    // the selection still covers it, so the guard would happily replace at offsets
+    // taken against a document that no longer exists. ensureFresh re-takes the index
+    // first, and the cursor goes with it — so Replace is Find Next, and the total it
+    // reports is the document as it is now (#5 NF-8).
+    load('cat one\n\ncat two');
+    assert.equal(scan('cat').total, 2);
+    findNext(true);                                    // on the first match
+    const v = ed.view();
+    const second = blockRange('cat two');
+    v.dispatch(v.state.tr.insertText('extra cat ', second.from, second.from));
+    assert.deepEqual(findReplace(v, 'dog', true, true),
+      { replaced: 0, skipped: 0, total: 3, current: 1 });
+    assert.equal(md(), 'cat one\n\nextra cat cat two');
+  });
 });
 
 describe('ReplaceAllIsScopedToTheSelection', () => {
