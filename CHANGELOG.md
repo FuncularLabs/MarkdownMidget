@@ -9,6 +9,17 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Fixed
+- **Saving from the formatted view keeps tight lists tight, `snake_case_word` as
+  written, and emphasis that touches punctuation as emphasis.** A document that
+  passed through the formatted view came back with a blank line between every
+  bullet, with `snake\_case\_word`, and — for emphasis opening on an underscore,
+  `a*_b*` say — with text that no longer read as emphasis the next time the file
+  was opened. All three now survive a save. The rest of what the formatted view
+  does to a file's style — `-` bullets, `1.` numbering, `#` headings, fenced code,
+  inline links — is unchanged, pinned by tests, and listed in Help under
+  *Modified state, undo, and saving ▸ Markdown conventions*. (#2)
+
 ## [0.10.0-beta1] - 2026-09-10
 
 The source view gets colour — and, if you want it, a theme of its own — plus the

@@ -344,6 +344,27 @@ line with `--readonly`.
 - **Saving keeps the undo history** — you can still undo past a save, and undoing
   back to the saved content clears the `*`.
 
+### Markdown conventions
+
+A document that passes through the formatted view is saved in Markdown Midget's
+conventions, whatever style it was written in:
+
+- **Lists:** `-` bullets with one space after the marker, and `1.` numbering that
+  counts up. A list directly after another list switches to `*` bullets — with the
+  same marker, CommonMark would read the two as one list. Tight lists stay tight.
+- **Headings:** `#` headings, without closing hashes.
+- **Code blocks:** fenced with three backticks.
+- **Emphasis:** `*italic*` and `**bold**` when made in the editor; emphasis read
+  from a file keeps the `_` or `*` it was written with.
+- **Hard line break:** a backslash at the end of the line.
+
+What is converted: a reference-style link (`[text][ref]` plus its definition line)
+becomes an inline link and the definition line is dropped; a setext heading
+(underlined with `===` or `---`) becomes a `#` heading; an indented code block
+becomes fenced; `## Heading ##` loses its trailing hashes; an underscore in an
+image's alt text is written `\_`. A `snake_case_word` is saved as written. A
+document opened and saved only in the source view is written back exactly as typed.
+
 ## Files & windows
 
 - Native format is Markdown (`.md`). Plain text is also fine.
