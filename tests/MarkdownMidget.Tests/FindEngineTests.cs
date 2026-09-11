@@ -180,4 +180,141 @@ public class FindEngineTests
         // Multiline mode is on so ^ matches the start of each line, not just the doc.
         Assert.Matches(re!, "foo\nbar\nbaz");
     }
+
+    // ===== Replace (#5): the per-mode replacement text and the Replace All edit plan =====
+    //
+    // The pure half of Replace. A ReplaceSpec is a query and its replacement prepared
+    // for one mode; ReplaceAllEdits plans the edits for a text (optionally within a
+    // scope) and ApplyEdits is the reference application the views mirror.
+
+    private static string ReplaceAll(string text, string query, FindEngine.Mode mode, string replacement,
+        int scopeStart = 0, int scopeLength = -1, bool matchCase = false, bool wholeWord = false)
+    {
+        var spec = FindEngine.Prepare(query, mode, matchCase, wholeWord, replacement);
+        Assert.NotNull(spec);
+        return FindEngine.ApplyEdits(text, spec!.ReplaceAllEdits(text, scopeStart, scopeLength));
+    }
+
+    [Fact]
+    public void ReplaceNormalIsLiteral()
+    {
+        // A '$' in a Normal-mode replacement is a dollar sign, never a group reference.
+        var spec = FindEngine.Prepare("a.b", FindEngine.Mode.Normal, false, false, "$1-$&");
+        Assert.NotNull(spec);
+        Assert.True(spec!.Literal);
+        Assert.Equal("$1-$& aXb", ReplaceAll("a.b aXb", "a.b", FindEngine.Mode.Normal, "$1-$&"));
+    }
+
+    [Fact]
+    public void ReplaceWildcardsIsLiteral()
+    {
+        var spec = FindEngine.Prepare("h*o", FindEngine.Mode.Wildcards, false, false, "$&");
+        Assert.NotNull(spec);
+        Assert.True(spec!.Literal);
+        Assert.Equal("$& there", ReplaceAll("hello there", "h*o", FindEngine.Mode.Wildcards, "$&"));
+    }
+
+    [Theory]
+    [InlineData(@"a\tb", "a\tb")]
+    [InlineData(@"a\nb", "a\nb")]
+    [InlineData(@"a\rb", "a\rb")]
+    [InlineData(@"a\\b", @"a\b")]
+    [InlineData(@"a\0b", "a\0b")]
+    [InlineData(@"\x41", "A")]
+    [InlineData(@"\u2014", "—")]
+    [InlineData(@"a\.b", "a.b")]          // unknown escape: the character itself, as in the query
+    [InlineData(@"\xZZ", "xZZ")]          // not two hex digits: the 'x' is literal, like the query side
+    [InlineData(@"trailing\", @"trailing\")]
+    [InlineData(@"$1", "$1")]             // Extended is literal apart from its escapes
+    public void ReplaceExtendedExpandsEscapes(string replacement, string expected)
+    {
+        var spec = FindEngine.Prepare("x", FindEngine.Mode.Extended, false, false, replacement);
+        Assert.NotNull(spec);
+        Assert.True(spec!.Literal);
+        Assert.Equal(expected, spec.Replacement);
+        Assert.Equal(expected, ReplaceAll("x", "x", FindEngine.Mode.Extended, replacement));
+    }
+
+    [Fact]
+    public void ReplaceGroups()
+    {
+        // Regex mode hands the template to .NET: numbered and named groups, $0 / $& for
+        // the whole match, $$ for a dollar sign.
+        Assert.Equal("host at me", ReplaceAll("me@host", @"(\w+)@(\w+)", FindEngine.Mode.Regex, "$2 at $1"));
+        Assert.Equal("me!host", ReplaceAll("me@host", @"(?<user>\w+)@", FindEngine.Mode.Regex, "${user}!"));
+        Assert.Equal("[cat] [cat]", ReplaceAll("cat cat", "cat", FindEngine.Mode.Regex, "[$0]"));
+        Assert.Equal("<cat>", ReplaceAll("cat", "cat", FindEngine.Mode.Regex, "<$&>"));
+        Assert.Equal("$5", ReplaceAll("cost", "cost", FindEngine.Mode.Regex, "$$5"));
+
+        // Same thing one match at a time, the way Replace (not All) uses it.
+        var spec = FindEngine.Prepare(@"(\w+)@(\w+)", FindEngine.Mode.Regex, false, false, "$2 at $1");
+        Assert.NotNull(spec);
+        Assert.False(spec!.Literal);
+        var m = spec.Regex.Match("me@host");
+        Assert.Equal("host at me", spec.ReplacementFor(m));
+    }
+
+    [Fact]
+    public void ReplaceAllWithinSelection()
+    {
+        // "cat" at 0, 4, 8, 12. A scope of [4, 11) holds the middle two whole.
+        const string text = "cat cat cat cat";
+        Assert.Equal("cat dog dog cat", ReplaceAll(text, "cat", FindEngine.Mode.Normal, "dog", scopeStart: 4, scopeLength: 7));
+        // A match that only partly overlaps the scope is outside it: [5, 11) cuts the
+        // second "cat" in half, so only the third is replaced.
+        Assert.Equal("cat cat dog cat", ReplaceAll(text, "cat", FindEngine.Mode.Normal, "dog", scopeStart: 5, scopeLength: 6));
+        // No scope (the default) is the whole text.
+        Assert.Equal("dog dog dog dog", ReplaceAll(text, "cat", FindEngine.Mode.Normal, "dog"));
+        // An empty scope replaces nothing.
+        Assert.Equal(text, ReplaceAll(text, "cat", FindEngine.Mode.Normal, "dog", scopeStart: 4, scopeLength: 0));
+    }
+
+    [Fact]
+    public void ReplaceAllEditsAreInDocumentOrderWithTheMatchedLength()
+    {
+        var spec = FindEngine.Prepare("cat", FindEngine.Mode.Normal, false, false, "tiger");
+        var edits = spec!.ReplaceAllEdits("cat, cat");
+        Assert.Equal(2, edits.Count);
+        Assert.Equal(new FindEngine.Edit(0, 3, "tiger"), edits[0]);
+        Assert.Equal(new FindEngine.Edit(5, 3, "tiger"), edits[1]);
+        // And applying them yields the text a plain Regex.Replace would.
+        Assert.Equal("tiger, tiger", FindEngine.ApplyEdits("cat, cat", edits));
+    }
+
+    [Fact]
+    public void ReplaceAllOfAnEmptyMatchInserts()
+    {
+        // ^ in multiline mode matches at every line start with zero length; replacing it
+        // inserts, exactly as Regex.Replace does — the "prefix every line" idiom.
+        Assert.Equal("> a\n> b", ReplaceAll("a\nb", "^", FindEngine.Mode.Regex, "> "));
+    }
+
+    [Fact]
+    public void ReplaceRemovesWhenTheReplacementIsEmpty()
+    {
+        Assert.Equal("a b", ReplaceAll("a cat b", "cat ", FindEngine.Mode.Normal, ""));
+    }
+
+    [Fact]
+    public void ReplaceHonoursMatchCaseAndWholeWord()
+    {
+        Assert.Equal("Cat dog", ReplaceAll("Cat cat", "cat", FindEngine.Mode.Normal, "dog", matchCase: true));
+        Assert.Equal("dog catalog", ReplaceAll("cat catalog", "cat", FindEngine.Mode.Normal, "dog", wholeWord: true));
+    }
+
+    [Fact]
+    public void MalformedPatternIsRefused()
+    {
+        // A malformed regex never becomes a ReplaceSpec, so there is nothing to apply;
+        // the host shows the same message Find shows, and that message is this one.
+        Assert.Null(FindEngine.Prepare("(unclosed", FindEngine.Mode.Regex, false, false, "x"));
+        Assert.Null(FindEngine.Prepare("", FindEngine.Mode.Normal, false, false, "x"));
+        Assert.Equal("Invalid pattern.", FindEngine.InvalidPatternMessage);
+    }
+
+    [Fact]
+    public void ApplyEditsWithNoEditsReturnsTheTextUnchanged()
+    {
+        Assert.Equal("abc", FindEngine.ApplyEdits("abc", System.Array.Empty<FindEngine.Edit>()));
+    }
 }
