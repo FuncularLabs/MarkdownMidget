@@ -60,8 +60,27 @@ internal sealed class OpenGuard : IDisposable
     // beside the current one until Commit or Abandon says which of the two survives.
     private FileStream? _pending;
     private string? _pendingPath;
+    // The pause before a 0/0 read's second look (see ReadHolder). Injected so a test
+    // can put the holder's write exactly there; the window uses the real one.
+    private readonly Action<int> _wait;
 
-    public OpenGuard(string directory) => _dir = directory;
+    public OpenGuard(string directory, Action<int>? wait = null)
+    {
+        _dir = directory;
+        _wait = wait ?? DefaultWait;
+    }
+
+    /// <summary>
+    /// How long a reader that found a held lock empty gives its holder to finish
+    /// writing before the second look. Take opens the lock and then writes into it,
+    /// so a reader can land in between and see 0/0 for a window that is a few
+    /// microseconds from saying who it is; ~20 ms covers that write and flush
+    /// many times over, and is paid only by such reads and by reads of a lock a
+    /// backup tool sits on.
+    /// </summary>
+    internal const int HolderWriteGraceMs = 20;
+
+    private static readonly Action<int> DefaultWait = Thread.Sleep;
 
     public static string DefaultDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -182,9 +201,10 @@ internal sealed class OpenGuard : IDisposable
     /// <summary>
     /// Who holds <paramref name="path"/>, without claiming it. For App.OnStartup,
     /// which asks before any window exists so that a double-click on an already-open
-    /// file never flashes a second window.
+    /// file never flashes a second window. <paramref name="wait"/> is the pause
+    /// before a 0/0 read's second look (see ReadHolder); tests inject theirs.
     /// </summary>
-    public static Probe Peek(string directory, string path)
+    public static Probe Peek(string directory, string path, Action<int>? wait = null)
     {
         var lockPath = Path.Combine(directory, KeyFor(path) + ".lock");
         if (!File.Exists(lockPath)) return new Probe(ProbeState.Free, 0, 0);
@@ -198,7 +218,7 @@ internal sealed class OpenGuard : IDisposable
             return new Probe(ProbeState.Free, 0, 0);
         }
         catch (FileNotFoundException) { return new Probe(ProbeState.Free, 0, 0); }
-        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath); }
+        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath, wait ?? DefaultWait); }
         catch (Exception) { return new Probe(ProbeState.Unavailable, 0, 0); }
     }
 
@@ -228,19 +248,36 @@ internal sealed class OpenGuard : IDisposable
             taken = fs;
             return new Probe(ProbeState.Free, 0, 0);
         }
-        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath); }
+        catch (IOException ex) when (IsSharingViolation(ex)) { return ReadHolder(lockPath, _wait); }
         catch (Exception) { return new Probe(ProbeState.Unavailable, 0, 0); }
     }
 
     /// <summary>
-    /// Read pid and hwnd out of a lock somebody else holds. Delete must be in the
-    /// share mode: the holder opened the file DeleteOnClose, and Windows refuses any
-    /// later open of such a file that doesn't share delete. Unreadable or
+    /// Read pid and hwnd out of a lock somebody else holds. Unreadable or
     /// unparseable content is reported as held by nobody in particular (0/0), which
     /// HolderIsLive refuses outright: the lock IS held, but by nothing that can be
-    /// shown to be a window of ours, and there is no window to send them to.
+    /// shown to be a window of ours, and there is no window to send them to. But
+    /// the holder writes AFTER it opens (Take), and a reader can land in that gap -
+    /// or an AV scanner's exclusive open right after the create can make the
+    /// holder's own write fail for the moment - so a first look that yields 0/0
+    /// waits HolderWriteGraceMs and looks once more before the holder is refused. A
+    /// second 0/0 stands: the guard does not sit polling a lock a backup tool holds.
     /// </summary>
-    private static Probe ReadHolder(string lockPath)
+    private static Probe ReadHolder(string lockPath, Action<int> wait)
+    {
+        var probe = ReadHolderOnce(lockPath);
+        if (probe.HolderPid == 0 && probe.HolderHwnd == 0)
+        {
+            wait(HolderWriteGraceMs);
+            probe = ReadHolderOnce(lockPath);
+        }
+        return probe;
+    }
+
+    /// <summary>One look. Delete must be in the share mode: the holder opened the
+    /// file DeleteOnClose, and Windows refuses any later open of such a file that
+    /// doesn't share delete.</summary>
+    private static Probe ReadHolderOnce(string lockPath)
     {
         try
         {

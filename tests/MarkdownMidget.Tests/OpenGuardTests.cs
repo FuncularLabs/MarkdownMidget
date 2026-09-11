@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using MarkdownMidget.Instances;
 using Xunit;
 
@@ -259,6 +261,89 @@ public class OpenGuardTests : IDisposable
             Assert.Equal(OpenVerdict.Proceed, decision.Verdict);
             Assert.False(OpenGuard.TryFocusWindow(probe.HolderHwnd));   // nothing to focus either way
         }
+    }
+
+    // ---- the 0/0 window: a holder caught between opening its lock and writing to it ----
+
+    [Fact]
+    public void AHolderCaughtBeforeItsWriteIsReadAgain()
+    {
+        // Take opens the lock and then writes pid and handle into it. A reader that
+        // lands in between (tens of microseconds) sees an empty file: held, by nobody
+        // it can name, which the decision refuses - and the open would proceed
+        // unguarded beside a window of ours that was about to say who it was. So a
+        // read that yields 0/0 waits once and looks again. The wait is injected;
+        // here it is the moment the holder's write lands.
+        var path = Doc("racing.md");
+        var lockPath = New().LockPathFor(path);
+        using var holder = new FileStream(lockPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+        var waits = new List<int>();
+        void WriteDuringTheWait(int ms)
+        {
+            waits.Add(ms);
+            holder.Write(Encoding.UTF8.GetBytes($"{Other}\n{0x1234}\n{path}\n"));
+            holder.Flush();
+        }
+
+        var guard = new OpenGuard(_dir, WriteDuringTheWait);
+        _cleanup.Add(guard);
+        var probe = guard.Acquire(path, Me, hwnd: 1);
+        Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
+        Assert.Equal(Other, probe.HolderPid);
+        Assert.Equal(0x1234, probe.HolderHwnd);
+        Assert.Equal(new[] { OpenGuard.HolderWriteGraceMs }, waits);
+        Assert.Null(guard.HeldPath);
+
+        // Peek (App.OnStartup's probe) lands in the same gap and takes the same second look.
+        holder.SetLength(0);
+        waits.Clear();
+        var peeked = OpenGuard.Peek(_dir, path, WriteDuringTheWait);
+        Assert.Equal(OpenGuard.ProbeState.Held, peeked.State);
+        Assert.Equal(Other, peeked.HolderPid);
+        Assert.Equal(0x1234, peeked.HolderHwnd);
+        Assert.Equal(new[] { OpenGuard.HolderWriteGraceMs }, waits);
+
+        // A holder that has written is read the first time: no wait at all.
+        waits.Clear();
+        Assert.Equal(Other, guard.Acquire(path, Me, hwnd: 1).HolderPid);
+        Assert.Equal(Other, OpenGuard.Peek(_dir, path, WriteDuringTheWait).HolderPid);
+        Assert.Empty(waits);
+
+        // Still nothing after the wait: held by nobody nameable, as before - and the
+        // second look is the last. The guard does not sit polling a lock that a
+        // backup tool holds.
+        holder.SetLength(0);
+        var looks = 0;
+        var patient = new OpenGuard(_dir, _ => looks++);
+        _cleanup.Add(patient);
+        var empty = patient.Acquire(path, Me, hwnd: 1);
+        Assert.Equal(OpenGuard.ProbeState.Held, empty.State);
+        Assert.Equal(0, empty.HolderPid);
+        Assert.Equal(0, empty.HolderHwnd);
+        Assert.Equal(1, looks);
+        looks = 0;
+        Assert.Equal(0, OpenGuard.Peek(_dir, path, _ => looks++).HolderPid);
+        Assert.Equal(1, looks);
+    }
+
+    [Fact]
+    public void TheHolderWriteGraceIsARealPause()
+    {
+        // Without an injected wait the second look comes after a real pause: short,
+        // since every read of a lock a backup tool holds pays it, but long enough to
+        // cover a holder's write and flush. Only the lower bound is asserted - an
+        // upper bound is the scheduler's to break, not the guard's.
+        Assert.InRange(OpenGuard.HolderWriteGraceMs, 10, 100);
+        var path = Doc("slow.md");
+        var lockPath = New().LockPathFor(path);
+        using var holder = new FileStream(lockPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+        var clock = Stopwatch.StartNew();
+        var probe = New().Acquire(path, Me, hwnd: 1);
+        clock.Stop();
+        Assert.Equal(OpenGuard.ProbeState.Held, probe.State);
+        Assert.Equal(0, probe.HolderPid);
+        Assert.True(clock.ElapsedMilliseconds >= OpenGuard.HolderWriteGraceMs / 2,
+            $"the second look came after {clock.ElapsedMilliseconds} ms; the grace is {OpenGuard.HolderWriteGraceMs} ms");
     }
 
     [Fact]
