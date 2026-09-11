@@ -3,6 +3,12 @@
 // message and no insert, and a payload sliced one character wrong corrupts the
 // picture that goes into the document. None of it needed a DOM to test — the
 // FileReader arrives as a factory — so none of it was tested. Now it is.
+//
+// `node --test` has no default per-test timeout, so the failure these tests exist
+// to catch — a promise that never settles — used to HANG the suite rather than
+// fail it (delete onabort and see). The npm `test` script passes
+// --test-timeout=10000 so a hang is reported as a failing test with a message and
+// a non-zero exit; run these with `npm test`, not a bare `node --test`.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,26 +80,6 @@ test('an aborted read resolves null — onabort is wired, so the promise cannot 
 test('a readAsDataURL that throws resolves null instead of escaping the promise', async () => {
   const throwing = () => ({ readAsDataURL() { throw new Error('nope'); } });
   assert.equal(await readBase64({}, throwing), null);
-});
-
-test('a reader that resolves twice keeps the first answer', async () => {
-  // Belt and braces: onload followed by onabort (or any pair) must not reject the
-  // "already resolved" promise or change its value.
-  const make = () => {
-    const reader = {
-      result: null,
-      readAsDataURL() {
-        queueMicrotask(() => {
-          reader.result = 'data:text/plain;base64,Zmlyc3Q=';
-          reader.onload();
-          reader.onabort();
-          reader.onerror();
-        });
-      },
-    };
-    return reader;
-  };
-  assert.equal(await readBase64({}, make), 'Zmlyc3Q=');
 });
 
 test('readHeads slices exactly the first HEAD_BYTES of every file', async () => {

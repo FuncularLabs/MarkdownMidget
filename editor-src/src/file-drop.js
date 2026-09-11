@@ -31,19 +31,20 @@ const newFileReader = () => new FileReader();
 /**
  * A blob's bytes as base64, or null if it could not be read.
  *
- * Resolves exactly once, on every path a FileReader can take: load, error, abort,
- * and a readAsDataURL that throws outright. A promise that can hang here would
- * hang the host's insert behind it, which is why abort is wired as well as error.
+ * Resolves on every path a FileReader can take: load, error, abort, and a
+ * readAsDataURL that throws outright. A promise that can hang here would hang the
+ * host's insert behind it, which is why abort is wired as well as error. A reader
+ * that fires two of them settles on the first — resolve() after a promise has
+ * settled is a no-op in the language, so no flag guards it (a flag here was
+ * untestable: no mutation of it could change an observable answer).
  */
 export function readBase64(blob, makeReader = newFileReader) {
   return new Promise((resolve) => {
-    let settled = false;
-    const settle = (value) => { if (!settled) { settled = true; resolve(value); } };
     let reader;
     try {
       reader = makeReader();
     } catch (_) {
-      return settle(null);
+      return resolve(null);
     }
     // A data URL is "data:<type>;base64,<payload>"; only the payload travels. An
     // empty file can come back as a bare "data:" with no comma: that is an empty
@@ -51,14 +52,14 @@ export function readBase64(blob, makeReader = newFileReader) {
     reader.onload = () => {
       const s = String(reader.result);
       const comma = s.indexOf(',');
-      settle(comma < 0 ? '' : s.slice(comma + 1));
+      resolve(comma < 0 ? '' : s.slice(comma + 1));
     };
-    reader.onerror = () => settle(null);
-    reader.onabort = () => settle(null);
+    reader.onerror = () => resolve(null);
+    reader.onabort = () => resolve(null);
     try {
       reader.readAsDataURL(blob);
     } catch (_) {
-      settle(null);
+      resolve(null);
     }
   });
 }

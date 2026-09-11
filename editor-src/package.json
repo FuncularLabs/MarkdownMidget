@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "test": "node --test"
+    "test": "node --test --test-timeout=10000"
   },
   "dependencies": {
     "@milkdown/kit": "^7.21.2",
