@@ -122,13 +122,29 @@ a second serialiser configuration to test). Both go in the documented list.
 
 ### 0.13.0 — Find & Replace
 
-| AC | Test |
-|---|---|
-| F1. Replace and Replace All in both views, honouring the current search mode (normal, extended, wildcard, regex with groups) | `FindEngineTests.Replace*` (pure, per mode) |
-| F2. Replace All scoped to the selection when there is one | `FindEngineTests.ReplaceAllWithinSelection` |
-| F3. Replace in the formatted view replaces exactly the found range and nothing else, including across inline marks | `find.test.mjs` (jsdom, the editor's find ranges) |
-| F4. Replace All is one undo step in both views | source: `SourceEditorTests.ReplaceAllIsOneUndoUnit`; formatted: `find.test.mjs` |
-| F5. A regex replacement with `$1` groups substitutes correctly and a malformed pattern is refused with the existing message, never applied | `FindEngineTests.ReplaceGroups`, `MalformedPatternIsRefused` |
+**What the tests prove, and what they do not.** Three layers are covered:
+the pure engine (`FindEngineTests`, `SourceEditorTests` — xUnit), the formatted
+view driven against a real editor in jsdom (`find.test.mjs`), and the source
+view's edit application through AvalonEdit (`SourceEditorTests`, STA). The
+**host wiring in `MainWindow.xaml.cs`** — roughly 190 lines that read the dialog,
+choose a view, marshal to the editor and write the status line — is covered by
+**inspection and dogfooding only**: coverlet cannot instrument a WPF app on
+.NET 10, so those lines are not merely untested but unmeasurable. Where a host
+decision could be lifted out and tested it has been (`FindEngine.ResolveScope`,
+`CaptureDecision`, `ReplaceAllStatus`, `ReportsInvalidPattern`); what is left in
+the window is plumbing between them.
+
+| AC | Test | Layer |
+|---|---|---|
+| F1. Replace and Replace All in both views, honouring the current search mode (normal, extended, wildcard, regex with groups) | `FindEngineTests.Replace*` (pure, per mode); `find.test.mjs` for the formatted view. Host: the two `Do*Replace*` methods choose between them — by inspection | engine + jsdom |
+| F2. Replace All scoped to the selection when there is one | `FindEngineTests.ReplaceAllWithinSelection`, `.AMatchThatEndsOneCharacterPastTheScopeIsOutsideIt`, `.ReplaceAllScopeIsTheUsersSelectionOrTheRangeKeptForThem`; `find.test.mjs` `ReplaceAllIsScopedToTheSelection` | engine + jsdom |
+| F3. Replace in the formatted view replaces exactly the found range and nothing else, including across inline marks | `find.test.mjs` `ReplacesExactlyTheFoundRangeAcrossInlineMarks` | jsdom |
+| F4. Replace All is one undo step in both views | source: `SourceEditorTests.ReplaceAllIsOneUndoUnit` (real AvalonEdit); formatted: `find.test.mjs` `ReplaceAllIsOneUndoStep` | AvalonEdit + jsdom |
+| F5. A regex replacement with `$1` groups substitutes correctly and a malformed pattern is refused with the existing message, never applied | `FindEngineTests.ReplaceGroups`, `.MalformedPatternIsRefused`, and the shared table `TheReplacementTemplateSubsetIsTheSameInBothEngines` (read by both suites) | engine + jsdom |
+| F6. A pattern means the same in both views, or Find refuses it | `FindEngineTests.RefusedRegexConstructsAreRefusedBeforeEitherViewSeesThem` / `.AcceptedRegexConstructsStillCompile` / `.LiteralModesEscapeOnlyWhatBothEnginesCallSyntax`; `find.test.mjs` `WhatTheHostAcceptsThisViewCanRun`. Host: surfacing the editor's refusal is `FindEngine.ReportsInvalidPattern` (tested) wired into three call sites (by inspection) | engine + jsdom |
+| F7. A match of no width inserts, in both views | `FindEngineTests.ReplaceAllOfAnEmptyMatchInserts`; `find.test.mjs` `ZeroWidthMatchesInsert` | engine + jsdom |
+| F8. Replace changes the match the caret is on, or finds the next one | source: the `IsSourceFindSelection` branch in `DoSourceReplace` — by inspection; formatted: `find.test.mjs` 'with the caret moved away from the match, Replace is Find Next too' | jsdom (+ inspection) |
+| F9. The dialog's own surface: access keys unique to new controls, tooltips written once | `FindDialogMarkupTests` (a source scan of `FindDialog.xaml(.cs)`) | markup scan |
 
 ### 0.14.0 — images
 
