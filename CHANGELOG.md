@@ -27,8 +27,9 @@ changes between alpha tags.
   one undo step. A paste that carries text still pastes the text. (#7)
 - **A picture file dropped on the editor is inserted as a picture.** Dropping a
   PNG, JPEG, GIF, WebP or BMP file on either view used to open it as a text
-  document — after the discard prompt, if you had unsaved changes — and fill the
-  editor with garbage. Now a dropped file is routed by what it is: a picture is
+  document — after the discard prompt on the formatted view, or in a fresh window
+  from the toolbar — and fill the editor with garbage. Now a dropped file is
+  routed by what it is: a picture is
   embedded at the caret exactly as Insert ▸ Picture embeds it (recognised by its
   bytes, so a picture named `.md` is still a picture), a markdown or text file
   opens as before, and anything else is refused with a note in the status bar
