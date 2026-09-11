@@ -14,8 +14,9 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Access keys in use on this window: F L N E W X C O P R A (W three times,
-             as before). New controls must not reuse one. -->
+        <!-- Access keys in use on this window: F L N E W X C O P R A (W three times
+             and N twice, as before). New controls must not reuse one; a test over
+             this file checks that nothing new does. -->
         <Grid Grid.Row="0" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -66,12 +67,12 @@
         </DockPanel>
 
         <DockPanel Grid.Row="4" Margin="0,0,0,8">
+            <!-- The tooltips are set in the constructor, from the consts the
+                 read-only ones are swapped in and out of: one place, not two. -->
             <Button x:Name="ReplaceAllButton" DockPanel.Dock="Right" Content="Replace _All" Width="110"
-                    Click="ReplaceAll_Click" ToolTipService.ShowOnDisabled="True"
-                    ToolTip="Every match — within the selection when there is one — as one undo step" />
+                    Click="ReplaceAll_Click" ToolTipService.ShowOnDisabled="True" />
             <Button x:Name="ReplaceButton" DockPanel.Dock="Right" Content="_Replace" Width="100" Margin="0,0,6,0"
-                    Click="Replace_Click" ToolTipService.ShowOnDisabled="True"
-                    ToolTip="The current match, then find the next" />
+                    Click="Replace_Click" ToolTipService.ShowOnDisabled="True" />
             <TextBlock />
         </DockPanel>
 

@@ -32,6 +32,10 @@ public partial class FindDialog : Window
         ModeExtended.ToolTip = FindEngine.ExtendedTooltip;
         ModeWildcards.ToolTip = FindEngine.WildcardsTooltip;
         ModeRegex.ToolTip = FindEngine.RegexTooltip;
+        // The Replace tooltips too: SetReadOnly owns both strings, so the markup
+        // carries no copy of them to drift (#5 F-15). The host calls it again with
+        // the document's real state as soon as the dialog is made.
+        SetReadOnly(false);
         // Before the host subscribes, so putting the text back raises no search.
         QueryBox.Text = s_lastQuery;
         ReplaceBox.Text = s_lastReplacement;
