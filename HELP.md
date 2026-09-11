@@ -416,7 +416,7 @@ line with `--readonly`.
   - **Drop again before a drop has finished** and the newer drop wins: the status
     bar says the earlier one was replaced, and nothing from it is inserted.
   - **Change the document while a drop is still being read** — open another file,
-    close this one, save it, or turn on **View ▸ Read Only** — and the drop is
+    close this one, save it, or turn on **Edit ▸ Read Only** — and the drop is
     abandoned: the status bar says the document changed, and nothing from it is
     inserted or opened. The picture would otherwise land in a document that never
     received it.

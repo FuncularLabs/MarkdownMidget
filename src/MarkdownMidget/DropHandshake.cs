@@ -102,7 +102,7 @@ internal static class DropHandshake
     /// A plan is made from <c>DropTargetNow()</c> BEFORE the request for bytes goes
     /// out and applied AFTER the answer comes back — up to
     /// <see cref="ReadTimeout"/> later, with no busy overlay over the window. Every
-    /// menu is live in that gap: File ▸ Open, File ▸ New, File ▸ Close, View ▸ Read
+    /// menu is live in that gap: File ▸ Open, File ▸ New, File ▸ Close, Edit ▸ Read
     /// Only, and a drop on the toolbar. Applying a stale plan then put the picture
     /// into whatever document had arrived in the meantime, or — with nothing testing
     /// <c>_closed</c> on the insert path — into a closed document, which the user

@@ -44,7 +44,7 @@ internal enum DropKind
 public enum DropTarget
 {
     Editable,
-    /// <summary>View ▸ Read Only (or the Help window): a picture is an edit, and none is taken.</summary>
+    /// <summary>Edit ▸ Read Only (or the Help window): a picture is an edit, and none is taken.</summary>
     ReadOnly,
     /// <summary>File ▸ Close left no document to put a picture in.</summary>
     NoDocument,

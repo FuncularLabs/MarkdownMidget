@@ -339,7 +339,7 @@ public class DropHandshakeTests
     // and applied AFTER it comes back — a gap of up to ReadTimeout (10–90 s), with
     // no busy overlay over it. Everything the user can reach in that gap changes
     // what the plan was decided against: File ▸ Open, File ▸ New, File ▸ Close,
-    // View ▸ Read Only, and a drop on the toolbar. So the three things the plan
+    // Edit ▸ Read Only, and a drop on the toolbar. So the three things the plan
     // depended on are pinned before the request and compared after it, the same
     // three-part pin HandleExternalChangeAsync uses across its own awaits.
 

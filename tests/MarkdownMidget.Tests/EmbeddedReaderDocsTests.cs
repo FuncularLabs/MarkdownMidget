@@ -153,6 +153,19 @@ public class EmbeddedReaderDocsTests
         Assert.Contains(DropHandshake.UnreadableNotice(["a.png", "b.png"]), help, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheHelpNamesTheMenuTheReadOnlyItemIsActuallyUnder()
+    {
+        // NF-1 (HOUSE-RULE). The item is MenuReadOnly, and it sits under
+        // Header="_Edit" in MainWindow.xaml — there is no View menu with a Read Only
+        // item on it, so naming the View menu sent the user hunting through one that
+        // does not have it. Pinned on the drop bullet's OWN wording ("turn on …"), not
+        // on the bare menu path: the read-only section higher up already says
+        // "Edit ▸ Read Only", so a pin on that alone would go green with the drop
+        // bullet still wrong.
+        Assert.Contains("turn on **Edit ▸ Read Only**", Read("HELP.md"), StringComparison.Ordinal);
+    }
+
     private static string Read(string resourceName)
     {
         using var stream = App.GetManifestResourceStream(resourceName);
