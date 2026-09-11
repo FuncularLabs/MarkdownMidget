@@ -43,13 +43,17 @@ newest release and any newer prerelease separately, so it's always clear which
 you're installing.
 
 **It's portable.** There is no installer and no Add or Remove Programs entry: the
-exe runs from wherever you put it, and deleting it is the uninstall. Windows only
-offers it for `.md` files once you run **File ▸ Windows Integration ▸ Register as
-.md editor…** (per-user, no admin prompt), which also keeps a stable copy under
+exe runs from wherever you put it, and deleting it is the uninstall (unless you
+registered it — **File ▸ Windows Integration ▸ Unregister as .md editor** undoes
+that, installed copy and shortcuts included). Windows only offers it for `.md`
+files once you run **File ▸ Windows Integration ▸ Register as .md editor…**
+(per-user, no admin prompt), which installs a stable copy under
 `%LocalAppData%\Programs\MarkdownMidget\` so the Open With entry survives moving
-the download. Updates come from the app itself: **Help ▸ About Markdown Midget**
-offers an Update button, which for a portable exe downloads the new version into
-the same folder and starts it, leaving yours behind for you to delete.
+the download — and by default *moves* your download there rather than copying it;
+clear that checkbox to leave the download where it is. Updates come from the app
+itself: **Help ▸ About Markdown Midget** offers an Update button when a newer
+version exists, which for a portable exe downloads the new version into the same
+folder and starts it, leaving yours behind for you to delete.
 
 Every tagged push builds on GitHub Actions and attaches the exe automatically
 (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).

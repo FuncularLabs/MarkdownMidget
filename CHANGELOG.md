@@ -30,7 +30,8 @@ changes between alpha tags.
   Remove Programs entry, the markdown conventions a save through the formatted
   view writes (and the source view as the way round them), pictures embedded
   rather than saved beside the document, US-English spell check, one document per
-  window, and the rest. **Help ▸ View Help**, at the end. (#9)
+  window, and the rest. **Help ▸ View Help**, near the end — Distribution follows
+  it. (#9)
 
 ### Changed
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one

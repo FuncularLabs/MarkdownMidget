@@ -410,7 +410,9 @@ already in it.
   can't be brought forward, the file opens **read-only** here and a message says
   where it is open. Once it is closed there, turn off **Edit ▸ Read Only** to edit
   it here: the file is claimed again first, so it stays read-only while another
-  window still has it.
+  window still has it. It is a convenience and not a lock — [Known
+  limits](#known-limits) has the two cases where it steps aside and lets the file
+  open unguarded.
 
 ## What's new
 
@@ -422,8 +424,6 @@ haven't opened yet for the version you're currently running. Opening it, from
 either place, clears the asterisk. It only tracks what *this* window has seen; a
 window that was already open when you updated won't clear its own asterisk until
 you open the changelog from it.
-
-## Updates
 
 ## Secure Markdown (encrypted documents)
 
@@ -473,6 +473,8 @@ file picker**.
 get a dialog pointing at that file instead. When reporting a problem, that file is
 the single most useful thing to include.
 
+## Updates
+
 **Help ▸ About Markdown Midget** shows the version you're running and the newest
 available versions — the newest **release** and, separately, a **prerelease** if
 one is genuinely ahead, so you can knowingly opt into early builds. A prerelease
@@ -512,12 +514,13 @@ into and what to do instead.
 
 - **No installer, and no Add or Remove Programs entry.** Markdown Midget is a
   single `.exe` you keep wherever you like, so deleting that file is the
-  uninstall — unless you registered it, which **File ▸ Windows Integration ▸
-  Unregister as .md editor** offers to undo, shortcuts and installed copy
-  included.
-  Windows doesn't offer it for `.md` files until you run **File ▸ Windows
-  Integration ▸ Register as .md editor…**, which adds the Open With entry
-  and installs a stable copy under `%LocalAppData%\Programs\MarkdownMidget\`.
+  uninstall. Windows doesn't offer Markdown Midget for `.md` files until you run
+  **File ▸ Windows Integration ▸ Register as .md editor…**, which adds the Open
+  With entry and installs a stable copy under
+  `%LocalAppData%\Programs\MarkdownMidget\` — moving your download there unless
+  you clear the Move checkbox. Once you have registered it, deleting the exe is no
+  longer the whole uninstall: **File ▸ Windows Integration ▸ Unregister as .md
+  editor** offers to undo each part, shortcuts and installed copy included.
   Updating is the app's own job: **Help ▸ About Markdown Midget** lists what's
   available and offers an Update button — for a portable exe that means
   downloading the new one into the same folder and starting it, leaving yours
