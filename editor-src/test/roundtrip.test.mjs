@@ -484,4 +484,38 @@ describe('AstralNeighboursSurvive', () => {
     assert.equal(tail, `_${EMOJI}_a\n`);
     assert.equal(textSurvives(tail, EMOJI)[1], `\\_${EMOJI}\\_a\n`);
   });
+
+  test('guard: a literal &#xD83D; in the run is not half a character', () => {
+    // #2 O-5. `&#xD83D;` is also something a user can type. Here it is the last
+    // eight characters of the run's own text, written `\&#xD83D;`, and the tail
+    // pattern matches a reference the default never made. Writing THAT run
+    // plain would lose a mark the default keeps — it encodes the letter after
+    // the run, as at any other punctuation-to-letter boundary — so the fallback
+    // must not fire. (A `(?<!\\)` lookbehind is not the discriminator: a run
+    // ending in a literal backslash before an emoji is written `\\&#xDE00;`,
+    // a real half it would miss. The plain content is.)
+    ed.roundTrip('foo\\&#xD83D;a');
+    ed.selectText(1, 12);  // `foo&#xD83D;`; the typed `a` stays outside the run
+    ed.editor.action(callCommand(toggleEmphasisCommand.key));
+    const made = ed.view().state.doc.toJSON();
+    const out = ed.markdown();
+    assert.equal(out, '*foo\\&#xD83D;*&#x61;\n');
+    ed.roundTrip(out);
+    assert.deepEqual(ed.view().state.doc.toJSON(), made, 'the emphasis must come back as emphasis');
+    assert.equal(hasEmphasis(), true);
+    assert.equal(survives(out), out);
+  });
+
+  test('guard: the same reference at the head of the run', () => {
+    // The head branch is anchored to the plain content the same way. The
+    // default encodes the letter BEFORE the run and leaves the run's text
+    // alone; this passed before O-5 and must keep passing.
+    ed.roundTrip('a\\&#xD83D;foo');
+    ed.selectText(2, 13);  // `&#xD83D;foo`; the typed `a` stays outside the run
+    ed.editor.action(callCommand(toggleEmphasisCommand.key));
+    const out = ed.markdown();
+    assert.equal(out, '&#x61;*\\&#xD83D;foo*\n');
+    assert.equal(survives(out), out);
+    assert.equal(hasEmphasis(), true, 'the emphasis must come back as emphasis');
+  });
 });

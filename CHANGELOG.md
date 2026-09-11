@@ -57,9 +57,9 @@ changes between alpha tags.
   was opened. All three now survive a save. The one exception is emphasis of that
   kind — opening or closing on punctuation — that directly touches an emoji (or
   any other character UTF-16 stores as a pair): the text is kept whole, the
-  emphasis may come back as plain text. The rest of what the formatted view
-  does to a file's style — `1.` numbering, `#` headings, fenced code, inline
-  links — is unchanged, pinned by tests, and listed in Help under
+  emphasis may come back as the literal `*…*` text. The rest of what the
+  formatted view does to a file's style — `1.` numbering, `#` headings, fenced
+  code, inline links — is unchanged, pinned by tests, and listed in Help under
   *Modified state, undo, and saving ▸ Markdown conventions*. (#2)
 
 ## [0.10.0] - 2026-09-10

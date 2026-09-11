@@ -357,7 +357,10 @@ conventions, whatever style it was written in:
 - **Headings:** `#` headings, without closing hashes.
 - **Code blocks:** fenced with three backticks.
 - **Emphasis:** `*italic*` and `**bold**` when made in the editor; emphasis read
-  from a file keeps the `_` or `*` it was written with.
+  from a file keeps the `_` or `*` it was written with. One kind is not kept:
+  emphasis that opens or closes on punctuation and directly touches an emoji (or
+  any other character UTF-16 stores as a pair) is written plain, so the text is
+  kept whole but the emphasis may come back as the literal `*…*` text.
 - **Hard line break:** a backslash at the end of the line.
 
 What is converted: a reference-style link (`[text][ref]` plus its definition line)

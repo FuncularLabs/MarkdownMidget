@@ -130,7 +130,19 @@ function encodedAttention(option) {
     state.options[option] = marker;
     try {
       const out = defaultHandlers[option](node, parent, state, info);
-      return encodesHalfACharacter(out, fence, state, info) ? plainAttention(node, option, state, info, fence) : out;
+      const asked = state.attentionEncodeSurroundingInfo || {};
+      if (encodesHalfANeighbour(asked, info)) return plainAttention(node, option, state, info, fence);
+      const content = out.slice(fence.length, -fence.length);
+      if (!referencesHalfACharacter(content)) return out;
+      // The reference at the run's own head or tail may be the run's own TEXT
+      // rather than the default's encoding of it; only the plain content, which
+      // carries no encoding, says which (#2 O-5). Writing the run plain is the
+      // expensive half of the answer, so it is computed only here, and only for
+      // the two shapes that can be a half.
+      const plain = plainAttention(node, option, state, info, fence);
+      if (encodesHalfAnEnd(content, plain.slice(fence.length, -fence.length))) return plain;
+      state.attentionEncodeSurroundingInfo = asked;  // plainAttention cleared it; the default's decision stands
+      return out;
     } finally {
       state.options[option] = saved;
     }
@@ -158,23 +170,47 @@ function encodedAttention(option) {
 // on punctuation), which is the accepted cost of that rare case. Encoding the
 // whole character instead (`&#x1F600;*\_b*` keeps mark and text) would mean
 // rewriting the neighbouring text node, which this handler does not reach.
-const ENDS_IN_LOW_SURROGATE = /[\uDC00-\uDFFF]$/;      // `info.before`: the character before the run, by its second half
-const STARTS_WITH_HIGH_SURROGATE = /^[\uD800-\uDBFF]/; // `info.after`: the character after the run, by its first half
+//
+// That fallback costs a mark, so it fires only where a character really was cut
+// in half. A reference in the output is not proof of one: `&#xD83D;` is eight
+// characters a user can type, and the run's own text ends with them just as the
+// default's encoding does (#2 O-5). Every branch below is anchored to a real
+// surrogate half — in `info.before`/`info.after` for a neighbour, in the plain
+// (unencoded) content for the run's own ends.
+const ENDS_IN_LOW_SURROGATE = /[\uDC00-\uDFFF]$/;      // `info.before`, or the plain content: a character by its second half
+const STARTS_WITH_HIGH_SURROGATE = /^[\uD800-\uDBFF]/; // `info.after`, or the plain content: a character by its first half
 const HALF_REFERENCE = '&#x[dD][89a-fA-F][0-9a-fA-F]{2};';  // what encodeCharacterReference makes of either half: D800–DFFF
 const HEAD_HALF_REFERENCE = new RegExp('^' + HALF_REFERENCE);
 const TAIL_HALF_REFERENCE = new RegExp(HALF_REFERENCE + '$');
 
 /**
- * Whether the default handler's encoding hit half a character: the run's own
- * first or last character, already written as a reference, or a neighbour the
- * handler asked containerPhrasing (state.attentionEncodeSurroundingInfo) to encode.
+ * Whether a neighbour the handler asked containerPhrasing to encode
+ * (state.attentionEncodeSurroundingInfo) is half a character.
  */
-function encodesHalfACharacter(out, fence, state, info) {
-  const asked = state.attentionEncodeSurroundingInfo || {};
-  const content = out.slice(fence.length, -fence.length);
+function encodesHalfANeighbour(asked, info) {
   return (asked.before && ENDS_IN_LOW_SURROGATE.test(info.before))
-    || (asked.after && STARTS_WITH_HIGH_SURROGATE.test(info.after))
-    || HEAD_HALF_REFERENCE.test(content) || TAIL_HALF_REFERENCE.test(content);
+    || (asked.after && STARTS_WITH_HIGH_SURROGATE.test(info.after));
+}
+
+/** Whether the run's own first or last characters LOOK like a reference to half a character. Cheap; `encodesHalfAnEnd` decides. */
+function referencesHalfACharacter(content) {
+  return HEAD_HALF_REFERENCE.test(content) || TAIL_HALF_REFERENCE.test(content);
+}
+
+/**
+ * Whether that reference is the default's encoding of the run's own first or
+ * last character, and not text the user wrote. The pattern alone cannot tell
+ * them apart: a run whose text ends with the eight characters `&#xD83D;` is
+ * written `\&#xD83D;` and matches, and writing THAT run plain loses a mark the
+ * default would have kept (#2 O-5). The plain content — the content before any
+ * encoding — settles it: only the default's work leaves a real surrogate half
+ * at that end. A `(?<!\\)` lookbehind is not the discriminator; a run ending in
+ * a literal backslash before an emoji is written `\\&#xDE00;`, a real half it
+ * would miss.
+ */
+function encodesHalfAnEnd(content, plainContent) {
+  return (HEAD_HALF_REFERENCE.test(content) && STARTS_WITH_HIGH_SURROGATE.test(plainContent))
+    || (TAIL_HALF_REFERENCE.test(content) && ENDS_IN_LOW_SURROGATE.test(plainContent));
 }
 
 /** Milkdown's own form of the run — fence, content, fence — with no encoding asked of the neighbours. */
