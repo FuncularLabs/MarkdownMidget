@@ -24,7 +24,11 @@ namespace MarkdownMidget;
 /// Leaving the source view is unaffected: the box's text goes back through the
 /// editor, which parses it into the document it was loaded from in the first place
 /// (the file's text is what <c>LoadDocumentAsync</c> handed it), so a Ctrl+E there
-/// and back is the same document and is not an edit.
+/// and back is the same document and is not an edit. That last part is not the
+/// serialiser's to guarantee, so it is not left to it: a box that was still
+/// unmodified on the way out adopts the editor's spelling as the new clean baseline
+/// (<c>SetSourceModeAsync</c>), and a parse that does not come back to the same text
+/// therefore cannot mark an untouched document modified.
 /// </summary>
 internal static class SourceText
 {

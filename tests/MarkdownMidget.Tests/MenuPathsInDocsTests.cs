@@ -37,7 +37,7 @@ namespace MarkdownMidget.Tests;
 ///
 /// Two things it deliberately cannot see, so nobody reads a pass here as more than
 /// it is. The separator is exactly '▸' and the set is not widened: README spells a
-/// non-menu transition with '→' ("Downloads → app folder"), and admitting that arrow
+/// non-menu transition with '→' ("Ribbon → menu + toolbar"), and admitting that arrow
 /// would turn those into menu claims. And the scan STARTS from the real top-level
 /// menu names, so a chain whose top menu is itself misspelled ("Fiel ▸ New") matches
 /// no starting point and is skipped in silence rather than reported — this pin

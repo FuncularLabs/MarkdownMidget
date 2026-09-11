@@ -536,7 +536,7 @@ into and what to do instead.
   back exactly as it was written, open it, press **Ctrl+E** before you touch the
   formatted view, and work in the Markdown source view: it opens on the file as it
   is on disk, and a document edited and saved only there is written back as typed —
-  its line endings and byte-order mark included. Once the formatted view has
+  its line endings and UTF-8 byte-order mark included. Once the formatted view has
   changed the document, the source view shows the editor's version of it, because
   that is then the only copy of your work.
 - **Emphasis that touches an emoji can come back as plain text.** The one

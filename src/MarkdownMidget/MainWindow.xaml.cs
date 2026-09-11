@@ -45,8 +45,10 @@ public partial class MainWindow : Window
     // the modified flag, and undo past the Open state is impossible (history flushed).
     // This is the AUTHORITATIVE SURFACE's spelling of that state: normally the
     // editor's serialisation, and the source box's own text whenever the box is the
-    // authoritative copy (a load while in source view sets it from there, and
-    // leaving the source view unmodified adopts the editor's words back).
+    // authoritative copy (a load while in source view sets it from there, a save from
+    // the source view — Save, Encrypt, Change Password, Convert to plaintext — takes
+    // it from SourceBox.Text, and leaving the source view unmodified adopts the
+    // editor's words back).
     private string _cleanMarkdown = string.Empty;
     // The file as it was last read from or written to disk, folded to LF - the
     // second baseline (issue #4). _cleanMarkdown is normally the EDITOR's

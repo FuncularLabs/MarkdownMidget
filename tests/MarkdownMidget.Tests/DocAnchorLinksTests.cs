@@ -18,7 +18,7 @@ namespace MarkdownMidget.Tests;
 /// no build break, no test failure, and a reader who clicks "see Known limits"
 /// lands on the title and concludes the section was cut. The 1.0 docs lean on these
 /// cross-references (README points at HELP's Markdown conventions and Known limits;
-/// Help's Known limits points back into five of its own sections), so the plan's
+/// Help's Known limits points back into four of its own sections), so the plan's
 /// L1/L2 promises are only as good as the links that carry them.
 ///
 /// Slugs follow GitHub's rule for markdown headings: lowercase, every character
