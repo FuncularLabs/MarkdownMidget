@@ -15,7 +15,17 @@ raw-markdown source editing.
 
 Built on **.NET / WPF** hosting a **WebView2** control. The editing surface is
 [Milkdown](https://milkdown.dev/) (a ProseMirror-based WYSIWYG markdown editor),
-so markdown is the literal document model rather than a lossy import/export.
+so markdown is the literal document model rather than an import/export format:
+your text is the file, not a translation of it. What a trip through the formatted
+view does change is *style* — a save writes Markdown Midget's own conventions
+(`-` bullets, `#` headings, fenced code, inline links in place of reference
+links), listed in [Markdown conventions](HELP.md#markdown-conventions) along with
+the one case where emphasis can come back as literal text, and pinned by a
+round-trip test suite. To keep a file's own style, press **Ctrl+E** before the
+formatted view changes anything: the Markdown source view opens on the file as it
+is on disk, and a document edited and saved only there is written back as typed.
+Once the formatted view has changed the document, the source view shows the
+editor's version of it — that is then the only copy of your work.
 
 ![Markdown Midget editing a document](https://raw.githubusercontent.com/FuncularLabs/MarkdownMidget/master/art/screenshot.png)
 
@@ -28,8 +38,22 @@ the newest stable release, and it's what the badge above tracks.
 
 A prerelease (`-beta`) may sit above it on the page while a feature is being
 proven; take that one only if you want what's coming rather than what's settled.
-Markdown Midget can also update itself: **Help ▸ About** lists the newest release
-and any newer prerelease separately, so it's always clear which you're installing.
+Markdown Midget can also update itself: **Help ▸ About Markdown Midget** lists the
+newest release and any newer prerelease separately, so it's always clear which
+you're installing.
+
+**It's portable.** There is no installer and no Add or Remove Programs entry: the
+exe runs from wherever you put it, and deleting it is the uninstall (unless you
+registered it — **File ▸ Windows Integration ▸ Unregister as .md editor** undoes
+that, installed copy and shortcuts included). Windows only offers it for `.md`
+files once you run **File ▸ Windows Integration ▸ Register as .md editor…**
+(per-user, no admin prompt), which installs a stable copy under
+`%LocalAppData%\Programs\MarkdownMidget\` so the Open With entry survives moving
+the download — and by default *moves* your download there rather than copying it;
+clear that checkbox to leave the download where it is. Updates come from the app
+itself: **Help ▸ About Markdown Midget** offers an Update button when a newer
+version exists, which for a portable exe downloads the new version into the same
+folder and starts it, leaving yours behind for you to delete.
 
 Every tagged push builds on GitHub Actions and attaches the exe automatically
 (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
@@ -76,15 +100,17 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-Beta (0.10.x), in daily use and signed on every release. Windows-only for now; the
-editor core is web-based, so a cross-platform shell (MAUI/Avalonia) is a realistic
-future step. A real installer that registers in Add/Remove Programs is on the
-[roadmap](ROADMAP.md) — the portable exe will stay available either way.
+**0.10.x released; 1.0 in progress.** In daily use and signed on every release.
+Windows-only for now; the editor core is web-based, so a cross-platform shell
+(MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
+deliberate limit written down in [HELP.md ▸ Known limits](HELP.md#known-limits);
+a real installer that registers in Add/Remove Programs is the headline of the
+release after it, and the portable exe will stay available either way.
 
 ## Layout
 
 ```
-MarkdownMidget.sln
+MarkdownMidget.slnx
 src/MarkdownMidget/         WPF app (net10.0-windows)
   MainWindow.xaml(.cs)      Menu, toolbar, WebView2 host, source toggle, file I/O
   wwwroot/                  Built editor bundle (served to WebView2) — generated

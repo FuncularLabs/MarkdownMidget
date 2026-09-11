@@ -25,6 +25,13 @@ changes between alpha tags.
   do nothing in the source view, silently. It now inserts the picture at the caret
   as the same base64 data URI Insert ▸ Picture and the formatted view produce, in
   one undo step. A paste that carries text still pastes the text. (#7)
+- **Help gains a Known limits section.** The deliberate limits, in one place,
+  each with what you run into and what to do instead: no installer and no Add or
+  Remove Programs entry, the markdown conventions a save through the formatted
+  view writes (and the source view as the way round them), pictures embedded
+  rather than saved beside the document, US-English spell check, one document per
+  window, and the rest. **Help ▸ View Help**, near the end — Distribution follows
+  it. (#9)
 
 ### Changed
 - **Bullet lists are saved with `-` bullets; they were `*`.** And where one
@@ -32,6 +39,15 @@ changes between alpha tags.
   `-`): with the same marker, CommonMark would read the two as one list. (#2)
 
 ### Fixed
+- **Ctrl+E straight after opening shows the file as it is on disk.** The Markdown
+  source view was filled from the formatted editor, so a file written with setext
+  headings or reference-style links arrived in it already rewritten into Markdown
+  Midget's conventions — and a save from there wrote the rewrite, having never
+  shown you your own file. The source view now opens on the file's own text while
+  the document is still the one you opened or saved, so a document edited and
+  saved only there is written back as typed. Once the formatted view has changed
+  the document, the source view shows the editor's version of it, because that is
+  then the only copy of your work. (#2)
 - **A file's line endings and byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view
   writes LF between blocks but keeps whatever was inside fenced, indented and

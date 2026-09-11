@@ -43,13 +43,22 @@ public partial class MainWindow : Window
     // Dirty tracking by content comparison: the document is "unchanged" whenever it
     // matches the last opened/saved markdown — so undoing back to that state clears
     // the modified flag, and undo past the Open state is impossible (history flushed).
+    // This is the AUTHORITATIVE SURFACE's spelling of that state: normally the
+    // editor's serialisation, and the source box's own text whenever the box is the
+    // authoritative copy (a load while in source view sets it from there, a save from
+    // the source view — Save, Encrypt, Change Password, Convert to plaintext — takes
+    // it from SourceBox.Text, and leaving the source view unmodified adopts the
+    // editor's words back).
     private string _cleanMarkdown = string.Empty;
     // The file as it was last read from or written to disk, folded to LF - the
-    // second baseline (issue #4). _cleanMarkdown is the EDITOR's serialisation of
-    // that state and differs from it whenever the editor normalises, so "did the
-    // file change on disk?" is asked of this one AS WELL AS _cleanMarkdown: a
-    // rewrite equal to either is not a change (see ExternalChange). Set wherever
-    // _cleanMarkdown is set from disk: load, save, reload, Keep.
+    // second baseline (issue #4). _cleanMarkdown is normally the EDITOR's
+    // serialisation of that state and differs from it whenever the editor
+    // normalises, so "did the file change on disk?" is asked of this one AS WELL AS
+    // _cleanMarkdown: a rewrite equal to either is not a change (see ExternalChange).
+    // It is also what the source view SHOWS for an unmodified document, so that a
+    // file edited and saved only there comes back as it was typed (see SourceText);
+    // IsUnmodifiedText therefore accepts either spelling while the source view is up.
+    // Set wherever _cleanMarkdown is set from disk: load, save, reload, Keep.
     private string _diskBaseline = string.Empty;
     // What the open file's bytes looked like, so Save writes them back the same way
     // (issue #3): its line-ending convention and whether it began with a UTF-8
@@ -957,7 +966,15 @@ public partial class MainWindow : Window
                 MenuViewSource.IsChecked = _sourceMode;
                 return;
             }
-            SourceBox.Text = latest;
+            // …and show the FILE's own spelling of it while the document is still
+            // the one that was opened or saved (SourceText). The editor's
+            // serialisation normalises — a setext heading comes back ATX, a
+            // reference link inlined — so handing `latest` straight to the box put
+            // a rewritten document in front of anyone who pressed Ctrl+E to see
+            // their file, and a save from there wrote the rewrite. Once the
+            // formatted view HAS changed the document, `latest` is the only copy of
+            // that work and is what arrives.
+            SourceBox.Text = SourceText.For(latest, _cleanMarkdown, _diskBaseline);
             Web.Visibility = Visibility.Collapsed;
             SourceBox.Visibility = Visibility.Visible;
             SourceBox.Focus();
@@ -968,6 +985,10 @@ public partial class MainWindow : Window
             // actually landed. A silently failed setMarkdown would leave the editor
             // showing the pre-edit document while the source box — the only copy of
             // the edits — is hidden and about to be treated as stale.
+            //
+            // Asked BEFORE the push, while _sourceMode still makes the box the
+            // authoritative copy: did the user actually change anything in here?
+            var wasUnmodified = IsUnmodifiedText(SourceBox.Text);
             await SetDocumentMarkdownAsync(SourceBox.Text);
             // Ask the editor directly: TryGetDocumentMarkdownAsync would hand back
             // SourceBox.Text, since _sourceMode is still true until below.
@@ -981,6 +1002,16 @@ public partial class MainWindow : Window
                 MenuViewSource.IsChecked = _sourceMode;
                 return;
             }
+            // Nothing was edited, so the document leaving this view is the same saved
+            // state that entered it — now spelled the way the editor spells it, which
+            // is the spelling the formatted view's dirty tracking compares against.
+            // Adopting it keeps the one invariant this pair of views runs on: the
+            // clean baseline is the AUTHORITATIVE surface's words for the last
+            // opened/saved state. Without it a serialiser that does not come back to
+            // the same text through a parse marks an untouched document modified on a
+            // Ctrl+E round trip. _diskBaseline is deliberately NOT touched: the file
+            // has not changed, and external-change detection is asked of that one.
+            if (wasUnmodified) _cleanMarkdown = landed;
             SourceBox.Visibility = Visibility.Collapsed;
             Web.Visibility = Visibility.Visible;
         }
@@ -1999,8 +2030,12 @@ public partial class MainWindow : Window
             var markdown = await TryGetDocumentMarkdownAsync();
             if (markdown is null) { _backupDirty = true; return; }   // keep the last good one
             // Only unsaved content is worth keeping. If it matches what's on disk,
-            // the file itself is the backup.
-            if (string.Equals(markdown, _cleanMarkdown, StringComparison.Ordinal)) { DiscardBackup(); return; }
+            // the file itself is the backup. Asked of the VISIBLE surface's own
+            // baseline: in the source view the box legitimately holds the file's
+            // spelling, and comparing that against the editor's serialisation alone
+            // would keep a snapshot of a document with nothing unsaved in it — which
+            // the next launch offers back as "recovered unsaved changes".
+            if (IsUnmodifiedText(markdown)) { DiscardBackup(); return; }
             if (_docEncrypted && _docPassword is { } pw)
             {
                 // The snapshot of an encrypted document is itself encrypted
@@ -2553,7 +2588,11 @@ public partial class MainWindow : Window
         var inMemory = await TryGetDocumentMarkdownAsync();
         if (inMemory is null) return;                       // couldn't ask; don't guess
         if (!PassValid()) { RecheckExternalChange(path); return; }
-        var hasUnsavedWork = !string.Equals(inMemory, _cleanMarkdown, StringComparison.Ordinal);
+        // Same two-baseline question as everywhere else (IsUnmodifiedText): a source
+        // view showing the file's own spelling holds no unsaved work, and reading it
+        // as work would write a timestamped .bak and raise the external-change dialog
+        // for a document the user has not touched.
+        var hasUnsavedWork = !IsUnmodifiedText(inMemory);
 
         // Nothing unsaved: the in-memory copy IS the old disk version, so there's
         // nothing to lose, nothing worth backing up, and nothing to ask about.
@@ -4360,6 +4399,20 @@ public partial class MainWindow : Window
         _dirtyTimer.Start();
     }
 
+    /// <summary>
+    /// Is <paramref name="current"/> — what the visible surface holds — still the
+    /// document as last opened or saved? In the formatted view that is the editor's
+    /// own serialisation and nothing else. In the source view the box may be showing
+    /// the FILE's spelling instead (see <see cref="SourceText"/>), which is the same
+    /// saved state in different words, so it counts as unmodified too; without this
+    /// the title gains a `*`, a crash snapshot is written and the close prompt fires
+    /// the moment Ctrl+E is pressed on an untouched file the editor normalises.
+    /// </summary>
+    private bool IsUnmodifiedText(string current) =>
+        _sourceMode
+            ? SourceText.IsUnmodified(current, _cleanMarkdown, _diskBaseline)
+            : string.Equals(current, _cleanMarkdown, StringComparison.Ordinal);
+
     private async Task UpdateDirtyAsync()
     {
         if (_suppressDirty) return;
@@ -4368,7 +4421,7 @@ public partial class MainWindow : Window
         // without asking — taking the crash copy with it. Keep the last known state.
         var current = await TryGetDocumentMarkdownAsync();
         if (current is null) return;
-        var dirty = !string.Equals(current, _cleanMarkdown, StringComparison.Ordinal);
+        var dirty = !IsUnmodifiedText(current);
         if (dirty != _dirty)
         {
             _dirty = dirty;

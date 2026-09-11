@@ -63,6 +63,44 @@ public class BuiltInThemeTests
     }
 
     [Fact]
+    public void HelpsCountOfBuiltInThemeFilesIsTheNumberThatShip()
+    {
+        // Help says the number twice — once for the themes folder, once for the
+        // Known limits bullet about edits to it being overwritten — and the number
+        // is easy to get wrong, because the MENU offers seven themes and the folder
+        // holds six FILES: Default has no file, it is the palette every other theme
+        // replaces. Both sentences are read here so neither can drift alone, and the
+        // truth comes from the embedded resources rather than a constant, so adding
+        // or removing a palette fails this until Help is told.
+        var shipped = App.GetManifestResourceNames()
+            .Count(n => n.StartsWith("themes/", StringComparison.Ordinal)
+                     && n.EndsWith(".css", StringComparison.OrdinalIgnoreCase));
+        var word = new[] { "zero", "one", "two", "three", "four", "five", "six",
+                           "seven", "eight", "nine", "ten", "eleven", "twelve" };
+        Assert.InRange(shipped, 1, word.Length - 1);
+
+        var claims = Regex.Matches(Help(), @"\b([A-Za-z]+|\d+) built-in theme files\b")
+            .Select(m => m.Groups[1].Value)
+            .ToArray();
+        Assert.True(claims.Length >= 2,
+            $"HELP.md states the built-in theme FILE count {claims.Length} time(s); both the " +
+            "themes-folder line and the Known limits bullet are supposed to say it");
+        foreach (var claim in claims)
+            Assert.True(claim.Equals(word[shipped], StringComparison.OrdinalIgnoreCase)
+                        || claim == shipped.ToString(CultureInfo.InvariantCulture),
+                $"HELP.md says \"{claim} built-in theme files\"; {shipped} .css files ship " +
+                "under themes/ (Default is the seventh THEME and has no file)");
+    }
+
+    private static string Help()
+    {
+        using var stream = App.GetManifestResourceStream("HELP.md");
+        Assert.NotNull(stream);
+        using var reader = new StreamReader(stream!);
+        return reader.ReadToEnd();
+    }
+
+    [Fact]
     public void TheirNamesSurviveTheTripThroughTheMenu()
         // The filenames carry their own capitalisation because the display name is
         // derived from them and nothing else — `github-light.css` would appear as

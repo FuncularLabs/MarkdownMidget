@@ -214,7 +214,8 @@ new name appears in the menu without restarting the app.
 
 Two folders, and the difference matters:
 
-- **`themes\`** holds the seven built-ins. They are rewritten from the app whenever
+- **`themes\`** holds the six built-in theme files — the seventh theme, Default, is
+  the app's own palette and has no file. They are rewritten from the app whenever
   you update, so that a fix to one reaches you — which also means **edits to them
   are lost**.
 - **`themes\custom\`** is yours. Nothing there is ever overwritten. A custom file
@@ -367,8 +368,14 @@ What is converted: a reference-style link (`[text][ref]` plus its definition lin
 becomes an inline link and the definition line is dropped; a setext heading
 (underlined with `===` or `---`) becomes a `#` heading; an indented code block
 becomes fenced; `## Heading ##` loses its trailing hashes; an underscore in an
-image's alt text is written `\_`. A `snake_case_word` is saved as written. A
-document opened and saved only in the source view is written back exactly as typed.
+image's alt text is written `\_`. A `snake_case_word` is saved as written.
+
+None of it applies to a document opened and saved only in the **Markdown source
+view**: press **Ctrl+E** before the formatted view has changed anything and the
+source view opens on the file as it is on disk, not on this list's version of it,
+so what you save is what you typed. After the formatted view has changed the
+document, the source view shows the editor's text and these conventions are
+already in it.
 
 ## Files & windows
 
@@ -403,7 +410,9 @@ document opened and saved only in the source view is written back exactly as typ
   can't be brought forward, the file opens **read-only** here and a message says
   where it is open. Once it is closed there, turn off **Edit ▸ Read Only** to edit
   it here: the file is claimed again first, so it stays read-only while another
-  window still has it.
+  window still has it. It is a convenience and not a lock — [Known
+  limits](#known-limits) has the two cases where it steps aside and lets the file
+  open unguarded.
 
 ## What's new
 
@@ -415,8 +424,6 @@ haven't opened yet for the version you're currently running. Opening it, from
 either place, clears the asterisk. It only tracks what *this* window has seen; a
 window that was already open when you updated won't clear its own asterisk until
 you open the changelog from it.
-
-## Updates
 
 ## Secure Markdown (encrypted documents)
 
@@ -466,6 +473,8 @@ file picker**.
 get a dialog pointing at that file instead. When reporting a problem, that file is
 the single most useful thing to include.
 
+## Updates
+
 **Help ▸ About Markdown Midget** shows the version you're running and the newest
 available versions — the newest **release** and, separately, a **prerelease** if
 one is genuinely ahead, so you can knowingly opt into early builds. A prerelease
@@ -497,6 +506,96 @@ be asked to save first if there are unsaved changes). The About box also shows
 both versions whenever they differ, so it's always clear what you're running
 versus what's installed. This applies to installed copies; a portable exe never
 changes under a running window, so the item doesn't appear there.
+
+## Known limits
+
+Deliberate choices, parked rather than overlooked. Each one says what you'll run
+into and what to do instead.
+
+- **No installer, and no Add or Remove Programs entry.** Markdown Midget is a
+  single `.exe` you keep wherever you like, so deleting that file is the
+  uninstall. Windows doesn't offer Markdown Midget for `.md` files until you run
+  **File ▸ Windows Integration ▸ Register as .md editor…**, which adds the Open
+  With entry and installs a stable copy under
+  `%LocalAppData%\Programs\MarkdownMidget\` — moving your download there unless
+  you clear the Move checkbox. Once you have registered it, deleting the exe is no
+  longer the whole uninstall: **File ▸ Windows Integration ▸ Unregister as .md
+  editor** offers to undo each part, shortcuts and installed copy included.
+  Updating is the app's own job: **Help ▸ About Markdown Midget** lists what's
+  available and offers an Update button — for a portable exe that means
+  downloading the new one into the same folder and starting it, leaving yours
+  behind for you to delete. **Help ▸ Apply vX.Y.Z Update**, the one-click catch-up
+  for a window that was open while another window updated, belongs to that
+  installed copy alone: a portable exe never changes under a running window, so
+  the item never appears there. A real installer is a later release's headline.
+- **A document that passes through the formatted view is saved in Markdown
+  Midget's conventions, not in yours.** Your content is kept; its spelling is
+  ours — `-` bullets, `#` headings, fenced code, inline links in place of
+  reference links, `\_` for an underscore in a picture's alt text. The whole list
+  is in [Markdown conventions](#markdown-conventions) above. If a file has to come
+  back exactly as it was written, open it, press **Ctrl+E** before you touch the
+  formatted view, and work in the Markdown source view: it opens on the file as it
+  is on disk, and a document edited and saved only there is written back as typed —
+  its line endings and UTF-8 byte-order mark included. Once the formatted view has
+  changed the document, the source view shows the editor's version of it, because
+  that is then the only copy of your work.
+- **Emphasis that touches an emoji can come back as plain text.** The one
+  accepted loss in that list: emphasis opening or closing on punctuation that
+  directly touches an emoji (or any other character UTF-16 stores as a pair) is
+  written plain, so the words are kept whole but the `*…*` may read as literal
+  text the next time the file is opened. Put a space between the emphasis mark
+  and the emoji where the formatting matters.
+- **Pictures are embedded in the document, never saved as files.** **Insert ▸
+  Picture…** and a pasted picture both write the image into the markdown as a
+  base64 `data:` URI, so the document travels whole — and grows by about a third
+  more than the picture's own size. To keep pictures as files instead, write the
+  link yourself (`![alt](images/shot.png)`): a relative path is resolved against
+  the open document's folder.
+- **The already-open guard is a convenience, not a lock.** Opening a file another
+  window has brings that window forward; if it can't be brought forward, the file
+  opens read-only here with a note saying where it is open. Two cases fall
+  outside it. A claim the app can't tie to a running window of its own — the
+  holding process is gone, or something else is sitting on the claim file, a
+  backup or antivirus tool say — is treated as stale and ignored; and if the
+  folder it keeps those claims in can't be written at all, the guard steps aside
+  entirely. In both the file opens normally, unguarded, because refusing to open
+  your document would be the worse failure. Two windows on one file is then
+  possible again, and it's the external-change prompt (see Files & windows) that
+  catches it.
+- **A document you never saved doesn't remember its line endings after a crash.**
+  A file's CRLF-or-LF convention is read from the file itself, so an untitled
+  document has none of its own — except text dropped on the editing area, which
+  keeps the dropped file's endings until you Save As. The crash copy doesn't
+  record them, so untitled work handed back after a crash comes back as LF and
+  saves LF. Save As and check the file if the endings matter to you.
+- **Spell check is US English, and so is the app.** The dictionary is `en-US`,
+  there is no language picker, and the interface itself is English only. Words it
+  doesn't know go into your own list, which is private to the app — see
+  [Spell check](#spell-check), which is also where years of Word's "Add to
+  Dictionary" clicks can be brought over.
+- **Task-list checkboxes render, but nothing inserts one.** A `- [ ]` item shows
+  as a checkbox in the formatted view; no menu or toolbar item writes one. Type it
+  in the Markdown source view (**Ctrl+E**).
+- **The source view is fixed at Consolas 14.** No font, size or zoom control of
+  its own — the **Ctrl + mouse wheel** zoom and the percentage in the status bar
+  belong to the formatted view.
+- **PDF is the only export.** **File ▸ Print ▸ Export to PDF…** or the printer;
+  there is no HTML or Word export. The markdown file itself is the portable form.
+- **One document per window.** No tabs and no Window menu: **File ▸ New** opens
+  another window, each window is its own process, and Alt+Tab is the document
+  list.
+- **Mermaid ships inside the editor bundle whether a document uses it or not.**
+  Diagrams work with nothing to install; the cost is download size, and there is
+  no way to leave it out.
+- **Edits to the six built-in theme files are lost when you update.** They are
+  rewritten from the app so that a fix reaches you. Keep your own colours in
+  `themes\custom\`, where nothing is ever overwritten — see [Writing your
+  own](#writing-your-own).
+- **There is no password recovery for an encrypted document.** Not a hidden one,
+  not a support channel — see
+  [Secure Markdown](#secure-markdown-encrypted-documents).
+
+<!-- #5/#6 limits land with their merges -->
 
 ## Distribution
 

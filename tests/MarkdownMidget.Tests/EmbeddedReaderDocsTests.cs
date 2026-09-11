@@ -85,6 +85,7 @@ public class EmbeddedReaderDocsTests
     [InlineData(3, "0.10.0")]
     [InlineData(4, "0.10.0")]
     [InlineData(7, "0.10.0")]
+    [InlineData(9, "0.10.0")]
     public void AnIssueIsCreditedToOneSectionNewerThanTheReleaseThatLackedIt(int issue, string lastReleaseWithout)
     {
         // A conflict-free merge once filed a branch's [Unreleased] ### Fixed block

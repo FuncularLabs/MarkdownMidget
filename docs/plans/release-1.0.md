@@ -53,8 +53,11 @@ diff counts 18 lines altered and 4 inserted; either way it is most of the file.
 Why it is invisible: in the formatted view, `SetCleanBaselineAsync` takes the clean
 baseline from the editor's re-serialisation, not the file, so a freshly opened
 document shows no asterisk. The rewrite lands on the first save after any edit. (A
-document opened and saved entirely in the source view is written back as typed: the
-source view holds the raw text and never passes through the serialiser.) A second
+document opened and saved entirely in the source view is written back as typed —
+but only since the `SourceText` fix: the box used to be filled from
+`getMarkdown()`, so the file arrived in it already rewritten and the "as typed"
+promise was false wherever it was written. Entering the source view on an
+unmodified document now shows `_diskBaseline`, the file's own text.) A second
 consequence:
 `HandleExternalChangeAsync` compares the disk text to that normalised baseline, so a
 tool that rewrites the file with identical bytes reads as an external change.
@@ -151,8 +154,8 @@ at the formatted view, which is still better than today's silent nothing.
 
 | AC | Test |
 |---|---|
-| L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads |
-| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | reviewed |
+| L1. ROADMAP's "Won't unless asked" and a new HELP "Known limits" section list every deliberate limit from the audit (below) | reviewed; `EmbeddedReaderDocsTests` pins HELP loads; `DocAnchorLinksTests` pins that the section's own cross-references resolve |
+| L2. README's promise paragraph is true as written after 0.12 (either "not lossy" holds, or it says "normalises to these conventions") | `SourceTextTests` pins the "source view, written back as typed" half of it; `DocAnchorLinksTests` pins that its link into HELP's conventions list lands on that heading |
 | L3. README Status, Recent changes and the badge reflect 1.0; CHANGELOG has the promotion section | same shape as the 0.9.0 promote |
 
 ## The installer decision
@@ -190,11 +193,14 @@ Filed 2026-09-10 as GitHub issues under the
 gap, so the discovery and the fix are both public. Commits and CHANGELOG entries
 reference them.
 
-| Stage | Issues |
-|---|---|
-| Stage 1 already-open guard | #1 (enhancement — single-instance-per-file was never promised) |
-| Stage 2 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change |
-| Stage 3 Find & Replace | #5 |
-| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste |
-| installer decision | #8 — decided A, closed |
-| Stage 5 limits written down | #9 |
+Status is the state on `master`, where every stage below lands unreleased: the
+0.11 line ships as 1.0.0-beta1.
+
+| Stage | Issues | Status |
+|---|---|---|
+| Stage 1 already-open guard | #1 (enhancement — single-instance-per-file was never promised) | Done 2026-09-11 (unreleased) |
+| Stage 2 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change | Done 2026-09-11 (unreleased) |
+| Stage 3 Find & Replace | #5 | Open |
+| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste | #7 done 2026-09-11 (unreleased); #6 open |
+| installer decision | #8 — decided A, closed | Decided 2026-09-10 |
+| Stage 5 limits written down | #9 | In progress |
