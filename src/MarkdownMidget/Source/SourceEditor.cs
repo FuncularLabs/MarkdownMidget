@@ -60,9 +60,12 @@ public class SourceEditor : TextEditor
         // picture — there is nothing downstream to hook. The hook therefore sits on
         // the command itself, in the tunnelling phase, on this editor: the TextArea
         // that owns the command lives inside its template, so every way in (Ctrl+V,
-        // Shift+Insert, Edit ▸ Paste) passes here before the TextArea's own binding
-        // gets a say. A paste that is not a picture is left unhandled and takes
-        // AvalonEdit's path untouched.
+        // Shift+Insert, Edit ▸ Paste) executes through here before the TextArea's
+        // own binding gets a say. The key gestures also ask CanExecute before they
+        // execute, and the TextArea would answer "no" for a picture, so the first
+        // handler answers "yes" for them; Edit ▸ Paste (TextEditor.Paste) executes
+        // directly and never asks. A paste that is not a picture is left unhandled
+        // and takes AvalonEdit's path untouched.
         CommandManager.AddPreviewCanExecuteHandler(this, OnPreviewCanPaste);
         CommandManager.AddPreviewExecutedHandler(this, OnPreviewPaste);
     }

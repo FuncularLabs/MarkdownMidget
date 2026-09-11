@@ -374,10 +374,13 @@ public class SourceEditorTests
     [Fact]
     public void PasteCommandRoutesAnImageIntoTheEditor()
     {
-        // The real route: TextEditor.Paste() asks the Paste command CanExecute, then
-        // executes it against the TextArea, and both tunnel down through the editor
-        // on their way there. Laid out, so the TextArea sits inside the editor's
-        // template as it does in the app. Only the clipboard read is substituted.
+        // The real route: TextEditor.Paste() executes the Paste command against the
+        // TextArea (no CanExecute first - the menu route runs straight to Executed,
+        // which tunnels down through the editor on its way there). This test proves
+        // the PreviewExecuted hook; the PreviewCanExecute hook, which only the key
+        // gestures consult, is PasteCommandIsEnabledForAnImageOnlyClipboard's job.
+        // Laid out, so the TextArea sits inside the editor's template as it does in
+        // the app. Only the clipboard read is substituted.
         var after = On(ed =>
         {
             ed.ClipboardSource = () => ImageOnly();
