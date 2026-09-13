@@ -40,8 +40,8 @@ public class BackupStoreTests : IDisposable
         const string sentinel = "SENSITIVE-ACCOUNT-4417";
         var store = New("enc");
         Assert.True(store.Start());
-        store.Save($"before encryption {sentinel}", @"C:\docs.mdenc", null);
-        Assert.True(store.SaveEncrypted(Sealed($"after encryption {sentinel}"), @"C:\docs.mdenc", null));
+        store.Save($"before encryption {sentinel}", @"C:\docs.mdenc", null, sourceView: false);
+        Assert.True(store.SaveEncrypted(Sealed($"after encryption {sentinel}"), @"C:\docs.mdenc", null, sourceView: false));
 
         Assert.False(File.Exists(Path.Combine(_dir, "enc.md")));
         Assert.True(File.Exists(Path.Combine(_dir, "enc.mdenc")));
@@ -60,8 +60,8 @@ public class BackupStoreTests : IDisposable
         // exactly one snapshot represents it.
         var store = New("conv");
         store.Start();
-        store.SaveEncrypted(Sealed("secret era"), @"C:\docs.mdenc", null);
-        store.Save("public era", @"C:\docs.md", null);
+        store.SaveEncrypted(Sealed("secret era"), @"C:\docs.mdenc", null, sourceView: false);
+        store.Save("public era", @"C:\docs.md", null, sourceView: false);
 
         Assert.False(File.Exists(Path.Combine(_dir, "conv.mdenc")));
         Assert.True(File.Exists(Path.Combine(_dir, "conv.md")));
@@ -77,7 +77,7 @@ public class BackupStoreTests : IDisposable
         // not the .md it knows isn't there.
         var crashed = New("crashedenc");
         crashed.Start();
-        crashed.SaveEncrypted(Sealed("locked-away work"), @"C:\docs.mdenc", null);
+        crashed.SaveEncrypted(Sealed("locked-away work"), @"C:\docs.mdenc", null, sourceView: false);
         crashed.Dispose();
 
         var next = New("next");
@@ -100,14 +100,14 @@ public class BackupStoreTests : IDisposable
         // survives, and the metadata still says plaintext.
         var store = New("corrupt");
         store.Start();
-        store.Save("still here", @"C:\docs.mdenc", null);
+        store.Save("still here", @"C:\docs.mdenc", null, sourceView: false);
         store.TestHookAfterEncryptedWrite = target =>
         {
             var bytes = File.ReadAllBytes(target);
             bytes[^1] ^= 0xFF;
             File.WriteAllBytes(target, bytes);
         };
-        Assert.False(store.SaveEncrypted(Sealed("doomed"), @"C:\docs.mdenc", null));
+        Assert.False(store.SaveEncrypted(Sealed("doomed"), @"C:\docs.mdenc", null, sourceView: false));
         Assert.True(File.Exists(Path.Combine(_dir, "corrupt.md")));
         var meta = System.Text.Json.JsonSerializer.Deserialize<BackupSnapshot>(
             File.ReadAllText(Path.Combine(_dir, "corrupt.json")))!;
@@ -123,8 +123,8 @@ public class BackupStoreTests : IDisposable
         // replay lens in section 7a) while still holding the .mdenc back.
         var crashed = New("half");
         crashed.Start();
-        crashed.Save("stale plaintext", @"C:\docs.mdenc", null);
-        crashed.SaveEncrypted(Sealed("current encrypted"), @"C:\docs.mdenc", null);
+        crashed.Save("stale plaintext", @"C:\docs.mdenc", null, sourceView: false);
+        crashed.SaveEncrypted(Sealed("current encrypted"), @"C:\docs.mdenc", null, sourceView: false);
         // Recreate the crash window: put the plaintext back beside the rest,
         // with the timestamps the encrypt-side crash actually produces (the
         // .md predates the .mdenc that superseded it).
@@ -153,7 +153,7 @@ public class BackupStoreTests : IDisposable
         // adjudicate.
         var crashed = New("revert");
         crashed.Start();
-        crashed.SaveEncrypted(Sealed("older encrypted content"), @"C:\docs.mdenc", null);
+        crashed.SaveEncrypted(Sealed("older encrypted content"), @"C:\docs.mdenc", null, sourceView: false);
         // Model Save() dying between its content write and its metadata write:
         // a fresh plaintext file appears, metadata still says Encrypted.
         File.WriteAllText(Path.Combine(_dir, "revert.md"), "newest edits, plaintext era");
@@ -175,7 +175,7 @@ public class BackupStoreTests : IDisposable
         // never plaintext through this API.
         var crashed = New("encenum");
         crashed.Start();
-        crashed.SaveEncrypted(Sealed("locked work"), @"C:\docs\w.mdenc", null);
+        crashed.SaveEncrypted(Sealed("locked work"), @"C:\docs\w.mdenc", null, sourceView: false);
         crashed.Dispose();
 
         var next = New("next");
@@ -195,13 +195,13 @@ public class BackupStoreTests : IDisposable
     {
         var crashed = New("encdonor");
         crashed.Start();
-        crashed.SaveEncrypted(Sealed("adopt me"), @"C:\docs\w.mdenc", null);
+        crashed.SaveEncrypted(Sealed("adopt me"), @"C:\docs\w.mdenc", null, sourceView: false);
         crashed.Dispose();
 
         var heir = New("heir");
         heir.Start();
         var (meta, container) = Assert.Single(heir.FindEncryptedOrphans());
-        Assert.True(heir.AdoptEncrypted(meta, container));
+        Assert.True(heir.AdoptEncrypted(meta, container, sourceView: false));
 
         Assert.False(File.Exists(Path.Combine(_dir, "encdonor.mdenc")));   // donor gone
         Assert.True(File.Exists(Path.Combine(_dir, "heir.mdenc")));        // re-homed sealed
@@ -218,7 +218,7 @@ public class BackupStoreTests : IDisposable
     {
         var live = New("enclive");
         live.Start();
-        live.SaveEncrypted(Sealed("mine"), @"C:\docs\w.mdenc", null);
+        live.SaveEncrypted(Sealed("mine"), @"C:\docs\w.mdenc", null, sourceView: false);
 
         var other = New("other");
         other.Start();
@@ -232,7 +232,7 @@ public class BackupStoreTests : IDisposable
     {
         var store = New("disc");
         store.Start();
-        store.SaveEncrypted(Sealed("about to be saved for real"), @"C:\docs.mdenc", null);
+        store.SaveEncrypted(Sealed("about to be saved for real"), @"C:\docs.mdenc", null, sourceView: false);
         store.Discard();
         Assert.False(File.Exists(Path.Combine(_dir, "disc.mdenc")));
         Assert.False(File.Exists(Path.Combine(_dir, "disc.json")));
@@ -245,7 +245,7 @@ public class BackupStoreTests : IDisposable
         // .mdenc and open it with the password the user supplies.
         var store = New("rt");
         store.Start();
-        store.SaveEncrypted(Sealed("recover me"), null, "untitled");
+        store.SaveEncrypted(Sealed("recover me"), null, "untitled", sourceView: false);
         var bytes = File.ReadAllBytes(Path.Combine(_dir, "rt.mdenc"));
         Assert.Equal("recover me", MarkdownMidget.Secure.SecureMarkdownFormat.Decrypt(bytes, "pw"));
     }
@@ -257,7 +257,7 @@ public class BackupStoreTests : IDisposable
         // to everyone else, or two instances fight over the same document.
         var live = New("live");
         Assert.True(live.Start());
-        live.Save("work in progress", @"C:\docs\a.md", null);
+        live.Save("work in progress", @"C:\docs\a.md", null, sourceView: false);
 
         var other = New("other");
         other.Start();
@@ -272,7 +272,7 @@ public class BackupStoreTests : IDisposable
     {
         var crashed = New("crashed");
         crashed.Start();
-        crashed.Save("# unsaved heading", @"C:\docs\notes.md", null);
+        crashed.Save("# unsaved heading", @"C:\docs\notes.md", null, sourceView: false);
         crashed.Dispose();                  // died without discarding
 
         var next = New("next");
@@ -289,7 +289,7 @@ public class BackupStoreTests : IDisposable
     {
         var clean = New("clean");
         clean.Start();
-        clean.Save("typed something", null, null);
+        clean.Save("typed something", null, null, sourceView: false);
         clean.Discard();                    // saved or deliberately abandoned
         clean.Dispose();
 
@@ -303,7 +303,7 @@ public class BackupStoreTests : IDisposable
     {
         var s = New("dropped");
         s.Start();
-        s.Save("pasted text", null, "clipboard.md");
+        s.Save("pasted text", null, "clipboard.md", sourceView: false);
         s.Dispose();
 
         var next = New("next");
@@ -318,13 +318,13 @@ public class BackupStoreTests : IDisposable
     {
         var dead = New("dead");
         dead.Start();
-        dead.Save("rescued", @"C:\docs\x.md", null);
+        dead.Save("rescued", @"C:\docs\x.md", null, sourceView: false);
         dead.Dispose();
 
         var live = New("live");
         live.Start();
         var (meta, markdown) = Assert.Single(live.FindOrphans());
-        Assert.True(live.Adopt(meta, markdown));
+        Assert.True(live.Adopt(meta, markdown, sourceView: false));
 
         // The orphan is gone, so a second window won't restore it again...
         Assert.Empty(live.FindOrphans());
@@ -341,7 +341,7 @@ public class BackupStoreTests : IDisposable
     {
         var s = New("partial");
         s.Start();
-        s.Save("something", null, null);
+        s.Save("something", null, null, sourceView: false);
         s.Dispose();
         File.Delete(Path.Combine(_dir, "partial.md"));   // content lost, metadata left
 
@@ -389,7 +389,7 @@ public class BackupStoreTests : IDisposable
     {
         var dead = New("dead");
         dead.Start();
-        dead.Save("the document that kills us", null, null);
+        dead.Save("the document that kills us", null, null, sourceView: false);
         dead.Dispose();
 
         var live = New("live");
@@ -413,7 +413,7 @@ public class BackupStoreTests : IDisposable
         var id = "poison";
         var first = New(id);
         first.Start();
-        first.Save("the document that kills us", null, "poison.md");
+        first.Save("the document that kills us", null, "poison.md", sourceView: false);
         first.Dispose();
 
         var attempts = 0;
@@ -429,7 +429,7 @@ public class BackupStoreTests : IDisposable
                                             // (it increments the snapshot in place)
             window.Discard();               // LoadDocumentAsync drops this window's own
                                             // copy first, which also resets its count...
-            window.Adopt(meta, markdown);   // ...and adoption must put it back
+            window.Adopt(meta, markdown, sourceView: false);   // ...and adoption must put it back
             attempts++;
             window.Dispose();               // crashed again
         }
@@ -444,15 +444,15 @@ public class BackupStoreTests : IDisposable
         // first tick after a recovery would undo the guard just as thoroughly.
         var dead = New("dead");
         dead.Start();
-        dead.Save("content", null, "x.md");
+        dead.Save("content", null, "x.md", sourceView: false);
         dead.Dispose();
 
         var live = New("live");
         live.Start();
         var (meta, markdown) = Assert.Single(live.FindOrphans());
         meta.RecoveryAttempts = 2;
-        live.Adopt(meta, markdown);
-        live.Save("content, edited some more", null, "x.md");   // a timer tick
+        live.Adopt(meta, markdown, sourceView: false);
+        live.Save("content, edited some more", null, "x.md", sourceView: false);   // a timer tick
         live.Dispose();
 
         var next = New("next");
@@ -469,17 +469,17 @@ public class BackupStoreTests : IDisposable
         // the user writes next -- new work would then be refused on its first crash.
         var dead = New("dead");
         dead.Start();
-        dead.Save("troublesome", null, "bad.md");
+        dead.Save("troublesome", null, "bad.md", sourceView: false);
         dead.Dispose();
 
         var live = New("live");
         live.Start();
         var (meta, markdown) = Assert.Single(live.FindOrphans());
         meta.RecoveryAttempts = RecoveryPlan.MaxAttempts - 1;
-        live.Adopt(meta, markdown);
+        live.Adopt(meta, markdown, sourceView: false);
 
         live.Discard();                       // the user saves, so the snapshot goes
-        live.Save("a completely new document", null, "new.md");   // then types afresh
+        live.Save("a completely new document", null, "new.md", sourceView: false);   // then types afresh
         live.Dispose();
 
         var next = New("next");
@@ -500,7 +500,7 @@ public class BackupStoreTests : IDisposable
         // fails and the session looks alive -- hiding the user's work permanently.
         var dead = New("dead");
         dead.Start();
-        dead.Save("precious", null, "x.md");
+        dead.Save("precious", null, "x.md", sourceView: false);
         dead.Dispose();
 
         var lockFile = Path.Combine(_dir, "dead.lock");
@@ -534,7 +534,7 @@ public class BackupStoreTests : IDisposable
     {
         var dead = New("dead");
         dead.Start();
-        dead.Save("still wanted", null, "x.md");
+        dead.Save("still wanted", null, "x.md", sourceView: false);
         dead.Dispose();
         File.WriteAllText(Path.Combine(_dir, "dead.lock"), "");   // as a power cut would leave it
 
@@ -549,7 +549,7 @@ public class BackupStoreTests : IDisposable
     {
         var dead = New("dead");
         dead.Start();
-        dead.Save("stubborn", null, "x.md");
+        dead.Save("stubborn", null, "x.md", sourceView: false);
         dead.Dispose();
 
         var live = New("live");
@@ -590,7 +590,7 @@ public class BackupStoreTests : IDisposable
         {
             var s = New(id);
             s.Start();
-            s.Save("content of " + id, null, id + ".md");
+            s.Save("content of " + id, null, id + ".md", sourceView: false);
             s.Dispose();
         }
         var live = New("live");
@@ -604,7 +604,7 @@ public class BackupStoreTests : IDisposable
     {
         var s = New("busy");
         s.Start();
-        for (var i = 0; i < 20; i++) s.Save($"revision {i}", null, null);
+        for (var i = 0; i < 20; i++) s.Save($"revision {i}", null, null, sourceView: false);
         Assert.Empty(Directory.EnumerateFiles(_dir, "*.tmp"));
 
         s.Dispose();
@@ -620,7 +620,7 @@ public class BackupStoreTests : IDisposable
         // Failing to take the lock must mean "don't back up", not "back up anyway"
         // — an unlocked snapshot would look abandoned to every other window.
         var s = New("nolock");
-        Assert.False(s.Save("content", null, null));
+        Assert.False(s.Save("content", null, null, sourceView: false));
         // Assert on the files unconditionally - guarding this with Directory.Exists
         // would short-circuit away the only assertion that matters.
         Directory.CreateDirectory(_dir);

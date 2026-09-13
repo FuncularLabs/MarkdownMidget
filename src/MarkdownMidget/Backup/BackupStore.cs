@@ -12,7 +12,7 @@ namespace MarkdownMidget.Backup;
 ///
 /// Each window owns a session made of three files:
 ///   {id}.md    the markdown, verbatim
-///   {id}.json  where it came from
+///   {id}.json  where it came from, and which view it was being written in
 ///   {id}.lock  held open, exclusively, for as long as the window lives
 ///
 /// A password-protected document swaps the first for {id}.mdenc — the same
@@ -119,13 +119,15 @@ internal sealed class BackupStore : IDisposable
     /// <summary>
     /// Take over an encrypted orphan as our own session. The caller has already
     /// opened the container with the user's password; we re-home the SEALED bytes
-    /// (never the plaintext) under our id. Copy before delete, like Adopt.
+    /// (never the plaintext) under our id. Copy before delete, like Adopt — and
+    /// <paramref name="sourceView"/> is the recovering window's own view, for the
+    /// reason Adopt gives.
     /// </summary>
-    public bool AdoptEncrypted(BackupSnapshot orphan, byte[] container)
+    public bool AdoptEncrypted(BackupSnapshot orphan, byte[] container, bool sourceView)
     {
         var previous = _attempts;
         _attempts = orphan.RecoveryAttempts;
-        if (!SaveEncrypted(container, orphan.Path, orphan.DisplayName)) { _attempts = previous; return false; }
+        if (!SaveEncrypted(container, orphan.Path, orphan.DisplayName, sourceView)) { _attempts = previous; return false; }
         Purge(orphan.SessionId);
         return true;
     }
@@ -153,8 +155,14 @@ internal sealed class BackupStore : IDisposable
     /// Record the current unsaved content. Content first, metadata second: metadata
     /// pointing at content that isn't there yet is the one ordering that loses data,
     /// because the recovery scan trusts the metadata.
+    ///
+    /// <paramref name="sourceView"/> is the view the content was just read from, and
+    /// it rides in the metadata write, so the pair the next launch reads is always
+    /// one tick's work and the view that tick read it from. A crash between the two
+    /// writes leaves the new content under the previous tick's view: the work is
+    /// whole, and at worst comes back in the view it was in five seconds earlier.
     /// </summary>
-    public bool Save(string markdown, string? path, string? displayName)
+    public bool Save(string markdown, string? path, string? displayName, bool sourceView)
     {
         if (_lock is null) return false;
         try
@@ -168,6 +176,7 @@ internal sealed class BackupStore : IDisposable
                 DisplayName = displayName,
                 SavedUtc = DateTime.UtcNow,
                 RecoveryAttempts = _attempts,
+                SourceView = sourceView,
             }));
             // The document may have been converted back from encrypted: with the
             // plaintext snapshot fully in place (content, then metadata saying
@@ -188,8 +197,11 @@ internal sealed class BackupStore : IDisposable
     /// snapshot and its metadata are both fully in place. A crash anywhere in
     /// between leaves either the old plaintext snapshot or both; run N+1's
     /// next tick completes the swap. What it never leaves is no snapshot.
+    ///
+    /// <paramref name="sourceView"/> is recorded exactly as Save records it, so
+    /// encrypting a document does not cost it the view it is being written in.
     /// </summary>
-    public bool SaveEncrypted(byte[] container, string? path, string? displayName)
+    public bool SaveEncrypted(byte[] container, string? path, string? displayName, bool sourceView)
     {
         if (_lock is null) return false;
         try
@@ -213,6 +225,7 @@ internal sealed class BackupStore : IDisposable
                 SavedUtc = DateTime.UtcNow,
                 RecoveryAttempts = _attempts,
                 Encrypted = true,
+                SourceView = sourceView,
             }));
             TryDelete(ContentPath(_sessionId));
             return true;
@@ -319,14 +332,20 @@ internal sealed class BackupStore : IDisposable
     /// Take over an orphan's content as our own session, then remove the original.
     /// Copy before delete, always: the reverse loses the document if anything fails
     /// in between.
+    ///
+    /// <paramref name="sourceView"/> is the view the RECOVERING window ended up
+    /// showing, never the orphan's: entering the source view can fail (the editor may
+    /// not answer), and the snapshot this session now owns has to say what is really
+    /// in front of the user, or the next crash hands the work back somewhere they
+    /// have not been.
     /// </summary>
-    public bool Adopt(BackupSnapshot orphan, string markdown)
+    public bool Adopt(BackupSnapshot orphan, string markdown, bool sourceView)
     {
         // Inherit the count BEFORE saving, so the record of how many times this
         // document has been handed to a window survives the change of ownership.
         var previous = _attempts;
         _attempts = orphan.RecoveryAttempts;
-        if (!Save(markdown, orphan.Path, orphan.DisplayName)) { _attempts = previous; return false; }
+        if (!Save(markdown, orphan.Path, orphan.DisplayName, sourceView)) { _attempts = previous; return false; }
         Purge(orphan.SessionId);
         return true;
     }

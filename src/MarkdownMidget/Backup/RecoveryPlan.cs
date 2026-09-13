@@ -35,6 +35,20 @@ internal sealed record RecoveryPlan(
         return new RecoveryPlan(usable[0], usable.Skip(1).ToList(), givenUp);
     }
 
+    /// <summary>
+    /// Whether recovery should put the window into the Markdown source view before it
+    /// loads <paramref name="snapshot"/>: the work was being written there, and the
+    /// window is not there already.
+    ///
+    /// One direction only. A window whose user asked for the source view keeps it,
+    /// and a snapshot written in the formatted view — or by a build that recorded no
+    /// view at all, which reads as false — arrives exactly as it always has. The
+    /// view is a hint about where the work was being done, never an instruction to
+    /// take a view away from someone.
+    /// </summary>
+    public static bool EntersSourceView(BackupSnapshot snapshot, bool sourceViewShowing) =>
+        snapshot.SourceView && !sourceViewShowing;
+
     /// <summary>Everything this plan will actually put in front of the user.</summary>
     public int RestoreCount => (Here is null ? 0 : 1) + Elsewhere.Count;
 }

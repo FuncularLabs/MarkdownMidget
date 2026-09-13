@@ -227,6 +227,23 @@ public class SourceTextTests
         Assert.True(SourceText.IsUnmodified(shown!, cleanMarkdown: OnDisk, diskBaseline: OnDisk));
     }
 
+    [Fact]
+    public void AnUntitledRecoveryInTheSourceViewShowsTheWorkAsItWasTyped()
+    {
+        // Work that was never saved anywhere is the case with no file to fall back on:
+        // the snapshot IS the document. Recovery loads it through LoadDocumentAsync, so
+        // the disk baseline here is that snapshot (non-empty, whatever the document's
+        // lack of a file), and the box has to hold the user's own words rather than the
+        // editor's rewrite of them. Both baselines become empty a moment later, so it
+        // reads as unsaved — the close prompt and the next crash copy still cover it.
+        var typed = "Notes\n=====\n\nSee [docs][d].\n\n[d]: https://example.invalid\n";
+
+        var shown = SourceText.AfterLoad(sourceViewShowing: true, Serialised, Serialised, typed);
+
+        Assert.Equal(typed, shown);
+        Assert.False(SourceText.IsUnmodified(shown!, cleanMarkdown: "", diskBaseline: ""));
+    }
+
     // ===== the wiring, read from the source =====
 
     [Fact]

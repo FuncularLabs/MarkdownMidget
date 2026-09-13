@@ -3,7 +3,8 @@ using System;
 namespace MarkdownMidget.Backup;
 
 /// <summary>
-/// What was in a window that never got saved, and where it came from.
+/// What was in a window that never got saved, where it came from, and which view it
+/// was being written in.
 ///
 /// Stored beside the content rather than inside it so the content file stays
 /// exactly the markdown the user typed — recoverable by hand with any editor if
@@ -38,6 +39,21 @@ internal sealed class BackupSnapshot
     /// and deserialize to false, which is correct: they are all plaintext.
     /// </summary>
     public bool Encrypted { get; set; }
+
+    /// <summary>
+    /// True when the window was showing the Markdown source view (Ctrl+E) as this
+    /// snapshot was taken, so recovery can hand the work back in the view it was
+    /// being done in — where the user's own spelling of it is what the box shows.
+    /// Old metadata files lack the field and deserialize to false, which is right:
+    /// they recover in the formatted view, exactly as they did when they were
+    /// written.
+    ///
+    /// A JSON bool, and it stays one. A build that does not know the field ignores
+    /// it, but a change of TYPE would throw in that build's deserializer — and a
+    /// snapshot this app cannot read is one it deliberately never offers back. No
+    /// hint about which view to open in is worth hiding a document behind.
+    /// </summary>
+    public bool SourceView { get; set; }
 
     /// <summary>
     /// True once the user has been told we're giving up on this one. The snapshot

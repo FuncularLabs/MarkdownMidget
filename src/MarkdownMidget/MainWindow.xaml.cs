@@ -2174,6 +2174,14 @@ public partial class MainWindow : Window
         // would snapshot the wrong document — and recreate a copy just discarded.
         if (_backup is null || !_backupDirty || _closed || _suppressDirty) return;
         _backupDirty = false;
+        // Which view this snapshot is of, read HERE: _sourceMode is what decides which
+        // surface the document below comes from (TryGetDocumentMarkdownAsync hands back
+        // the source box in source view, the editor otherwise), and both the editor call
+        // and the key derivation further down are awaits. A Ctrl+E landing in either
+        // would otherwise file one view's text under the other view's name, and the next
+        // launch would open the wrong one — showing the editor's rewrite of work that
+        // was typed by hand, which is the whole of what this records.
+        var sourceView = _sourceMode;
         try
         {
             // TryGet, not Get: a failed editor call comes back as "" from the latter,
@@ -2211,11 +2219,11 @@ public partial class MainWindow : Window
                 }
                 var container = Secure.SecureMarkdownFormat.EncryptWithKey(
                     markdown, _backupKey, _backupSalt, Secure.SecureMarkdownFormat.KdfProfile.Default);
-                _backup.SaveEncrypted(container, _currentPath, _displayName);
+                _backup.SaveEncrypted(container, _currentPath, _displayName, sourceView);
             }
             else
             {
-                _backup.Save(markdown, _currentPath, _displayName);
+                _backup.Save(markdown, _currentPath, _displayName, sourceView);
             }
         }
         catch { _backupDirty = true; }   // try again on the next tick
@@ -2373,6 +2381,7 @@ public partial class MainWindow : Window
         var disk = mine.Path is not null && File.Exists(mine.Path)
             ? await ReadFileOrEmptyAsync(mine.Path)
             : DocumentText.NewDocument;
+        await EnterRecoveredViewAsync(mine);
         await LoadDocumentAsync(disk with { Text = markdown }, mine.Path);
         // The snapshot's file is open in this window now, so it is claimed like any
         // other document: a double-click on it must find this window.
@@ -2388,9 +2397,40 @@ public partial class MainWindow : Window
         // Take ownership so this window's timer keeps protecting it from here on. If
         // that write fails the orphan is deliberately left alone, but nothing would
         // retry — _backupDirty is false after a load — so arm the next tick.
-        if (_backup?.Adopt(mine, markdown) == false) _backupDirty = true;
+        if (_backup?.Adopt(mine, markdown, _sourceMode) == false) _backupDirty = true;
         FlashStatus($"Recovered unsaved changes to {mine.Describe()} — not yet saved");
         await FocusDocumentAsync();
+    }
+
+    /// <summary>
+    /// Put this window in the view the crashed one was writing in, BEFORE its work is
+    /// loaded. Before, because which text the source box gets is decided inside
+    /// LoadDocumentAsync (SourceText.AfterLoad), at the one moment the disk baseline
+    /// is the snapshot: the box then holds the recovered work as it was captured. A
+    /// switch made after the load runs SourceText.For against two baselines that both
+    /// point at the file, which hands back the editor's re-serialisation of the work —
+    /// setext headings as `#`, reference links inlined — and that rewrite is exactly
+    /// what this exists to stop the user being shown and then saving.
+    ///
+    /// A window with nothing open takes a blank document first: SetSourceModeAsync has
+    /// no document to flip without one, and blank-then-source is the sequence a
+    /// pathless --source launch already lands through. That blank document cannot cost
+    /// the snapshot anything if the load below then throws — LoadDocumentAsync drops
+    /// only THIS session's copy, the orphan's files are touched by nothing but Adopt
+    /// and only after its own save succeeds, and a blank document is unmodified, so
+    /// the next tick writes no snapshot of its own. The orphan is left on disk with
+    /// its attempt already counted, which is what the next launch reads.
+    ///
+    /// If the switch fails (the editor cannot be asked for the document, which
+    /// SetSourceModeAsync reports and refuses to switch on), recovery carries on in
+    /// the formatted view: the work is loaded either way, and the snapshot this window
+    /// then adopts records the view it really ended up in.
+    /// </summary>
+    private async Task EnterRecoveredViewAsync(Backup.BackupSnapshot snapshot)
+    {
+        if (!Backup.RecoveryPlan.EntersSourceView(snapshot, _sourceMode)) return;
+        if (_closed) await StartBlankDocumentAsync();
+        await SetSourceModeAsync(true);
     }
 
     private static async Task<DocumentText.Decoded> ReadFileOrEmptyAsync(string path)
@@ -2449,25 +2489,40 @@ public partial class MainWindow : Window
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            // The clean baseline is what the FILE decrypts to — recovered content
-            // is unsaved work on top of it. A file that is missing or no longer
-            // opens with this password baselines to empty, so everything reads as
-            // unsaved, which errs toward protecting it. Read before the load, as in
-            // LoadRecoveredAsync: the file's line ending is the one the recovered
-            // text is loaded under.
-            var disk = await ReadEncryptedCleanAsync(meta.Path, pw);
-            await LoadDocumentAsync(disk with { Text = text }, meta.Path, pw);
-            if (meta.Path is not null) RekeyDocumentClaim(meta.Path);   // same as LoadRecoveredAsync
-            _cleanMarkdown = disk.Text;
-            _diskBaseline = disk.Text;
-            _displayName = meta.Path is null ? meta.DisplayName : null;
-            _dirty = !string.Equals(text, _cleanMarkdown, StringComparison.Ordinal);
-            UpdateTitle();
-            if (_backup?.AdoptEncrypted(meta, container) == false) _backupDirty = true;
-            FlashStatus($"Recovered unsaved changes to {meta.Describe()} — not yet saved");
-            await FocusDocumentAsync();
+            await LoadRecoveredEncryptedAsync(meta, container, pw, text);
             return;
         }
+    }
+
+    /// <summary>
+    /// The rest of <see cref="RecoverEncryptedAsync"/>, once a password has actually
+    /// opened the copy: the steps LoadRecoveredAsync takes for a plaintext snapshot.
+    /// Its own method because everything above it lives inside the prompt's retry
+    /// loop, where the order these run in cannot be read off the source — and the
+    /// order matters, since the view has to be taken before the load. Out here, the
+    /// prompt's Cancel and Discard exits cannot reach any of it.
+    /// </summary>
+    private async Task LoadRecoveredEncryptedAsync(Backup.BackupSnapshot meta, byte[] container,
+                                                   string password, string text)
+    {
+        // The clean baseline is what the FILE decrypts to — recovered content
+        // is unsaved work on top of it. A file that is missing or no longer
+        // opens with this password baselines to empty, so everything reads as
+        // unsaved, which errs toward protecting it. Read before the load, as in
+        // LoadRecoveredAsync: the file's line ending is the one the recovered
+        // text is loaded under.
+        var disk = await ReadEncryptedCleanAsync(meta.Path, password);
+        await EnterRecoveredViewAsync(meta);
+        await LoadDocumentAsync(disk with { Text = text }, meta.Path, password);
+        if (meta.Path is not null) RekeyDocumentClaim(meta.Path);   // same as LoadRecoveredAsync
+        _cleanMarkdown = disk.Text;
+        _diskBaseline = disk.Text;
+        _displayName = meta.Path is null ? meta.DisplayName : null;
+        _dirty = !string.Equals(text, _cleanMarkdown, StringComparison.Ordinal);
+        UpdateTitle();
+        if (_backup?.AdoptEncrypted(meta, container, _sourceMode) == false) _backupDirty = true;
+        FlashStatus($"Recovered unsaved changes to {meta.Describe()} — not yet saved");
+        await FocusDocumentAsync();
     }
 
     private static async Task<DocumentText.Decoded> ReadEncryptedCleanAsync(string? path, string password)
