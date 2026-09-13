@@ -145,6 +145,22 @@ internal static class RepoSources
     public static string? WhyNotUnconditional(string methodBody, string statement, string? after = null)
     {
         var code = WithoutComments(methodBody);
+
+        // Two literal shapes this reading cannot follow. Both end a literal in the wrong
+        // place, and everything after it is then read as the opposite of what it is —
+        // code as text, text as code — which is a pin that passes on a method whose call
+        // has been skipped. Refused out loud, like a directive, rather than read wrong.
+        if (code.Contains(RawStringMark, StringComparison.Ordinal))
+            return $"the method has a raw string literal (`{RawStringMark}`), which this reading does not understand: "
+                 + "it takes those quotes for an empty literal and the start of another, and with an odd number of "
+                 + $"them the rest of the method is read as text — an early return included — so `{statement}` cannot "
+                 + "be shown to run. Move the raw string out of the method.";
+
+        if (QuoteInsideInterpolationHole(code))
+            return $"the method has a quote inside an interpolation hole, which this reading does not follow: the "
+                 + $"hole's own literal ends the outer one, and what comes after is read wrong, so `{statement}` "
+                 + "cannot be shown to run. Move that string out of the method.";
+
         var bare = WithoutLiterals(code);   // same length: an index into one is an index into the other
 
         var directive = Regex.Match(bare, @"^[ \t]*#", RegexOptions.Multiline);
@@ -153,13 +169,13 @@ internal static class RepoSources
                  + $"text cannot say which copy compiles, so nothing here can show `{statement}` runs. Take the "
                  + "directive out of the method.";
 
-        var at = OnlyIndexOf(code, statement, out var problem);
+        var at = OnlyIndexOf(code, bare, statement, out var problem);
         if (problem is not null) return problem;
 
         var scanFrom = 0;
         if (after is not null)
         {
-            var anchor = OnlyIndexOf(code, after, out var anchorProblem);
+            var anchor = OnlyIndexOf(code, bare, after, out var anchorProblem);
             if (anchorProblem is not null) return anchorProblem;
             if (anchor >= at)
                 return $"`{statement}` does not come after `{after}` in the method, so it cannot be what follows it.";
@@ -209,24 +225,96 @@ internal static class RepoSources
         Assert.True(why is null, why);
     }
 
-    /// <summary>The one index of <paramref name="what"/>, or -1 with
-    /// <paramref name="problem"/> saying whether it is missing or repeated.</summary>
-    private static int OnlyIndexOf(string code, string what, out string? problem)
+    /// <summary>Three quotes: the opening of a raw string literal, which the literal scan
+    /// below does not understand.</summary>
+    private const string RawStringMark = "\"\"\"";
+
+    /// <summary>The one index of <paramref name="what"/> AS CODE, or -1 with
+    /// <paramref name="problem"/> saying whether it is missing or repeated. Hits inside a
+    /// string or character literal do not count: <paramref name="bare"/> has their
+    /// insides blanked, so a copy of the statement in a message, or in a verbatim block,
+    /// is text — the way a copy in a comment already was.</summary>
+    private static int OnlyIndexOf(string code, string bare, string what, out string? problem)
     {
-        var at = code.IndexOf(what, StringComparison.Ordinal);
-        if (at < 0)
+        var hits = 0;
+        var first = -1;
+        for (var at = code.IndexOf(what, StringComparison.Ordinal); at >= 0;
+             at = code.IndexOf(what, at + 1, StringComparison.Ordinal))
         {
-            problem = $"`{what}` is not in the method's code (a copy inside a comment is not code).";
+            if (bare[at] != what[0]) continue;   // blanked in bare: inside a literal
+            hits++;
+            if (first < 0) first = at;
+        }
+        if (hits == 0)
+        {
+            problem = $"`{what}` is not in the method's code (a copy inside a comment or a string literal is not "
+                    + "code).";
             return -1;
         }
-        if (code.IndexOf(what, at + 1, StringComparison.Ordinal) >= 0)
+        if (hits > 1)
         {
             problem = $"`{what}` appears more than once in the method, so this cannot say which copy runs. Pin a "
                     + "longer, unique statement.";
             return -1;
         }
         problem = null;
-        return at;
+        return first;
+    }
+
+    /// <summary>
+    /// True when an interpolated string in <paramref name="code"/> holds a quote inside
+    /// one of its holes — <c>$"{(b ? "y" : "n")}"</c>. Ordinary C#, and the literal scan
+    /// walks straight past the string's real end when it meets one, so the caller refuses
+    /// the method rather than reading the rest of it wrong.
+    /// </summary>
+    private static bool QuoteInsideInterpolationHole(string code)
+    {
+        var i = 0;
+        while (i < code.Length)
+        {
+            if (code[i] is not ('"' or '\'')) { i++; continue; }
+            if (!(code[i] == '"' && IsInterpolatedStart(code, i))) { i = LiteralEnd(code, i); continue; }
+
+            var verbatim = code[i - 1] == '@' || (i > 1 && code[i - 2] == '@');
+            var j = i + 1;
+            while (j < code.Length)
+            {
+                var c = code[j];
+                if (!verbatim && c == '\\') { j += 2; continue; }
+                if (c == '{')
+                {
+                    if (j + 1 < code.Length && code[j + 1] == '{') { j += 2; continue; }   // {{ is a brace, not a hole
+                    var depth = 1;
+                    j++;
+                    while (j < code.Length && depth > 0)
+                    {
+                        if (code[j] is '"' or '\'') return true;
+                        if (code[j] == '{') depth++;
+                        else if (code[j] == '}') depth--;
+                        j++;
+                    }
+                    continue;
+                }
+                if (c == '"')
+                {
+                    if (verbatim && j + 1 < code.Length && code[j + 1] == '"') { j += 2; continue; }
+                    j++;
+                    break;
+                }
+                j++;
+            }
+            i = j;
+        }
+        return false;
+    }
+
+    /// <summary>Whether the quote at <paramref name="start"/> opens an interpolated
+    /// literal: <c>$"</c>, <c>$@"</c> or <c>@$"</c>.</summary>
+    private static bool IsInterpolatedStart(string code, int start)
+    {
+        if (start == 0) return false;
+        if (code[start - 1] == '$') return true;
+        return start > 1 && code[start - 1] == '@' && code[start - 2] == '$';
     }
 
     /// <summary>The code with the inside of every string and character literal blanked and

@@ -138,6 +138,45 @@ public class RepoSourcesTests
     }
 
     [Fact]
+    public void ARawStringInTheMethodIsRefused()
+    {
+        // A raw string reads as an empty literal and then another one, and with an odd
+        // number of quotes that one never closes: everything after it is blanked, an
+        // early return included, and the pins of that method all go quiet. Not
+        // understood, so refused out loud rather than read wrong.
+        Assert.Contains("raw string", Why(Cs("var probe = ```a ` b```;"), "if (on) return;", Wired)!,
+            System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AQuoteInsideAnInterpolationHoleIsRefused()
+    {
+        // The hole holds a literal of its own, which ends the outer one as this reading
+        // walks it — the raw string's problem in a shape that compiles every day. Also
+        // refused rather than guessed at.
+        Assert.Contains("interpolation", Why(Cs("var s = $`{(on ? `a` : `b`)}`;"), "if (on) return;", Wired)!,
+            System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AStatementCopiedIntoAStringIsNotTheStatement()
+    {
+        // The call deleted and its text left inside a verbatim string, whose first line
+        // ends in `;` so the line-above rule is happy. A copy in a comment was already
+        // refused; a copy in a literal was taken for the call itself.
+        Assert.Contains("is not in the method", Why(Cs("var s = @`x;"), Cs("Wired(x);`;"), "a();")!,
+            System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AStatementThatAlsoAppearsInAStringIsStillFoundInTheCode()
+    {
+        // And the other way round: a message that quotes the statement is not a second
+        // copy of it, so the real one is still the one.
+        Assert.Null(Why(Cs("Log(`Wired(x);`);"), Wired, "a();"));
+    }
+
+    [Fact]
     public void AfterAnAnchorOnlyWhatFollowsItHasToBeUnconditional()
     {
         // For a method with early returns of its own: "once the anchor has run, this

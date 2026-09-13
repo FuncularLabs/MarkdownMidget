@@ -100,8 +100,12 @@ public class AltF4NoDocumentTests
         var body = RepoSources.WithoutComments(RepoSources.MethodBody(MainWindowSource(),
             "private async Task<bool> SaveAsync("));
         Assert.Matches(new Regex(@"var leftNoDocument = _closed;\s*SetClosed\(false\);"), body);
+        // Through TryFocusDocumentAsync: the file is written by now, and the focus call
+        // reaches into the editor, which throws outright when the WebView2 has died
+        // (RunEditorAsync awaits ExecuteScriptAsync). Failing there would turn a good
+        // save into the app's crash dialog.
         RepoSources.AssertRunsUnconditionally(body,
-            "if (leftNoDocument) await FocusDocumentAsync();", after: "SetClosed(false);");
+            "if (leftNoDocument) await TryFocusDocumentAsync();", after: "SetClosed(false);");
     }
 
     [Fact]

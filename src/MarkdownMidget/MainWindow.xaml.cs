@@ -1220,6 +1220,20 @@ public partial class MainWindow : Window
         if (_editorReady) await RunEditorAsync("window.MDM.focus()");
     }
 
+    /// <summary>
+    /// <see cref="FocusDocumentAsync"/> for a caller whose own work has already
+    /// succeeded. The focus call reaches into the editor, and RunEditorAsync awaits
+    /// ExecuteScriptAsync, which throws outright when the WebView2 has died — from a
+    /// save that has written the file, or a drop that has inserted, that throw reaches an
+    /// async void handler and turns a finished job into the app's crash dialog. The caret
+    /// is a courtesy by then; the document and the file are not.
+    /// </summary>
+    private async Task TryFocusDocumentAsync()
+    {
+        try { await FocusDocumentAsync(); }
+        catch { /* the work is done and on disk; only the caret is missing */ }
+    }
+
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
         if (!await ConfirmDiscardAsync()) return;
@@ -1766,7 +1780,7 @@ public partial class MainWindow : Window
         // document it just saved with the caret in no element at all. Focus it, as an
         // open does. FocusDocumentAsync yields first, so this lands after the window is
         // active again, and it returns early in a read-only window.
-        if (leftNoDocument) await FocusDocumentAsync();
+        if (leftNoDocument) await TryFocusDocumentAsync();
         return true;
     }
 
@@ -5011,7 +5025,7 @@ public partial class MainWindow : Window
             _backupDirty = true;
             UpdateTitle();
             SetClosed(false);
-            await FocusDocumentAsync();
+            await TryFocusDocumentAsync();   // the drop has landed; a dead editor must not undo that
         }
         // _suppressDirty here too: a throw partway would otherwise leave it stuck,
         // freezing dirty tracking and backups for the rest of the session.
