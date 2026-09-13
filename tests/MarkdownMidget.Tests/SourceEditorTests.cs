@@ -1442,4 +1442,29 @@ public class SourceEditorTests
         Assert.Equal(0, emptyCount);
         Assert.False(emptyCanUndo);
     }
+
+    // ===== 4. a document installed over another leaves nothing to undo =====
+
+    [Fact]
+    public void ReplacingTheWholeTextTwiceLeavesNothingToUndo()
+    {
+        // A load while the source view is showing writes the box twice: the install's
+        // settled serialisation (SetDocumentMarkdownAsync), then the file's own text
+        // (LoadDocumentAsync, via SourceText.AfterLoad). Ctrl+Z straight after must
+        // bring back neither the editor's rewrite nor the document that was open
+        // before, and the caret starts at the top as it does for any opened file.
+        // That is the Text setter's contract; the adapter inherits it and has to keep it.
+        var (text, canUndo, caret) = On(ed =>
+        {
+            ed.Document.Insert(0, "typed in the old document ");
+            Assert.True(ed.CanUndo);
+            ed.Text = "# Title\n";
+            ed.Text = "Title\n=====\n";
+            return (ed.Text, ed.CanUndo, ed.CaretOffset);
+        }, "old document\n", laidOut: false);
+
+        Assert.Equal("Title\n=====\n", text);
+        Assert.False(canUndo);
+        Assert.Equal(0, caret);
+    }
 }

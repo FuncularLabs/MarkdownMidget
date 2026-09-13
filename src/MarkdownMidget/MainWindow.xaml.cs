@@ -996,13 +996,14 @@ public partial class MainWindow : Window
         }
         // The box mirrors the settled serialisation the editor just handed back, which
         // is what makes it the same document the baseline is taken from. Whether a
-        // file-backed document keeps its OWN spelling (line endings, BOM) across the
-        // view switch is #9's question, answered where the switch happens, not here:
-        // SourceText.For runs in SetSourceModeAsync(true), the one place entering
-        // source view. Accepted gap — a document loaded or dropped while the source
-        // view is ALREADY showing passes through here only, so the box shows the
-        // settled serialisation rather than the file's own text until the next Ctrl+E
-        // round trip.
+        // file-backed document then shows its OWN spelling in the source view (#2) is
+        // not this helper's question: it runs before its callers make _diskBaseline
+        // the new document's, so SourceText.For asked here would weigh the new text
+        // against the OLD document's baselines. It is answered where the baselines are
+        // current — SetSourceModeAsync(true) on Ctrl+E, and LoadDocumentAsync
+        // (SourceText.AfterLoad) for a document loaded while the source view is
+        // already showing. A document dropped on the formatted view has no file behind
+        // it, so under the same rule the editor's text is the one to show.
         SourceBox.Text = markdown;
         // Count here rather than in each caller: installing content doesn't raise a
         // 'change' message, so a freshly opened document would otherwise show no
@@ -1414,6 +1415,22 @@ public partial class MainWindow : Window
         }
         finally { _suppressDirty = false; }
         await SetCleanBaselineAsync();
+        // The source view already showing? Then the install above put the editor's
+        // settled serialisation in front of the user — the rewrite Ctrl+E no longer
+        // shows (#2) — and no Ctrl+E is coming to replace it. Ctrl+E's rule is
+        // applied here instead (SourceText.AfterLoad is SourceText.For), and here
+        // rather than earlier: both baselines are this document's now, and the clean
+        // one was taken from the editor's serialisation, exactly as for a load in the
+        // formatted view, which the #4 external-change check relies on. Asked before
+        // SetCleanBaselineAsync, the source view's clean baseline would have been
+        // read off the box as the file's text. The write replaces the whole text, so
+        // the box's undo history is cleared as the install's own write cleared it, and
+        // IsUnmodifiedText accepts the file's spelling, so the title gains no `*`. For
+        // a crash recovery the disk baseline here is still the snapshot the recovery
+        // handed over (it points both baselines at the file afterwards), so the box
+        // shows the recovered work, never the file.
+        if (SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) is { } ownSpelling)
+            SourceBox.Text = ownSpelling;
         SetClosed(false);
         StartWatching(path);
         // setMarkdown doesn't surface as a 'change' message, so schedule explicitly —

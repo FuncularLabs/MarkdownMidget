@@ -115,14 +115,17 @@ changes between alpha tags.
   the title gained its `*`, a crash copy was written and closing asked to save,
   for a document nobody had edited. That paragraph is now added as the document
   is opened, where it belongs, and Undo is unaffected. (#5)
-- **Ctrl+E straight after opening shows the file as it is on disk.** The Markdown
-  source view was filled from the formatted editor, so a file written with setext
-  headings or reference-style links arrived in it already rewritten into Markdown
-  Midget's conventions — and a save from there wrote the rewrite, having never
-  shown you your own file. The source view now opens on the file's own text while
-  the document is still the one you opened or saved, so a document edited and
-  saved only there is written back as typed. Once the formatted view has changed
-  the document, the source view shows the editor's version of it, because that is
+- **The Markdown source view shows the file as it is on disk.** It was filled
+  from the formatted editor, so a file written with setext headings or
+  reference-style links arrived in it already rewritten into Markdown Midget's
+  conventions — and a save from there wrote the rewrite, having never shown you
+  your own file. That happened on Ctrl+E straight after opening, and also when a
+  file was opened while the source view was already showing: File ▸ Open, Open
+  Recent, a drop on the source view, a reload after the file changed on disk. The
+  source view now shows the file's own text while the document is still the one
+  you opened or saved, whichever way it got there, so a document edited and saved
+  only there is written back as typed. Once the formatted view has changed the
+  document, the source view shows the editor's version of it, because that is
   then the only copy of your work. (#2)
 - **A file's line endings and UTF-8 byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view

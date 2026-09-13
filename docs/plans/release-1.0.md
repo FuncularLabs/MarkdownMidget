@@ -218,6 +218,6 @@ Status is the state on `master`, where every stage below lands unreleased: the
 | Stage 1 already-open guard | #1 (enhancement — single-instance-per-file was never promised) | Done 2026-09-11 (unreleased) |
 | Stage 2 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change | Done 2026-09-11 (unreleased) |
 | Stage 3 Find & Replace | #5 | Done 2026-09-11 (unreleased) |
-| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste | #7 done 2026-09-11 (unreleased); #6 open |
+| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste | Done 2026-09-11 (unreleased) |
 | installer decision | #8 — decided A, closed | Decided 2026-09-10 |
 | Stage 5 limits written down | #9 | In progress |

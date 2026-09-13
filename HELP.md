@@ -501,12 +501,16 @@ becomes an inline link and the definition line is dropped; a setext heading
 becomes fenced; `## Heading ##` loses its trailing hashes; an underscore in an
 image's alt text is written `\_`. A `snake_case_word` is saved as written.
 
-None of it applies to a document opened and saved only in the **Markdown source
-view**: press **Ctrl+E** before the formatted view has changed anything and the
-source view opens on the file as it is on disk, not on this list's version of it,
-so what you save is what you typed. After the formatted view has changed the
-document, the source view shows the editor's text and these conventions are
-already in it.
+None of it applies to a file opened and saved only in the **Markdown source
+view**. Open it while the source view is showing — with **File ▸ Open**,
+**File ▸ Open Recent**, a drop on the source view that opens it in place, or a
+reload when it changes on disk — or press **Ctrl+E** before the formatted view
+has changed anything, and the source view shows the file as it is on disk, not
+this list's version of it, so what you save is what you typed. After the
+formatted view has changed the document, the source view shows the editor's text
+and these conventions are already in it — as it does for a markdown file dropped
+on the formatted editing area, which opens as an untitled copy with no file
+behind it.
 
 ## Files & windows
 
@@ -722,10 +726,11 @@ into and what to do instead.
   ours — `-` bullets, `#` headings, fenced code, inline links in place of
   reference links, `\_` for an underscore in a picture's alt text. The whole list
   is in [Markdown conventions](#markdown-conventions) above. If a file has to come
-  back exactly as it was written, open it, press **Ctrl+E** before you touch the
-  formatted view, and work in the Markdown source view: it opens on the file as it
-  is on disk, and a document edited and saved only there is written back as typed —
-  its line endings and UTF-8 byte-order mark included. Once the formatted view has
+  back exactly as it was written, work on it in the Markdown source view: open it
+  while that view is showing, or press **Ctrl+E** before you touch the formatted
+  view. Either way the source view shows the file as it is on disk, and a document
+  edited and saved only there is written back as typed — its line endings and
+  UTF-8 byte-order mark included. Once the formatted view has
   changed the document, the source view shows the editor's version of it, because
   that is then the only copy of your work.
 - **Emphasis that touches an emoji can come back as plain text.** The one
@@ -735,11 +740,11 @@ into and what to do instead.
   text the next time the file is opened. Put a space between the emphasis mark
   and the emoji where the formatting matters.
 - **Pictures are embedded in the document, never saved as files.** **Insert ▸
-  Picture…** and a pasted picture both write the image into the markdown as a
-  base64 `data:` URI, so the document travels whole — and grows by about a third
-  more than the picture's own size. To keep pictures as files instead, write the
-  link yourself (`![alt](images/shot.png)`): a relative path is resolved against
-  the open document's folder.
+  Picture…**, a pasted picture and a dropped picture file all write the image into
+  the markdown as a base64 `data:` URI, so the document travels whole — and grows
+  by about a third more than the picture's own size. To keep pictures as files
+  instead, write the link yourself (`![alt](images/shot.png)`): a relative path is
+  resolved against the open document's folder.
 - **One size limit on a picture: 64 MB.** An embedded picture rides inside the
   document as text, costing about a third again its size in every copy and every
   save, so a picture larger than **64 MB** is not inserted — not by **Insert ▸
