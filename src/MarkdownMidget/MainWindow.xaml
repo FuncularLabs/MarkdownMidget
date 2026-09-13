@@ -408,9 +408,10 @@
             </Grid>
             <!-- Focusable so it can hold keyboard focus while nothing is open: focus
                  left in the hidden editor took Alt+F4 with it (NoDocumentFocus). Not a
-                 tab stop, so Tab never lands on an invisible stop. -->
+                 tab stop, so Tab never lands on an invisible stop. Named with the heading
+                 it shows, so Narrator has something to read when focus lands here. -->
             <Grid x:Name="ClosedSplash" Visibility="Collapsed" Background="#FF707479" AllowDrop="True"
-                  Focusable="True" KeyboardNavigation.IsTabStop="False">
+                  Focusable="True" KeyboardNavigation.IsTabStop="False" AutomationProperties.Name="No document open">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Image Source="/Assets/midget-256.png" Width="96" Height="96"
                            Opacity="0.55" Margin="0,0,0,18"

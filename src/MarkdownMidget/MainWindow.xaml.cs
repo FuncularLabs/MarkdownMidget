@@ -2540,13 +2540,24 @@ public partial class MainWindow : Window
     {
         _closed = on;
         ClosedSplash.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        // Focus off the editor before it is hidden, onto the splash now that it can
-        // take it. Left in a collapsed WebView2, focus took Alt+F4 with it and the
-        // window never closed (NoDocumentFocus). Leaving the state, the open path
-        // focuses the document itself.
+        // Entering the state: focus off the editor before it is hidden, onto the splash
+        // now that it can take it. Left in a collapsed WebView2, focus took Alt+F4 with
+        // it and the window never closed (NoDocumentFocus).
         if (on) NoDocumentFocus.Take(ClosedSplash);
         Web.Visibility = on || _sourceMode ? Visibility.Collapsed : Visibility.Visible;
         SourceBox.Visibility = (!on && _sourceMode) ? Visibility.Visible : Visibility.Collapsed;
+        // Leaving it: the splash collapsed above may still hold that focus, and WPF
+        // moves it off the splash but not into the document. Not every way out goes on
+        // to FocusDocumentAsync (Save As with nothing open does not, and it returns
+        // early in a read-only window), so hand it to the view now showing. Where
+        // FocusDocumentAsync does run, it focuses the same view. A dialog or the menu
+        // that holds focus keeps it.
+        if (!on && NoDocumentFocus.HandBack(ClosedSplash, _sourceMode ? (UIElement)SourceBox : Web))
+        {
+            // As FocusDocumentAsync: WPF focus on the WebView2, then the editor's own
+            // DOM focus, or the first keystroke goes nowhere.
+            if (!_sourceMode && _editorReady) _ = RunEditorAsync("window.MDM.focus()");
+        }
         // When closed, all document-modifying controls are pointless — gray them out.
         FormatToolBar.IsEnabled = !on && !_readOnly;
         FormatMenu.IsEnabled = !on && !_readOnly;

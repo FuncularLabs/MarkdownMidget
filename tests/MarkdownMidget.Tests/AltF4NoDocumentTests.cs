@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,7 +21,7 @@ namespace MarkdownMidget.Tests;
 ///
 /// Neither a WebView2 nor a real Alt+F4 can run here: no app window, no synthetic
 /// input. What can run is the mechanism: a native child window holding Win32 focus,
-/// and the one call that has to take it back onto the window's own surface. The
+/// and the calls that move focus onto the window's own surface and back off it. The
 /// wiring, and the with-a-document paths the fix must leave alone, are pinned by
 /// reading the source (<see cref="RepoSources"/>). A pin proves a call is there;
 /// the runtime tests prove what it does.
@@ -38,8 +39,8 @@ public class AltF4NoDocumentTests
         // (ACollapsedSplashTakesNothingFromTheViewThatHasFocus). Before the editor is
         // hidden, so focus leaves the WebView2 while its window is still up, the way
         // a click on the menu takes it. The alternative is asking a hidden window in
-        // another process to give focus up. Only on entering the state: leaving it,
-        // the document's own open path focuses the document (FocusDocumentAsync).
+        // another process to give focus up. Only on entering the state; leaving it is
+        // SetClosedHandsFocusBackToTheViewOnlyOnceItIsShowing.
         var body = RepoSources.MethodBody(MainWindowSource(), "private void SetClosed(");
         var shown = body.IndexOf("ClosedSplash.Visibility =", StringComparison.Ordinal);
         var take = body.IndexOf("if (on) NoDocumentFocus.Take(ClosedSplash);", StringComparison.Ordinal);
@@ -52,18 +53,51 @@ public class AltF4NoDocumentTests
     }
 
     [Fact]
-    public void TheSplashIsDeclaredFocusableAndOutOfTheTabOrder()
+    public void SetClosedHandsFocusBackToTheViewOnlyOnceItIsShowing()
+    {
+        // F2. Leaving the state collapses the splash, which may hold the focus Take
+        // gave it; WPF then moves focus off it, but not into the document. Not every
+        // way out goes on to FocusDocumentAsync (Save As with nothing open does not,
+        // and it returns early in a read-only window), so SetClosed hands focus to the
+        // view itself. After BOTH views have their visibility, because a collapsed
+        // view takes no focus; with the view each mode shows; and, in the formatted
+        // view, the editor's own DOM focus inside that same branch, as
+        // FocusDocumentAsync does, or the first keystroke goes nowhere.
+        var body = RepoSources.MethodBody(MainWindowSource(), "private void SetClosed(");
+        const string handBackCall = "if (!on && NoDocumentFocus.HandBack(ClosedSplash, _sourceMode ? (UIElement)SourceBox : Web))";
+        const string domFocus = "if (!_sourceMode && _editorReady) _ = RunEditorAsync(\"window.MDM.focus()\");";
+        var web = body.IndexOf("Web.Visibility =", StringComparison.Ordinal);
+        var source = body.IndexOf("SourceBox.Visibility =", StringComparison.Ordinal);
+        var handBack = body.IndexOf(handBackCall, StringComparison.Ordinal);
+        var dom = body.IndexOf(domFocus, StringComparison.Ordinal);
+        Assert.True(web >= 0 && source >= 0, "SetClosed no longer sets both views' visibility");
+        Assert.True(handBack >= 0, "SetClosed does not hand focus back to the showing view when a document arrives");
+        Assert.True(handBack > web, "focus is handed back before the formatted view is made visible");
+        Assert.True(handBack > source, "focus is handed back before the source view is made visible");
+        Assert.True(dom > handBack, "the editor's DOM focus is not requested after the hand-back");
+        // Inside the hand-back's own block: nothing between the two but its brace and comments.
+        var between = body[(handBack + handBackCall.Length)..dom];
+        Assert.Matches(new Regex(@"^\s*\{\s*(//[^\n]*\n\s*)*$"), between);
+    }
+
+    [Fact]
+    public void TheSplashIsDeclaredFocusableOutOfTheTabOrderAndNamedForNarrator()
     {
         // A Grid is not focusable by default, and a placeholder that is not focusable
         // cannot take focus (ASplashThatCannotHoldFocusDoesNotClaimIt), so the XAML has
         // to say so. Out of the tab order, so Tab still walks the real controls and the
-        // splash's own Open / New links, never an invisible stop.
+        // splash's own Open / New links, never an invisible stop. And named: focus
+        // lands on a panel with no text of its own, so Narrator reads its name, which
+        // is the heading the splash shows.
         var xaml = RepoSources.Read("src", "MarkdownMidget", "MainWindow.xaml");
         var start = xaml.IndexOf("<Grid x:Name=\"ClosedSplash\"", StringComparison.Ordinal);
         Assert.True(start >= 0, "no ClosedSplash grid in MainWindow.xaml");
         var tag = xaml[start..xaml.IndexOf('>', start)];
         Assert.Contains("Focusable=\"True\"", tag, StringComparison.Ordinal);
         Assert.Contains("KeyboardNavigation.IsTabStop=\"False\"", tag, StringComparison.Ordinal);
+        var block = xaml[start..xaml.IndexOf("</Grid>", start, StringComparison.Ordinal)];
+        Assert.Contains("Text=\"No document open\"", block, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"No document open\"", tag, StringComparison.Ordinal);
     }
 
     // ===== with a document open: what the fix must leave alone =====
@@ -137,8 +171,7 @@ public class AltF4NoDocumentTests
                 root.Children.Add(editor);
                 root.Children.Add(splash);
                 Pump();
-                if (editor.Child == IntPtr.Zero)
-                    throw new InvalidOperationException("the child window was never created, so the test could not run.");
+                RequireChild(editor);
                 SetFocus(editor.Child);
                 if (GetFocus() != editor.Child)
                     throw new InvalidOperationException("the child window never received Win32 focus, so the test "
@@ -159,6 +192,47 @@ public class AltF4NoDocumentTests
             Assert.True(outcome.splashFocused, "the splash must hold WPF keyboard focus, not only logical focus");
             Assert.True(outcome.took, "Take must report the focus it took");
             Assert.True(outcome.stillOnWindow, "hiding the editor afterwards must not move focus off the window");
+        }
+
+        [Fact]
+        public void TheSplashTakesFocusBackFromAChildWindowWhileItStillHoldsLogicalFocus()
+        {
+            // F1. The splash had focus before (a document closed earlier), a child window
+            // took Win32 focus since, and the splash was never shown a document that
+            // moved its logical focus on. WPF keyboard focus is then null, but the
+            // window's focus scope still names the splash. Asking for LOGICAL focus sees
+            // no change there and moves nothing, so Win32 focus stays in the child; only
+            // keyboard focus takes it back.
+            var outcome = OnStaWindow((win, root) =>
+            {
+                var editor = new NativeChild();
+                var splash = new Grid { Focusable = true };
+                root.Children.Add(editor);
+                root.Children.Add(splash);
+                Pump();
+                RequireChild(editor);
+                splash.Focus();
+                if (!splash.IsKeyboardFocused)
+                    throw new InvalidOperationException("the splash never received keyboard focus, so the test "
+                        + "could not run. This is the environment, not the code under test.");
+                SetFocus(editor.Child);
+                Pump();
+                if (GetFocus() != editor.Child)
+                    throw new InvalidOperationException("the child window never received Win32 focus, so the test "
+                        + "could not run. This is the environment, not the code under test.");
+
+                var keyboardFocusNull = Keyboard.FocusedElement is null;
+                var logicalOnSplash = ReferenceEquals(FocusManager.GetFocusedElement(FocusManager.GetFocusScope(splash)), splash);
+
+                var took = NoDocumentFocus.Take(splash);
+                var onWindow = GetFocus() == new WindowInteropHelper(win).Handle;
+                return (keyboardFocusNull, logicalOnSplash, took, onWindow, splashFocused: splash.IsKeyboardFocused);
+            });
+            Assert.True(outcome.keyboardFocusNull, "precondition: a child window holding Win32 focus leaves WPF keyboard focus null");
+            Assert.True(outcome.logicalOnSplash, "precondition: the splash keeps its logical focus meanwhile");
+            Assert.True(outcome.onWindow, "Win32 focus must leave the child window for the window itself, even when the splash already has logical focus");
+            Assert.True(outcome.splashFocused, "the splash must hold WPF keyboard focus");
+            Assert.True(outcome.took, "Take must report the focus it took");
         }
 
         [Fact]
@@ -188,9 +262,7 @@ public class AltF4NoDocumentTests
                 root.Children.Add(splash);
                 Pump();
                 source.Focus();
-                if (!source.IsKeyboardFocused)
-                    throw new InvalidOperationException("the text box never received keyboard focus, so the test "
-                        + "could not run. This is the environment, not the code under test.");
+                RequireKeyboardFocus(source);
                 var took = NoDocumentFocus.Take(splash);
                 return (took, sourceKeeps: source.IsKeyboardFocused);
             });
@@ -198,7 +270,78 @@ public class AltF4NoDocumentTests
             Assert.True(outcome.sourceKeeps, "a collapsed splash must not take focus from the view that has it");
         }
 
+        [Fact]
+        public void LeavingTheStateHandsTheSplashsFocusToTheViewNowShowing()
+        {
+            // F2. As SetClosed(false) does it, with no pump between: the focused splash
+            // is collapsed, the view is made visible, and the hand-back is asked. WPF
+            // moves focus off a collapsed element later, on the dispatcher, so the
+            // splash still holds it at that moment; the pump afterwards is that later.
+            var outcome = OnStaWindow((_, root) =>
+            {
+                var view = new TextBox { Visibility = Visibility.Collapsed };
+                var splash = new Grid { Focusable = true };
+                root.Children.Add(view);
+                root.Children.Add(splash);
+                Pump();
+                splash.Focus();
+                RequireKeyboardFocus(splash);
+
+                splash.Visibility = Visibility.Collapsed;
+                view.Visibility = Visibility.Visible;
+                var handed = NoDocumentFocus.HandBack(splash, view);
+                var viewFocused = view.IsKeyboardFocused;
+                Pump();
+                return (handed, viewFocused, viewStillFocused: view.IsKeyboardFocused);
+            });
+            Assert.True(outcome.handed, "HandBack must report that the splash's focus was handed on");
+            Assert.True(outcome.viewFocused, "the view now showing must take the focus the splash held");
+            Assert.True(outcome.viewStillFocused, "WPF's later re-evaluation of the collapsed splash must not undo it");
+        }
+
+        [Fact]
+        public void LeavingTheStateLeavesFocusAloneWhenTheSplashDidNotHoldIt()
+        {
+            // A dialog, the menu, or the document itself already has focus: the
+            // hand-back is not the view's to take. A second TextBox stands in for it.
+            var outcome = OnStaWindow((_, root) =>
+            {
+                var elsewhere = new TextBox();
+                var view = new TextBox { Visibility = Visibility.Collapsed };
+                var splash = new Grid { Focusable = true };
+                var panel = new StackPanel();
+                panel.Children.Add(elsewhere);
+                panel.Children.Add(view);
+                panel.Children.Add(splash);
+                root.Children.Add(panel);
+                Pump();
+                elsewhere.Focus();
+                RequireKeyboardFocus(elsewhere);
+
+                splash.Visibility = Visibility.Collapsed;
+                view.Visibility = Visibility.Visible;
+                var handed = NoDocumentFocus.HandBack(splash, view);
+                return (handed, elsewhereKeeps: elsewhere.IsKeyboardFocused, viewFocused: view.IsKeyboardFocusWithin);
+            });
+            Assert.False(outcome.handed);
+            Assert.True(outcome.elsewhereKeeps, "focus held outside the splash must stay where it is");
+            Assert.False(outcome.viewFocused);
+        }
+
         private static void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+
+        private static void RequireChild(NativeChild editor)
+        {
+            if (editor.Child == IntPtr.Zero)
+                throw new InvalidOperationException("the child window was never created, so the test could not run.");
+        }
+
+        private static void RequireKeyboardFocus(UIElement element)
+        {
+            if (!element.IsKeyboardFocused)
+                throw new InvalidOperationException($"the {element.GetType().Name} never received keyboard focus, so the "
+                    + "test could not run. This is the environment, not the code under test.");
+        }
 
         private static T OnStaWindow<T>(Func<Window, Grid, T> body)
         {
