@@ -68,8 +68,10 @@ internal static class SourceText
     /// this point is still the snapshot the recovery handed over (it points both
     /// baselines at the file only afterwards), so the box shows the recovered work
     /// as it was captured; a Ctrl+E after a recovery in the formatted view shows the
-    /// editor's copy of that work instead. Neither is the file, and both read as
-    /// modified against it.
+    /// editor's copy of that work instead. When the snapshot holds unsaved work,
+    /// neither is the file and both read as modified against it; a snapshot that
+    /// matches the file shows the file's text and reads unmodified, as the recovery
+    /// itself decided.
     ///
     /// Null while the formatted view is showing (Ctrl+E fills the box when it opens),
     /// and whenever For's answer is what <paramref name="boxText"/> already holds —
