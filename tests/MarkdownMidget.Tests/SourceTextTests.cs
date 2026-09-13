@@ -270,11 +270,13 @@ public class SourceTextTests
             "between — with `if (SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) " +
             "is { } ownSpelling) SourceBox.Text = ownSpelling;`");
 
-        var depth = RepoSources.BraceDepth(body, pair.Index);
-        Assert.True(depth == 1, $"the baseline and the decision sit at brace depth {depth} in LoadDocumentAsync, not at the method's own level (1): something makes them conditional");
-
-        Assert.False(System.Text.RegularExpressions.Regex.IsMatch(body[..pair.Index], @"\breturn\b"),
-            "LoadDocumentAsync can return before it asks SourceText.AfterLoad, so that load keeps the editor's rewrite in the source box");
+        // And that both of them RUN, every time the method does: at its own brace level,
+        // with no braceless owner on the line above, no way out before them, and no
+        // preprocessor directive deciding which copy compiles. One reading says all of
+        // that, shared with the window's other wiring pins (#2 review N2, N4).
+        RepoSources.AssertRunsUnconditionally(body, "await SetCleanBaselineAsync();");
+        RepoSources.AssertRunsUnconditionally(body,
+            "if (SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) is { } ownSpelling)");
     }
 
     [Fact]

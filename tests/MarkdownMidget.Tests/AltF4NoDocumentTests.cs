@@ -41,13 +41,17 @@ public class AltF4NoDocumentTests
         // a click on the menu takes it. The alternative is asking a hidden window in
         // another process to give focus up. Only on entering the state; leaving it is
         // SetClosedHandsFocusBackToTheViewOnlyOnceItIsShowing.
-        var body = RepoSources.MethodBody(MainWindowSource(), "private void SetClosed(");
+        // And every time (G1): a braceless `if (_sourceMode)` on the line above left this
+        // line here, in this order, and never run in the formatted view — the reported
+        // bug, with all thirteen of these tests green.
+        var body = RepoSources.WithoutComments(RepoSources.MethodBody(MainWindowSource(), "private void SetClosed("));
+        const string takeCall = "if (on) NoDocumentFocus.Take(ClosedSplash);";
+        RepoSources.AssertRunsUnconditionally(body, takeCall);
         var shown = body.IndexOf("ClosedSplash.Visibility =", StringComparison.Ordinal);
-        var take = body.IndexOf("if (on) NoDocumentFocus.Take(ClosedSplash);", StringComparison.Ordinal);
+        var take = body.IndexOf(takeCall, StringComparison.Ordinal);
         var hidden = body.IndexOf("Web.Visibility =", StringComparison.Ordinal);
         Assert.True(shown >= 0, "SetClosed no longer shows ClosedSplash");
         Assert.True(hidden >= 0, "SetClosed no longer sets Web.Visibility");
-        Assert.True(take >= 0, "SetClosed does not hand focus to ClosedSplash when the document closes");
         Assert.True(shown < take, "focus is handed to the splash before it is shown, and a collapsed element refuses it");
         Assert.True(take < hidden, "focus is handed to the splash only after the editor is hidden");
     }
@@ -56,15 +60,16 @@ public class AltF4NoDocumentTests
     public void SetClosedHandsFocusBackToTheViewOnlyOnceItIsShowing()
     {
         // F2. Leaving the state collapses the splash, which may hold the focus Take
-        // gave it; WPF then moves focus off it, but not into the document. Not every
-        // way out goes on to FocusDocumentAsync (Save As with nothing open does not,
-        // and it returns early in a read-only window), so SetClosed hands focus to the
-        // view itself. After BOTH views have their visibility, because a collapsed
-        // view takes no focus; with the view each mode shows; and, in the formatted
-        // view, the editor's own DOM focus inside that same branch, as
-        // FocusDocumentAsync does, or the first keystroke goes nowhere.
-        var body = RepoSources.MethodBody(MainWindowSource(), "private void SetClosed(");
+        // gave it; WPF then moves focus off it, but not into the document. The ways out
+        // that do not go on to FocusDocumentAsync — a read-only window, where it returns
+        // early — would leave focus on no element at all, so SetClosed hands it to the
+        // view itself. After BOTH views have their visibility, because a collapsed view
+        // takes no focus; with the view each mode shows; and, in the formatted view, the
+        // editor's own DOM focus inside that same branch, as FocusDocumentAsync does, or
+        // the first keystroke goes nowhere. And every time (G1).
+        var body = RepoSources.WithoutComments(RepoSources.MethodBody(MainWindowSource(), "private void SetClosed("));
         const string handBackCall = "if (!on && NoDocumentFocus.HandBack(ClosedSplash, _sourceMode ? (UIElement)SourceBox : Web))";
+        RepoSources.AssertRunsUnconditionally(body, handBackCall);
         const string domFocus = "if (!_sourceMode && _editorReady) _ = RunEditorAsync(\"window.MDM.focus()\");";
         var web = body.IndexOf("Web.Visibility =", StringComparison.Ordinal);
         var source = body.IndexOf("SourceBox.Visibility =", StringComparison.Ordinal);
@@ -78,6 +83,25 @@ public class AltF4NoDocumentTests
         // Inside the hand-back's own block: nothing between the two but its brace and comments.
         var between = body[(handBack + handBackCall.Length)..dom];
         Assert.Matches(new Regex(@"^\s*\{\s*(//[^\n]*\n\s*)*$"), between);
+    }
+
+    [Fact]
+    public void SavingFromTheNoDocumentStateFocusesTheDocumentItJustSaved()
+    {
+        // A pick disables this window while it is up — FilePickerService.WaitWhilePumping
+        // sets IsEnabled false and calls EnableWindow(false), and the native dialog's
+        // ShowDialog(owner) does the same — which takes keyboard focus off the splash and
+        // gives it back to nothing. So by the time Save As with nothing open leaves the
+        // state, SetClosed's hand-back has nothing to hand on, and the document it just
+        // saved would be showing with the caret in no element at all. Alt+F4 still closes
+        // the window, because focus is then the window's; the first keystroke is what
+        // would go nowhere. Whatever else SaveAsync returns early for, once it HAS left
+        // the state it focuses the document, as an open does.
+        var body = RepoSources.WithoutComments(RepoSources.MethodBody(MainWindowSource(),
+            "private async Task<bool> SaveAsync("));
+        Assert.Matches(new Regex(@"var leftNoDocument = _closed;\s*SetClosed\(false\);"), body);
+        RepoSources.AssertRunsUnconditionally(body,
+            "if (leftNoDocument) await FocusDocumentAsync();", after: "SetClosed(false);");
     }
 
     [Fact]

@@ -1755,9 +1755,18 @@ public partial class MainWindow : Window
         _dirty = false;
         UpdateTitle();
         if (pathChanged) StartWatching(path);
+        var leftNoDocument = _closed;
         SetClosed(false);
         AddRecent(path);
         DiscardBackup();   // it's on disk now; the crash copy has nothing left to protect
+        // A pick disables this window while it is up (FilePickerService: IsEnabled and
+        // EnableWindow, and ShowDialog for the native one), which takes keyboard focus
+        // off the splash and hands it back to nothing — so SetClosed's hand-back had
+        // nothing to hand on, and a Save As from the no-document state would show the
+        // document it just saved with the caret in no element at all. Focus it, as an
+        // open does. FocusDocumentAsync yields first, so this lands after the window is
+        // active again, and it returns early in a read-only window.
+        if (leftNoDocument) await FocusDocumentAsync();
         return true;
     }
 
@@ -2547,11 +2556,11 @@ public partial class MainWindow : Window
         Web.Visibility = on || _sourceMode ? Visibility.Collapsed : Visibility.Visible;
         SourceBox.Visibility = (!on && _sourceMode) ? Visibility.Visible : Visibility.Collapsed;
         // Leaving it: the splash collapsed above may still hold that focus, and WPF
-        // moves it off the splash but not into the document. Not every way out goes on
-        // to FocusDocumentAsync (Save As with nothing open does not, and it returns
-        // early in a read-only window), so hand it to the view now showing. Where
-        // FocusDocumentAsync does run, it focuses the same view. A dialog or the menu
-        // that holds focus keeps it.
+        // moves it off the splash but not into the document. So hand it to the view now
+        // showing, for the ways out that do not go on to FocusDocumentAsync — it returns
+        // early in a read-only window. Where it does run, it focuses the same view. A
+        // dialog or the menu that holds focus keeps it; after a pick nothing holds it at
+        // all, which is why SaveAsync focuses the document it saved.
         if (!on && NoDocumentFocus.HandBack(ClosedSplash, _sourceMode ? (UIElement)SourceBox : Web))
         {
             // As FocusDocumentAsync: WPF focus on the WebView2, then the editor's own
