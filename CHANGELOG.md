@@ -130,12 +130,11 @@ changes between alpha tags.
   HTML blocks — and a file that began with a UTF-8 byte-order mark lost it on
   the first save. Now the file's line ending is detected when it opens (by
   majority, for a mixed file) and put back throughout on every Save, Save As,
-  encrypt, password change, convert and timestamped `.bak`. The mark goes back
-  on every write that produces a readable file — Save, Save As, convert, the
-  `.bak` — if the file had one, and is never added if it didn't. An encrypted
-  write keeps no mark: inside ciphertext it would mark nothing. So a document
-  converted in the window that encrypted it gets its mark back, and one opened
-  from an `.mdenc` file does not. A new document saves LF. (#3)
+  Save My Version As, encrypt, password change, convert and timestamped `.bak`.
+  The mark goes back on every unencrypted save — Save, Save As, Save My
+  Version As, convert, the `.bak` — if the file had one, and is never added if
+  it didn't. An encrypted write keeps no mark: inside ciphertext it would mark
+  nothing. A new document saves LF. (#3)
 - **A file rewritten on disk with identical content is no longer reported as an
   external change.** A formatter with nothing to do, a sync client, or a tool
   that only changed the line endings raised the "modified by another program"

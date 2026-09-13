@@ -188,9 +188,27 @@ public class EmbeddedReaderDocsTests
         // byte-order mark. None does: every encrypted write seals ApplyLineEnding's
         // text, never Encode's bytes (DocumentTextTests pins which route calls
         // which, and what comes out of the container). The entry now says so, with
-        // the code's reason.
+        // the code's reason. The writes that do keep it are named as unencrypted
+        // saves, not as "every write that produces a readable file": the crash copy
+        // is one of those too, and BackupStore writes it with no mark. And the
+        // promise that a convert gets the mark back is gone, because an adopted
+        // re-encode, Keep Current or a reload resets what the window remembers.
         var changelog = Flat(Read("CHANGELOG.md"));
         Assert.DoesNotContain("encrypt, convert and timestamped `.bak`; the mark stays", changelog, StringComparison.Ordinal);
+        Assert.DoesNotContain("every write that produces a readable file", changelog, StringComparison.Ordinal);
+        Assert.DoesNotContain("gets its mark back", changelog, StringComparison.Ordinal);
+
+        // The external-change prompt's button, by its own label: no access key, and no
+        // ellipsis, as the entry writes Save As.
+        var dialog = RepoSources.Read("src", "MarkdownMidget", "ExternalChangeDialog.xaml");
+        var button = Regex.Match(dialog, "x:Name=\"SaveAsBtn\" Content=\"([^\"]*)\"");
+        Assert.True(button.Success, "no SaveAsBtn in ExternalChangeDialog.xaml");
+        var versionAs = button.Groups[1].Value.Replace("_", "").TrimEnd('…');
+
+        Assert.Contains($"put back throughout on every Save, Save As, {versionAs}, encrypt, password change, convert and timestamped `.bak`.",
+            changelog, StringComparison.Ordinal);
+        Assert.Contains($"The mark goes back on every unencrypted save — Save, Save As, {versionAs}, convert, the `.bak` — if the file had one, and is never added if it didn't.",
+            changelog, StringComparison.Ordinal);
         Assert.Contains("An encrypted write keeps no mark: inside ciphertext it would mark nothing.", changelog, StringComparison.Ordinal);
     }
 
