@@ -181,6 +181,19 @@ public class EmbeddedReaderDocsTests
         Assert.Contains(PictureLimit.Notice("huge.png"), changelog, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheChangelogDoesNotSayAnEncryptedWriteKeepsTheMark()
+    {
+        // The #3 entry listed "encrypt" among the writes that keep a file's
+        // byte-order mark. None does: every encrypted write seals ApplyLineEnding's
+        // text, never Encode's bytes (DocumentTextTests pins which route calls
+        // which, and what comes out of the container). The entry now says so, with
+        // the code's reason.
+        var changelog = Flat(Read("CHANGELOG.md"));
+        Assert.DoesNotContain("encrypt, convert and timestamped `.bak`; the mark stays", changelog, StringComparison.Ordinal);
+        Assert.Contains("An encrypted write keeps no mark: inside ciphertext it would mark nothing.", changelog, StringComparison.Ordinal);
+    }
+
     /// <summary>The text with every run of whitespace — a line break and the indent
     /// after it — as one space.</summary>
     private static string Flat(string text) => Regex.Replace(text, @"\s+", " ");

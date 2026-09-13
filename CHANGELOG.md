@@ -128,10 +128,14 @@ changes between alpha tags.
   with a code block in it came back with mixed endings — the formatted view
   writes LF between blocks but keeps whatever was inside fenced, indented and
   HTML blocks — and a file that began with a UTF-8 byte-order mark lost it on
-  the first save. Now the file's convention is detected when it opens (by
+  the first save. Now the file's line ending is detected when it opens (by
   majority, for a mixed file) and put back throughout on every Save, Save As,
-  encrypt, convert and timestamped `.bak`; the mark stays if it was there and is
-  never added if it wasn't. A new document saves LF. (#3)
+  encrypt, password change, convert and timestamped `.bak`. The mark goes back
+  on every write that produces a readable file — Save, Save As, convert, the
+  `.bak` — if the file had one, and is never added if it didn't. An encrypted
+  write keeps no mark: inside ciphertext it would mark nothing. So a document
+  converted in the window that encrypted it gets its mark back, and one opened
+  from an `.mdenc` file does not. A new document saves LF. (#3)
 - **A file rewritten on disk with identical content is no longer reported as an
   external change.** A formatter with nothing to do, a sync client, or a tool
   that only changed the line endings raised the "modified by another program"

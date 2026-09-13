@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using MarkdownMidget;
 using Xunit;
 
@@ -228,6 +228,68 @@ public class DocumentTextTests
         Assert.Equal(applied, Encoding.UTF8.GetString(DocumentText.Encode(mixed, ending, bom: false)));
         AssertOneEndingKind(applied, ending);
         Assert.Equal(5, Endings(applied));
+    }
+
+    [Fact]
+    public void AnEncryptedWriteKeepsTheLineEndingButNotTheMark()
+    {
+        // What an encrypted save does to a CRLF file that had a UTF-8 mark: the
+        // plaintext it seals is ApplyLineEnding's, so what comes back out of the
+        // container is CRLF throughout with no U+FEFF in front, and reads back as
+        // a file without a mark. The CHANGELOG says so for issue #3; it used to
+        // list "encrypt" among the routes that keep the mark.
+        var bom = Encoding.UTF8.GetPreamble();
+        var loaded = DocumentText.Detect([.. bom, .. Encoding.UTF8.GetBytes(Corpus(Crlf, Lf))]);
+        Assert.True(loaded.HadBom);
+
+        var sealedText = DocumentText.ApplyLineEnding(loaded.Text, loaded.Ending);
+        var container = Secure.SecureMarkdownFormat.Encrypt(
+            sealedText, "pw", Secure.SecureMarkdownFormat.KdfProfile.FastForTests);
+        var opened = Secure.SecureMarkdownFormat.Decrypt(container, "pw");
+
+        Assert.False(opened.StartsWith('\uFEFF'));
+        AssertOneEndingKind(opened, LineEnding.CrLf);
+        var reread = DocumentText.Detect(opened);
+        Assert.Equal(LineEnding.CrLf, reread.Ending);
+        Assert.False(reread.HadBom);
+        Assert.Equal(loaded.Text, reread.Text);
+    }
+
+    [Fact]
+    public void EveryRouteWritesTheConventionsTheChangelogSays()
+    {
+        // A wiring pin, read from the source: these are window handlers no test can
+        // run. Each encrypted write seals ApplyLineEnding's text and never Encode's
+        // bytes, so it keeps the line ending and drops the mark; each unencrypted
+        // write goes through Encode with the remembered mark. The tests above prove
+        // what the two functions do; this proves which route calls which.
+        var source = RepoSources.Read("src", "MarkdownMidget", "MainWindow.xaml.cs");
+
+        foreach (var encrypted in new[]
+                 {
+                     "private async void Encrypt_Click(",
+                     "private async void ChangePassword_Click(",
+                     "private static string WriteTimestampedEncryptedBackup(",
+                 })
+        {
+            var body = RepoSources.MethodBody(source, encrypted);
+            Assert.Contains("DocumentText.ApplyLineEnding(", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("DocumentText.Encode(", body, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("DocumentText.Encode(markdown, _lineEnding, _hadBom)",
+            RepoSources.MethodBody(source, "private async void ConvertPlain_Click("), StringComparison.Ordinal);
+        Assert.Contains("DocumentText.Encode(content, ending, bom)",
+            RepoSources.MethodBody(source, "private static string WriteTimestampedBackup("), StringComparison.Ordinal);
+
+        // Save and Save As share one method with one branch each way.
+        var save = RepoSources.MethodBody(source, "private async Task<bool> SaveAsync(");
+        var branch = save.IndexOf("if (wantEncrypted)", StringComparison.Ordinal);
+        var otherwise = save.IndexOf("else", branch, StringComparison.Ordinal);
+        Assert.True(branch >= 0 && otherwise > branch, "SaveAsync has no encrypted branch to check");
+        Assert.Contains("DocumentText.ApplyLineEnding(markdown, _lineEnding)", save[branch..otherwise], StringComparison.Ordinal);
+        Assert.DoesNotContain("DocumentText.Encode(", save[branch..otherwise], StringComparison.Ordinal);
+        Assert.Contains("DocumentText.Encode(markdown, _lineEnding, _hadBom)", save[otherwise..], StringComparison.Ordinal);
     }
 
     [Fact]
