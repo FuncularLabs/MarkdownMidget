@@ -28,12 +28,16 @@ public class SourceEncodingTests
         ".csproj", ".slnx", ".pubxml", ".yml", ".xshd", ".manifest",
     };
 
-    /// <summary>Build output, dependencies and other checkouts: not the repository's
-    /// own files, and not tracked.</summary>
+    /// <summary>Build output and dependencies: not the repository's own files, and not
+    /// tracked. Every dot-directory is skipped as well - .git, .vs, .claude and the
+    /// worktrees under it, any tool's cache - except <see cref="TrackedDotDirectory"/>,
+    /// the one the repository tracks files in.</summary>
     private static readonly HashSet<string> Skipped = new(StringComparer.OrdinalIgnoreCase)
     {
-        "bin", "obj", "node_modules", ".git", ".claude", "dist", "TestResults",
+        "bin", "obj", "node_modules", "dist", "TestResults",
     };
+
+    private const string TrackedDotDirectory = ".github";
 
     [Fact]
     public void NoTextFileStartsWithAByteOrderMark()
@@ -43,6 +47,7 @@ public class SourceEncodingTests
         string Relative(string file) => Path.GetRelativePath(root, file).Replace('\\', '/');
 
         Assert.Contains("tests/MarkdownMidget.Tests/SourceEncodingTests.cs", files.Select(Relative));
+        Assert.Contains(".github/workflows/ci.yml", files.Select(Relative));
         foreach (var allowed in Allowed)
             Assert.True(StartsWithMark(Path.Combine(root, allowed)), $"{allowed} has no mark now; take it off the list");
 
@@ -56,8 +61,12 @@ public class SourceEncodingTests
         foreach (var file in Directory.EnumerateFiles(dir))
             if (Extensions.Contains(Path.GetExtension(file))) yield return file;
         foreach (var sub in Directory.EnumerateDirectories(dir))
-            if (!Skipped.Contains(Path.GetFileName(sub)))
-                foreach (var file in TextFiles(sub)) yield return file;
+        {
+            var name = Path.GetFileName(sub);
+            if (Skipped.Contains(name)) continue;
+            if (name.StartsWith('.') && !name.Equals(TrackedDotDirectory, StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var file in TextFiles(sub)) yield return file;
+        }
     }
 
     private static bool StartsWithMark(string path)

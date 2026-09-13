@@ -262,15 +262,21 @@ public class DocumentTextTests
         // A wiring pin, read from the source: these are window handlers no test can
         // run, so this proves which route calls which function with which arguments,
         // and the tests above prove what those functions do. Each encrypted write
-        // seals ApplyLineEnding(text, the file's ending) and has no Encode in it, so
-        // it keeps the line ending and drops the mark; each unencrypted write hands
+        // seals ApplyLineEnding(text, the file's ending); each unencrypted write hands
         // Encode the file's ending and its remembered mark.
         //
-        // Every pin names the whole call, arguments included: a pin on the bare name
-        // stayed green with LineEnding.Lf, bom: false and a sealed Encode swapped in.
-        // Each is looked for only inside its own method, or its own branch of one, so
-        // a match elsewhere can't stand in for it; and every violation is reported,
-        // not just the first.
+        // Every pin names the whole call, arguments included, and is looked for only
+        // inside its own method. A method that only seals may not call Encode at all.
+        // Save and Save My Version As seal one way and write plain the other, so each
+        // may call Encode exactly once, in its pinned plain write, and nowhere else in
+        // the method: not nested in the encrypted arm, not before the branch. Every
+        // violation is reported, not just the first.
+        //
+        // What it does not check: which arm of an if a pinned call sits in; what
+        // reaches a call's arguments (a variable reassigned between the capture and
+        // the call, a mark prepended without Encode), because a scan proves a call is
+        // there, not what it does; and anything on a line after a string literal that
+        // holds "//", which Code strips as though it began a comment.
         var source = RepoSources.Read("src", "MarkdownMidget", "MainWindow.xaml.cs");
         var violations = new List<string>();
         const string encode = "DocumentText.Encode(";
@@ -283,6 +289,15 @@ public class DocumentTextTests
         void Lacks(string where, string code, string call)
         {
             if (code.Contains(Code(call), StringComparison.Ordinal)) violations.Add($"FORBIDDEN in {where}: {call}");
+        }
+        // The plain write exactly once; with it taken out, no Encode left in the method.
+        void OnlyEncodeIs(string where, string code, string plainWrite)
+        {
+            var call = Code(plainWrite);
+            var found = Count(code, call);
+            if (found != 1) violations.Add($"EXPECTED ONCE in {where}, found {found}: {plainWrite}");
+            else code = code.Remove(code.IndexOf(call, StringComparison.Ordinal), call.Length);
+            Lacks($"{where}, outside the plain write", code, encode);
         }
 
         // File ▸ Encrypt Document…
@@ -301,12 +316,11 @@ public class DocumentTextTests
         Has("ConvertPlain_Click", Method("private async void ConvertPlain_Click("),
             "file.WriteAsync(DocumentText.Encode(markdown, _lineEnding, _hadBom))");
 
-        // Save and Save As: one method, a branch each way.
-        var (saveSealed, savePlain) = Branches(Method("private async Task<bool> SaveAsync("), "if (wantEncrypted)");
-        Has("SaveAsync, encrypted branch", saveSealed, "var plaintext = DocumentText.ApplyLineEnding(markdown, _lineEnding);");
-        Has("SaveAsync, encrypted branch", saveSealed, "Secure.SecureMarkdownFile.Save(path, plaintext, pw)");
-        Lacks("SaveAsync, encrypted branch", saveSealed, encode);
-        Has("SaveAsync, plain branch", savePlain, "file.WriteAsync(DocumentText.Encode(markdown, _lineEnding, _hadBom))");
+        // Save and Save As: sealed one way, written plain the other.
+        var save = Method("private async Task<bool> SaveAsync(");
+        Has("SaveAsync", save, "var plaintext = DocumentText.ApplyLineEnding(markdown, _lineEnding);");
+        Has("SaveAsync", save, "Secure.SecureMarkdownFile.Save(path, plaintext, pw)");
+        OnlyEncodeIs("SaveAsync", save, "file.WriteAsync(DocumentText.Encode(markdown, _lineEnding, _hadBom))");
 
         // The timestamped .bak an external change writes: the file's conventions
         // captured, then one writer each way, each passing them on.
@@ -321,15 +335,11 @@ public class DocumentTextTests
             "Secure.SecureMarkdownFormat.Encrypt(DocumentText.ApplyLineEnding(content, ending), password)");
         Lacks("WriteTimestampedEncryptedBackup", sealedBak, encode);
 
-        // Save My Version As… on the external-change prompt: a branch each way.
-        var (mineSealed, minePlain) = Branches(Method("private async Task HandleSaveAsAfterExternalChangeAsync("),
-            "if (_docEncrypted && _docPassword is { } savePw)");
-        Has("HandleSaveAsAfterExternalChangeAsync, encrypted branch", mineSealed,
-            "var plaintext = DocumentText.ApplyLineEnding(inMemory, _lineEnding);");
-        Has("HandleSaveAsAfterExternalChangeAsync, encrypted branch", mineSealed,
-            "Secure.SecureMarkdownFile.Save(picked, plaintext, savePw)");
-        Lacks("HandleSaveAsAfterExternalChangeAsync, encrypted branch", mineSealed, encode);
-        Has("HandleSaveAsAfterExternalChangeAsync, plain branch", minePlain,
+        // Save My Version As… on the external-change prompt: the same two ways.
+        var mine = Method("private async Task HandleSaveAsAfterExternalChangeAsync(");
+        Has("HandleSaveAsAfterExternalChangeAsync", mine, "var plaintext = DocumentText.ApplyLineEnding(inMemory, _lineEnding);");
+        Has("HandleSaveAsAfterExternalChangeAsync", mine, "Secure.SecureMarkdownFile.Save(picked, plaintext, savePw)");
+        OnlyEncodeIs("HandleSaveAsAfterExternalChangeAsync", mine,
             "File.WriteAllBytesAsync(picked, DocumentText.Encode(inMemory, _lineEnding, _hadBom))");
 
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations));
@@ -337,23 +347,11 @@ public class DocumentTextTests
 
     /// <summary>Source as the wiring pin compares it: comments dropped (a call named in a
     /// comment is not a call), then every whitespace character removed, so a reformat - an
-    /// argument per line, another indent - neither breaks a pin nor stands in for one.</summary>
+    /// argument per line, another indent - doesn't break a pin. A comment is anything from
+    /// "//" to the end of the line, so a "//" inside a string literal drops the rest of
+    /// that line as well.</summary>
     private static string Code(string source) =>
         Regex.Replace(Regex.Replace(source, @"//[^\n]*|/\*.*?\*/", "", RegexOptions.Singleline), @"\s+", "");
-
-    /// <summary>The two arms of the if/else that starts at <paramref name="condition"/>, in
-    /// <see cref="Code"/> form: the first up to the <c>}else</c> that closes it, the second
-    /// from there to the method's <c>catch</c>. A pin on one arm can't be met by the other.</summary>
-    private static (string Then, string Else) Branches(string code, string condition)
-    {
-        var start = code.IndexOf(Code(condition), StringComparison.Ordinal);
-        Assert.True(start >= 0, $"no \"{condition}\" to split at");
-        var split = code.IndexOf("}else", start, StringComparison.Ordinal);
-        Assert.True(split > start, $"no else after \"{condition}\"");
-        var end = code.IndexOf("catch(", split, StringComparison.Ordinal);
-        Assert.True(end > split, $"no catch after the else of \"{condition}\"");
-        return (code[start..split], code[split..end]);
-    }
 
     [Fact]
     public void NewDocumentsDefaultToLf()
