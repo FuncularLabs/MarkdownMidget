@@ -172,6 +172,41 @@ To try an installed copy of a local build, publish a single-file build first
 Register refuses a plain `dotnet build` or `dotnet run` output: that exe needs
 the files beside it, and a copy of it on its own would not start.
 
+### Local build numbers
+
+Every local build of `src/MarkdownMidget` takes the next number from a counter and
+stamps it into the binary, so a copy of `MarkdownMidget.exe` can be told apart from
+the one it replaced:
+
+| Where | Looks like |
+| --- | --- |
+| Explorer ▸ Properties ▸ Details ▸ **File version** | `0.11.0.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `0.11.0-dev+build.57` |
+| The app: **Help ▸ About Markdown Midget**, and the title bar | `Version 0.11.0-dev+build.57` |
+
+The build prints the number too (`MarkdownMidget local build #57 - ...`). Check the
+exe's Properties before copying it over an installed copy, and **Help ▸ About
+Markdown Midget** after launching: if the two numbers differ, the copy is not the
+build you just made.
+
+The counter is `.local-build-number` at the root of the clone — git-ignored, one
+per clone **and per git worktree**, so builds in `.claude/worktrees/` never advance
+the number your own exe carries. **Delete the file to start again at 1** — a missing
+counter is the normal first-build state. A counter that is corrupt (half written by
+a build that died) or held by another process never fails a build either: it warns,
+and that build is unnumbered (`0.11.0` / `0.11.0-dev`, exactly as before this
+existed) rather than restarting at numbers older exes already carry.
+
+Every build invocation takes a number, including one where nothing changed — so a
+freshly published exe can never carry the number of the one before it. The cost is
+that the version attribute changes each time, so the compiler runs each time: a
+no-op build goes from about 1.1s to 2.2s for the app and from 1.3s to 2.7s for the
+test project, so a `dotnet test` cycle pays about a second and a half. CI and
+release builds are excluded (`GITHUB_ACTIONS`, `CI`), so a released exe reports
+exactly what the tag said; `-p:UseLocalBuildNumber=false` does the same locally.
+The mechanism is `build/LocalBuildNumber.targets`, imported by the app project
+only.
+
 To measure line coverage, use the Microsoft collector that `Microsoft.NET.Test.Sdk`
 brings in. The report goes under the folder you name; without `--results-directory`,
 it goes under the test project's `TestResults` folder, which is git-ignored:

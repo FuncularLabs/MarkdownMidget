@@ -20,6 +20,11 @@ src/MarkdownMidget/wwwroot/*.map
 # Release staging
 dist/
 
+# Local build counter (build/LocalBuildNumber.targets), plus its lock and staging
+# files. One per clone and per worktree, never shared: delete it to start the
+# numbering again at 1. See README, "Build & run".
+.local-build-number*
+
 # External-change backups (created by MM's watcher; content lives inside .exe workspace)
 *.bak
 *.md.bak

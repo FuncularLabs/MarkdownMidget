@@ -25,7 +25,7 @@ public class SourceEncodingTests
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".cs", ".xaml", ".md", ".css", ".js", ".mjs", ".json", ".html", ".svg",
-        ".csproj", ".slnx", ".pubxml", ".yml", ".xshd", ".manifest",
+        ".csproj", ".slnx", ".pubxml", ".targets", ".yml", ".xshd", ".manifest",
     };
 
     /// <summary>Build output and dependencies: not the repository's own files, and not
