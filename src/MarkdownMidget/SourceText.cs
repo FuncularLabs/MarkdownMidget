@@ -64,11 +64,16 @@ internal static class SourceText
     /// loaded in the formatted view and then Ctrl+E, or loaded with the source view
     /// showing, leaves the box holding the same text.
     ///
-    /// A crash recovery is the one load where the two part. Its disk baseline at
-    /// this point is still the snapshot the recovery handed over (it points both
-    /// baselines at the file only afterwards), so the box shows the recovered work
-    /// as it was captured; a Ctrl+E after a recovery in the formatted view shows the
-    /// editor's copy of that work instead. When the snapshot holds unsaved work,
+    /// A crash recovery is the one load where the two part, and the load that reaches
+    /// here most deliberately: a snapshot taken in the source view is recovered into
+    /// that view (<c>RecoveryPlan.EntersSourceView</c>, applied before the load), so
+    /// this is what decides what the user sees of their rescued work. Its disk
+    /// baseline at this point is still the snapshot the recovery handed over (it
+    /// points both baselines at the file only afterwards), so the box shows the
+    /// recovered work as it was captured; a Ctrl+E after a recovery that landed in
+    /// the formatted view — a snapshot taken there, or one from a build that recorded
+    /// no view — shows the editor's copy of that work instead. When the snapshot
+    /// holds unsaved work,
     /// neither is the file and both read as modified against it; a snapshot that
     /// matches the file shows the file's text and reads unmodified, as the recovery
     /// itself decided.

@@ -127,6 +127,18 @@ changes between alpha tags.
   only there is written back as typed. Once the formatted view has changed the
   document, the source view shows the editor's version of it, because that is
   then the only copy of your work. (#2)
+- **Work recovered after a crash comes back in the view you were writing in.**
+  Unsaved work from the **Markdown source** view was handed back in the formatted
+  view, and pressing Ctrl+E there showed the formatted editor's version of what you
+  had typed — setext headings as `#`, reference links inlined — which a save from
+  either view then wrote to your file. You never saw your own words again. The view
+  is now recorded with each crash copy and entered before the work is loaded, so the
+  source view shows the recovered text exactly as it was typed, still marked unsaved
+  and still pointing at its file; the formatted view holds the same document, so
+  Ctrl+E works straight away. Windows that went down together each come back in
+  their own view, encrypted documents included (the password prompt comes first, and
+  cancelling it leaves the window as it was). Copies left by 0.10.0 or earlier
+  record no view and come back in the formatted view, as before. (#2)
 - **A file's line endings and UTF-8 byte-order mark are kept as found.** A CRLF file
   with a code block in it came back with mixed endings — the formatted view
   writes LF between blocks but keeps whatever was inside fenced, indented and

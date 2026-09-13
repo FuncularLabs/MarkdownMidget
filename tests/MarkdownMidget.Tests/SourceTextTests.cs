@@ -99,9 +99,10 @@ public class SourceTextTests
     // ===== a document loaded while the source view is already showing =====
     //
     // File ▸ Open, Open Recent, a drop on the source view, both reloads after the
-    // file changed on disk, the Save As that follows an external change, and crash
-    // recovery into a window launched with --source all install the new document
-    // through LoadDocumentAsync without leaving the source view. The install fills
+    // file changed on disk, the Save As that follows an external change, and the
+    // recovery of work that was being written in the source view (which enters that
+    // view before it loads: RecoveryPlan.EntersSourceView) all install the new
+    // document through LoadDocumentAsync without leaving the source view. The install fills
     // the box with the editor's settled serialisation — the rewrite Ctrl+E stopped
     // showing — and the document reads as unmodified, so a save from there wrote
     // Markdown Midget's conventions over a file the user never saw in the formatted

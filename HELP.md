@@ -419,6 +419,16 @@ one comes back in its own window. In the rare case where a document can't be
 restored (three attempts is the limit), the app says so and leaves the file in the
 backup folder for you to open by hand — it's plain markdown.
 
+**It comes back in the view you were writing in.** Work you were doing in the
+**Markdown source** view (Ctrl+E) reopens there, showing your text exactly as you
+typed it rather than the formatted editor's version of it, and Ctrl+E switches to
+the formatted view as usual. Each copy remembers its own view, so windows that went
+down together each come back in the right one. Two things to know: the view is
+recorded with the copy, so switching views and crashing within a few seconds can
+bring the work back in the view you just left; and copies left by version 0.10.0 or
+earlier don't record a view at all, so they come back in the formatted view as they
+always did. Nothing about your text depends on either — only which view you land in.
+
 Switching this off in **Edit ▸ Settings…** stops both halves: no new copies are
 made, and copies already waiting from an earlier crash are not offered back. They
 stay in the backup folder, so turn the setting on again (or open the folder) if you
