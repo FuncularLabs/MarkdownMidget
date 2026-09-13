@@ -242,21 +242,39 @@ public class SourceTextTests
         // the file's spelling — and #4's external-change check would lose the
         // editor's spelling of the same saved state. A scan proves the call is there,
         // with these arguments and in this order; the tests above prove what it does.
-        var body = RepoSources.MethodBody(
+        //
+        // And that nothing stands between the load and the call (F-1). "After
+        // SetCleanBaselineAsync somewhere" let the call be wrapped in
+        // `if (password is null) { … }`, or skipped by an early
+        // `if (_docEncrypted) { …; return; }`, with the whole suite green — the
+        // rewrite back for .mdenc files or reloads in the source view. So, read with
+        // the comments out (a commented-out call is not a call, and the explanation
+        // above it is not code between the two): the call follows
+        // `await SetCleanBaselineAsync();` with only whitespace between them, at the
+        // method's own brace level, and no `return` comes before it. The method has
+        // no early return today; one added later skips this decision for its load,
+        // and has to decide the source box itself before it may change this pin.
+        var body = RepoSources.WithoutComments(RepoSources.MethodBody(
             RepoSources.Read("src", "MarkdownMidget", "MainWindow.xaml.cs"),
-            "private async Task LoadDocumentAsync(");
+            "private async Task LoadDocumentAsync("));
 
-        const string decision = "SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) is { } ownSpelling";
-        const string write = "SourceBox.Text = ownSpelling;";
         var disk = body.IndexOf("_diskBaseline = DocumentText.Fold(doc.Text);", StringComparison.Ordinal);
         var clean = body.IndexOf("await SetCleanBaselineAsync();", StringComparison.Ordinal);
-        var asked = body.IndexOf(decision, StringComparison.Ordinal);
-        var written = body.IndexOf(write, StringComparison.Ordinal);
-
         Assert.True(disk >= 0, "LoadDocumentAsync no longer sets _diskBaseline from the loaded text");
         Assert.True(clean > disk, "SetCleanBaselineAsync no longer follows the disk baseline in LoadDocumentAsync");
-        Assert.True(asked > clean, $"no \"{decision}\" after SetCleanBaselineAsync in LoadDocumentAsync");
-        Assert.True(written > asked, $"no \"{write}\" after the decision in LoadDocumentAsync");
+
+        var pair = System.Text.RegularExpressions.Regex.Match(body,
+            @"await SetCleanBaselineAsync\(\);\s*if \(SourceText\.AfterLoad\(_sourceMode, SourceBox\.Text, _cleanMarkdown, _diskBaseline\) is \{ \} ownSpelling\)\s*(?:\{\s*)?SourceBox\.Text = ownSpelling;");
+        Assert.True(pair.Success,
+            "LoadDocumentAsync must follow `await SetCleanBaselineAsync();` directly — nothing but whitespace " +
+            "between — with `if (SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) " +
+            "is { } ownSpelling) SourceBox.Text = ownSpelling;`");
+
+        var depth = RepoSources.BraceDepth(body, pair.Index);
+        Assert.True(depth == 1, $"the baseline and the decision sit at brace depth {depth} in LoadDocumentAsync, not at the method's own level (1): something makes them conditional");
+
+        Assert.False(System.Text.RegularExpressions.Regex.IsMatch(body[..pair.Index], @"\breturn\b"),
+            "LoadDocumentAsync can return before it asks SourceText.AfterLoad, so that load keeps the editor's rewrite in the source box");
     }
 
     [Fact]
