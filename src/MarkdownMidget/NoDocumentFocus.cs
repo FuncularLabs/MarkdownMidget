@@ -27,8 +27,9 @@ internal static class NoDocumentFocus
     /// </summary>
     public static bool Take(UIElement placeholder)
     {
-        // Focus(), not FocusManager.SetFocusedElement: logical focus moves nothing at
-        // the Win32 level, and Win32 focus is what Alt+F4 follows.
+        // Keyboard focus, which WPF acquires by setting Win32 focus on the element's
+        // window. Asked of keyboard focus rather than IsFocused, because a collapsed
+        // or unfocusable element can still be granted logical focus.
         placeholder.Focus();
         return placeholder.IsKeyboardFocused;
     }
