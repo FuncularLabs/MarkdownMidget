@@ -159,6 +159,13 @@ changes between alpha tags.
   formatted view does to a file's style — `1.` numbering, `#` headings, fenced
   code, inline links — is unchanged, pinned by tests, and listed in Help under
   *Modified state, undo, and saving ▸ Markdown conventions*. (#2)
+- **Alt+F4 closes the window when no document is open.** With nothing open —
+  after File ▸ Close (Ctrl+W) in the formatted view, say — Alt+F4 did nothing.
+  Keyboard focus stayed in the editor that the gray "No document open"
+  placeholder had replaced, so the key went to a window you could no longer see.
+  The placeholder now takes focus when it appears, and Alt+F4 closes the window.
+  The close box and File ▸ Exit always worked. With a document open nothing
+  changes: Alt+F4 still asks to save a modified document first.
 
 ## [0.10.0] - 2026-09-10
 

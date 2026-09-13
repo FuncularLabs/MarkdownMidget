@@ -11,10 +11,10 @@ namespace MarkdownMidget;
 /// which is why the window's Ctrl+O / Ctrl+S command bindings work with the editor
 /// focused. But it raises them straight on the element, bypassing InputManager, and
 /// WPF's menu mnemonics live in AccessKeyManager's InputManager hook — which therefore
-/// never sees an Alt+F coming from the editor. Before a document is open the splash
-/// has focus and everything works; open one, the editor takes focus, and Alt goes
-/// dead. The fix hands those keys to AccessKeyManager by name and turns an Alt tap
-/// into menu mode, the two things WPF would have done itself.
+/// never sees an Alt+F coming from the editor. With no document open the splash holds
+/// focus (<see cref="NoDocumentFocus"/>) and everything works; open one, the editor
+/// takes focus, and Alt goes dead. The fix hands those keys to AccessKeyManager by
+/// name and turns an Alt tap into menu mode, the two things WPF would have done itself.
 ///
 /// The decisions are pure and live here; the window supplies the key event, the
 /// modifier state and the "is this letter a menu access key" lookup.

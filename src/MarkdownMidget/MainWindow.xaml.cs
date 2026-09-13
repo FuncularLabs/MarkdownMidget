@@ -2540,6 +2540,11 @@ public partial class MainWindow : Window
     {
         _closed = on;
         ClosedSplash.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        // Focus off the editor before it is hidden, onto the splash now that it can
+        // take it. Left in a collapsed WebView2, focus took Alt+F4 with it and the
+        // window never closed (NoDocumentFocus). Leaving the state, the open path
+        // focuses the document itself.
+        if (on) NoDocumentFocus.Take(ClosedSplash);
         Web.Visibility = on || _sourceMode ? Visibility.Collapsed : Visibility.Visible;
         SourceBox.Visibility = (!on && _sourceMode) ? Visibility.Visible : Visibility.Collapsed;
         // When closed, all document-modifying controls are pointless — gray them out.
