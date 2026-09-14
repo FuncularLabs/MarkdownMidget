@@ -75,6 +75,7 @@ public partial class MainWindow : Window
     // it from SourceBox.Text, and leaving the source view unmodified adopts the
     // editor's words back).
     private string _cleanMarkdown = string.Empty;
+    private TaskCompletionSource _painted = new();   // the editor has painted the document being installed (SetDocumentMarkdownAsync)
     // The file as it was last read from or written to disk, folded to LF - the
     // second baseline (issue #4). _cleanMarkdown is normally the EDITOR's
     // serialisation of that state and differs from it whenever the editor
@@ -491,6 +492,7 @@ public partial class MainWindow : Window
                     if (timed.RootElement.TryGetProperty("lines", out var timedLines))
                         foreach (var p in timedLines.EnumerateArray()) TimingLog.Write("editor", p[0].GetString() ?? "", p[1].GetDouble());
                 break;
+            case "painted": _painted.TrySetResult(); break;   // after setMarkdown: the clean baseline can be read now
             case "change":
                 if (!_sourceMode)
                 {
@@ -994,6 +996,7 @@ public partial class MainWindow : Window
         // mismatch becomes a crash snapshot labelled with the wrong file.
         if (_editorReady)
         {
+            _painted = new(TaskCreationOptions.RunContinuationsAsynchronously);
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
             phase = TimingLog.Lap("install", "setMarkdown", phase);
             // setMarkdown settles the document before it returns (editor-src/src/settle.js):
@@ -1004,8 +1007,10 @@ public partial class MainWindow : Window
             // that, not what we asked for, or the clean baseline taken in source view
             // would differ from the formatted view's markdown by one blank line and the
             // document would read as modified the moment the views were swapped (#5 NF-5).
-            settled = await RunEditorAsync("window.MDM.getMarkdown()");
-            phase = TimingLog.Lap("install", "getMarkdown", phase);
+            // Read after the first paint, not in front of it, and of the document setMarkdown installed: a keystroke made meanwhile stays unsaved work.
+            if (!_sourceMode) { await Task.WhenAny(_painted.Task, Task.Delay(2000)); phase = TimingLog.Lap("install", "painted", phase); }
+            settled = await RunEditorAsync("window.MDM.getSettledMarkdown()");
+            phase = TimingLog.Lap("install", "getSettledMarkdown", phase);
             if (settled is not null) markdown = settled;
         }
         // The box mirrors the settled serialisation the editor just handed back, which
@@ -5476,7 +5481,7 @@ public partial class MainWindow : Window
 
     private async Task UpdateDirtyAsync(string? editorAnswer = null)   // editorAnswer: the formatted view's markdown, just read
     {
-        if (_suppressDirty) return;
+        if (_suppressDirty) { ScheduleDirtyCheck(); return; }   // an edit made while a document installs is judged once it has its baseline
         // A failed read must not be mistaken for an empty document: that would clear
         // the modified flag, and an unmodified document is one the app throws away
         // without asking — taking the crash copy with it. Keep the last known state.

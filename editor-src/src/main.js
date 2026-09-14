@@ -3,7 +3,7 @@
 // pulls markdown with getMarkdown() and pushes it with setMarkdown(). The
 // WordPad-style toolbar in the WPF shell drives formatting through cmd().
 
-import { editorViewCtx } from '@milkdown/kit/core';
+import { editorViewCtx, serializerCtx } from '@milkdown/kit/core';
 import { undo, redo } from '@milkdown/kit/prose/history';
 import { callCommand, replaceAll, getMarkdown, insert } from '@milkdown/kit/utils';
 import { insertTableAction, runTableCommand, focusTableCell } from './tables.js';
@@ -22,7 +22,7 @@ import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, settledMarkdown, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
 } from './line-map.js';
 
 import {
@@ -69,7 +69,7 @@ const COMMANDS = {
 let editor = null;
 let editorView = null;
 let suppressChange = false;
-const serialize = () => editor.action(getMarkdown());
+const serialize = (doc) => editor.action(doc ? (ctx) => ctx.get(serializerCtx)(doc) : getMarkdown());   // the live document's, or `doc`'s
 
 // Returns whether the message actually went. Almost every caller ignores that —
 // a 'change' or 'contextmenu' the host missed is not worth a second thought — but
@@ -516,14 +516,15 @@ const MDM = {
     if (editorView) runTableCommand(editorView, name);
   },
 
-  getMarkdown() {
+  getMarkdown(settledOnly) {
     if (!editor) return '';
     const t0 = performance.now();
-    const { markdown, rebuilt } = markdownWithLines(editorView.state.doc, serialize);
+    const { markdown, rebuilt } = (settledOnly ? settledMarkdown : markdownWithLines)(editorView.state.doc, serialize);
     if (rebuilt) postSelectionState(editorView.state);   // the status bar's line catches up (#10)
     note(rebuilt ? 'getMarkdown.rebuilt' : 'getMarkdown', t0);
     return markdown;
   },
+  getSettledMarkdown() { return this.getMarkdown(true); },   // the document as setMarkdown installed it: the host's clean baseline, read once it has painted
   timing(on) { timings = on ? [] : null; },   // the host's MDM_TIMING=1 (TimingLog.cs)
 
   // Go to Line (#10): the host asks how many lines there are, then goes to one.
@@ -578,7 +579,9 @@ const MDM = {
     suppressChange = true;
     try {
       beginLoad();   // number it by this text while it is untouched (#10)
-      editor.action(replaceAll(md || '', flush));
+      // A rebuilt view resets its element's scrollTop, a write that lays the whole new document out before it paints; #app is what scrolls.
+      Object.defineProperty(editorView.dom, 'scrollTop', { get: () => 0, set() {}, configurable: true });
+      try { editor.action(replaceAll(md || '', flush)); } finally { delete editorView.dom.scrollTop; }
       note('setMarkdown.parse', t0);
       if (flush) editorView = editor.ctx.get(editorViewCtx); // state was recreated
       // Inside the suppressed window on purpose: settling is part of installing the
@@ -595,6 +598,8 @@ const MDM = {
     postHistory();
     if (editorView) postSelectionState(editorView.state);   // the new document's Ln/Col (#10)
     note('setMarkdown', t0);
+    const painted = () => postToHost({ type: 'painted' });   // the host reads its clean baseline after this rather than in front of the paint
+    if (document.hidden) painted(); else requestAnimationFrame(() => setTimeout(painted));   // a hidden page does not paint: say so now
   },
 
   undo() { if (editorView) { undo(editorView.state, editorView.dispatch); this.focus(); } },

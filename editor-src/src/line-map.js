@@ -36,6 +36,7 @@ let gutter = false;     // View ▸ Line Numbers: numbers in the margin (gutterN
 let gutterView = null;  // the view they are drawn in
 let drawn = {};         // the margin last built: { doc, current, staleFrom } it was built from, and its set
 let pin = null;         // Go to Line's line for a caret on a line with no place of its own: { doc, head, line } (pinLine)
+let settled = null;     // the document the last load installed (settledMarkdown)
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
@@ -78,7 +79,7 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
 export function beginLoad() { capturing = true; captured = null; }
 
 /** The document is installed: number it by the text it was loaded from. */
-export function endLoad(doc, text) { capturing = false; staleFrom = null; pin = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
+export function endLoad(doc, text) { settled = doc; capturing = false; staleFrom = null; pin = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
 
 /** View ▸ Line Numbers: show or hide the numbers in the margin. The setting it already has redraws nothing. */
 export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on; redraw(); }
@@ -121,6 +122,10 @@ export function markdownWithLines(doc, serialize) {
     recording = null;
   }
 }
+
+/** The markdown of the document the last load installed (MDM.getSettledMarkdown, the host's clean baseline, read after the first paint):
+ *  while untouched, the read above; once edited, that document's own markdown, leaving the live numbering to the next read. */
+export const settledMarkdown = (doc, serialize) => (settled && settled !== doc ? { markdown: serialize(settled), rebuilt: false } : markdownWithLines(doc, serialize));
 
 /** The numbering for `doc`, rebuilt first when it is stale (Go to Line), or null. */
 export function ensureLines(doc, serialize) {

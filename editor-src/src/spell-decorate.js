@@ -66,7 +66,7 @@ function buildVisible(doc, ranges, viewport) {
   return DecorationSet.create(doc, decos);
 }
 
-function visiblePmRange(view) {
+function visiblePmRange(view, measure = true) {
   const size = view.state.doc.content.size;
   // Degenerate viewport (minimized window, measurement failure): decorate around
   // the selection rather than the whole document — full-doc decoration is the
@@ -75,6 +75,7 @@ function visiblePmRange(view) {
     const head = view.state.selection.head;
     return [Math.max(0, head - 2 * VIEWPORT_MARGIN), Math.min(size, head + 2 * VIEWPORT_MARGIN)];
   };
+  if (!measure) return nearSelection();
   try {
     const rect = view.dom.getBoundingClientRect();
     const win = view.dom.ownerDocument.defaultView || window;
@@ -135,7 +136,9 @@ export const spellDecorate = $prose(() => new Plugin({
     const win = editorView.dom.ownerDocument.defaultView || window;
     win.addEventListener('scroll', onScroll, true);   // capture: any scrolling ancestor
     win.addEventListener('resize', onScroll);
-    lastViewport = visiblePmRange(editorView);
+    // Not measured: ProseMirror makes this view inside setMarkdown, before the new document is laid out, and a layout
+    // read here would lay all of it out before the first paint. setSpellRanges and the scroll handler measure first.
+    lastViewport = visiblePmRange(editorView, false);
     return {
       // Belt-and-braces: if the caret moves outside the decorated window (paging
       // with the keyboard, jump-to-end, a host whose scroll events misbehave),

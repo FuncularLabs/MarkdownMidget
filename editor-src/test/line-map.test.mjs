@@ -10,17 +10,19 @@ import { turnIntoTextCommand, liftListItemCommand, insertHardbreakCommand } from
 import { newlineInCode, joinBackward, deleteSelection } from '@milkdown/kit/prose/commands';
 import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { undo, undoDepth } from '@milkdown/kit/prose/history';
+import { serializerCtx } from '@milkdown/kit/core';
 import { mountEditor } from './jsdom-editor.mjs';
 import { settleDocument } from '../src/settle.js';
+import { setSpellRanges } from '../src/spell-decorate.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers, settledMarkdown,
 } from '../src/line-map.js';
 
 let ed;
 before(async () => { ed = await mountEditor(); });
 
 const doc = () => ed.view().state.doc;
-const serialize = () => ed.editor.action(getMarkdown());
+const serialize = (d) => ed.editor.action(d ? (ctx) => ctx.get(serializerCtx)(d) : getMarkdown());   // as main.js
 const saved = () => markdownWithLines(doc(), serialize);
 const load = (md) => {
   beginLoad();
@@ -334,4 +336,35 @@ test('Enter or Shift+Enter in the last block hides the label after it until the 
   } finally { showLineNumbers(false); }
   const numbered = [true, 'P:1', 'GAP:2', 'P:3'];
   assert.deepEqual(reads, [numbered, numbered, [...numbered, 'GAP:4', 'P:5', 'GAP:6'], numbered, numbered, [...numbered, 'GAP:5']]);
+});
+
+const layoutReads = async (fn, reads = []) => {   // what `fn` calls of getBoundingClientRect, on any element, and posAtCoords, on any view
+  const spied = [[ed.window.Element.prototype, 'getBoundingClientRect'], [ed.view().constructor.prototype, 'posAtCoords']].map(([o, name]) => [o, name, o[name]]);
+  spied.forEach(([o, name, f]) => { o[name] = function (...a) { reads.push(name); return f.apply(this, a); }; });
+  try { await fn(); } finally { spied.forEach(([o, name, f]) => { o[name] = f; }); }
+  return reads;
+};
+
+test('creating the editor, or loading a document with line numbers off or on, reads no layout; the squiggles measure when drawn', async () => {
+  const { createEditor } = await import('../src/editor-factory.js'), md = readFileSync(new URL('../../HELP.md', import.meta.url), 'utf8');
+  let other;
+  assert.deepEqual(await layoutReads(async () => { other = await createEditor({ root: ed.window.document.body.appendChild(ed.window.document.createElement('div')), initialMarkdown: md }); }), []);
+  await other.destroy();
+  for (const on of [false, true]) { showLineNumbers(on); assert.deepEqual(await layoutReads(() => load(md)), [], `line numbers ${on}`); }
+  showLineNumbers(false);
+  assert.ok((await layoutReads(() => setSpellRanges(ed.view(), [{ from: 3, to: 7 }]))).includes('getBoundingClientRect'));
+  assert.ok(ed.view().dom.querySelector('.mdm-misspelled'));
+});
+
+test("the settled markdown is the first read after a load, needing no rebuild for Go to Line; after a keystroke it is still the loaded text, and the live numbering stands", () => {
+  for (const file of ['../../CHANGELOG.md', '../../HELP.md', 'fixtures/roundtrip-audit.md']) {
+    load(readFileSync(new URL(file, import.meta.url), 'utf8'));
+    const settled = settledMarkdown(doc(), serialize).markdown, live = markdownWithLines(doc(), serialize), v = ed.view();
+    assert.deepEqual([settled, live.rebuilt], [live.markdown, false], file);
+    v.dispatch(v.state.tr.setSelection(Selection.near(doc().resolve(doc().content.size >> 1))));
+    v.dispatch(v.state.tr.insertText('x', Selection.atStart(doc()).from));
+    markdownWithLines(doc(), serialize);   // the host's dirty check, which may come first: numbered by the saved markdown now
+    const { line } = lineStatus(v.state);
+    assert.deepEqual([settledMarkdown(doc(), serialize).markdown, serialize() !== settled, line > 0, lineStatus(v.state).line], [settled, true, true, line], file);
+  }
 });

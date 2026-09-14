@@ -216,22 +216,29 @@ public partial class MainWindow
         // landing stale.
         if (!_editorReady) return;
         var spelling = TimingLog.Start();
+        var lap = spelling;   // each phase of the round trip, then the whole of it
         var json = await RunEditorAsync(
             $"window.MDM.getSpellText({(!_skipCodeSpell ? "true" : "false")})");
+        lap = TimingLog.Lap("spell", "getSpellText", lap);
         if (string.IsNullOrEmpty(json)) return;
 
         SpellTextPayload? payload;
         try { payload = JsonSerializer.Deserialize<SpellTextPayload>(json, AnchorJson); }
         catch { return; }
         if (payload is null) return;
+        lap = TimingLog.Lap("spell", "deserialize", lap);
 
         var hits = await _spellService.CheckAsync(payload.Plain);
+        lap = TimingLog.Lap("spell", "check", lap);
         var segments = payload.Segs
             .Select(s => new SpellSegment(s.PlainStart, s.PmPos, s.Len)).ToList();
         var ranges = SpellTextMap.MapRanges(segments, hits.Select(h => (h.Start, h.Length)));
+        lap = TimingLog.Lap("spell", "mapRanges", lap);
         if (gen != _spellGeneration) return;   // a different document loaded meanwhile
         var body = string.Join(",", ranges.Select(r => $"{{\"from\":{r.From},\"to\":{r.To}}}"));
+        lap = TimingLog.Lap("spell", "serialize", lap);
         await RunEditorAsync($"window.MDM.setSpellRanges([{body}])");
+        TimingLog.Lap("spell", "setSpellRanges", lap);
         TimingLog.Lap("spell", "roundTrip", spelling);
     }
 
