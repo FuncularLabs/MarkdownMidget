@@ -524,8 +524,8 @@ const MDM = {
     note(rebuilt ? 'getMarkdown.rebuilt' : 'getMarkdown', t0);
     return markdown;
   },
-  getSettledMarkdown() { return this.getMarkdown(true); },   // the document as setMarkdown installed it: the host's clean baseline, read when it first needs one
-  changedSinceLoad() { return !editorView || changedSinceLoad(editorView.state.doc); },   // false: untouched since setMarkdown, so the host needs no baseline yet
+  getSettledMarkdown() { return this.getMarkdown(true); },   // the document as setMarkdown installed it: the host's clean baseline as text, read only where text is compared (Ctrl+E, an external change)
+  changedSinceLoad() { return !editorView || changedSinceLoad(editorView.state.doc); },   // false: node for node what setMarkdown installed, so clean against that load's baseline, with nothing serialised
   timing(on) { timings = on ? [] : null; },   // the host's MDM_TIMING=1 (TimingLog.cs)
 
   // Go to Line (#10): the host asks how many lines there are, then goes to one.

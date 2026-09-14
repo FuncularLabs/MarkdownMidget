@@ -11,7 +11,6 @@ import { Editor, rootCtx, defaultValueCtx, editorViewOptionsCtx, commandsCtx } f
 import { commonmark } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
-import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { trailing } from '@milkdown/kit/plugin/trailing';
 import { $useKeymap, $command } from '@milkdown/kit/utils';
 import { nord } from '@milkdown/theme-nord';
@@ -200,6 +199,19 @@ const selectionState = (report) => $prose(() => new Plugin({
   }),
 }));
 
+// Milkdown's listener plugin as markdownUpdated used it (a report 200 ms after the last kept-in-history change to the document or its stored marks, when
+// the document differs from the last one looked at; a load's new plugin views drop a pending one), less the serialising nothing read: every load and every report.
+const docChanged = (report) => $prose(() => {
+  let prevDoc = null, latest = null, timer = 0;
+  return new Plugin({ key: new PluginKey('MDM_DOC_CHANGED'), view: () => ({ destroy: () => clearTimeout(timer) }), state: {
+    init: (_, state) => { prevDoc = state.doc; },
+    apply: (tr) => {
+      if (!(tr.docChanged || tr.storedMarksSet) || tr.getMeta('addToHistory') === false) return;
+      latest = tr.doc; clearTimeout(timer); timer = setTimeout(() => { if (!prevDoc.eq(latest)) report(); prevDoc = latest; }, 200);
+    },
+  } });
+});
+
 // The picture ceiling on a paste (picture-paste.js says why the editor applies it
 // rather than the host). A handleDOMEvents handler, not handlePaste: ProseMirror
 // runs these ahead of its own paste handling, so a refused paste is cancelled
@@ -229,7 +241,7 @@ const pictureCeiling = (maxPictureBytes, onPictureRefused) => $prose(() => new P
  * @param {object} o
  * @param {Element} o.root               where the editor mounts
  * @param {string}  [o.initialMarkdown]  the first document
- * @param {() => void} [o.onMarkdownUpdated]  the listener's markdownUpdated hook
+ * @param {() => void} [o.onMarkdownUpdated]  told when an edit has changed the document (docChanged)
  * @param {(state) => void} [o.onSelectionState]  block style + marks at the cursor
  * @param {number|null} [o.maxPictureBytes]  the host's picture ceiling, applied to
  *   a paste; null applies none (see picture-paste.js)
@@ -249,8 +261,6 @@ export function createEditor({
         ...prev,
         attributes: { class: 'mdm-prosemirror', spellcheck: 'false' }, // native off — the app runs its own engine
       }));
-      const l = ctx.get(listenerCtx);
-      l.markdownUpdated(onMarkdownUpdated);
       // Block style + active marks at the cursor are reported by the
       // selectionState plugin below, NOT here: selectionUpdated never fires
       // for a storedMarks-only transaction (Ctrl+B at a collapsed caret), so
@@ -272,7 +282,7 @@ export function createEditor({
     .use(resizableImage)
     .use(htmlRender)
     .use(history)
-    .use(listener)
+    .use(docChanged(onMarkdownUpdated))
     .use(underline)
     .use(prism)
     .use(linkTitle)

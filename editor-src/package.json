@@ -7,7 +7,8 @@
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "test": "node --test --test-timeout=10000"
+    "test": "node --test --test-timeout=10000",
+    "postinstall": "patch-package --error-on-fail"
   },
   "dependencies": {
     "@milkdown/kit": "^7.21.2",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "esbuild": "^0.28.1",
     "jsdom": "^25.0.1",
+    "patch-package": "8.0.1",
     "postcss": "^8.5.25"
   }
 }

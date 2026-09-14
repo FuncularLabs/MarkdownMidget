@@ -127,8 +127,10 @@ export function markdownWithLines(doc, serialize) {
  *  while untouched, the read above; once edited, that document's own markdown, leaving the live numbering to the next read. */
 export const settledMarkdown = (doc, serialize) => (settled && settled !== doc ? { markdown: serialize(settled), rebuilt: false } : markdownWithLines(doc, serialize));
 
-/** Whether `doc` is not the document the last load installed (MDM.changedSinceLoad): only a transaction with steps makes a new one. */
-export const changedSinceLoad = (doc) => settled !== doc;
+/** Whether `doc` differs, node for node, from the document the last load installed (MDM.changedSinceLoad, the host's dirty check): a selection,
+ *  a decoration or a transaction with no steps makes no new document, and an edit undone makes an equal one. Nodes an edit left alone are shared,
+ *  so the comparison stops at them: no serialising, and far less than the whole document. */
+export const changedSinceLoad = (doc) => settled !== doc && !settled?.eq(doc);
 
 /** The numbering for `doc`, rebuilt first when it is stale (Go to Line), or null. */
 export function ensureLines(doc, serialize) {

@@ -1465,8 +1465,8 @@ public partial class MainWindow : Window
             _displayName = null;
         }
         finally { _suppressDirty = false; }
-        // The formatted view leaves a placeholder that the first comparison fills from the editor (TakePendingBaselineAsync): a baseline
-        // serialised here cost every open the whole document, for an untouched one that never compares. The source view, or an empty or unready editor, asks as before.
+        // The formatted view leaves a placeholder: the editor says whether its document is still the loaded one (UnchangedSinceLoadAsync), and Ctrl+E or an
+        // external change fills it (TakePendingBaselineAsync). A baseline serialised here cost every open the whole document. The source view, or an empty or unready editor, asks as before.
         if (_sourceMode || !_editorReady || doc.Text.Length == 0) await SetCleanBaselineAsync();
         else { _cleanMarkdown = _pendingBaseline = new string("\0baseline not taken\0".AsSpan()); _dirty = false; UpdateTitle(); }
         // The source view already showing? Then the install above put the editor's
@@ -2238,7 +2238,7 @@ public partial class MainWindow : Window
             // spelling, and comparing that against the editor's serialisation alone
             // would keep a snapshot of a document with nothing unsaved in it — which
             // the next launch offers back as "recovered unsaved changes".
-            await TakePendingBaselineAsync(current: markdown);   // a placeholder baseline is filled before it is compared
+            if (await UnchangedSinceLoadAsync() == true) { DiscardBackup(); return; }   // a load's own baseline is asked, not filled: this tick comes while typing
             if (IsUnmodifiedText(markdown)) { DiscardBackup(); return; }
             if (_docEncrypted && _docPassword is { } pw)
             {
@@ -5508,13 +5508,15 @@ public partial class MainWindow : Window
     private async Task UpdateDirtyAsync(string? editorAnswer = null)   // editorAnswer: the formatted view's markdown, just read
     {
         if (_suppressDirty) { ScheduleDirtyCheck(); return; }   // an edit made while a document installs is judged once it has its baseline
-        if (!await TakePendingBaselineAsync(needed: false)) return;   // untouched since its load: still clean, and nothing serialised to say so
+        var unchanged = await UnchangedSinceLoadAsync();
+        if (unchanged == true && !_dirty) return;   // untouched since its load, and already shown clean: nothing serialised to say so
         // A failed read must not be mistaken for an empty document: that would clear
         // the modified flag, and an unmodified document is one the app throws away
         // without asking — taking the crash copy with it. Keep the last known state.
-        var current = editorAnswer ?? await TryGetDocumentMarkdownAsync();
+        var current = editorAnswer ?? await TryGetDocumentMarkdownAsync();   // the count's, and the #10 line numbers' catch-up
         if (current is null) return;
         var dirty = !IsUnmodifiedText(current);
+        if (unchanged is { } same) dirty = !same;   // a load's own baseline: the editor's node-for-node answer, never text against a placeholder
         if (dirty != _dirty)
         {
             _dirty = dirty;
@@ -5615,20 +5617,30 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Fills a formatted-view load's placeholder baseline when something first compares against it: with <paramref name="current"/>, markdown just
-    /// read, while the editor says the document is untouched since that load, and otherwise with the editor's copy of what the load installed. False,
-    /// reading nothing, for an untouched document when no baseline is <paramref name="needed"/>. A failed ask keeps the placeholder, which no document
-    /// equals: modified, the safe way round. Never in the source view, whose edits the editor does not see.
+    /// Fills a formatted-view load's placeholder baseline where text has to be compared with it (Ctrl+E, an external change): with <paramref name="current"/>,
+    /// markdown just read, while the editor says the document is unchanged since that load, and otherwise with the editor's copy of what the load installed.
+    /// A failed ask keeps the placeholder, which no document equals: modified, the safe way round. Never in the source view, whose edits the editor does not see.
     /// </summary>
-    private async Task<bool> TakePendingBaselineAsync(bool needed = true, string? current = null)
+    private async Task TakePendingBaselineAsync(string? current = null)
     {
         var pending = _pendingBaseline;
-        if (pending is null || _sourceMode || !ReferenceEquals(_cleanMarkdown, pending)) return true;
-        string? text = null;
-        try { if (await RunEditorAsync("String(window.MDM.changedSinceLoad())") == "false") { if (!needed) return false; text = current; } text ??= await RunEditorAsync("window.MDM.getSettledMarkdown()"); }
-        catch { return true; }
+        if (pending is null || _sourceMode || !ReferenceEquals(_cleanMarkdown, pending)) return;
+        string? text;
+        try { text = (await RunEditorAsync("String(window.MDM.changedSinceLoad())") == "false" ? current : null) ?? await RunEditorAsync("window.MDM.getSettledMarkdown()"); }
+        catch { return; }
         if (text is not null && ReferenceEquals(_cleanMarkdown, pending) && ReferenceEquals(_pendingBaseline, pending)) _cleanMarkdown = _baselineFromPending = new string(text.AsSpan());
-        return true;
+    }
+
+    /// <summary>
+    /// Whether the formatted view's document is still, node for node, the one its load installed (an edit undone included), asked while the clean
+    /// baseline is that load's own: its placeholder, or what filled it. The dirty check and the backup tick ask this instead of serialising the load's
+    /// document on the first edit. Null, and text is compared, for a baseline from anywhere else (a save, a recovery, Ctrl+E) or when the editor can't answer.
+    /// </summary>
+    private async Task<bool?> UnchangedSinceLoadAsync()
+    {
+        if (_sourceMode || _pendingBaseline is null || !(ReferenceEquals(_cleanMarkdown, _pendingBaseline) || ReferenceEquals(_cleanMarkdown, _baselineFromPending))) return null;
+        try { return await RunEditorAsync("String(window.MDM.changedSinceLoad())") switch { "false" => true, "true" => false, _ => null }; }
+        catch { return null; }
     }
 
     private bool _canUndo;

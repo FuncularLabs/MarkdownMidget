@@ -1,0 +1,19 @@
+diff --git a/node_modules/@milkdown/transformer/lib/index.js b/node_modules/@milkdown/transformer/lib/index.js
+index 1afa101..b6c8cd2 100644
+--- a/node_modules/@milkdown/transformer/lib/index.js
++++ b/node_modules/@milkdown/transformer/lib/index.js
+@@ -63,11 +63,12 @@ var ParserState = class extends Stack {
+ 		this.#maybeMerge = (a, b) => {
+ 			if (this.#hasText(a) && this.#hasText(b) && Mark.sameSet(a.marks, b.marks)) return this.schema.text(a.text + b.text, a.marks);
+ 		};
++		let types; // Markdown Midget: listed once per parser, not once per markdown node (editor-src/test/parser-types.test.mjs)
+ 		this.#matchTarget = (node) => {
+-			const result = Object.values({
++			const result = (types ??= Object.values({
+ 				...this.schema.nodes,
+ 				...this.schema.marks
+-			}).find((x) => {
++			})).find((x) => {
+ 				return x.spec.parseMarkdown.match(node);
+ 			});
+ 			if (!result) throw parserMatchError(node);
