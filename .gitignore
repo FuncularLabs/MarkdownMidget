@@ -21,8 +21,9 @@ src/MarkdownMidget/wwwroot/*.map
 dist/
 
 # Local build counter (build/LocalBuildNumber.targets), plus its lock and staging
-# files. One per clone and per worktree, never shared: delete it to start the
-# numbering again at 1. See README, "Build & run".
+# files. The counter normally lives in the repository's own directory
+# (.git/mm-local-build-number), which git never tracks; this is the fallback used
+# when there is no git repository to ask. See README, "Build & run".
 .local-build-number*
 
 # External-change backups (created by MM's watcher; content lives inside .exe workspace)

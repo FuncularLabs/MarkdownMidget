@@ -1,6 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading;
 using MarkdownMidget.Themes;
 using MarkdownMidget.Updates;
@@ -20,6 +23,49 @@ namespace MarkdownMidget.Tests;
 /// </summary>
 public class BuildNumberVersionTests
 {
+    [Fact]
+    public void ThisVeryBuildOfTheAppCarriesItsBuildNumber()
+    {
+        // The end of the chain nothing else was watching: every other test here
+        // drives build/LocalBuildNumber.targets directly, so deleting the <Import>
+        // from MarkdownMidget.csproj left the shipped assembly unnumbered with the
+        // whole suite green (review F-1). This asserts on the assembly the suite is
+        // actually running against.
+        var assembly = typeof(AboutDialog).Assembly;
+        var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        var fileVersion = FileVersionInfo.GetVersionInfo(assembly.Location).FileVersion ?? "";
+        var components = fileVersion.Split('.');
+
+        if (IsContinuousIntegration())
+        {
+            // The other half of the same claim: a build on CI - which is what a
+            // release is - carries no number at all.
+            Assert.DoesNotContain("build.", informational, StringComparison.Ordinal);
+            Assert.Equal("0", components.Last());
+            return;
+        }
+
+        var numbered = Regex.Match(informational, @"build\.(\d+)$");
+        Assert.True(numbered.Success,
+            $"the assembly under test reports \"{informational}\": this build took no number. Either the " +
+            "Import of build/LocalBuildNumber.targets is gone from MarkdownMidget.csproj, or it was built " +
+            "with -p:UseLocalBuildNumber=false.");
+        Assert.Equal(4, components.Length);
+        Assert.Equal(numbered.Groups[1].Value, components[3]);
+    }
+
+    /// <summary>The same signals build/LocalBuildNumber.targets uses to decide it is
+    /// not a local build. A property set on the command line cannot be seen from
+    /// here; an environment variable is what a CI runner actually exports.</summary>
+    private static bool IsContinuousIntegration()
+    {
+        var ci = Environment.GetEnvironmentVariable("CI");
+        return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"))
+            || (!string.IsNullOrEmpty(ci) && ci != "false")
+            || Environment.GetEnvironmentVariable("TF_BUILD") == "true"
+            || Environment.GetEnvironmentVariable("ContinuousIntegrationBuild") == "true";
+    }
+
     [Theory]
     [InlineData("0.11.0-dev+build.57", "0.11.0-dev", true)]
     [InlineData("v0.11.0-dev+build.57", "0.11.0-dev", true)]

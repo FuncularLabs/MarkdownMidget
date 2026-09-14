@@ -182,30 +182,44 @@ the one it replaced:
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `0.11.0.57` |
 | Explorer ▸ Properties ▸ Details ▸ **Product version** | `0.11.0-dev+build.57` |
-| The app: **Help ▸ About Markdown Midget**, and the title bar | `Version 0.11.0-dev+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 0.11.0-dev+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v0.11.0-dev+build.57` |
 
 The build prints the number too (`MarkdownMidget local build #57 - ...`). Check the
 exe's Properties before copying it over an installed copy, and **Help ▸ About
 Markdown Midget** after launching: if the two numbers differ, the copy is not the
 build you just made.
 
-The counter is `.local-build-number` at the root of the clone — git-ignored, one
-per clone **and per git worktree**, so builds in `.claude/worktrees/` never advance
-the number your own exe carries. **Delete the file to start again at 1** — a missing
-counter is the normal first-build state. A counter that is corrupt (half written by
-a build that died) or held by another process never fails a build either: it warns,
-and that build is unnumbered (`0.11.0` / `0.11.0-dev`, exactly as before this
-existed) rather than restarting at numbers older exes already carry.
+**One counter per repository, not per checkout.** It lives in the repository's own
+directory — `.git/mm-local-build-number`, found with `git rev-parse
+--git-common-dir` — so a clone and every worktree linked to it take numbers from
+the same sequence and no number is ever issued twice. (Two separate *clones* are
+two repositories and number independently.) **Delete that file to start again at
+1**; a missing counter is the normal first-build state. Without git — a source copy,
+or no git on `PATH` — it falls back to `.local-build-number` in the checkout, which
+is git-ignored.
+
+A counter that is corrupt (half written by a build that died) or held by another
+process never fails a build: it warns (`MMBN0001`, or `MMBN0002` when only the file
+version could not carry the number) and that build is unnumbered (`0.11.0` /
+`0.11.0-dev`, exactly as before this existed) rather than restarting at numbers
+older exes already carry. Under `-warnaserror` those warnings would fail the build
+like any other, so demote them with
+`-p:MSBuildWarningsAsMessages=MMBN0001;MMBN0002` if you build that way.
 
 Every build invocation takes a number, including one where nothing changed — so a
 freshly published exe can never carry the number of the one before it. The cost is
 that the version attribute changes each time, so the compiler runs each time: a
 no-op build goes from about 1.1s to 2.2s for the app and from 1.3s to 2.7s for the
-test project, so a `dotnet test` cycle pays about a second and a half. CI and
-release builds are excluded (`GITHUB_ACTIONS`, `CI`), so a released exe reports
-exactly what the tag said; `-p:UseLocalBuildNumber=false` does the same locally.
-The mechanism is `build/LocalBuildNumber.targets`, imported by the app project
-only.
+test project, so a `dotnet test` cycle pays about a second and a half. The suite
+pays more: `LocalBuildNumberTests` drives real MSBuild processes (including four at
+once, to prove two builds can never take one number) and takes about 16s against
+the other 1420 tests' 6s, so a full run is about 27s. It has its own non-parallel
+collection, so it does not compete with the window tests for the desktop. CI and
+release builds are excluded (`GITHUB_ACTIONS`, `CI`, `TF_BUILD`,
+`ContinuousIntegrationBuild`), so a released exe reports exactly what the tag said;
+`-p:UseLocalBuildNumber=false` does the same locally. The mechanism is
+`build/LocalBuildNumber.targets`, imported by the app project only.
 
 To measure line coverage, use the Microsoft collector that `Microsoft.NET.Test.Sdk`
 brings in. The report goes under the folder you name; without `--results-directory`,

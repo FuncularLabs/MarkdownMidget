@@ -17,10 +17,15 @@
                                                        Properties > Details > Product version,
                                                        and Help > About inside the app
 
-    The counter lives at the root of the clone (see LocalBuildNumberFile below),
-    is git-ignored, and is deleted to start again at 1. One per clone and per
-    worktree, on purpose: an agent building in .claude/worktrees must not advance
-    the number the owner is reading off their own exe.
+    Where the counter lives. In the repository's own directory — the one
+    `git rev-parse` reports for the git-common-dir option — so a clone and every
+    worktree linked to it share ONE counter. A counter per checkout was the first design and it was
+    wrong: two checkouts of one repository would each reach 7, and 0.11.0.7 would
+    then name two different binaries, which is the one thing this feature exists to
+    prevent. Worktree builds advancing the owner's number is the point, not a cost.
+    Without git (a source copy, or no git on PATH) it falls back to
+    LocalBuildNumberFallbackFile in the checkout, which is the same thing when there
+    is only one checkout. Deleting the file starts again at 1.
 
     Every invocation takes a number, including one where nothing has changed. That
     is the point — an exe published a moment ago can then never carry the number of
@@ -38,12 +43,15 @@
   -->
 
   <PropertyGroup>
-    <!-- Beside the clone's root: one per clone AND per git worktree (each has its
-         own checkout of this file), which is what keeps agent builds out of the
-         owner's numbering. Not under obj/ — `dotnet clean` and `git clean -xfd`
-         would silently restart the numbering there, handing out numbers that
-         exes already in the wild carry. -->
-    <LocalBuildNumberFile Condition="'$(LocalBuildNumberFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..', '.local-build-number'))</LocalBuildNumberFile>
+    <!-- The counter's name inside the repository directory (.git, normally), where
+         nothing can commit it. -->
+    <LocalBuildNumberSharedName Condition="'$(LocalBuildNumberSharedName)' == ''">mm-local-build-number</LocalBuildNumberSharedName>
+    <!-- Used only when there is no git repository to ask: then the checkout IS the
+         repository as far as anyone can tell. Git-ignored; see .gitignore. -->
+    <LocalBuildNumberFallbackFile Condition="'$(LocalBuildNumberFallbackFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..', '.local-build-number'))</LocalBuildNumberFallbackFile>
+    <!-- Overridable so a build can be pointed at a counter of its own (the tests do
+         this, and never touch the repository's). -->
+    <LocalBuildNumberGitExecutable Condition="'$(LocalBuildNumberGitExecutable)' == ''">git</LocalBuildNumberGitExecutable>
     <!-- How long to wait for another build that is holding the counter. Long
          enough for a parallel build to finish its read-write; short enough that a
          stuck lock file costs a warning rather than a hang. -->
@@ -72,6 +80,93 @@
   </PropertyGroup>
 
   <!--
+    Which counter file this build uses: the repository's, or the checkout's when
+    there is no repository to ask.
+
+    The git-common-dir option is the question that has one answer for a clone and
+    for every worktree linked to it (the plain git-dir option does not: a worktree
+    gets its own .git/worktrees/[name]). A relative answer - git says ".git" when
+    asked from the top of a work tree - is resolved against the directory we asked
+    from.
+
+    Anything unexpected falls back rather than failing: no git on PATH, a directory
+    that is not a repository, a git too old to know the option, a directory that
+    does not exist. Numbering per checkout is a mild loss; a build that cannot start
+    because git is missing is not acceptable for a convenience feature.
+  -->
+  <UsingTask TaskName="ResolveLocalBuildNumberFile" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <StartDirectory ParameterType="System.String" Required="true" />
+      <FallbackFile ParameterType="System.String" Required="true" />
+      <FileName ParameterType="System.String" Required="true" />
+      <GitExecutable ParameterType="System.String" />
+      <CounterFile ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Diagnostics" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        CounterFile = FallbackFile;
+        string why = null;
+        try
+        {
+            ProcessStartInfo psi = new ProcessStartInfo(
+                string.IsNullOrEmpty(GitExecutable) ? "git" : GitExecutable,
+                "rev-parse --git-common-dir");
+            psi.WorkingDirectory = StartDirectory;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+
+            using (Process git = Process.Start(psi))
+            {
+                // Both streams are a line long; reading them before the wait is
+                // what stops a full pipe from deadlocking the build.
+                string output = git.StandardOutput.ReadToEnd();
+                git.StandardError.ReadToEnd();
+                if (!git.WaitForExit(15000))
+                {
+                    try { git.Kill(); } catch { }
+                    why = "git did not answer within 15 seconds";
+                }
+                else if (git.ExitCode != 0)
+                {
+                    why = StartDirectory + " is not inside a git repository (git exited " + git.ExitCode + ")";
+                }
+                else
+                {
+                    string dir = output.Trim();
+                    if (dir.Length == 0)
+                    {
+                        why = "git named no repository directory";
+                    }
+                    else
+                    {
+                        // Relative to where we asked, when git answers ".git".
+                        if (!Path.IsPathRooted(dir)) dir = Path.Combine(StartDirectory, dir);
+                        dir = Path.GetFullPath(dir);
+                        if (Directory.Exists(dir)) CounterFile = Path.Combine(dir, FileName);
+                        else why = "git named " + dir + ", which is not a directory";
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            why = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        if (why != null)
+            Log.LogMessage(MessageImportance.Low,
+                "Local build numbers are counted per checkout in " + CounterFile + ": " + why + ".");
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!--
     Take the next number, and say what the two version strings become.
 
     The counter is guarded by a lock file rather than by the counter file itself:
@@ -79,11 +174,14 @@
     dies mid-write cannot leave half a number behind, and a file being replaced
     cannot also be the thing being locked.
 
-    Every failure here is a warning and an unnumbered build, never a build error.
-    Losing the number costs the owner a glance at a timestamp; failing the build
-    over a counter file would be absurd. A number is never invented for a counter
-    that could not be read: reusing 1 after a corrupt file would hand out numbers
-    that exes already carry.
+    Every failure here is a warning and an unnumbered build, never a build error of
+    its own. Under -warnaserror MSBuild promotes any warning, so both carry a code
+    that can be demoted: MMBN0001 (this build took no number) and MMBN0002 (it took
+    one, but the file version could not carry it), either of which can be listed in
+    -p:MSBuildWarningsAsMessages. Losing the number costs the owner a glance at a
+    timestamp; failing the build over a counter file would be absurd. A number is
+    never invented for a counter that could not be read: reusing 1 after a corrupt
+    file would hand out numbers that exes already carry.
   -->
   <UsingTask TaskName="AllocateLocalBuildNumber" TaskFactory="RoslynCodeTaskFactory"
              AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
@@ -122,19 +220,27 @@
             {
                 try
                 {
+                    // DeleteOnClose is what makes the lock end with the process that
+                    // holds it: a build killed mid-allocation leaves no file for the
+                    // next one to wait 15 seconds on.
                     held = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite,
                                           FileShare.None, 1, FileOptions.DeleteOnClose);
                 }
-                catch (IOException)
+                catch (Exception ex)
                 {
-                    // Another build is between its read and its write. That is the
-                    // whole point of the lock, so wait for it - but not forever.
+                    // IOException: another build is between its read and its write,
+                    // which is the whole point of the lock. UnauthorizedAccessException:
+                    // Windows reports a file that is pending deletion that way, so the
+                    // moment a holder lets go looks like a permission failure for an
+                    // instant - treating it as fatal would drop numbers under exactly
+                    // the contention this exists for. Both wait; neither waits forever.
+                    if (!(ex is IOException || ex is UnauthorizedAccessException)) throw;
                     if (DateTime.UtcNow >= deadline)
                     {
                         problem = "another process held " + lockPath + " for more than " + timeout + " seconds";
                         break;
                     }
-                    Thread.Sleep(50);
+                    Thread.Sleep(20);
                 }
             }
 
@@ -161,7 +267,7 @@
                 else
                 {
                     int next = current + 1;
-                    string staging = CounterFile + ".tmp";
+                    string staging = CounterFile + ".tmp." + Guid.NewGuid().ToString("N").Substring(0, 8);
                     File.WriteAllText(staging, next.ToString(CultureInfo.InvariantCulture));
                     // Replace rather than overwrite: a torn write would be read as
                     // a corrupt counter by every later build.
@@ -196,8 +302,9 @@
             }
             else
             {
-                Log.LogWarning("Local build " + Number + ": \"" + BaseFileVersion + "\" is not a file " +
-                               "version, so this build's number is only in the product version.");
+                Log.LogWarning(null, "MMBN0002", null, null, 0, 0, 0, 0,
+                    "Local build {0}: \"{1}\" is not a file version, so this build's number is only in " +
+                    "the product version.", Number, BaseFileVersion);
             }
 
             if (!string.IsNullOrEmpty(BaseInformationalVersion))
@@ -212,8 +319,9 @@
         }
         else
         {
-            Log.LogWarning("This build carries no local build number: " +
-                           (problem ?? "the counter could not be read") + ".");
+            Log.LogWarning(null, "MMBN0001", null, null, 0, 0, 0, 0,
+                "This build carries no local build number: {0}.",
+                problem ?? "the counter could not be read");
         }
       ]]></Code>
     </Task>
@@ -230,6 +338,14 @@
           BeforeTargets="GetAssemblyAttributes"
           DependsOnTargets="GetAssemblyVersion"
           Condition="'$(UseLocalBuildNumber)' == 'true'">
+    <ResolveLocalBuildNumberFile Condition="'$(LocalBuildNumberFile)' == ''"
+                                 StartDirectory="$(MSBuildProjectDirectory)"
+                                 FallbackFile="$(LocalBuildNumberFallbackFile)"
+                                 FileName="$(LocalBuildNumberSharedName)"
+                                 GitExecutable="$(LocalBuildNumberGitExecutable)">
+      <Output TaskParameter="CounterFile" PropertyName="LocalBuildNumberFile" />
+    </ResolveLocalBuildNumberFile>
+
     <AllocateLocalBuildNumber CounterFile="$(LocalBuildNumberFile)"
                               TimeoutSeconds="$(LocalBuildNumberTimeoutSeconds)"
                               BaseFileVersion="$(FileVersion)"
