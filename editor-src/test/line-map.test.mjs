@@ -389,6 +389,34 @@ test("a gap with no room for a label under the block above it (a rule, a table, 
   assert.deepEqual(read, [true, 'P:1', 'GAP:2', 'HR:3', 'P:4–5', 'GAP:6', 'TABLE:7–9', 'UL:10–11', 'LI:12–13', 'GAP:14', 'PRE:15–17', 'SPAN:15–17', 'P:18–19', 'GAP:20']);
 });
 
+test("a block after a nested list in a quote or a list item has its own range: the nested item's stops at its own last line", () => {
+  showLineNumbers(true);
+  const reads = [(load('> quote\n> - a\n> - b\n>\n> tail\n'), margin()), (load('- a\n  - b\n\n  tail\n- c\n'), margin())];
+  showLineNumbers(false);
+  assert.deepEqual(reads, [[true, 'BLOCKQUOTE:1', 'LI:2', 'LI:3', 'P:4–5', 'P:6'], [true, 'UL:1', 'LI:2', 'P:3–4', 'LI:5', 'P:6']]);
+});
+
+test('a block that took in the one after it, by Backspace or a delete across blocks, shows only its first line until the next read', () => {
+  const v = ed.view(), reads = [], head = (text, after) => (caret(text, after), v.state.selection.head);
+  showLineNumbers(true);
+  load('a\nb\n\nc\nd\ne\n'); caret('c'); joinBackward(v.state, v.dispatch);   // Backspace at the start of c
+  reads.push(margin(), (saved(), margin()));
+  load('a\nb\nc\n\nd\n\nz\n'); v.dispatch(v.state.tr.setSelection(TextSelection.create(doc(), head('a', 1), head('d', 1)))); deleteSelection(v.state, v.dispatch);
+  reads.push(margin(), (saved(), margin()));
+  showLineNumbers(false);
+  assert.deepEqual(reads, [[true, 'P:1'], [true, 'P:1–4', 'GAP:5'], [true, 'P:1'], [true, 'P:1', 'GAP:2', 'P:3', 'GAP:4']]);
+});
+
+test('a table or a code fence ending a file with no final newline, and an empty code fence, count their own lines, before and after a read', () => {
+  showLineNumbers(true);
+  const reads = [(load('a\n\n| x |\n| - |\n| 1 |'), margin()), (load('a\n\n```\nx\n```'), margin()), (load('a\n\n```\n```\n\nb\n'), margin())];
+  ed.view().dispatch(ed.view().state.tr.insertText('!', 1));
+  reads.push((saved(), margin()));
+  showLineNumbers(false);
+  const empty = [true, 'P:1', 'GAP:2', 'PRE:3–4', 'GAP:5', 'P:6', 'GAP:7'];
+  assert.deepEqual(reads, [[true, 'P:1', 'GAP:2', 'TABLE:3–5'], [true, 'P:1', 'GAP:2', 'PRE:3–5'], empty, empty]);
+});
+
 for (const file of ['../../HELP.md', '../../CHANGELOG.md', 'fixtures/roundtrip-audit.md']) {
   test(`the margin shows every line of ${file} once and in order, untouched and after an edit and a read`, () => {
     const all = () => [...Array(ensureLines(doc(), serialize).lines).keys()].map((i) => i + 1), reads = [];
