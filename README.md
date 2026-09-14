@@ -102,7 +102,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**0.10.x released; 1.0 in progress.** In daily use and signed on every release.
+**1.0.0-beta1 — the first 1.0 prerelease; 0.10.0 is still the latest stable**, so
+the badge above and the entry marked **Latest** on the releases page both point at
+0.10.0 until the promote. In daily use and signed on every release.
 Windows-only for now; the editor core is web-based, so a cross-platform shell
 (MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
 deliberate limit written down in [HELP.md ▸ Known limits](HELP.md#known-limits);
@@ -180,10 +182,10 @@ the one it replaced:
 
 | Where | Looks like |
 | --- | --- |
-| Explorer ▸ Properties ▸ Details ▸ **File version** | `0.11.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `0.11.0-dev+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 0.11.0-dev+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v0.11.0-dev+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-beta1+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-beta1+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-beta1+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -314,6 +316,16 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.0-beta1** *(prerelease)* — **1.0, as far as a beta.** A save through the
+  formatted view no longer rewrites your markdown's style behind your back: the
+  conventions it does write are pinned by a round-trip suite and listed in Help,
+  and a file's **line endings and byte-order mark** survive the trip. **Find has
+  Replace**, in both views and all four modes, one undo step per Replace All. A
+  **picture dropped or pasted** into either view is embedded instead of opening as
+  text or doing nothing silently. Opening a file **already open in another window**
+  brings that window forward rather than giving you a second copy that saves over
+  the first. And Help gains a **Known limits** section — everything the app
+  deliberately doesn't do, in one place.
 - **v0.10.0** — **The source view is syntax-highlighted** and follows the theme,
   or runs its own (View ▸ Theme ▸ Same Theme for Both Views). Alt menu shortcuts
   now work with a document open.

@@ -66,7 +66,8 @@ tool that rewrites the file with identical bytes reads as an external change.
 
 **Decided 2026-09-10:** everything below lands on ONE line, 0.11 (unreleased
 while the work is in progress), and ships together as 1.0.0-beta1, then rc1, then
-1.0.0 after dogfooding — no per-stage tags. The stage numbers that follow are WORK
+1.0.0 after dogfooding — no per-stage tags. **Cut 2026-09-13:** all five stages
+are in, and the 0.11 line became 1.0.0-beta1. The stage numbers that follow are WORK
 ORDER, kept so the issues' "Release" lines still map; they are not release numbers.
 The order is the one the risk deserves, except the already-open guard, pulled to
 the front because it is felt daily, stands alone, and is the first piece of the
@@ -210,14 +211,15 @@ Filed 2026-09-10 as GitHub issues under the
 gap, so the discovery and the fix are both public. Commits and CHANGELOG entries
 reference them.
 
-Status is the state on `master`, where every stage below lands unreleased: the
-0.11 line ships as 1.0.0-beta1.
+Status is the state on `master`. Every stage below landed unreleased on the 0.11
+line and was cut as 1.0.0-beta1 on 2026-09-13 — version, CHANGELOG section and
+docs in the repository; the tag is the owner's step and is not made here.
 
 | Stage | Issues | Status |
 |---|---|---|
-| Stage 1 already-open guard | #1 (enhancement — single-instance-per-file was never promised) | Done 2026-09-11 (unreleased) |
-| Stage 2 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change | Done 2026-09-11 (unreleased) |
-| Stage 3 Find & Replace | #5 | Done 2026-09-11 (unreleased) |
-| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste | Done 2026-09-11 (unreleased) |
+| Stage 1 already-open guard | #1 (enhancement — single-instance-per-file was never promised) | Done 2026-09-11 (1.0.0-beta1) |
+| Stage 2 round-trip honesty | #2 conventions rewritten, #3 line endings and BOM, #4 identical-bytes external change | Done 2026-09-11 (1.0.0-beta1) |
+| Stage 3 Find & Replace | #5 | Done 2026-09-11 (1.0.0-beta1) |
+| Stage 4 images | #6 dropped image file opens as text, #7 source-view image paste | Done 2026-09-11 (1.0.0-beta1) |
 | installer decision | #8 — decided A, closed | Decided 2026-09-10 |
-| Stage 5 limits written down | #9 | In progress |
+| Stage 5 limits written down | #9 | Done 2026-09-13 (1.0.0-beta1) |

@@ -9,6 +9,26 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+## [1.0.0-beta1] - 2026-09-13
+
+The first 1.0 prerelease. 1.0 is not feature-maximal: it is the release where the
+tool does what its first paragraph promises, with every deliberate limit written
+down. The 2026-09-10 readiness audit found one hole that would embarrass a 1.0 —
+a save through the formatted view quietly rewrote your markdown's style, and took
+the file's line endings and byte-order mark with it — plus a handful of edges that
+read as unfinished. All of them are below: the conventions a save writes are
+pinned and documented, line endings and the mark survive, Find has Replace, a
+picture dropped or pasted is a picture rather than garbage or nothing, a file
+already open in another window brings that window forward instead of opening a
+second copy, and **Help ▸ View Help** gains a *Known limits* section saying what
+the app deliberately does not do. 1.0 ships portable-only — there is still no
+installer, and that is the next release's headline.
+
+A prerelease for the usual reason: this is a great deal of file-handling change —
+what a save writes to your file, what a drop does, how a second window on the same
+file is treated — and it wants real hands on real documents before the stable
+promote.
+
 ### Added
 - **Find has Replace.** The Find dialog (Ctrl+F) has a *Replace with* box and
   **Replace** / **Replace All** buttons, in both views and in all four search

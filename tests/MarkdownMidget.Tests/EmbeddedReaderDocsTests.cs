@@ -80,6 +80,24 @@ public class EmbeddedReaderDocsTests
             $"CHANGELOG.md has no [{version}] heading and no [Unreleased] section");
     }
 
+    [Fact]
+    public void TheVersionThisProjectCarriesHasTheChangelogSectionTheReleaseWorkflowCuts()
+    {
+        // release.yml builds the GitHub release body by finding "^##\s+\[<version>\]"
+        // in this file, where <version> is the tag with its leading v stripped — the
+        // same string the csproj carries at the cut. Miss it by one character and the
+        // workflow only WARNS, then publishes the generic "Alpha update." body over a
+        // real release. The test above accepts [Unreleased] because that is the
+        // ordinary state of a dev build; this one is about the cut, so a -dev version
+        // is the exemption and everything else must have a section of its own.
+        var version = Regex.Match(RepoSources.Read("src", "MarkdownMidget", "MarkdownMidget.csproj"),
+            @"<Version>([^<]+)</Version>").Groups[1].Value;
+        Assert.NotEqual("", version);
+        if (version.EndsWith("-dev", StringComparison.Ordinal)) return;
+
+        Assert.Matches($@"(?m)^##\s+\[{Regex.Escape(version)}\]", Read("CHANGELOG.md"));
+    }
+
     [Theory]
     [InlineData(1, "0.10.0")]
     [InlineData(2, "0.10.0")]

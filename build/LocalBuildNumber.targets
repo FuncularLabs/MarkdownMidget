@@ -1,8 +1,8 @@
 <Project>
   <!--
     A number for every local build, so a freshly published MarkdownMidget.exe can be told
-    apart from the one it replaced: FileVersion 0.11.0 -> 0.11.0.57, InformationalVersion
-    0.11.0-dev -> 0.11.0-dev+build.57. Imported by src/MarkdownMidget only.
+    apart from the one it replaced: FileVersion 1.0.0 -> 1.0.0.57, InformationalVersion
+    1.0.0-beta1 -> 1.0.0-beta1+build.57. Imported by src/MarkdownMidget only.
 
     Every build takes the next number, even one where nothing changed - that is what makes
     a fresh publish identifiable - and the changed attribute costs a recompile, about a

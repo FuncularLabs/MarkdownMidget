@@ -11,7 +11,7 @@ deliberately parked).
 
 ---
 
-## 1.0 (0.10.0 promoted 2026-09-10; everything below ships as 1.0.0-beta1 from the 0.11 line)
+## 1.0 (cut as 1.0.0-beta1 on 2026-09-13; 0.10.0 was promoted 2026-09-10)
 
 The 2026-09-10 readiness audit, planned in detail in
 [docs/plans/release-1.0.md](docs/plans/release-1.0.md). The verdict was "close on
@@ -19,7 +19,7 @@ breadth, one hole that would embarrass a 1.0, a few that read as unfinished". In
 order of risk:
 
 - ~~**Saving rewrites your markdown conventions, invisibly.**~~ **Done 2026-09-11
-  (unreleased, #2)**: the conventions the formatted view saves in are pinned in
+  (1.0.0-beta1, #2)**: the conventions the formatted view saves in are pinned in
   `editor-src/src/conventions.js`, kept pinned by a round-trip harness that runs the
   shipped editor in jsdom (one named case per convention), and written down in Help
   under *Modified state, undo, and saving ▸ Markdown conventions*; intraword
@@ -29,21 +29,21 @@ order of risk:
   whole but may come back as the literal `*…*` text. Was: a 39-line README-style
   file came back with 30 lines changed and no edit made.
 - ~~**Line endings are mangled and the BOM is dropped.**~~ **Done 2026-09-10
-  (unreleased, #3)**: the file's line ending (by majority) and UTF-8 BOM are detected
+  (1.0.0-beta1, #3)**: the file's line ending (by majority) and UTF-8 BOM are detected
   on open, every ending is folded in memory, and Save re-applies the detected
   convention end to end; a re-encode on disk with the text unchanged is adopted.
   Was: structural endings became LF but endings inside code and HTML blocks stayed as
   written, so a CRLF file with one code block saved with mixed endings, and the BOM
   was dropped.
 - ~~**A file rewritten with identical bytes reads as an external change.**~~ **Done
-  2026-09-10 (unreleased, #4)**: the watcher now keeps the disk text as a second
+  2026-09-10 (1.0.0-beta1, #4)**: the watcher now keeps the disk text as a second
   baseline and reports a change only when the file differs from both it and the
   editor's own serialisation.
-- ~~**Find has no Replace.**~~ **Done 2026-09-11 (unreleased, #5)**: Replace and
+- ~~**Find has no Replace.**~~ **Done 2026-09-11 (1.0.0-beta1, #5)**: Replace and
   Replace All in the Find dialog, both views, all four modes; Replace All is one
   undo step and is scoped to the selection when there is one. Was: Find only.
 - ~~**Dropping an image file on the editor opens it as text**~~ **Done 2026-09-11
-  (unreleased, #6)**: a dropped file is routed by its content — a picture (PNG,
+  (1.0.0-beta1, #6)**: a dropped file is routed by its content — a picture (PNG,
   JPEG, GIF, WebP, BMP, recognised by its bytes, whatever its name) is embedded in
   either view exactly as Insert ▸ Picture embeds it, a markdown or text file opens
   as before, and anything else is refused by name and never replaces the document.
@@ -51,13 +51,13 @@ order of risk:
   was untitled and unmodified, in a fresh window from the toolbar otherwise, or
   after the discard prompt on the formatted view.
   ~~Pasting an image into the *source* view does nothing.~~ **Done 2026-09-11
-  (unreleased, #7)**: Ctrl+V with an image and no text on the clipboard inserts the
+  (1.0.0-beta1, #7)**: Ctrl+V with an image and no text on the clipboard inserts the
   same data-URI markdown the formatted view produces — `![](data:image/png;base64,…)`
   at the caret (over any selection), in one undo step (Markdown Monster accepts
   pasted images in its text editor too, though it saves them as files — our embed
   model is the consistent answer). Pasting into the formatted view already worked.
 - ~~**The same file open in two windows silently overwrites.**~~ **Done 2026-09-10
-  (unreleased, #1)**: the per-path lock — focus the window that has it, else open
+  (1.0.0-beta1, #1)**: the per-path lock — focus the window that has it, else open
   read-only with a message — described in full where the multi-window list strikes
   the same item further down.
 - **No installer.** Decided 2026-09-10: portable-only 1.0, stated in README/HELP;
@@ -65,6 +65,11 @@ order of risk:
 
 Then 1.0 itself adds no features: it writes every deliberate limit down (see the
 last section) and makes the README's promise true as written.
+**Done 2026-09-13 (1.0.0-beta1, #9)**: HELP's *Known limits* section, the "Won't
+unless asked" list at the foot of this file, and a README opening paragraph that
+says what a trip through the formatted view does change. The beta is cut in the
+repository — version, CHANGELOG section and these docs — and not yet tagged;
+1.0.0 follows after dogfooding.
 
 ## Next
 
@@ -386,7 +391,7 @@ Concrete things that fall out of being N unrelated processes today:
   bespoke solutions to the same problem. A third shared thing will want a third.
   Worth deciding whether there should be one small "shared user state" layer
   before adding one.
-- ~~**The same file can be open in two windows.**~~ **Done 2026-09-10 (unreleased,
+- ~~**The same file can be open in two windows.**~~ **Done 2026-09-10 (1.0.0-beta1,
   #1)**: a per-file claim under `%LocalAppData%\MarkdownMidget\open` (one lock file
   per normalised path, holding pid, window handle and path) lets a second open find
   the window that has the file and bring it forward instead of opening a copy; when
@@ -424,10 +429,10 @@ release, with infrastructure riding along with whatever needs it.
   Word's CUSTOM.DIC" — import only, never write back. Sharing the OS dictionary
   was considered and deliberately rejected as too risky.
 
-- ~~**Find & Replace.**~~ **Done 2026-09-11 (unreleased, #5)**: not a tab — a
+- ~~**Find & Replace.**~~ **Done 2026-09-11 (1.0.0-beta1, #5)**: not a tab — a
   Replace field and Replace / Replace All buttons in the Find dialog, scoped to the
   selection, honouring the current search mode, one undo step per Replace All.
-- ~~**Independent code-view theme.**~~ **Done 2026-09-10 (unreleased)**, in a
+- ~~**Independent code-view theme.**~~ **Done 2026-09-10 (0.10.0)**, in a
   simpler shape than first scoped: no second theme format and no second list. One
   list of themes; **View ▸ Theme ▸ Same Theme for Both Views** (on by default) and,
   when off, View ▸ Theme changes only the view you're in. The source view's theme is
@@ -436,7 +441,7 @@ release, with infrastructure riding along with whatever needs it.
 - **.NET 8 build + portable self-contained build.** The multi-target plan (net8 /
   net10 / portable ~63 MB) is scoped and the code already compiles for net8; just
   needs the csproj multi-target + extra publish profiles + release-workflow matrix.
-- ~~**Editor round-trip test harness.**~~ **Done 2026-09-11 (unreleased, #2)**:
+- ~~**Editor round-trip test harness.**~~ **Done 2026-09-11 (1.0.0-beta1, #2)**:
   `editor-src/test/roundtrip.test.mjs` mounts the shipped editor in jsdom
   (ProseMirror + the Milkdown plugins) under `node --test` and runs markdown in →
   editor → markdown out: an idempotence invariant over a corpus (the audit fixture,
