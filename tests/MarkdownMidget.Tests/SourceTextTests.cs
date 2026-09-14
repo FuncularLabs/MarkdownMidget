@@ -268,7 +268,7 @@ public class SourceTextTests
         // rewrite back for .mdenc files or reloads in the source view. So, read with
         // the comments out (a commented-out call is not a call, and the explanation
         // above it is not code between the two): the call follows
-        // `await SetCleanBaselineAsync(_sourceMode ? null : settled);` with only whitespace between them, at the
+        // the baseline's `if (…) await SetCleanBaselineAsync(); else { …placeholder… }` with only whitespace between them, at the
         // method's own brace level, and no `return` comes before it. The method has
         // no early return today; one added later skips this decision for its load,
         // and has to decide the source box itself before it may change this pin.
@@ -277,14 +277,14 @@ public class SourceTextTests
             "private async Task LoadDocumentAsync("));
 
         var disk = body.IndexOf("_diskBaseline = DocumentText.Fold(doc.Text);", StringComparison.Ordinal);
-        var clean = body.IndexOf("await SetCleanBaselineAsync(_sourceMode ? null : settled);", StringComparison.Ordinal);
+        var clean = body.IndexOf("if (_sourceMode || !_editorReady || doc.Text.Length == 0) await SetCleanBaselineAsync();", StringComparison.Ordinal);
         Assert.True(disk >= 0, "LoadDocumentAsync no longer sets _diskBaseline from the loaded text");
         Assert.True(clean > disk, "SetCleanBaselineAsync no longer follows the disk baseline in LoadDocumentAsync");
 
         var pair = System.Text.RegularExpressions.Regex.Match(body,
-            @"await SetCleanBaselineAsync\(_sourceMode \? null : settled\);\s*if \(SourceText\.AfterLoad\(_sourceMode, SourceBox\.Text, _cleanMarkdown, _diskBaseline\) is \{ \} ownSpelling\)\s*(?:\{\s*)?SourceBox\.Text = ownSpelling;");
+            @"if \(_sourceMode \|\| !_editorReady \|\| doc\.Text\.Length == 0\) await SetCleanBaselineAsync\(\);\s*else \{ _cleanMarkdown = _pendingBaseline = new string\([^\n]*\); _dirty = false; UpdateTitle\(\); \}\s*if \(SourceText\.AfterLoad\(_sourceMode, SourceBox\.Text, _cleanMarkdown, _diskBaseline\) is \{ \} ownSpelling\)\s*(?:\{\s*)?SourceBox\.Text = ownSpelling;");
         Assert.True(pair.Success,
-            "LoadDocumentAsync must follow `await SetCleanBaselineAsync(_sourceMode ? null : settled);` directly — nothing but whitespace " +
+            "LoadDocumentAsync must follow its baseline's `if (…) await SetCleanBaselineAsync(); else { …placeholder… }` directly — nothing but whitespace " +
             "between — with `if (SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) " +
             "is { } ownSpelling) SourceBox.Text = ownSpelling;`");
 
@@ -292,7 +292,7 @@ public class SourceTextTests
         // with no braceless owner on the line above, no way out before them, and no
         // preprocessor directive deciding which copy compiles. One reading says all of
         // that, shared with the window's other wiring pins (#2 review N2, N4).
-        RepoSources.AssertRunsUnconditionally(body, "await SetCleanBaselineAsync(_sourceMode ? null : settled);");
+        RepoSources.AssertRunsUnconditionally(body, "if (_sourceMode || !_editorReady || doc.Text.Length == 0) await SetCleanBaselineAsync();");
         RepoSources.AssertRunsUnconditionally(body,
             "if (SourceText.AfterLoad(_sourceMode, SourceBox.Text, _cleanMarkdown, _diskBaseline) is { } ownSpelling)");
     }

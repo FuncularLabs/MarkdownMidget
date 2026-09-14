@@ -155,7 +155,8 @@ internal static class DropHandshake
     /// <c>HandleExternalChangeAsync</c> takes across its own awaits: a reassignment
     /// to identical text is still a movement, and a value comparison would miss it.
     /// <c>SetCleanBaselineAsync</c> is the writer that takes the trouble to build a
-    /// fresh instance, and an open or a reload goes through it. A SAVE does not —
+    /// fresh instance, and an open or a reload goes through it — or, in the formatted view, leaves a fresh placeholder,
+    /// whose filling-in later is the same baseline (<c>DropStillApplies</c>). A SAVE does not —
     /// <c>SaveToPathAsync</c> assigns <c>_cleanMarkdown</c> directly, as do the
     /// encrypt and convert paths — and neither does a Keep, which is
     /// <c>AcceptDiskAsBaseline</c> assigning <c>disk.Text</c>; both are fresh

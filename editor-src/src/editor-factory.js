@@ -32,6 +32,7 @@ import { lineCapture, lineMap } from './line-map.js';
 import {
   wrapInHeadingCommand,
   turnIntoTextCommand,
+  syncHeadingIdPlugin,
 } from '@milkdown/kit/preset/commonmark';
 import { underline } from './underline.js';
 
@@ -260,7 +261,9 @@ export function createEditor({
       ctx.set(prismConfig.key, { configureRefractor: () => refractor });
     })
     .config(conventions)
-    .use(commonmark)
+    // Without the heading-id sync: a second pass over every load, one setNodeMarkup per heading, for ids nothing reads. A `#anchor`
+    // link resolves against the document's <base> and is refused as a navigation; the heading's own markup still carries its id.
+    .use(commonmark.filter((p) => p !== syncHeadingIdPlugin))
     .use(gfm)
     .use(tightBulletList)   // after the presets: the schema keeps the last definition of a node
     .use(tightListItem)

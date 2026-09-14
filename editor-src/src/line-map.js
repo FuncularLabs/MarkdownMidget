@@ -127,6 +127,9 @@ export function markdownWithLines(doc, serialize) {
  *  while untouched, the read above; once edited, that document's own markdown, leaving the live numbering to the next read. */
 export const settledMarkdown = (doc, serialize) => (settled && settled !== doc ? { markdown: serialize(settled), rebuilt: false } : markdownWithLines(doc, serialize));
 
+/** Whether `doc` is not the document the last load installed (MDM.changedSinceLoad): only a transaction with steps makes a new one. */
+export const changedSinceLoad = (doc) => settled !== doc;
+
 /** The numbering for `doc`, rebuilt first when it is stale (Go to Line), or null. */
 export function ensureLines(doc, serialize) {
   if (current?.doc !== doc) markdownWithLines(doc, serialize);
@@ -138,7 +141,7 @@ function moved(step, doc) {
   const { slice } = step, n = doc.nodeAt(step.from ?? 0), $from = doc.resolve(step.from ?? 0);
   if (step instanceof AddMarkStep || step instanceof RemoveMarkStep) return null;
   if (n?.isTextblock && step.gapFrom - step.from === 1 && step.to - step.gapTo === 1 && n.nodeSize === step.to - step.from
-    && step.insert === 1 && slice.size === 2 && slice.content.firstChild.type === n.type) return null;   // attributes only: a heading's id
+    && step.insert === 1 && slice.size === 2 && slice.content.firstChild.type === n.type) return null;   // attributes only: a code block's language, say
   if (!(step instanceof ReplaceStep)) return step.from ?? step.pos ?? 0;
   let f = slice.content, depth = 0;   // a slice open at both ends around one text block (a paste) is inline too
   while (depth < slice.openStart && f.childCount === 1) { f = f.firstChild.content; depth++; }

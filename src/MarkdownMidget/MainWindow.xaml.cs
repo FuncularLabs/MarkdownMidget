@@ -72,6 +72,8 @@ public partial class MainWindow : Window
     // editor's words back).
     private string _cleanMarkdown = string.Empty;
     private TaskCompletionSource _painted = new();   // the editor has painted the document being installed (SetDocumentMarkdownAsync)
+    private int _loadToken;   // which install _painted is for: SetDocumentMarkdownAsync numbers each, and the editor's painted names it
+    private string? _pendingBaseline, _baselineFromPending;   // a formatted-view load's placeholder _cleanMarkdown, and what filled it (TakePendingBaselineAsync)
     // The file as it was last read from or written to disk, folded to LF - the
     // second baseline (issue #4). _cleanMarkdown is normally the EDITOR's
     // serialisation of that state and differs from it whenever the editor
@@ -488,7 +490,7 @@ public partial class MainWindow : Window
                     if (timed.RootElement.TryGetProperty("lines", out var timedLines))
                         foreach (var p in timedLines.EnumerateArray()) TimingLog.Write("editor", p[0].GetString() ?? "", p[1].GetDouble());
                 break;
-            case "painted": _painted.TrySetResult(); break;   // after setMarkdown: the clean baseline can be read now
+            case "painted": if (EditorScripts.IsPaintedFor(e.WebMessageAsJson, _loadToken)) _painted.TrySetResult(); break;   // this install's setMarkdown has painted (or its page is hidden)
             case "change":
                 if (!_sourceMode)
                 {
@@ -967,8 +969,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// Installs <paramref name="markdown"/> in both surfaces and hands back what the
     /// editor settled on — the serialisation it will return from now on, and so the
-    /// markdown a clean baseline should be taken from. Null when the editor could not
-    /// be asked (not ready, or it did not answer): a caller that needs to know whether
+    /// markdown a clean baseline should be taken from. Null in the formatted view, which reads it only when first needed,
+    /// and when the editor could not be asked (not ready, or it did not answer): a caller that needs to know whether
     /// the document landed in the formatted view reads that, rather than serialising
     /// the whole document a second time to ask the same question.
     /// </summary>
@@ -993,7 +995,8 @@ public partial class MainWindow : Window
         if (_editorReady)
         {
             _painted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
+            _pendingBaseline = null;   // this install moves the editor's settled snapshot on: no earlier load's placeholder may be filled from it
+            await RunEditorAsync(EditorScripts.SetMarkdown(markdown, ++_loadToken));
             phase = TimingLog.Lap("install", "setMarkdown", phase);
             // setMarkdown settles the document before it returns (editor-src/src/settle.js):
             // one that ends in anything but a paragraph or a heading — a list, a table, a
@@ -1003,14 +1006,13 @@ public partial class MainWindow : Window
             // that, not what we asked for, or the clean baseline taken in source view
             // would differ from the formatted view's markdown by one blank line and the
             // document would read as modified the moment the views were swapped (#5 NF-5).
-            // Read after the first paint, not in front of it, and of the document setMarkdown installed: a keystroke made meanwhile stays unsaved work.
+            // Read here only in the source view, which shows it; the formatted view goes on after its first paint and takes its baseline when first needed (TakePendingBaselineAsync).
             if (!_sourceMode) { await Task.WhenAny(_painted.Task, Task.Delay(2000)); phase = TimingLog.Lap("install", "painted", phase); }
-            settled = await RunEditorAsync("window.MDM.getSettledMarkdown()");
-            phase = TimingLog.Lap("install", "getSettledMarkdown", phase);
+            else { settled = await RunEditorAsync("window.MDM.getSettledMarkdown()"); phase = TimingLog.Lap("install", "getSettledMarkdown", phase); }
             if (settled is not null) markdown = settled;
         }
-        // The box mirrors the settled serialisation the editor just handed back, which
-        // is what makes it the same document the baseline is taken from. Whether a
+        // In the source view the box mirrors the settled serialisation the editor just handed back, which
+        // is what makes it the same document the baseline is taken from (the formatted view's waits for Ctrl+E). Whether a
         // file-backed document then shows its OWN spelling in the source view (#2) is
         // not this helper's question: it runs before its callers make _diskBaseline
         // the new document's, so SourceText.For asked here would weigh the new text
@@ -1109,6 +1111,7 @@ public partial class MainWindow : Window
             // formatted view HAS changed the document, `latest` is the only copy of
             // that work and is what arrives.
             switching = TimingLog.Lap("toSource", "getMarkdown", switching);
+            await TakePendingBaselineAsync(current: latest);   // untouched since its load, what was just read is the baseline
             SourceBox.Text = SourceText.For(latest, _cleanMarkdown, _diskBaseline);
             TimingLog.Lap("toSource", "sourceBox.set", switching);
             Web.Visibility = Visibility.Collapsed;
@@ -1427,7 +1430,6 @@ public partial class MainWindow : Window
         // close a modified document without asking and with no crash copy — the
         // failure this whole feature exists to prevent, caused by its own guard.
         _suppressDirty = true;
-        string? settled = null;   // the editor's serialisation of it, which the clean baseline below is taken from
         var phase = TimingLog.Start();
         try
         {
@@ -1443,7 +1445,7 @@ public partial class MainWindow : Window
             _spellGeneration++;
             await ApplyDocBaseAsync(path);            // resolve relative images first
             TimingLog.Lap("open", "setDocBase", phase);   // the install logs its own phases
-            settled = await SetDocumentMarkdownAsync(doc.Text); // setMarkdown flushes undo history
+            await SetDocumentMarkdownAsync(doc.Text); // setMarkdown flushes undo history
             _currentPath = path;
             _lineEnding = doc.Ending;
             _hadBom = doc.HadBom;
@@ -1458,9 +1460,10 @@ public partial class MainWindow : Window
             _displayName = null;
         }
         finally { _suppressDirty = false; }
-        // In the formatted view the editor's answer above IS the baseline: asking again serialised the whole document a
-        // second time for the same text. The source view, or no answer, asks as before.
-        await SetCleanBaselineAsync(_sourceMode ? null : settled);
+        // The formatted view leaves a placeholder that the first comparison fills from the editor (TakePendingBaselineAsync): a baseline
+        // serialised here cost every open the whole document, for an untouched one that never compares. The source view, or an empty or unready editor, asks as before.
+        if (_sourceMode || !_editorReady || doc.Text.Length == 0) await SetCleanBaselineAsync();
+        else { _cleanMarkdown = _pendingBaseline = new string("\0baseline not taken\0".AsSpan()); _dirty = false; UpdateTitle(); }
         // The source view already showing? Then the install above put the editor's
         // settled serialisation in front of the user — the rewrite Ctrl+E no longer
         // shows (#2) — and no Ctrl+E is coming to replace it. Ctrl+E's rule is
@@ -2230,6 +2233,7 @@ public partial class MainWindow : Window
             // spelling, and comparing that against the editor's serialisation alone
             // would keep a snapshot of a document with nothing unsaved in it — which
             // the next launch offers back as "recovered unsaved changes".
+            await TakePendingBaselineAsync(current: markdown);   // a placeholder baseline is filled before it is compared
             if (IsUnmodifiedText(markdown)) { DiscardBackup(); return; }
             if (_docEncrypted && _docPassword is { } pw)
             {
@@ -2794,6 +2798,7 @@ public partial class MainWindow : Window
         // re-read below — `confirm` against `newContent`, taken right before
         // ReloadPreservingPositionAsync — which a mid-pass save of an empty document
         // fails, so the pass rechecks instead of reloading.
+        await TakePendingBaselineAsync();   // a formatted-view load's placeholder is filled first, so the pin below is of the real baseline
         var cleanAtStart = _cleanMarkdown;
         bool PassValid() => StillEditing(path) && ReferenceEquals(_cleanMarkdown, cleanAtStart);
 
@@ -4776,7 +4781,8 @@ public partial class MainWindow : Window
     /// from. False means the plan made against it is stale and nothing from the drop
     /// may be applied.</summary>
     private bool DropStillApplies((string? Path, string Clean, DropTarget Target, long View, long Generation) then) =>
-        DropHandshake.StillApplies(then.Path, _currentPath, then.Clean, _cleanMarkdown,
+        DropHandshake.StillApplies(then.Path, _currentPath, then.Clean,
+            ReferenceEquals(then.Clean, _pendingBaseline) && ReferenceEquals(_cleanMarkdown, _baselineFromPending) ? then.Clean : _cleanMarkdown,   // a placeholder filled in is not a move
             then.Target, DropTargetNow(), then.View, _viewGeneration);
 
     /// <summary>Whether <paramref name="then"/>'s drop is still the one the window
@@ -5477,6 +5483,7 @@ public partial class MainWindow : Window
     private async Task UpdateDirtyAsync(string? editorAnswer = null)   // editorAnswer: the formatted view's markdown, just read
     {
         if (_suppressDirty) { ScheduleDirtyCheck(); return; }   // an edit made while a document installs is judged once it has its baseline
+        if (!await TakePendingBaselineAsync(needed: false)) return;   // untouched since its load: still clean, and nothing serialised to say so
         // A failed read must not be mistaken for an empty document: that would clear
         // the modified flag, and an unmodified document is one the app throws away
         // without asking — taking the crash copy with it. Keep the last known state.
@@ -5580,6 +5587,23 @@ public partial class MainWindow : Window
         _cleanMarkdown = markdown ?? new string(_cleanMarkdown.AsSpan());
         _dirty = false;
         UpdateTitle();
+    }
+
+    /// <summary>
+    /// Fills a formatted-view load's placeholder baseline when something first compares against it: with <paramref name="current"/>, markdown just
+    /// read, while the editor says the document is untouched since that load, and otherwise with the editor's copy of what the load installed. False,
+    /// reading nothing, for an untouched document when no baseline is <paramref name="needed"/>. A failed ask keeps the placeholder, which no document
+    /// equals: modified, the safe way round. Never in the source view, whose edits the editor does not see.
+    /// </summary>
+    private async Task<bool> TakePendingBaselineAsync(bool needed = true, string? current = null)
+    {
+        var pending = _pendingBaseline;
+        if (pending is null || _sourceMode || !ReferenceEquals(_cleanMarkdown, pending)) return true;
+        string? text = null;
+        try { if (await RunEditorAsync("String(window.MDM.changedSinceLoad())") == "false") { if (!needed) return false; text = current; } text ??= await RunEditorAsync("window.MDM.getSettledMarkdown()"); }
+        catch { return true; }
+        if (text is not null && ReferenceEquals(_cleanMarkdown, pending) && ReferenceEquals(_pendingBaseline, pending)) _cleanMarkdown = _baselineFromPending = new string(text.AsSpan());
+        return true;
     }
 
     private bool _canUndo;

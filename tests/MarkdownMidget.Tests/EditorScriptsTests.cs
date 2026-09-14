@@ -42,6 +42,15 @@ public class EditorScriptsTests
     }
 
     [Fact]
+    public void AnInstallCarriesItsLoadAndOnlyThatLoadsPaintedEndsItsWait()
+    {
+        Assert.Equal("window.MDM.setMarkdown(\"# a\", true, 7)", EditorScripts.SetMarkdown("# a", 7));
+        Assert.True(EditorScripts.IsPaintedFor("{\"type\":\"painted\",\"load\":7}", 7));
+        Assert.False(EditorScripts.IsPaintedFor("{\"type\":\"painted\",\"load\":6}", 7));   // an earlier install's, after its wait ran out
+        Assert.False(EditorScripts.IsPaintedFor("{\"type\":\"painted\"}", 7));              // one that names no load
+    }
+
+    [Fact]
     public void TheDocumentGoesInAsAJavascriptStringLiteral()
     {
         // The other half of the call is the document, which is data: a quote, a

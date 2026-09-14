@@ -22,7 +22,7 @@ import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, settledMarkdown, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, settledMarkdown, changedSinceLoad, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
 } from './line-map.js';
 
 import {
@@ -524,7 +524,8 @@ const MDM = {
     note(rebuilt ? 'getMarkdown.rebuilt' : 'getMarkdown', t0);
     return markdown;
   },
-  getSettledMarkdown() { return this.getMarkdown(true); },   // the document as setMarkdown installed it: the host's clean baseline, read once it has painted
+  getSettledMarkdown() { return this.getMarkdown(true); },   // the document as setMarkdown installed it: the host's clean baseline, read when it first needs one
+  changedSinceLoad() { return !editorView || changedSinceLoad(editorView.state.doc); },   // false: untouched since setMarkdown, so the host needs no baseline yet
   timing(on) { timings = on ? [] : null; },   // the host's MDM_TIMING=1 (TimingLog.cs)
 
   // Go to Line (#10): the host asks how many lines there are, then goes to one.
@@ -573,7 +574,7 @@ const MDM = {
 
   // flush=true rebuilds editor state, clearing undo history — used when loading a
   // document so undo can't reach back past the freshly opened/new content.
-  setMarkdown(md, flush = true) {
+  setMarkdown(md, flush = true, load = 0) {   // load: the host's number for this install, echoed in its painted
     if (!editor) return;
     const t0 = performance.now(); if (timings) paintFrom = t0;
     suppressChange = true;
@@ -598,7 +599,7 @@ const MDM = {
     postHistory();
     if (editorView) postSelectionState(editorView.state);   // the new document's Ln/Col (#10)
     note('setMarkdown', t0);
-    const painted = () => postToHost({ type: 'painted' });   // the host reads its clean baseline after this rather than in front of the paint
+    const painted = () => postToHost({ type: 'painted', load });   // the host's install waits for this, and only this install's
     if (document.hidden) painted(); else requestAnimationFrame(() => setTimeout(painted));   // a hidden page does not paint: say so now
   },
 

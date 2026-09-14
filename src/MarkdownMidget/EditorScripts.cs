@@ -31,4 +31,10 @@ internal static class EditorScripts
     /// </summary>
     public static string Create(string markdown) =>
         $"window.MDM.create({JsLiteral(markdown)}, {PictureLimit.EditorOptionsJson()})";
+
+    /// <summary><c>MDM.setMarkdown</c> for install <paramref name="load"/>, which the editor echoes in the <c>painted</c> it posts after it.</summary>
+    public static string SetMarkdown(string markdown, int load) => $"window.MDM.setMarkdown({JsLiteral(markdown)}, true, {load})";
+
+    /// <summary>Whether a <c>painted</c> message is install <paramref name="load"/>'s: an earlier install's, arriving after its wait ran out, is not.</summary>
+    public static bool IsPaintedFor(string messageJson, int load) { using var m = JsonDocument.Parse(messageJson); return m.RootElement.TryGetProperty("load", out var l) && l.TryGetInt32(out var n) && n == load; }
 }
