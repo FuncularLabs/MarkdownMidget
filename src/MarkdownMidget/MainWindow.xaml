@@ -195,7 +195,7 @@
                             <MenuItem Header="CSS" Tag="css" Click="CodeBlock_Click" />
                         </MenuItem>
                     </MenuItem>
-                    <MenuItem Header="_View">
+                    <MenuItem Header="_View" SubmenuOpened="ViewMenu_Opened">
                         <MenuItem x:Name="MenuViewSource" Header="Edit Markdown _Source"
                                   IsCheckable="True" InputGestureText="Ctrl+E" Click="ToggleSource_Click" />
                         <MenuItem x:Name="MenuWordWrap" Header="Word Wr_ap (source view)"
@@ -219,7 +219,7 @@
                             <MenuItem x:Name="PageWidthFull" Header="_Full Width" IsCheckable="True"
                                       Tag="full" Click="PageWidth_Click" />
                         </MenuItem>
-                        <MenuItem x:Name="ThemeMenu" Header="_Theme" SubmenuOpened="ThemeMenu_Opened"
+                        <MenuItem x:Name="ThemeMenu" Header="_Theme"
                                   ToolTip="Recolour the editing surface. Printing is unaffected — paper stays light." />
                         <Separator />
                         <MenuItem x:Name="MenuSpellCheck" Header="_Spell Check"

@@ -73,9 +73,13 @@ public partial class MainWindow
 
     // ===== the menu =====
 
-    // Rebuilt on open rather than once at startup, so a file dropped into custom\
-    // shows up without restarting the app — the same reason Open Recent rebuilds.
-    private void ThemeMenu_Opened(object sender, RoutedEventArgs e) => BuildThemeMenu();
+    // Rebuilt each time View opens rather than once at startup, so a file dropped into
+    // custom\ shows up without restarting the app — the same reason Open Recent rebuilds.
+    // On View's own opening, not Theme's: see MenuAccessKeys.IsOwnSubmenuOpening.
+    private void ViewMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (MenuAccessKeys.IsOwnSubmenuOpening(sender, e.OriginalSource)) BuildThemeMenu();
+    }
 
     private void BuildThemeMenu()
     {

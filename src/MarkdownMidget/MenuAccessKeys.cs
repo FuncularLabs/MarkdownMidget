@@ -92,6 +92,13 @@ internal static class MenuAccessKeys
     /// gesture that enters the menu. Alt+F then release is not a tap.</summary>
     public static bool IsAltTap(Key realKey, bool altUsedSincePress) =>
         IsAltKey(realKey) && !altUsedSincePress;
+
+    /// <summary>True when a menu's SubmenuOpened is its OWN submenu opening, not a nested
+    /// one's bubbling up. Never rebuild a submenu's items from its own opening: Right or
+    /// Enter opens it and then focuses the first entry, and items cleared in between
+    /// leave nothing to focus — so the next Right moves on to the next top-level menu.</summary>
+    public static bool IsOwnSubmenuOpening(object sender, object? originalSource) =>
+        ReferenceEquals(sender, originalSource);
 }
 
 /// <summary>

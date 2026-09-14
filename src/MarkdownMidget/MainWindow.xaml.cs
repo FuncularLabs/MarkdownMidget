@@ -3918,6 +3918,8 @@ public partial class MainWindow : Window
 
     private void FileMenu_Opened(object sender, RoutedEventArgs e)
     {
+        // Open Recent's own opening bubbles here too; rebuilding it then strands Right.
+        if (!MenuAccessKeys.IsOwnSubmenuOpening(sender, e.OriginalSource)) return;
         BuildRecentMenu();
         // Guard at the operation as well (each handler re-checks) — the menu state
         // is UX, not the enforcement.

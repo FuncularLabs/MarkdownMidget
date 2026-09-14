@@ -290,6 +290,14 @@ public class MenuAccessKeysTests
         Assert.True(t.KeyUp(Key.LeftAlt));
     }
 
+    [Fact]
+    public void OnlyAMenusOwnOpeningIsItsOwn()
+    {
+        object file = new(), recent = new();
+        Assert.True(MenuAccessKeys.IsOwnSubmenuOpening(file, file));
+        Assert.False(MenuAccessKeys.IsOwnSubmenuOpening(file, recent));
+    }
+
     // ===== the WPF side, against a real menu =====
 
     private static T OnMenuWindow<T>(Func<Window, Menu, T> body)
@@ -362,6 +370,24 @@ public class MenuAccessKeysTests
             });
             Assert.True(focusWithin, "the menu must hold keyboard focus");
             Assert.True(firstFocused, "the first item must be the focused one");
+        }
+
+        [Fact]
+        public void ANestedSubmenuOpeningReachesTheParentButIsNotItsOwn()
+        {
+            // File ▸ Open Recent opening bubbles to File's SubmenuOpened handler, which
+            // rebuilt Open Recent mid-open: Right found nothing to focus.
+            var own = OnMenuWindow((_, menu) =>
+            {
+                var file = (MenuItem)menu.Items[0];
+                bool? seen = null;
+                file.SubmenuOpened += (s, e) => seen = MenuAccessKeys.IsOwnSubmenuOpening(s, e.OriginalSource);
+                var nested = (MenuItem)file.Items[0];
+                nested.RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent, nested));
+                return seen;
+            });
+            Assert.NotNull(own);                     // it bubbled to the parent
+            Assert.False(own.Value);
         }
     }
 }

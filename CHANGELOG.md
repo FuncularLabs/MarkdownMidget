@@ -17,6 +17,10 @@ changes between alpha tags.
   Go to Line reaches every line in the formatted view too, blank lines and fences included,
   and its margin shows every line once: each block's range of lines, and the lines between blocks.
 
+### Fixed
+
+- **Right on File ▸ Open Recent or View ▸ Theme opens it at its first entry**, and Left comes back; it used to jump to the next menu.
+
 ## [1.0.0-beta1] - 2026-09-13
 
 The first 1.0 prerelease. 1.0 is not feature-maximal: it is the release where the
