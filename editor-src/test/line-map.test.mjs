@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { replaceAll, getMarkdown, callCommand } from '@milkdown/kit/utils';
 import { turnIntoTextCommand, liftListItemCommand, insertHardbreakCommand } from '@milkdown/kit/preset/commonmark';
-import { newlineInCode } from '@milkdown/kit/prose/commands';
+import { newlineInCode, joinBackward, deleteSelection } from '@milkdown/kit/prose/commands';
 import { TextSelection } from '@milkdown/kit/prose/state';
 import { undo } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
@@ -176,6 +176,25 @@ test("typing, Enter in a code block and a line break keep the caret's line befor
   reads.push(caret('below'));
   assert.deepEqual(reads, [{ line: 1, col: 5 }, { line: 3, col: 10 }, { line: 9, col: 1 }, { line: 7, col: 1 }, { line: 3, col: 1 },
     {}, { line: 10, col: 1 }, { line: 4, col: 1 }, {}, { line: 11, col: 1 }]);
+});
+
+test("paragraphs merged by Backspace or by deleting across them have no line until the next read, not a deleted one's", () => {
+  const md = 'aaa first\n\nbbb second\n\nccc third\n', v = ed.view();
+  load(md);
+  caret('bbb');
+  joinBackward(v.state, v.dispatch);   // Backspace at the start of a paragraph
+  v.dispatch(v.state.tr.insertText('x'));
+  const reads = [lineStatus(v.state)];
+  saved();
+  reads.push(lineStatus(v.state));
+  load(md);
+  const from = (caret('first'), v.state.selection.head), to = (caret('third'), v.state.selection.head);
+  v.dispatch(v.state.tr.setSelection(TextSelection.create(doc(), from, to)));
+  deleteSelection(v.state, v.dispatch);   // Delete
+  reads.push(lineStatus(v.state));
+  saved();
+  reads.push(lineStatus(v.state));
+  assert.deepEqual(reads, [{}, { line: 1, col: 11 }, {}, { line: 1, col: 5 }]);
 });
 
 test('an HTML block or comment over several lines counts its lines, and Go to Line inside it lands right after it', () => {

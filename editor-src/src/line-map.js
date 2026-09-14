@@ -156,9 +156,11 @@ function last(test) {
 export function lineStatus(state) {
   const $head = state.selection.$head;
   const e = current && last((en) => en.pos <= $head.pos);
-  let d = $head.depth;   // the caret's text block, or its table, numbered only when no edit since the rebuild could have moved it
+  // The caret's text block, or its table, numbered only by its own entry (a merged-away block's entry maps
+  // into the block that took its text) and only when no edit since the rebuild could have moved it (staleFrom).
+  let d = $head.depth;
   if (e?.type === 'table') while (d > 0 && $head.node(d).type.name !== 'table') d--;
-  if (!e || !d || $head.before(d) >= (staleFrom ?? Infinity)) return {};
+  if (!e || !d || $head.before(d) !== e.pos || $head.before(d) >= (staleFrom ?? Infinity)) return {};
   let text = $head.parent.isTextblock ? $head.parent.textBetween(0, $head.parentOffset, undefined, leafText) : '';
   let line = e.line;
   if (e.type === 'table') {   // a table row is a line; the delimiter row follows the header
