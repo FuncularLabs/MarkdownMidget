@@ -277,8 +277,8 @@ is deferred from this first iteration. Notable deferrals / divergences:
 - **Underline → inline HTML.** Markdown has no underline; it round-trips as
   `<u>…</u>` (see above).
 - **Toolbar glyphs.** Old-school flat icon buttons (Segoe Fluent Icons). The
-  `</>` mark is reserved for inline code; the source/WYSIWYG toggle uses braces
-  (`{}`, → markdown source) and a document glyph (→ formatted view).
+  `</>` mark is reserved for inline code; the view pair is a page-with-picture
+  button (formatted view) and a `##` button (markdown source), the current one lit.
 - **Pictures embed as data URIs.** Inserting a picture base64-encodes the file
   into the markdown (`![alt](data:image/…;base64,…)`) so it renders inside the
   sandboxed WebView and travels with the document. Right-click ▸ **Resize…**
