@@ -226,11 +226,11 @@ test('the margin numbers top-level blocks and list items, not one starting on th
   reads.push(margin());
   showLineNumbers(false);
   reads.push(margin());   // a mermaid block's number is on its code and on a span before its diagram, which shows while the code is hidden
-  assert.deepEqual(reads, [[false], [true, 'H1:1', 'GAP:2', 'UL:3', 'LI:4', 'LI:5', 'GAP:6', 'BLOCKQUOTE:7', 'LI:8', 'GAP:9', 'TABLE:10', 'GAP:13', 'PRE:14', 'SPAN:14', 'GAP:16', 'P:17'], [false]]);
+  assert.deepEqual(reads, [[false], [true, 'H1:1', 'GAP:2', 'UL:3', 'LI:4', 'LI:5', 'GAP:6', 'BLOCKQUOTE:7', 'LI:8', 'GAP:9', 'TABLE:10–12', 'PRE:13–16', 'SPAN:13–16', 'P:17'], [false]]);
 });
 
 test('a block a structural edit may have moved has no margin number until the next read, whose redraw is not an edit', () => {
-  load('one\n\ntwo\n\nthree\n');
+  load('one\nuno\n\ntwo\n\nthree\n');   // one's range may have grown too: only its first line shows
   showLineNumbers(true);
   const v = ed.view(), { state } = v;
   v.dispatch(state.tr.insert(doc().child(0).nodeSize, state.schema.nodes.paragraph.create(null, state.schema.text('new'))));
@@ -238,7 +238,7 @@ test('a block a structural edit may have moved has no margin number until the ne
   saved();
   reads.push(margin(), doc() === edited, undoDepth(v.state));   // the same document, no history: nothing for the host to call a change
   showLineNumbers(false);
-  assert.deepEqual(reads, [[true, 'P:1'], 1, [true, 'P:1', 'GAP:2', 'P:3', 'GAP:4', 'P:5', 'GAP:6', 'P:7', 'GAP:8'], true, 1]);
+  assert.deepEqual(reads, [[true, 'P:1'], 1, [true, 'P:1–2', 'GAP:3', 'P:4', 'GAP:5', 'P:6', 'GAP:7', 'P:8', 'GAP:9'], true, 1]);
 });
 
 test('the margin redraws for a setting or a numbering that changed, and dispatches nothing for one that did not', () => {
@@ -297,8 +297,8 @@ test('the margin labels the lines between top-level blocks above the next number
   load('# Heading\n\n\nParagraph\n\n```js\nlet a = 1;\n```\n\n| x | y |\n| - | - |\n| 1 | 2 |\n\n[ref]: https://example.com\n');
   const reads = [margin(), (load('a\n\n\n\nb\n\n- c\n\n  d\n'), margin())];   // no label for the blank line inside the list item
   showLineNumbers(false);
-  assert.deepEqual([...reads, margin()], [[true, 'H1:1', 'GAP:2 3', 'P:4', 'GAP:5', 'PRE:6', 'GAP:8 9', 'TABLE:10', 'GAP:13 14', 'P:15'],
-    [true, 'P:1', 'GAP:2–4', 'P:5', 'GAP:6', 'UL:7', 'P:10'], [false]]);
+  assert.deepEqual([...reads, margin()], [[true, 'H1:1', 'GAP:2 3', 'P:4', 'GAP:5', 'PRE:6–8', 'GAP:9', 'TABLE:10–12', 'P:13–15'],
+    [true, 'P:1', 'GAP:2–4', 'P:5', 'GAP:6', 'UL:7–9', 'P:10'], [false]]);
 });
 
 test('the labels are worked out once per numbering, and typing keeps their elements', () => {
@@ -335,7 +335,7 @@ test('Enter or Shift+Enter in the last block hides the label after it until the 
     }
   } finally { showLineNumbers(false); }
   const numbered = [true, 'P:1', 'GAP:2', 'P:3'];
-  assert.deepEqual(reads, [numbered, numbered, [...numbered, 'GAP:4', 'P:5', 'GAP:6'], numbered, numbered, [...numbered, 'GAP:5']]);
+  assert.deepEqual(reads, [numbered, numbered, [...numbered, 'GAP:4', 'P:5', 'GAP:6'], numbered, numbered, [true, 'P:1', 'GAP:2', 'P:3–4', 'GAP:5']]);
 });
 
 const layoutReads = async (fn, reads = []) => {   // what `fn` calls of getBoundingClientRect, on any element, and posAtCoords, on any view
@@ -368,3 +368,35 @@ test("the settled markdown is the first read after a load, needing no rebuild fo
     assert.deepEqual([settledMarkdown(doc(), serialize).markdown, serialize() !== settled, line > 0, lineStatus(v.state).line], [settled, true, true, line], file);
   }
 });
+
+const USER_STORY = '# User story\n\nAs the owner, I want\neach range\nin the margin.\n\n\n---\n\n## Acceptance\n\n> Every number\n> once, in order,\n> never overlapping.\n\n## Notes\n\nOne\ntwo\nthree\nfour\nfive\nsix\n\n```js\nconst a = 1;\nconst b = 2;\n```\n\n| Name | Value |\n| ---- | ----- |\n| one  | 1     |\n| two  | 2     |\n\n[spec]: https://example.com/spec\n';
+/** The line numbers the margin shows, top to bottom, a range as all its lines, without a mermaid diagram's copy of its block's. */
+const numbers = () => margin().slice(1).filter((m) => !m.startsWith('SPAN')).flatMap((m) => { const [a, b = a] = m.split(':')[1].split(/–| /).map(Number); return [...Array(b - a + 1).keys()].map((i) => a + i); });
+
+test('a block shows the lines it covers as a range, and a gap between blocks its own label, as on a user story; nothing when off', () => {
+  load(USER_STORY);
+  const reads = [margin(), (showLineNumbers(true), margin())];
+  showLineNumbers(false);
+  assert.deepEqual([...reads, margin()], [[false], [true, 'H1:1', 'GAP:2', 'P:3–5', 'GAP:6 7', 'HR:8', 'H2:9–10', 'GAP:11', 'BLOCKQUOTE:12–14', 'GAP:15',
+    'H2:16', 'GAP:17', 'P:18–23', 'GAP:24', 'PRE:25–28', 'GAP:29', 'TABLE:30–33', 'P:34–36'], [false]]);
+});
+
+test("a gap with no room for a label under the block above it (a rule, a table, a list item, a diagram) goes to the next block's range", () => {
+  showLineNumbers(true);
+  load('a\n\n***\n\nb\n\n| x |\n| - |\n| 1 |\n\n- d\n\n- e\n\n```mermaid\ngraph TD\n```\n\nf\n');
+  const read = margin();
+  showLineNumbers(false);
+  assert.deepEqual(read, [true, 'P:1', 'GAP:2', 'HR:3', 'P:4–5', 'GAP:6', 'TABLE:7–9', 'UL:10–11', 'LI:12–13', 'GAP:14', 'PRE:15–17', 'SPAN:15–17', 'P:18–19', 'GAP:20']);
+});
+
+for (const file of ['../../HELP.md', '../../CHANGELOG.md', 'fixtures/roundtrip-audit.md']) {
+  test(`the margin shows every line of ${file} once and in order, untouched and after an edit and a read`, () => {
+    const all = () => [...Array(ensureLines(doc(), serialize).lines).keys()].map((i) => i + 1), reads = [];
+    showLineNumbers(true);
+    load(readFileSync(new URL(file, import.meta.url), 'utf8'));
+    const { schema, tr } = ed.view().state;
+    reads.push(numbers(), all(), (ed.view().dispatch(tr.insert(0, schema.nodes.paragraph.create(null, schema.text('new')))), saved(), numbers()), all());
+    showLineNumbers(false);
+    assert.deepEqual([reads[0], reads[2]], [reads[1], reads[3]]);
+  });
+}

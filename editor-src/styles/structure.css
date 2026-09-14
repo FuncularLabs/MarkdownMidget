@@ -61,6 +61,7 @@ body {
   left: 0;
   width: 56px;
   text-align: right;
+  white-space: nowrap;
   font: 400 12px/24px Calibri, "Segoe UI", system-ui, sans-serif;
   color: color-mix(in srgb, var(--mdm-text) 50%, transparent);
 }
@@ -70,16 +71,18 @@ body {
   display: none;
 }
 
-/* The lines between two blocks with no place of their own (line-map.js), dim in the gap, on a widget of no height: nothing moves. */
+/* The lines between two blocks with no place of their own (line-map.js), looking as a block's number does, on a widget of no height: nothing
+ * moves. Its 12px box ends where the 16px margin under the block above does, below that block's numbers; line-map.js draws one only there (roomy). */
 .mdm-prosemirror [data-gap]::before {
   content: attr(data-gap);
   position: absolute;
   left: 0;
   width: 56px;
-  margin-top: -16px;
+  margin-top: -12px;
   text-align: right;
-  font: 400 10px/16px Calibri, "Segoe UI", system-ui, sans-serif;
-  color: color-mix(in srgb, var(--mdm-text) 30%, transparent);
+  white-space: nowrap;
+  font: 400 12px/12px Calibri, "Segoe UI", system-ui, sans-serif;
+  color: color-mix(in srgb, var(--mdm-text) 50%, transparent);
 }
 
 .mdm-prosemirror p,

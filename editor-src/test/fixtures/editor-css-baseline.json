@@ -199,6 +199,12 @@
  },
  {
   "where": ".mdm-prosemirror [data-line]::before",
+  "prop": "white-space",
+  "value": "nowrap",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-line]::before",
   "prop": "font",
   "value": "400 12px/24px Calibri, \"Segoe UI\", system-ui, sans-serif",
   "important": false
@@ -242,7 +248,7 @@
  {
   "where": ".mdm-prosemirror [data-gap]::before",
   "prop": "margin-top",
-  "value": "-16px",
+  "value": "-12px",
   "important": false
  },
  {
@@ -253,14 +259,20 @@
  },
  {
   "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "white-space",
+  "value": "nowrap",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
   "prop": "font",
-  "value": "400 10px/16px Calibri, \"Segoe UI\", system-ui, sans-serif",
+  "value": "400 12px/12px Calibri, \"Segoe UI\", system-ui, sans-serif",
   "important": false
  },
  {
   "where": ".mdm-prosemirror [data-gap]::before",
   "prop": "color",
-  "value": "color-mix(in srgb, #1a1a1a 30%, transparent)",
+  "value": "color-mix(in srgb, #1a1a1a 50%, transparent)",
   "important": false
  },
  {

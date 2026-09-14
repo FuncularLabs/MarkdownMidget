@@ -27,8 +27,9 @@ line you asked for until you move, type or save.
 
 **View ▸ Line Numbers ▸ Show Line Numbers** (or the **Line numbers** button on the View toolbar) puts
 line numbers in the margin: every line in the source view, and in the formatted view the
-line each paragraph, heading, code block, table and list item starts on, with the lines between
-blocks (blank lines, a closing fence, link definitions) dim in the gap: `2 3`, or `12–14`. After an edit
+lines each paragraph, heading, code block, table and list item covers, as `3–5`; the lines between
+blocks (blank lines, link definitions) are in the gap, as `2 3` or `12–14`, or, where a gap is too narrow
+for them (under a rule or a table), at the front of the next block's range, as `7–8`. After an edit
 that can move lines, the numbers below it go blank for a moment until they catch up.
 **View ▸ Line Numbers ▸ Same Setting for Both Views** is on by default; turn it off and
 the menu and the button change only the view you're in. The numbers never print.

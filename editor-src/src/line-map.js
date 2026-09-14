@@ -239,20 +239,33 @@ export function lineTarget(doc, want) {
 }
 
 const run = (from, to) => (to - from > 1 ? `${from}–${to}` : from < to ? `${from} ${to}` : `${from}`);   // 2, 2 3, 2–4
+const range = (from, to) => (from < to ? `${from}–${to}` : `${from}`);   // 7, 7–8
+// A gap's label stands in the 16px margin under the block above it, clear of that block's numbers (structure.css). Under anything
+// else (a rule, a table, a mermaid diagram, a list item in its list) there is no room: its lines lead the next block's range.
+const roomy = (n) => !n || (/^(paragraph|heading|blockquote|bullet_list|ordered_list|code_block)$/.test(n.type.name) && !/^mermaid$/i.test(n.attrs.language ?? ''));
 
-/** Labels for the lines with no place of their own above each top-level block (null: the end): once per numbering, while shown. */
-function gapsOf(doc) {
-  if (current.gaps) return current.gaps;
-  const gaps = new Map(), { entries, lines } = current;
+/** Once per numbering, while shown, for each block numbered (a top-level block or a list item, not one on a line already numbered):
+ *  its lines, led by a gap with no room of its own; that gap's label when it has room (null: after the last block); its first line
+ *  alone, for while an edit inside it waits for the read; and the entry numbered next. Every line is in one label, in order. */
+function labelsOf(doc) {
+  if (current.labels) return current.labels;
+  const labels = new Map(), { entries, lines } = current;
   const lastLine = (e, n = doc.nodeAt(e.pos)) => e.line + (n?.type.name !== e.type ? 0 : e.type === 'table' ? n.childCount   // as lineStatus counts
-    : n.isTextblock ? n.textBetween(0, n.content.size, undefined, leafText).split('\n').length - 1 + (e.type === 'code_block' ? e.skip : 0) : 0);
-  entries.forEach((e, i) => {   // the entry before a top-level block is the last block inside the one above it
-    const after = doc.resolve(e.pos).depth ? e.line : i && lastLine(entries[i - 1]);
-    if (e.line > after + 1) gaps.set(e, run(after + 1, e.line - 1));
+    : n.isTextblock ? n.textBetween(0, n.content.size, undefined, leafText).split('\n').length - 1 + (e.type === 'code_block' ? 2 * e.skip : 0) : 0);   // and a closing fence
+  let open = null, above = null;   // the label being built; the top-level block above
+  entries.forEach((e, i) => {   // the entry before a block is the last block inside the one above it
+    const top = !doc.resolve(e.pos).depth;
+    if ((!top && e.type !== 'list_item') || e.line === open?.line) return;
+    const after = i && lastLine(entries[i - 1]), room = top && roomy(above);
+    if (open) Object.assign(open, { text: range(open.from, Math.min(after, e.line - 1)), next: e });
+    labels.set(e, open = { line: e.line, from: room ? e.line : Math.min(after + 1, e.line), gap: room && e.line > after + 1 ? run(after + 1, e.line - 1) : null });
+    open.cut = range(open.from, e.line);
+    if (top) above = doc.nodeAt(e.pos);
   });
-  const end = entries.length ? lastLine(entries[entries.length - 1]) : lines;
-  if (end < lines) gaps.set(null, run(end + 1, lines));
-  return (current.gaps = gaps);
+  const end = Math.min(lines, entries.length ? lastLine(entries[entries.length - 1]) : lines);
+  if (end < lines && roomy(above)) labels.set(null, { gap: run(end + 1, lines) });
+  if (open) open.text = range(open.from, roomy(above) ? end : lines);
+  return (current.labels = labels);
 }
 
 /** The margin's numbers: top-level blocks and list items where lineStatus would number them (before staleFrom, by their
@@ -260,20 +273,19 @@ function gapsOf(doc) {
 function gutterNumbers(doc) {
   if (!gutter || !current || capturing) return null;
   if (drawn.doc === doc && drawn.current === current && drawn.staleFrom === staleFrom) return drawn.set;   // nothing moved
-  const decos = [], gaps = gapsOf(doc);
+  const decos = [], labels = labelsOf(doc);
   // A label is a widget of no height the margins collapse through, after any other widget there (a mermaid diagram's is side 1).
   const label = (pos, text) => Decoration.widget(pos, () => { const d = document.createElement('div'); d.dataset.gap = text; return d; }, { side: 2, key: `mdm-gap:${text}` });
-  let shown = 0;
   for (const e of current.entries) {
     const node = e.pos < Math.min(staleFrom ?? Infinity, doc.content.size) ? doc.nodeAt(e.pos) : null;
-    if (node?.type.name !== e.type || e.line === shown || (e.type !== 'list_item' && doc.resolve(e.pos).depth)) continue;
-    const end = e.pos + node.nodeSize;
-    if (gaps.has(e)) decos.push(label(e.pos, gaps.get(e)));
-    decos.push(Decoration.node(e.pos, end, { 'data-line': String(shown = e.line) }));
+    if (node?.type.name !== e.type || !labels.has(e)) continue;
+    const end = e.pos + node.nodeSize, l = labels.get(e), text = (staleFrom ?? Infinity) < (l.next?.pos ?? Infinity) ? l.cut : l.text;
+    if (l.gap) decos.push(label(e.pos, l.gap));
+    decos.push(Decoration.node(e.pos, end, { 'data-line': text }));
     // A mermaid block's code is hidden until the caret is in it, so its number also stands before its diagram.
-    if (/^mermaid$/i.test(node.attrs.language ?? '')) decos.push(Decoration.widget(end, () => { const s = document.createElement('span'); s.dataset.line = e.line; return s; }, { side: -1, key: `mdm-line:${e.line}` }));
+    if (/^mermaid$/i.test(node.attrs.language ?? '')) decos.push(Decoration.widget(end, () => { const s = document.createElement('span'); s.dataset.line = text; return s; }, { side: -1, key: `mdm-line:${text}` }));
   }
-  if (gaps.has(null) && staleFrom === null) decos.push(label(doc.content.size, gaps.get(null)));
+  if (labels.has(null) && staleFrom === null) decos.push(label(doc.content.size, labels.get(null).gap));
   drawn = { doc, current, staleFrom, set: DecorationSet.create(doc, decos) };
   return drawn.set;
 }
