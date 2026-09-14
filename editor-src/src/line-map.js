@@ -12,7 +12,7 @@
 // which the host calls once typing pauses, not after every keystroke). An edit that can
 // move lines (anything but typing inside one text block, or typing a line break) leaves
 // the blocks from where it happened on without numbers until that read (staleFrom).
-// Go to Line reaches every line: one with no place of its own reads as itself where the caret went, until it moves (pinLine).
+// Go to Line reaches every line: one with no place of its own reads as itself where the caret went, until it moves or is saved (pinLine).
 import { $prose, $remark } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
 import { ReplaceStep, AddMarkStep, RemoveMarkStep } from '@milkdown/kit/prose/transform';
@@ -78,7 +78,7 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
 export function beginLoad() { capturing = true; captured = null; }
 
 /** The document is installed: number it by the text it was loaded from. */
-export function endLoad(doc, text) { capturing = false; staleFrom = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
+export function endLoad(doc, text) { capturing = false; staleFrom = null; pin = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
 
 /** View ▸ Line Numbers: show or hide the numbers in the margin. The setting it already has redraws nothing. */
 export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on; redraw(); }
@@ -87,7 +87,7 @@ export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on
 const redraw = () => gutterView?.dispatch(gutterView.state.tr);
 
 /** A save has made the file the saved markdown: number by that from the next read (MDM.lineBaseSaved). */
-export function forgetLoad() { current = null; }
+export function forgetLoad() { current = null; pin = null; }
 
 function pair(doc, records, lines) {
   if (!records) return null;
@@ -200,7 +200,7 @@ export function lineStatus(state) {
   return { line: Math.min(line, current.lines), col: chars(text) + 1 };
 }
 
-/** After Go to Line `want`: a line with no place of its own (a blank line, a fence, a rule) reads as itself until the caret or the document moves. */
+/** After Go to Line `want`: a line with no place of its own (a blank line, a fence, a rule) reads as itself until the caret or the document moves, or a save or load renumbers it. */
 export function pinLine(state, want) {
   pin = null;
   const line = current && Math.max(1, Math.min(Math.trunc(want) || 1, current.lines));
@@ -268,8 +268,7 @@ function gutterNumbers(doc) {
     // A mermaid block's code is hidden until the caret is in it, so its number also stands before its diagram.
     if (/^mermaid$/i.test(node.attrs.language ?? '')) decos.push(Decoration.widget(end, () => { const s = document.createElement('span'); s.dataset.line = e.line; return s; }, { side: -1, key: `mdm-line:${e.line}` }));
   }
-  const tail = current.entries[current.entries.length - 1];
-  if (gaps.has(null) && tail.pos < (staleFrom ?? Infinity)) decos.push(label(doc.content.size, gaps.get(null)));
+  if (gaps.has(null) && staleFrom === null) decos.push(label(doc.content.size, gaps.get(null)));
   drawn = { doc, current, staleFrom, set: DecorationSet.create(doc, decos) };
   return drawn.set;
 }

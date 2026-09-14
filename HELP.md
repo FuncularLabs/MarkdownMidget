@@ -23,7 +23,7 @@ save it there, lines follow the markdown the formatted view saves, which is what
 then holds and can differ from the file (see *Markdown conventions*). Go to Line reaches every
 line in both views: in the formatted view, a line with no place of its own (a blank line, a code
 fence, a table's divider row) puts the cursor as near as it can, and the status bar shows the
-line you asked for until you move or type.
+line you asked for until you move, type or save.
 
 **View ▸ Line Numbers ▸ Show Line Numbers** (or the **Line numbers** button on the View toolbar) puts
 line numbers in the margin: every line in the source view, and in the formatted view the

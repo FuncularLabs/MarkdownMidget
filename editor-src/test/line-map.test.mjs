@@ -313,3 +313,25 @@ test('the labels are worked out once per numbering, and typing keeps their eleme
     assert.deepEqual([typed, reads > read, v.dom.querySelector('[data-gap]') === label], [0, true, true]);
   } finally { proto.textBetween = real; showLineNumbers(false); }
 });
+
+test("a save forgets a pinned line: the status reads the caret's line in the saved markdown", () => {
+  load('Title\n=====\n\n\nbody\n');
+  const reads = [goRead(3)];
+  forgetLoad(); saved();   // MDM.lineBaseSaved: # Title\n\nbody\n
+  assert.deepEqual([...reads, lineStatus(ed.view().state)], [{ line: 3, col: 1 }, { line: 1, col: 6 }]);
+});
+
+test('Enter or Shift+Enter in the last block hides the label after it until the next read', () => {
+  const v = ed.view(), reads = [];
+  showLineNumbers(true);
+  try {
+    for (const brk of [() => v.dispatch(v.state.tr.split(v.state.selection.head)), () => ed.editor.action(callCommand(insertHardbreakCommand.key))]) {
+      load('one\n\ntwo\n');
+      caret('two', 3);
+      brk();
+      reads.push(margin(), (v.dispatch(v.state.tr.insertText('x')), margin()), (saved(), margin()));
+    }
+  } finally { showLineNumbers(false); }
+  const numbered = [true, 'P:1', 'GAP:2', 'P:3'];
+  assert.deepEqual(reads, [numbered, numbered, [...numbered, 'GAP:4', 'P:5', 'GAP:6'], numbered, numbered, [...numbered, 'GAP:5']]);
+});
