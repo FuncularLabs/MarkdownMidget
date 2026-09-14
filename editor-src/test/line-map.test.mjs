@@ -6,7 +6,8 @@ import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { replaceAll, getMarkdown, callCommand } from '@milkdown/kit/utils';
-import { turnIntoTextCommand } from '@milkdown/kit/preset/commonmark';
+import { turnIntoTextCommand, liftListItemCommand, insertHardbreakCommand } from '@milkdown/kit/preset/commonmark';
+import { newlineInCode } from '@milkdown/kit/prose/commands';
 import { TextSelection } from '@milkdown/kit/prose/state';
 import { undo } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
@@ -106,7 +107,7 @@ test("an edit above the caret keeps its block, moves its line at the next read, 
   load(SAVED);
   const { state } = ed.view();
   ed.view().dispatch(state.tr.insert(0, state.schema.nodes.paragraph.create(null, state.schema.text('new'))));
-  assert.equal(caret('q').line, 6);   // not read yet: the old line, on the right block
+  assert.deepEqual(caret('q'), {});   // not read yet: no line rather than the old one
   saved();
   assert.equal(caret('q').line, 8);
   undo(ed.view().state, ed.view().dispatch);
@@ -137,6 +138,44 @@ test("a block whose type changed since the last read has no line until the next 
   saved();
   reads.push(lineStatus(v.state));
   assert.deepEqual(reads, ['code_block', {}, { line: 4, col: 1 }, 'paragraph', {}, { line: 3, col: 1 }]);
+});
+
+test('a paragraph joined to a list, or lifted out of one, has no line until the next read; the blocks above keep theirs', () => {
+  load('intro\n\n- a item\n- b item\n\nzz words\n');
+  const v = ed.view(), h = (caret('zz words'), v.state.selection.head);
+  v.dispatch(v.state.tr.insertText('-', h));
+  v.someProp('handleTextInput', (f) => f(v, h + 1, h + 1, ' '));   // the bullet-list input rule
+  const reads = [doc().child(1).childCount, caret('zz words', 2), caret('b item')];
+  saved();
+  reads.push(caret('zz words', 2));
+  ed.editor.action(callCommand(liftListItemCommand.key));   // Shift+Tab
+  reads.push(caret('zz words', 2));
+  saved();
+  reads.push(caret('zz words', 2));
+  assert.deepEqual(reads, [3, {}, { line: 4, col: 1 }, { line: 5, col: 3 }, {}, { line: 6, col: 3 }]);
+});
+
+test("typing, Enter in a code block and a line break keep the caret's line before the read; only the blocks below wait", () => {
+  load('# H\n\npara\n\n```\none\n```\n\nbelow\n');
+  const v = ed.view();
+  caret('H', 1);
+  v.dispatch(v.state.tr.insertText('ead'));
+  const reads = [lineStatus(v.state)];
+  caret('para', 4);
+  v.dispatch(v.state.tr.insertText(' more'));
+  reads.push(lineStatus(v.state), caret('below'));
+  caret('one', 3);
+  newlineInCode(v.state, v.dispatch);   // Enter in a code block
+  reads.push(lineStatus(v.state), caret('para'), caret('below'));
+  saved();
+  reads.push(caret('below'));
+  caret('more');
+  ed.editor.action(callCommand(insertHardbreakCommand.key));   // Shift+Enter
+  reads.push(lineStatus(v.state), caret('below'));
+  saved();
+  reads.push(caret('below'));
+  assert.deepEqual(reads, [{ line: 1, col: 5 }, { line: 3, col: 10 }, { line: 9, col: 1 }, { line: 7, col: 1 }, { line: 3, col: 1 },
+    {}, { line: 10, col: 1 }, { line: 4, col: 1 }, {}, { line: 11, col: 1 }]);
 });
 
 test('an HTML block or comment over several lines counts its lines, and Go to Line inside it lands right after it', () => {

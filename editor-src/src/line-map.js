@@ -9,11 +9,12 @@
 // does not pair numbers nothing rather than something wrong. Between rebuilds lineMap
 // keeps the positions on their blocks, so the column and the line inside a block stay
 // live; block start lines catch up at the next markdownWithLines (main.js getMarkdown,
-// which the host calls once typing pauses, not after every keystroke). A block made
-// since then (Enter, a paste) has no position of its own and gets no number until that
-// read, rather than the number of the block above it.
+// which the host calls once typing pauses, not after every keystroke). An edit that can
+// move lines (anything but typing inside one text block, or typing a line break) leaves
+// the blocks from where it happened on without numbers until that read (staleFrom).
 import { $prose, $remark } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
+import { ReplaceStep, AddMarkStep, RemoveMarkStep } from '@milkdown/kit/prose/transform';
 
 // The mdast blocks that hold blocks, and the ProseMirror block each mdast block becomes.
 const CONTAINERS = new Set(['root', 'blockquote', 'list', 'listItem', 'footnoteDefinition']);
@@ -28,6 +29,7 @@ let recording = null;   // blocks recorded while the serialiser runs
 let capturing = false;  // a document is being loaded, and
 let captured = null;    // the blocks its parse found
 let current = null;     // { doc, entries: [{ pos, type, line, skip }], lines }: the numbering in force
+let staleFrom = null;   // blocks starting here or later may have moved since it was built
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
@@ -70,7 +72,7 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
 export function beginLoad() { capturing = true; captured = null; }
 
 /** The document is installed: number it by the text it was loaded from. */
-export function endLoad(doc, text) { capturing = false; current = pair(doc, captured, linesIn(text)); }
+export function endLoad(doc, text) { capturing = false; staleFrom = null; current = pair(doc, captured, linesIn(text)); }
 
 /** A save has made the file the saved markdown: number by that from the next read (MDM.lineBaseSaved). */
 export function forgetLoad() { current = null; }
@@ -95,7 +97,7 @@ export function markdownWithLines(doc, serialize) {
   recording = [];
   try {
     const markdown = serialize();
-    current = pair(doc, recording, linesIn(markdown));
+    current = pair(doc, recording, linesIn(markdown)); staleFrom = null;
     return { markdown, rebuilt: true };
   } finally {
     recording = null;
@@ -108,6 +110,21 @@ export function ensureLines(doc, serialize) {
   return current;
 }
 
+/** Where `step` may move lines, in the doc before it: its start; its text block's end for typing with a line break; null for none. */
+function moved(step, doc) {
+  const { slice } = step, n = doc.nodeAt(step.from ?? 0), $from = doc.resolve(step.from ?? 0);
+  if (step instanceof AddMarkStep || step instanceof RemoveMarkStep) return null;
+  if (n?.isTextblock && step.gapFrom - step.from === 1 && step.to - step.gapTo === 1 && n.nodeSize === step.to - step.from
+    && step.insert === 1 && slice.size === 2 && slice.content.firstChild.type === n.type) return null;   // attributes only: a heading's id
+  if (!(step instanceof ReplaceStep)) return step.from ?? step.pos ?? 0;
+  let f = slice.content, depth = 0;   // a slice open at both ends around one text block (a paste) is inline too
+  while (depth < slice.openStart && f.childCount === 1) { f = f.firstChild.content; depth++; }
+  if (depth !== slice.openStart || depth !== slice.openEnd || f.firstChild?.isBlock
+    || !$from.parent.isTextblock || !$from.sameParent(doc.resolve(step.to))) return step.from;
+  const text = doc.textBetween(step.from, step.to, '', leafText) + f.textBetween(0, f.size, '', leafText);
+  return text.includes('\n') ? $from.end() : null;
+}
+
 /** Keeps the numbering's positions on their blocks through each edit, until the next rebuild. */
 export const lineMap = $prose(() => new Plugin({
   key: new PluginKey('mdmLineMap'),
@@ -115,6 +132,11 @@ export const lineMap = $prose(() => new Plugin({
     init: () => null,
     apply(tr) {
       if (tr.docChanged && current) for (const e of current.entries) e.pos = tr.mapping.map(e.pos);
+      if (current) tr.steps.forEach((step, i) => {
+        const at = moved(step, tr.docs[i]), map = step.getMap();
+        if (staleFrom !== null) staleFrom = map.map(staleFrom, -1);
+        if (at !== null) staleFrom = Math.min(staleFrom ?? Infinity, map.map(at, -1));
+      });
       return null;
     },
   },
@@ -134,9 +156,9 @@ function last(test) {
 export function lineStatus(state) {
   const $head = state.selection.$head;
   const e = current && last((en) => en.pos <= $head.pos);
-  let d = $head.depth;   // the entry must be the caret's own text block's, or its table's, and of its type still
+  let d = $head.depth;   // the caret's text block, or its table, numbered only when no edit since the rebuild could have moved it
   if (e?.type === 'table') while (d > 0 && $head.node(d).type.name !== 'table') d--;
-  if (!e || !d || $head.before(d) !== e.pos || $head.node(d).type.name !== e.type) return {};
+  if (!e || !d || $head.before(d) >= (staleFrom ?? Infinity)) return {};
   let text = $head.parent.isTextblock ? $head.parent.textBetween(0, $head.parentOffset, undefined, leafText) : '';
   let line = e.line;
   if (e.type === 'table') {   // a table row is a line; the delimiter row follows the header
