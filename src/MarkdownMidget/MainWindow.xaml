@@ -319,7 +319,18 @@
                                       ToolTip="Word wrap (source view only)"
                                       Click="WordWrapButton_Click" Content="&#xE751;" />
                         <ToggleButton x:Name="LineNumbersToggle" Style="{StaticResource ToolChar}"
-                                      ToolTip="Line numbers" Click="LineNumbers_Click" FontSize="15" Content="&#x2116;" />
+                                      ToolTip="Line numbers" AutomationProperties.Name="Line numbers" Click="LineNumbers_Click">
+                            <!-- A frame of numbered lines, 111-113, with text bars: 3x5-pixel digits
+                                 snapped to whole pixels so they stay sharp at toolbar size, and all of
+                                 it in the button's Foreground, like the glyph buttons beside it. -->
+                            <Path Width="21" Height="21" SnapsToDevicePixels="True"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  Data="M0,0H21V21H0Z M1,1H20V20H1Z
+                                        M2,3h1v1h-1z M3,2h1v5h-1z M5,3h1v1h-1z M6,2h1v5h-1z M8,3h1v1h-1z M9,2h1v5h-1z
+                                        M2,9h1v1h-1z M3,8h1v5h-1z M5,9h1v1h-1z M6,8h1v5h-1z M8,8h2v1h-2z M10,9h1v1h-1z M9,10h1v1h-1z M8,11h1v1h-1z M8,12h3v1h-3z
+                                        M2,15h1v1h-1z M3,14h1v5h-1z M5,15h1v1h-1z M6,14h1v5h-1z M8,14h2v1h-2z M10,15h1v1h-1z M9,16h1v1h-1z M10,17h1v1h-1z M8,18h2v1h-2z
+                                        M13,3h6v1h-6z M13,9h6v1h-6z M13,11h3v1h-3z M13,15h5v1h-5z" />
+                        </ToggleButton>
                         <ToggleButton x:Name="MarksToggle" Style="{StaticResource ToolChar}"
                                       ToolTip="Show formatting marks (¶)"
                                       Click="ToggleMarks_Click" FontSize="15" Content="&#xB6;" />
