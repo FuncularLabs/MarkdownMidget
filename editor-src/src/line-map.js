@@ -134,9 +134,9 @@ function last(test) {
 export function lineStatus(state) {
   const $head = state.selection.$head;
   const e = current && last((en) => en.pos <= $head.pos);
-  let d = $head.depth;   // the entry must be the caret's own text block's, or its table's
+  let d = $head.depth;   // the entry must be the caret's own text block's, or its table's, and of its type still
   if (e?.type === 'table') while (d > 0 && $head.node(d).type.name !== 'table') d--;
-  if (!e || !d || $head.before(d) !== e.pos) return {};
+  if (!e || !d || $head.before(d) !== e.pos || $head.node(d).type.name !== e.type) return {};
   let text = $head.parent.isTextblock ? $head.parent.textBetween(0, $head.parentOffset, undefined, leafText) : '';
   let line = e.line;
   if (e.type === 'table') {   // a table row is a line; the delimiter row follows the header

@@ -5,7 +5,8 @@
 import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { replaceAll, getMarkdown } from '@milkdown/kit/utils';
+import { replaceAll, getMarkdown, callCommand } from '@milkdown/kit/utils';
+import { turnIntoTextCommand } from '@milkdown/kit/preset/commonmark';
 import { TextSelection } from '@milkdown/kit/prose/state';
 import { undo } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
@@ -120,6 +121,22 @@ test("a block made since the last read has no line until the next read, rather t
   assert.deepEqual(lineStatus(ed.view().state), {});
   saved();
   assert.deepEqual(lineStatus(ed.view().state), { line: 3, col: 2 });
+});
+
+test("a block whose type changed since the last read has no line until the next read; Go to Line rebuilds first", () => {
+  load('one\n\nzz\n\nthree\n');
+  const v = ed.view(), h = (caret('zz'), v.state.selection.head);
+  v.dispatch(v.state.tr.setSelection(TextSelection.create(doc(), h, h + 2)).insertText('```'));
+  v.someProp('handleTextInput', (f) => f(v, h + 3, h + 3, ' '));   // the code-block input rule
+  v.dispatch(v.state.tr.insertText('let a = 1;'));
+  const reads = [doc().child(1).type.name, lineStatus(v.state)];
+  ensureLines(doc(), serialize);   // main.js goToLine
+  reads.push(goRead(4));
+  ed.editor.action(callCommand(turnIntoTextCommand.key));
+  reads.push(doc().child(1).type.name, lineStatus(v.state));
+  saved();
+  reads.push(lineStatus(v.state));
+  assert.deepEqual(reads, ['code_block', {}, { line: 4, col: 1 }, 'paragraph', {}, { line: 3, col: 1 }]);
 });
 
 test('an HTML block or comment over several lines counts its lines, and Go to Line inside it lands right after it', () => {
