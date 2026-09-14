@@ -9,7 +9,9 @@
 // does not pair numbers nothing rather than something wrong. Between rebuilds lineMap
 // keeps the positions on their blocks, so the column and the line inside a block stay
 // live; block start lines catch up at the next markdownWithLines (main.js getMarkdown,
-// which the host calls after every edit).
+// which the host calls once typing pauses, not after every keystroke). A block made
+// since then (Enter, a paste) has no position of its own and gets no number until that
+// read, rather than the number of the block above it.
 import { $prose, $remark } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
 
@@ -29,6 +31,9 @@ let current = null;     // { doc, entries: [{ pos, type, line, skip }], lines }:
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
+// An inline item's text for counting lines: a break's newline; raw HTML from its first line
+// break on, so its lines count and the line it ends on counts its characters (one line: none).
+const leafText = (n) => (n.type.name === 'html' ? n.attrs.value.slice(n.attrs.value.search(/\n|$/)) : n.type.spec.leafText?.(n) ?? '');
 
 /** The serialiser's root handler, wrapped: while recording, each block is recorded with the line it is written on. */
 export const recordingRoot = (base) => (node, parent, state, info) => {
@@ -125,12 +130,14 @@ function last(test) {
   return found;
 }
 
-/** The caret's markdown line and column, or {} when the document has no numbering. */
+/** The caret's markdown line and column, or {} when the document or the caret's block has no numbering. */
 export function lineStatus(state) {
   const $head = state.selection.$head;
   const e = current && last((en) => en.pos <= $head.pos);
-  if (!e) return {};
-  let text = $head.parent.isTextblock ? $head.parent.textBetween(0, $head.parentOffset) : '';
+  let d = $head.depth;   // the entry must be the caret's own text block's, or its table's
+  if (e?.type === 'table') while (d > 0 && $head.node(d).type.name !== 'table') d--;
+  if (!e || !d || $head.before(d) !== e.pos) return {};
+  let text = $head.parent.isTextblock ? $head.parent.textBetween(0, $head.parentOffset, undefined, leafText) : '';
   let line = e.line;
   if (e.type === 'table') {   // a table row is a line; the delimiter row follows the header
     for (let d = $head.depth; d > 0; d--) {
@@ -161,9 +168,9 @@ export function lineTarget(doc, want) {
   left -= e.type === 'code_block' ? e.skip : 0;
   let p = left > 0 ? e.pos + node.nodeSize - 1 : e.pos + 1;   // past its last line: the end of the block
   node.forEach((child, offset) => {
-    const text = child.isText ? child.text : child.type.spec.leafText?.(child) ?? '';
+    const text = child.isText ? child.text : leafText(child);
     for (let i = text.indexOf('\n'); left > 0 && i >= 0; i = text.indexOf('\n', i + 1)) {
-      if (--left === 0) p = e.pos + 1 + offset + i + 1;
+      if (--left === 0) p = e.pos + 1 + offset + Math.min(i + 1, child.nodeSize);   // a line inside raw HTML: right after it
     }
   });
   return p;

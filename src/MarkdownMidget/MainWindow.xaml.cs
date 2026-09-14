@@ -509,6 +509,7 @@ public partial class MainWindow : Window
                     }
                     if (d.RootElement.TryGetProperty("line", out var ln) && d.RootElement.TryGetProperty("col", out var cl))
                         ShowCaret((ln.GetInt32(), cl.GetInt32()));
+                    else StatusCaret.Text = string.Empty;
                 }
                 break;
             case "history":

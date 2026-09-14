@@ -36,6 +36,11 @@ const caret = (text, after = 0) => {
 /** A position shown as its block's text with `|` where the position is. */
 const at = (pos) => { const $p = doc().resolve(pos); const t = $p.parent.textContent; return `${t.slice(0, $p.parentOffset)}|${t.slice($p.parentOffset)}`; };
 const shape = () => ensureLines(doc(), serialize).entries.map((e) => `${e.type}@${e.line}`);
+/** Go to Line `n`, then the status bar where it landed. */
+const goRead = (n) => {
+  ed.view().dispatch(ed.view().state.tr.setSelection(TextSelection.create(doc(), lineTarget(doc(), n))));
+  return lineStatus(ed.view().state);
+};
 
 const DISK = 'Title\n=====\n\n[ref]: https://example.com\n\n    indented\n    code\n\nPara one\ntwo\n';
 const SAVED = '# H\n\n- a\n  - b\n\n> q\n\n| x | y |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\n```js\none\ntwo\n```\n';
@@ -106,6 +111,30 @@ test("an edit above the caret keeps its block, moves its line at the next read, 
   undo(ed.view().state, ed.view().dispatch);
   saved();
   assert.equal(caret('q').line, 6);
+});
+
+test("a block made since the last read has no line until the next read, rather than the block above's", () => {
+  load('one line\n\ntwo line\n');
+  caret('one line', 8);
+  ed.view().dispatch(ed.view().state.tr.split(ed.view().state.selection.head).insertText('x'));   // Enter, then typing
+  assert.deepEqual(lineStatus(ed.view().state), {});
+  saved();
+  assert.deepEqual(lineStatus(ed.view().state), { line: 3, col: 2 });
+});
+
+test('an HTML block or comment over several lines counts its lines, and Go to Line inside it lands right after it', () => {
+  for (const untouched of [true, false]) {
+    load('# T\n\n<div align="center">\nhello world\n</div>\n\n<!-- a\nb\nc -->\n\nend\n');
+    if (!untouched) { forgetLoad(); saved(); }
+    assert.deepEqual([goRead(3), goRead(4), goRead(5), goRead(7), goRead(8), goRead(9), caret('end')],
+      [{ line: 3, col: 1 }, { line: 5, col: 7 }, { line: 5, col: 7 }, { line: 7, col: 1 }, { line: 9, col: 6 }, { line: 9, col: 6 }, { line: 11, col: 1 }]);
+  }
+});
+
+test('inline HTML broken over lines counts its lines, and the line it ends on counts its characters', () => {
+  load('text <span\nclass="x">more\nline3\n');
+  assert.deepEqual([caret('more'), caret('line3', 5), goRead(2), goRead(3)],
+    [{ line: 2, col: 11 }, { line: 3, col: 6 }, { line: 2, col: 11 }, { line: 3, col: 1 }]);
 });
 
 test('a document whose blocks do not pair with its parse gets no numbers rather than wrong ones', () => {
