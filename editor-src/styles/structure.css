@@ -49,6 +49,27 @@ body {
   outline: none;
 }
 
+/* View ▸ Line Numbers (#10): a block's markdown line in the left padding, as generated content, never selected or
+ * copied. The vendor positions list items, which puts their numbers in the indent; while numbers show, they aren't. */
+.mdm-line-numbers li {
+  position: static;
+}
+
+.mdm-prosemirror [data-line]::before {
+  content: attr(data-line);
+  position: absolute;
+  left: 0;
+  width: 56px;
+  text-align: right;
+  font: 400 12px/24px Calibri, "Segoe UI", system-ui, sans-serif;
+  color: color-mix(in srgb, var(--mdm-text) 50%, transparent);
+}
+
+/* A mermaid block's number is also on a span before its diagram (line-map.js), for while its code is hidden. */
+.mdm-prosemirror .mdm-mermaid-active + [data-line] {
+  display: none;
+}
+
 .mdm-prosemirror p,
 .mdm-prosemirror blockquote,
 .mdm-prosemirror ul,

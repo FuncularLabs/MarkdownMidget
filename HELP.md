@@ -22,6 +22,13 @@ are not counted. An untouched document is numbered as its file is; once you edit
 save it there, lines follow the markdown the formatted view saves, which is what it
 then holds and can differ from the file (see *Markdown conventions*).
 
+**View ▸ Line Numbers ▸ Show Line Numbers** (or the **№** button on the View toolbar) puts
+line numbers in the margin: every line in the source view, and in the formatted view the
+line each paragraph, heading, code block, table and list item starts on. After an edit
+that can move lines, the numbers below it go blank for a moment until they catch up.
+**View ▸ Line Numbers ▸ Same Setting for Both Views** is on by default; turn it off and
+the menu and the button change only the view you're in. The numbers never print.
+
 ## Toolbar
 
 From left to right:

@@ -76,9 +76,9 @@ after dogfooding.
 
 ### Line numbers (#10)
 
-Phase 1 is in: the cursor's line and column in the status bar, and Go to Line
-(Ctrl+G), in both views. Phase 2 is open: line-number margins, with a View-menu
-toggle and toolbar button that can differ per view, as themes can.
+Both phases are in: the cursor's line and column in the status bar and Go to Line
+(Ctrl+G), in both views; and line-number margins, with a View-menu toggle and
+toolbar button that can differ per view, as themes can.
 
 ### Themes — shipped in 0.7.0
 

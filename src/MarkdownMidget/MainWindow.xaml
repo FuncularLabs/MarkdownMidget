@@ -196,6 +196,11 @@
                         <MenuItem x:Name="MenuWordWrap" Header="Word Wr_ap (source view)"
                                   IsCheckable="True" Click="WordWrap_Click"
                                   ToolTip="Wrap long lines in the markdown source view instead of scrolling horizontally." />
+                        <MenuItem Header="_Line Numbers">
+                            <MenuItem x:Name="MenuLineNumbers" Header="_Show Line Numbers" IsCheckable="True" Click="LineNumbers_Click" />
+                            <MenuItem x:Name="MenuLinkLineNumbers" Header="Same Setting for _Both Views" IsCheckable="True" IsChecked="True"
+                                      Click="LinkLineNumbers_Click" ToolTip="On: line numbers show or hide in both views at once. Off: each view keeps its own." />
+                        </MenuItem>
                         <Separator />
                         <MenuItem x:Name="MenuAutoReload" Header="Auto-_reload changed files"
                                   IsCheckable="True" IsChecked="True" Click="AutoReload_Click"
@@ -313,6 +318,8 @@
                         <ToggleButton x:Name="WrapToggle" Style="{StaticResource ToolGlyph}"
                                       ToolTip="Word wrap (source view only)"
                                       Click="WordWrapButton_Click" Content="&#xE751;" />
+                        <ToggleButton x:Name="LineNumbersToggle" Style="{StaticResource ToolChar}"
+                                      ToolTip="Line numbers" Click="LineNumbers_Click" FontSize="15" Content="&#x2116;" />
                         <ToggleButton x:Name="MarksToggle" Style="{StaticResource ToolChar}"
                                       ToolTip="Show formatting marks (¶)"
                                       Click="ToggleMarks_Click" FontSize="15" Content="&#xB6;" />

@@ -312,6 +312,7 @@ public partial class MainWindow
             SourceBox.Background = bg;
             SourceBox.Foreground = fg;
             SourceBox.CaretBrush = caret;
+            SourceBox.LineNumbersForeground = Brushes.Gray;   // AvalonEdit's own, readable on the original pane
             FlashStatus("The theme was applied, but the markdown source view couldn't follow it.");
             return;
         }
@@ -321,6 +322,7 @@ public partial class MainWindow
         // Without this the caret keeps WPF's default black and disappears entirely on
         // a dark theme — the pane looks right and typing looks broken.
         SourceBox.CaretBrush = new SolidColorBrush(read.Foreground);
+        SourceBox.LineNumbersForeground = new SolidColorBrush(read.Foreground) { Opacity = 0.5 };   // the gutter: the text, dimmed
 
         ApplySourceSyntax(json);
     }

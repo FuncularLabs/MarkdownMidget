@@ -35,6 +35,13 @@ public class ThemeLinkingTests
     public void TheMenuTicksTheActiveViewsTheme(bool linked, bool sourceMode, string expected)
         => Assert.Equal(expected, ThemeLinking.TickedKey(linked, sourceMode, "doc", "src"));
 
+    [Theory]
+    // any per-view setting (View ▸ Line Numbers): in the source view, linked shows the formatted view's value, unlinked its own
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void APerViewSettingShowsTheActiveViewsValue(bool linked, bool expected)
+        => Assert.Equal(expected, ThemeLinking.Ticked(linked, sourceMode: true, documentValue: false, sourceValue: true));
+
     [Fact]
     public void UnlinkedInTheSourceViewNeverTouchesTheDocument()
     {

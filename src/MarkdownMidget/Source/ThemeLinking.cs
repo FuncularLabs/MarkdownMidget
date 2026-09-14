@@ -20,5 +20,9 @@ internal static class ThemeLinking
 
     /// <summary>The theme key the menu should tick: the active view's.</summary>
     public static string TickedKey(bool linked, bool sourceMode, string documentKey, string sourceKey) =>
-        linked || !sourceMode ? documentKey : sourceKey;
+        Ticked(linked, sourceMode, documentKey, sourceKey);
+
+    /// <summary>The same rule for any per-view setting (View ▸ Line Numbers): the value the tick shows.</summary>
+    public static T Ticked<T>(bool linked, bool sourceMode, T documentValue, T sourceValue) =>
+        linked || !sourceMode ? documentValue : sourceValue;
 }

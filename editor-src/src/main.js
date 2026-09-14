@@ -22,7 +22,7 @@ import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, showLineNumbers,
 } from './line-map.js';
 
 import {
@@ -524,6 +524,7 @@ const MDM = {
   // A save made the file the saved markdown, so number by that from now on.
   lineBaseSaved() { forgetLoad(); this.getMarkdown(); },
   reportSelection() { if (editorView) postSelectionState(editorView.state); },
+  setLineNumbers(on) { showLineNumbers(on); },   // View ▸ Line Numbers (#10)
 
   /**
    * Phase two of a file drop: the full bytes of the files the host's plan chose.

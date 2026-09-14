@@ -15,6 +15,7 @@
 import { $prose, $remark } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
 import { ReplaceStep, AddMarkStep, RemoveMarkStep } from '@milkdown/kit/prose/transform';
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 
 // The mdast blocks that hold blocks, and the ProseMirror block each mdast block becomes.
 const CONTAINERS = new Set(['root', 'blockquote', 'list', 'listItem', 'footnoteDefinition']);
@@ -30,6 +31,8 @@ let capturing = false;  // a document is being loaded, and
 let captured = null;    // the blocks its parse found
 let current = null;     // { doc, entries: [{ pos, type, line, skip }], lines }: the numbering in force
 let staleFrom = null;   // blocks starting here or later may have moved since it was built
+let gutter = false;     // View ▸ Line Numbers: numbers in the margin (gutterNumbers)
+let gutterView = null;  // the view they are drawn in
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
@@ -72,7 +75,13 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
 export function beginLoad() { capturing = true; captured = null; }
 
 /** The document is installed: number it by the text it was loaded from. */
-export function endLoad(doc, text) { capturing = false; staleFrom = null; current = pair(doc, captured, linesIn(text)); }
+export function endLoad(doc, text) { capturing = false; staleFrom = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
+
+/** View ▸ Line Numbers: show or hide the numbers in the margin. */
+export function showLineNumbers(on) { gutter = !!on; redraw(); }
+
+// The margin follows a new numbering at once: a transaction with no steps is no edit, no history and no change for the host.
+const redraw = () => gutterView?.dispatch(gutterView.state.tr);
 
 /** A save has made the file the saved markdown: number by that from the next read (MDM.lineBaseSaved). */
 export function forgetLoad() { current = null; }
@@ -98,6 +107,7 @@ export function markdownWithLines(doc, serialize) {
   try {
     const markdown = serialize();
     current = pair(doc, recording, linesIn(markdown)); staleFrom = null;
+    if (gutter) redraw();
     return { markdown, rebuilt: true };
   } finally {
     recording = null;
@@ -139,6 +149,11 @@ export const lineMap = $prose(() => new Plugin({
       });
       return null;
     },
+  },
+  view: (v) => { gutterView = v; return { destroy: () => { if (gutterView === v) gutterView = null; } }; },
+  props: {
+    attributes: () => (gutter ? { class: 'mdm-line-numbers' } : {}),   // list items give up the vendor's position (structure.css)
+    decorations: (state) => gutterNumbers(state.doc),
   },
 }));
 
@@ -198,4 +213,21 @@ export function lineTarget(doc, want) {
     }
   });
   return p;
+}
+
+/** The margin's numbers: top-level blocks and list items where lineStatus would number them (before staleFrom, by their
+ *  own entry), none on a line already numbered, as a list's first item is, and none while a load is pairing. */
+function gutterNumbers(doc) {
+  if (!gutter || !current || capturing) return null;
+  const decos = [];
+  let shown = 0;
+  for (const e of current.entries) {
+    const node = e.pos < Math.min(staleFrom ?? Infinity, doc.content.size) ? doc.nodeAt(e.pos) : null;
+    if (node?.type.name !== e.type || e.line === shown || (e.type !== 'list_item' && doc.resolve(e.pos).depth)) continue;
+    const end = e.pos + node.nodeSize;
+    decos.push(Decoration.node(e.pos, end, { 'data-line': String(shown = e.line) }));
+    // A mermaid block's code is hidden until the caret is in it, so its number also stands before its diagram.
+    if (/^mermaid$/i.test(node.attrs.language ?? '')) decos.push(Decoration.widget(end, () => { const s = document.createElement('span'); s.dataset.line = e.line; return s; }, { side: -1, key: `mdm-line:${e.line}` }));
+  }
+  return DecorationSet.create(doc, decos);
 }

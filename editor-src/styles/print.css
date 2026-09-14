@@ -57,6 +57,10 @@
     display: none !important;
   }
 
+  .mdm-prosemirror [data-line]::before {
+    display: none !important;
+  }
+
   .mdm-prosemirror blockquote {
     background: transparent !important;
     color: #333 !important;

@@ -173,6 +173,7 @@ public partial class MainWindow : Window
         MenuWordWrap.IsChecked = _wordWrap;
         ApplyWordWrap();
         UpdateWrapToggleUi();
+        ApplyLineNumbers();
         MenuAutoReload.IsChecked = _autoReload;
         _noteTimer.Tick += (_, _) => { _noteTimer.Stop(); StatusNote.Text = string.Empty; };
         _backupTimer.Tick += async (_, _) => await WriteBackupAsync();
@@ -474,6 +475,7 @@ public partial class MainWindow : Window
                 // Native (browser) spell check stays OFF — the app runs its own engine
                 // with a private dictionary; squiggles come from host-computed ranges.
                 _ = RunEditorAsync("window.MDM.setSpellcheck(false)");
+                ApplyLineNumbers();   // the formatted view's, now there is a page
                 // Applied here rather than at construction: setTheme needs a page.
                 // A theme that has gone missing between launches says so and falls
                 // back WITHOUT forgetting the choice — reverting silently is the thing
@@ -1150,6 +1152,7 @@ public partial class MainWindow : Window
 
         // Word wrap applies to the source view only.
         UpdateWrapToggleUi();
+        ApplyLineNumbers();   // unlinked, the tick and the button follow the view
 
         if (on) _squiggles?.SetRanges(Array.Empty<(int, int)>()); // previous ranges are stale for this text
         if (on) SetUndoRedoEnabled(true, true); // the source TextBox manages its own undo
@@ -3949,6 +3952,9 @@ public partial class MainWindow : Window
         public string? SourceTheme { get; set; }
         // View ▸ Theme ▸ "Same Theme for Both Views". Default on.
         public bool LinkThemes { get; set; } = true;
+        public bool LineNumbers { get; set; }              // View ▸ Line Numbers (#10): the formatted view's, both views' while linked
+        public bool? SourceLineNumbers { get; set; }       // the source view's own; null = LineNumbers
+        public bool LinkLineNumbers { get; set; } = true;  // "Same Setting for Both Views"
         // The newest version whose changelog the user has actually opened — compared
         // with WhatsNewState, not equality, so an older value after an update is the
         // ordinary case rather than something to migrate.
@@ -3972,6 +3978,7 @@ public partial class MainWindow : Window
     private Rect? _savedBounds;              // persisted; normal (un-maximized) bounds
     private bool _savedMaximized;
     private bool _startWithBlankDocument;    // persisted; startup lands on a blank doc
+    private bool _lineNumbers, _sourceLineNumbers, _linkLineNumbers = true;   // persisted; see LineNumbers_Click
 
     private sealed class PrintPrefs
     {
@@ -4026,6 +4033,9 @@ public partial class MainWindow : Window
             _themeKey = s.Theme ?? Themes.ThemeStore.DefaultKey;
             _linkThemes = s.LinkThemes;
             _sourceThemeKey = s.SourceTheme ?? _themeKey;
+            _lineNumbers = s.LineNumbers;
+            _sourceLineNumbers = s.SourceLineNumbers ?? _lineNumbers;
+            _linkLineNumbers = s.LinkLineNumbers;
             _lastSeenChangelogVersion = s.LastSeenChangelogVersion;
             _savedBounds = s.WindowWidth is > 0 && s.WindowHeight is > 0
                 ? new Rect(s.WindowLeft ?? 0, s.WindowTop ?? 0, s.WindowWidth.Value, s.WindowHeight.Value)
@@ -4147,6 +4157,9 @@ public partial class MainWindow : Window
             s.Theme = existing?.Theme ?? s.Theme;
             s.SourceTheme = existing?.SourceTheme ?? s.SourceTheme;
             s.LinkThemes = existing?.LinkThemes ?? s.LinkThemes;
+            s.LineNumbers = existing?.LineNumbers ?? s.LineNumbers;
+            s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
+            s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
             s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
             WriteSettings(s);
         }
@@ -4196,6 +4209,9 @@ public partial class MainWindow : Window
         Theme = _themeKey,
         SourceTheme = _sourceThemeKey,
         LinkThemes = _linkThemes,
+        LineNumbers = _lineNumbers,
+        SourceLineNumbers = _sourceLineNumbers,
+        LinkLineNumbers = _linkLineNumbers,
         LastSeenChangelogVersion = _lastSeenChangelogVersion,
     };
 
@@ -4592,6 +4608,36 @@ public partial class MainWindow : Window
     {
         WrapToggle.IsEnabled = _sourceMode;
         WrapToggle.IsChecked = _sourceMode && _wordWrap;
+    }
+
+    /// <summary>View ▸ Line Numbers ▸ Show Line Numbers and the toolbar button: one entry point, so they can't drift. Linked it
+    /// sets both views, unlinked only the view you're in (as View ▸ Theme), and it writes only what it set.</summary>
+    private void LineNumbers_Click(object sender, RoutedEventArgs e)
+    {
+        var on = sender is MenuItem m ? m.IsChecked : LineNumbersToggle.IsChecked == true;
+        var (formatted, source) = Source.ThemeLinking.TargetsFor(_linkLineNumbers, _sourceMode);
+        (_lineNumbers, _sourceLineNumbers) = (formatted ? on : _lineNumbers, source ? on : _sourceLineNumbers);
+        SavePersistentField(s => { if (formatted) s.LineNumbers = on; if (source) s.SourceLineNumbers = on; });
+        ApplyLineNumbers();
+        RefocusEditor();
+    }
+
+    /// <summary>Unlinking changes nothing on screen and relinking snaps the source view to the formatted view's value:
+    /// either way the source view starts from the formatted view's value.</summary>
+    private void LinkLineNumbers_Click(object sender, RoutedEventArgs e)
+    {
+        (_linkLineNumbers, _sourceLineNumbers) = (MenuLinkLineNumbers.IsChecked, _lineNumbers);
+        SavePersistentField(s => { s.LinkLineNumbers = _linkLineNumbers; s.SourceLineNumbers = _sourceLineNumbers; });
+        ApplyLineNumbers();
+    }
+
+    /// <summary>Both views' numbers on screen; the menu tick and the button show the view you're in.</summary>
+    private void ApplyLineNumbers()
+    {
+        SourceBox.ShowLineNumbers = Source.ThemeLinking.Ticked(_linkLineNumbers, sourceMode: true, _lineNumbers, _sourceLineNumbers);
+        if (_editorReady) _ = RunEditorAsync($"window.MDM.setLineNumbers({(_lineNumbers ? "true" : "false")})");
+        LineNumbersToggle.IsChecked = MenuLineNumbers.IsChecked = Source.ThemeLinking.Ticked(_linkLineNumbers, _sourceMode, _lineNumbers, _sourceLineNumbers);
+        MenuLinkLineNumbers.IsChecked = _linkLineNumbers;
     }
 
     // ===== Drag & drop: pictures go in, markdown opens, anything else is refused =====

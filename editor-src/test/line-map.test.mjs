@@ -9,11 +9,11 @@ import { replaceAll, getMarkdown, callCommand } from '@milkdown/kit/utils';
 import { turnIntoTextCommand, liftListItemCommand, insertHardbreakCommand } from '@milkdown/kit/preset/commonmark';
 import { newlineInCode, joinBackward, deleteSelection } from '@milkdown/kit/prose/commands';
 import { TextSelection } from '@milkdown/kit/prose/state';
-import { undo } from '@milkdown/kit/prose/history';
+import { undo, undoDepth } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
 import { settleDocument } from '../src/settle.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, showLineNumbers,
 } from '../src/line-map.js';
 
 let ed;
@@ -43,6 +43,9 @@ const goRead = (n) => {
   ed.view().dispatch(ed.view().state.tr.setSelection(TextSelection.create(doc(), lineTarget(doc(), n))));
   return lineStatus(ed.view().state);
 };
+
+/** The margin (View ▸ Line Numbers) as drawn: whether its class is on, then each numbered element and its number. */
+const margin = () => [ed.view().dom.classList.contains('mdm-line-numbers'), ...[...ed.view().dom.querySelectorAll('[data-line]')].map((el) => `${el.tagName}:${el.dataset.line}`)];
 
 const DISK = 'Title\n=====\n\n[ref]: https://example.com\n\n    indented\n    code\n\nPara one\ntwo\n';
 const SAVED = '# H\n\n- a\n  - b\n\n> q\n\n| x | y |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\n```js\none\ntwo\n```\n';
@@ -210,6 +213,28 @@ test('inline HTML broken over lines counts its lines, and the line it ends on co
   load('text <span\nclass="x">more\nline3\n');
   assert.deepEqual([caret('more'), caret('line3', 5), goRead(2), goRead(3)],
     [{ line: 2, col: 11 }, { line: 3, col: 6 }, { line: 2, col: 11 }, { line: 3, col: 1 }]);
+});
+
+test('the margin numbers top-level blocks and list items, not one starting on the line numbered above it, and nothing when off', () => {
+  load('# H\n\n- a\n  - b\n- c\n\n> q\n> - d\n\n| x |\n| - |\n| 1 |\n\n```mermaid\ngraph TD\n```\n');
+  const reads = [margin()];
+  showLineNumbers(true);
+  reads.push(margin());
+  showLineNumbers(false);
+  reads.push(margin());   // a mermaid block's number is on its code and on a span before its diagram, which shows while the code is hidden
+  assert.deepEqual(reads, [[false], [true, 'H1:1', 'UL:3', 'LI:4', 'LI:5', 'BLOCKQUOTE:7', 'LI:8', 'TABLE:10', 'PRE:14', 'SPAN:14', 'P:17'], [false]]);
+});
+
+test('a block a structural edit may have moved has no margin number until the next read, whose redraw is not an edit', () => {
+  load('one\n\ntwo\n\nthree\n');
+  showLineNumbers(true);
+  const v = ed.view(), { state } = v;
+  v.dispatch(state.tr.insert(doc().child(0).nodeSize, state.schema.nodes.paragraph.create(null, state.schema.text('new'))));
+  const reads = [margin(), undoDepth(v.state)], edited = doc();
+  saved();
+  reads.push(margin(), doc() === edited, undoDepth(v.state));   // the same document, no history: nothing for the host to call a change
+  showLineNumbers(false);
+  assert.deepEqual(reads, [[true, 'P:1'], 1, [true, 'P:1', 'P:3', 'P:5', 'P:7'], true, 1]);
 });
 
 test('a document whose blocks do not pair with its parse gets no numbers rather than wrong ones', () => {

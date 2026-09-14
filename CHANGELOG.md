@@ -12,7 +12,8 @@ changes between alpha tags.
 ### Added
 
 - **The cursor's line and column in the status bar, and Go to Line (Ctrl+G)**, in
-  both views (#10). Lines are lines of the markdown; see Help, *The two views*.
+  both views (#10), and **View ▸ Line Numbers** to show them in the margin of either
+  view, together or per view. Lines are lines of the markdown; see Help, *The two views*.
 
 ## [1.0.0-beta1] - 2026-09-13
 
