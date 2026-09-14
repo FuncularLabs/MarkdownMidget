@@ -14,6 +14,8 @@ changes between alpha tags.
 - **The cursor's line and column in the status bar, and Go to Line (Ctrl+G)**, in
   both views (#10), and **View ▸ Line Numbers** to show them in the margin of either
   view, together or per view. Lines are lines of the markdown; see Help, *The two views*.
+  Go to Line reaches every line in the formatted view too, blank lines and fences included,
+  and its margin labels the lines between blocks.
 
 ## [1.0.0-beta1] - 2026-09-13
 

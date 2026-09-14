@@ -12,6 +12,7 @@
 // which the host calls once typing pauses, not after every keystroke). An edit that can
 // move lines (anything but typing inside one text block, or typing a line break) leaves
 // the blocks from where it happened on without numbers until that read (staleFrom).
+// Go to Line reaches every line: one with no place of its own reads as itself where the caret went, until it moves (pinLine).
 import { $prose, $remark } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
 import { ReplaceStep, AddMarkStep, RemoveMarkStep } from '@milkdown/kit/prose/transform';
@@ -34,6 +35,7 @@ let staleFrom = null;   // blocks starting here or later may have moved since it
 let gutter = false;     // View ▸ Line Numbers: numbers in the margin (gutterNumbers)
 let gutterView = null;  // the view they are drawn in
 let drawn = {};         // the margin last built: { doc, current, staleFrom } it was built from, and its set
+let pin = null;         // Go to Line's line for a caret on a line with no place of its own: { doc, head, line } (pinLine)
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
@@ -153,6 +155,7 @@ export const lineMap = $prose(() => new Plugin({
         if (staleFrom !== null) staleFrom = map.map(staleFrom, -1);
         if (at !== null) staleFrom = Math.min(staleFrom ?? Infinity, map.map(at, -1));
       });
+      if (pin && (tr.docChanged || tr.selection.head !== pin.head)) pin = null;
       return null;
     },
   },
@@ -176,6 +179,7 @@ function last(test) {
 /** The caret's markdown line and column, or {} when the document or the caret's block has no numbering. */
 export function lineStatus(state) {
   const $head = state.selection.$head;
+  if (pin?.doc === state.doc && pin.head === $head.pos) return { line: pin.line, col: 1 };
   const e = current && last((en) => en.pos <= $head.pos);
   // The caret's text block, or its table, numbered only by its own entry (a merged-away block's entry maps
   // into the block that took its text) and only when no edit since the rebuild could have moved it (staleFrom).
@@ -196,6 +200,13 @@ export function lineStatus(state) {
   return { line: Math.min(line, current.lines), col: chars(text) + 1 };
 }
 
+/** After Go to Line `want`: a line with no place of its own (a blank line, a fence, a rule) reads as itself until the caret or the document moves. */
+export function pinLine(state, want) {
+  pin = null;
+  const line = current && Math.max(1, Math.min(Math.trunc(want) || 1, current.lines));
+  if (line && lineStatus(state).line !== line) pin = { doc: state.doc, head: state.selection.head, line };
+}
+
 /** Where Go to Line puts the caret for `want`, clamped to the document: in the deepest block starting on or before it. */
 export function lineTarget(doc, want) {
   if (!current) return null;
@@ -209,6 +220,7 @@ export function lineTarget(doc, want) {
     for (let i = 0; i < row; i++) p += node.child(i).nodeSize;
     return Selection.near(doc.resolve(p + 1)).head;
   }
+  if (node.isLeaf) return e.pos;   // a rule: Selection.near selects it
   if (!node.isTextblock) return Selection.near(doc.resolve(e.pos + 1)).head;
   left -= e.type === 'code_block' ? e.skip : 0;
   let p = left > 0 ? e.pos + node.nodeSize - 1 : e.pos + 1;   // past its last line: the end of the block
@@ -221,21 +233,43 @@ export function lineTarget(doc, want) {
   return p;
 }
 
+const run = (from, to) => (to - from > 1 ? `${from}–${to}` : from < to ? `${from} ${to}` : `${from}`);   // 2, 2 3, 2–4
+
+/** Labels for the lines with no place of their own above each top-level block (null: the end): once per numbering, while shown. */
+function gapsOf(doc) {
+  if (current.gaps) return current.gaps;
+  const gaps = new Map(), { entries, lines } = current;
+  const lastLine = (e, n = doc.nodeAt(e.pos)) => e.line + (n?.type.name !== e.type ? 0 : e.type === 'table' ? n.childCount   // as lineStatus counts
+    : n.isTextblock ? n.textBetween(0, n.content.size, undefined, leafText).split('\n').length - 1 + (e.type === 'code_block' ? e.skip : 0) : 0);
+  entries.forEach((e, i) => {   // the entry before a top-level block is the last block inside the one above it
+    const after = doc.resolve(e.pos).depth ? e.line : i && lastLine(entries[i - 1]);
+    if (e.line > after + 1) gaps.set(e, run(after + 1, e.line - 1));
+  });
+  const end = entries.length ? lastLine(entries[entries.length - 1]) : lines;
+  if (end < lines) gaps.set(null, run(end + 1, lines));
+  return (current.gaps = gaps);
+}
+
 /** The margin's numbers: top-level blocks and list items where lineStatus would number them (before staleFrom, by their
  *  own entry), none on a line already numbered, as a list's first item is, and none while a load is pairing. */
 function gutterNumbers(doc) {
   if (!gutter || !current || capturing) return null;
   if (drawn.doc === doc && drawn.current === current && drawn.staleFrom === staleFrom) return drawn.set;   // nothing moved
-  const decos = [];
+  const decos = [], gaps = gapsOf(doc);
+  // A label is a widget of no height the margins collapse through, after any other widget there (a mermaid diagram's is side 1).
+  const label = (pos, text) => Decoration.widget(pos, () => { const d = document.createElement('div'); d.dataset.gap = text; return d; }, { side: 2, key: `mdm-gap:${text}` });
   let shown = 0;
   for (const e of current.entries) {
     const node = e.pos < Math.min(staleFrom ?? Infinity, doc.content.size) ? doc.nodeAt(e.pos) : null;
     if (node?.type.name !== e.type || e.line === shown || (e.type !== 'list_item' && doc.resolve(e.pos).depth)) continue;
     const end = e.pos + node.nodeSize;
+    if (gaps.has(e)) decos.push(label(e.pos, gaps.get(e)));
     decos.push(Decoration.node(e.pos, end, { 'data-line': String(shown = e.line) }));
     // A mermaid block's code is hidden until the caret is in it, so its number also stands before its diagram.
     if (/^mermaid$/i.test(node.attrs.language ?? '')) decos.push(Decoration.widget(end, () => { const s = document.createElement('span'); s.dataset.line = e.line; return s; }, { side: -1, key: `mdm-line:${e.line}` }));
   }
+  const tail = current.entries[current.entries.length - 1];
+  if (gaps.has(null) && tail.pos < (staleFrom ?? Infinity)) decos.push(label(doc.content.size, gaps.get(null)));
   drawn = { doc, current, staleFrom, set: DecorationSet.create(doc, decos) };
   return drawn.set;
 }

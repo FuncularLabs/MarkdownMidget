@@ -78,7 +78,8 @@ after dogfooding.
 
 Both phases are in: the cursor's line and column in the status bar and Go to Line
 (Ctrl+G), in both views; and line-number margins, with a View-menu toggle and
-toolbar button that can differ per view, as themes can.
+toolbar button that can differ per view, as themes can. Go to Line reaches every line in the
+formatted view, and its margin labels the lines between blocks.
 
 ### Themes — shipped in 0.7.0
 

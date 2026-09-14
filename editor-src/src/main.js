@@ -22,7 +22,7 @@ import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, showLineNumbers,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
 } from './line-map.js';
 
 import {
@@ -532,6 +532,7 @@ const MDM = {
     if (!editorView || !ensureLines(editorView.state.doc, serialize)) return false;
     const { state } = editorView;
     editorView.dispatch(state.tr.setSelection(Selection.near(state.doc.resolve(lineTarget(state.doc, n)))).scrollIntoView());
+    pinLine(editorView.state, n); postSelectionState(editorView.state);   // a blank line, a fence or a rule reads as the line asked for
     return this.focus();
   },
   // A save made the file the saved markdown, so number by that from now on.

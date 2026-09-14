@@ -70,6 +70,18 @@ body {
   display: none;
 }
 
+/* The lines between two blocks with no place of their own (line-map.js), dim in the gap, on a widget of no height: nothing moves. */
+.mdm-prosemirror [data-gap]::before {
+  content: attr(data-gap);
+  position: absolute;
+  left: 0;
+  width: 56px;
+  margin-top: -16px;
+  text-align: right;
+  font: 400 10px/16px Calibri, "Segoe UI", system-ui, sans-serif;
+  color: color-mix(in srgb, var(--mdm-text) 30%, transparent);
+}
+
 .mdm-prosemirror p,
 .mdm-prosemirror blockquote,
 .mdm-prosemirror ul,
@@ -92,7 +104,8 @@ body {
   line-height: 1.25;
 }
 
-.mdm-prosemirror > :first-child {
+.mdm-prosemirror > :first-child,
+.mdm-prosemirror > [data-gap]:first-child + * {
   margin-top: 0;
 }
 

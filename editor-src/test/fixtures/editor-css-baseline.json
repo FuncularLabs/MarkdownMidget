@@ -216,6 +216,54 @@
   "important": false
  },
  {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "content",
+  "value": "attr(data-gap)",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "position",
+  "value": "absolute",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "left",
+  "value": "0",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "width",
+  "value": "56px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "margin-top",
+  "value": "-16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "text-align",
+  "value": "right",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "font",
+  "value": "400 10px/16px Calibri, \"Segoe UI\", system-ui, sans-serif",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-gap]::before",
+  "prop": "color",
+  "value": "color-mix(in srgb, #1a1a1a 30%, transparent)",
+  "important": false
+ },
+ {
   "where": ".mdm-prosemirror blockquote, .mdm-prosemirror ol, .mdm-prosemirror p, .mdm-prosemirror pre, .mdm-prosemirror table, .mdm-prosemirror ul",
   "prop": "margin-top",
   "value": "0",
@@ -258,7 +306,7 @@
   "important": false
  },
  {
-  "where": ".mdm-prosemirror > :first-child",
+  "where": ".mdm-prosemirror > :first-child, .mdm-prosemirror > [data-gap]:first-child + *",
   "prop": "margin-top",
   "value": "0",
   "important": false
@@ -1002,7 +1050,7 @@
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror [data-line]::before",
+  "where": "@media print > .mdm-prosemirror [data-gap]::before, .mdm-prosemirror [data-line]::before",
   "prop": "display",
   "value": "none",
   "important": true

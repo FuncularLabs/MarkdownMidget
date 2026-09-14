@@ -20,11 +20,15 @@ views. In the formatted view, Col counts the characters of text before the curso
 its line; markdown symbols such as #, **, list markers, backslashes and link addresses
 are not counted. An untouched document is numbered as its file is; once you edit or
 save it there, lines follow the markdown the formatted view saves, which is what it
-then holds and can differ from the file (see *Markdown conventions*).
+then holds and can differ from the file (see *Markdown conventions*). Go to Line reaches every
+line in both views: in the formatted view, a line with no place of its own (a blank line, a code
+fence, a table's divider row) puts the cursor as near as it can, and the status bar shows the
+line you asked for until you move or type.
 
 **View ▸ Line Numbers ▸ Show Line Numbers** (or the **Line numbers** button on the View toolbar) puts
 line numbers in the margin: every line in the source view, and in the formatted view the
-line each paragraph, heading, code block, table and list item starts on. After an edit
+line each paragraph, heading, code block, table and list item starts on, with the lines between
+blocks (blank lines, a closing fence, link definitions) dim in the gap: `2 3`, or `12–14`. After an edit
 that can move lines, the numbers below it go blank for a moment until they catch up.
 **View ▸ Line Numbers ▸ Same Setting for Both Views** is on by default; turn it off and
 the menu and the button change only the view you're in. The numbers never print.

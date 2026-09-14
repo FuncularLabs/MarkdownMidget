@@ -8,12 +8,12 @@ import { readFileSync } from 'node:fs';
 import { replaceAll, getMarkdown, callCommand } from '@milkdown/kit/utils';
 import { turnIntoTextCommand, liftListItemCommand, insertHardbreakCommand } from '@milkdown/kit/preset/commonmark';
 import { newlineInCode, joinBackward, deleteSelection } from '@milkdown/kit/prose/commands';
-import { TextSelection } from '@milkdown/kit/prose/state';
+import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { undo, undoDepth } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
 import { settleDocument } from '../src/settle.js';
 import {
-  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, showLineNumbers,
+  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget, pinLine, showLineNumbers,
 } from '../src/line-map.js';
 
 let ed;
@@ -40,12 +40,14 @@ const at = (pos) => { const $p = doc().resolve(pos); const t = $p.parent.textCon
 const shape = () => ensureLines(doc(), serialize).entries.map((e) => `${e.type}@${e.line}`);
 /** Go to Line `n`, then the status bar where it landed. */
 const goRead = (n) => {
-  ed.view().dispatch(ed.view().state.tr.setSelection(TextSelection.create(doc(), lineTarget(doc(), n))));
+  ed.view().dispatch(ed.view().state.tr.setSelection(Selection.near(doc().resolve(lineTarget(doc(), n)))));
+  pinLine(ed.view().state, n);   // as main.js goToLine does
   return lineStatus(ed.view().state);
 };
+const sweep = () => [...Array(ensureLines(doc(), serialize).lines).keys()].map((i) => i + 1).filter((n) => goRead(n).line !== n);   // lines not read as themselves
 
-/** The margin (View ▸ Line Numbers) as drawn: whether its class is on, then each numbered element and its number. */
-const margin = () => [ed.view().dom.classList.contains('mdm-line-numbers'), ...[...ed.view().dom.querySelectorAll('[data-line]')].map((el) => `${el.tagName}:${el.dataset.line}`)];
+/** The margin (View ▸ Line Numbers) as drawn: whether its class is on, then each numbered element and its number, or GAP and a label's lines. */
+const margin = () => [ed.view().dom.classList.contains('mdm-line-numbers'), ...[...ed.view().dom.querySelectorAll('[data-line], [data-gap]')].map((el) => (el.dataset.gap ? `GAP:${el.dataset.gap}` : `${el.tagName}:${el.dataset.line}`))];
 
 const DISK = 'Title\n=====\n\n[ref]: https://example.com\n\n    indented\n    code\n\nPara one\ntwo\n';
 const SAVED = '# H\n\n- a\n  - b\n\n> q\n\n| x | y |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n\n```js\none\ntwo\n```\n';
@@ -205,7 +207,7 @@ test('an HTML block or comment over several lines counts its lines, and Go to Li
     load('# T\n\n<div align="center">\nhello world\n</div>\n\n<!-- a\nb\nc -->\n\nend\n');
     if (!untouched) { forgetLoad(); saved(); }
     assert.deepEqual([goRead(3), goRead(4), goRead(5), goRead(7), goRead(8), goRead(9), caret('end')],
-      [{ line: 3, col: 1 }, { line: 5, col: 7 }, { line: 5, col: 7 }, { line: 7, col: 1 }, { line: 9, col: 6 }, { line: 9, col: 6 }, { line: 11, col: 1 }]);
+      [{ line: 3, col: 1 }, { line: 4, col: 1 }, { line: 5, col: 7 }, { line: 7, col: 1 }, { line: 8, col: 1 }, { line: 9, col: 6 }, { line: 11, col: 1 }]);
   }
 });
 
@@ -222,7 +224,7 @@ test('the margin numbers top-level blocks and list items, not one starting on th
   reads.push(margin());
   showLineNumbers(false);
   reads.push(margin());   // a mermaid block's number is on its code and on a span before its diagram, which shows while the code is hidden
-  assert.deepEqual(reads, [[false], [true, 'H1:1', 'UL:3', 'LI:4', 'LI:5', 'BLOCKQUOTE:7', 'LI:8', 'TABLE:10', 'PRE:14', 'SPAN:14', 'P:17'], [false]]);
+  assert.deepEqual(reads, [[false], [true, 'H1:1', 'GAP:2', 'UL:3', 'LI:4', 'LI:5', 'GAP:6', 'BLOCKQUOTE:7', 'LI:8', 'GAP:9', 'TABLE:10', 'GAP:13', 'PRE:14', 'SPAN:14', 'GAP:16', 'P:17'], [false]]);
 });
 
 test('a block a structural edit may have moved has no margin number until the next read, whose redraw is not an edit', () => {
@@ -234,7 +236,7 @@ test('a block a structural edit may have moved has no margin number until the ne
   saved();
   reads.push(margin(), doc() === edited, undoDepth(v.state));   // the same document, no history: nothing for the host to call a change
   showLineNumbers(false);
-  assert.deepEqual(reads, [[true, 'P:1'], 1, [true, 'P:1', 'P:3', 'P:5', 'P:7'], true, 1]);
+  assert.deepEqual(reads, [[true, 'P:1'], 1, [true, 'P:1', 'GAP:2', 'P:3', 'GAP:4', 'P:5', 'GAP:6', 'P:7', 'GAP:8'], true, 1]);
 });
 
 test('the margin redraws for a setting or a numbering that changed, and dispatches nothing for one that did not', () => {
@@ -257,6 +259,57 @@ test('a document whose blocks do not pair with its parse gets no numbers rather 
   beginLoad();
   ed.editor.action(replaceAll('- a\n- b\n', true));
   endLoad(other, '# one\n\ntwo\n');
+  pinLine(ed.view().state, 2);   // nothing to pin a line to
   assert.deepEqual(lineStatus(ed.view().state), {});
   assert.equal(lineTarget(doc(), 1), null);
+});
+
+const KINDS = 'Title\n=====\n\n\n[ref]: https://example.com\n\n    indented\n    code\n\n```js\na\n```\n\n| x |\n| - |\n| 1 |\n\n***\n\n<div>\nhi\n</div>\n\n<!-- a\nb -->\n\n- one\n\n  more\n\n- two\n\n```mermaid\ngraph TD\n```\n\nwrapped\nline\n';
+
+test('Go to Line N reads Ln N for every line, the ones with no place of their own included, in both numberings', () => {
+  load(KINDS);
+  const untouched = sweep();
+  forgetLoad(); saved();
+  assert.deepEqual([untouched, sweep()], [[], []]);
+});
+
+for (const file of ['../../HELP.md', '../../CHANGELOG.md', 'fixtures/roundtrip-audit.md']) {
+  test(`Go to Line N reads Ln N for every line of ${file}, untouched`, () => { load(readFileSync(new URL(file, import.meta.url), 'utf8')); assert.deepEqual(sweep(), []); });
+}
+
+test('a line with no place of its own reads as itself where the caret went, until the caret moves, you type or undo; nothing is edited', () => {
+  load('one\n\n\ntwo\n');
+  const v = ed.view(), loaded = doc(), reads = [goRead(3), at(v.state.selection.head), doc() === loaded, undoDepth(v.state), caret('one', 2), goRead(2)];
+  v.dispatch(v.state.tr.insertText('x'));
+  reads.push(lineStatus(v.state), goRead(3), (undo(v.state, v.dispatch), lineStatus(v.state)));
+  assert.deepEqual(reads, [{ line: 3, col: 1 }, 'one|', true, 0, { line: 1, col: 3 }, { line: 2, col: 1 }, { line: 1, col: 5 }, { line: 3, col: 1 }, { line: 1, col: 4 }]);
+});
+
+test('Go to Line on a rule selects the rule and reads its line', () => {
+  load('above\n\n***\n\nbelow\n');
+  assert.deepEqual([goRead(3), ed.view().state.selection.node?.type.name], [{ line: 3, col: 1 }, 'hr']);
+});
+
+test('the margin labels the lines between top-level blocks above the next number: two listed, three as a range, none when off', () => {
+  showLineNumbers(true);
+  load('# Heading\n\n\nParagraph\n\n```js\nlet a = 1;\n```\n\n| x | y |\n| - | - |\n| 1 | 2 |\n\n[ref]: https://example.com\n');
+  const reads = [margin(), (load('a\n\n\n\nb\n\n- c\n\n  d\n'), margin())];   // no label for the blank line inside the list item
+  showLineNumbers(false);
+  assert.deepEqual([...reads, margin()], [[true, 'H1:1', 'GAP:2 3', 'P:4', 'GAP:5', 'PRE:6', 'GAP:8 9', 'TABLE:10', 'GAP:13 14', 'P:15'],
+    [true, 'P:1', 'GAP:2–4', 'P:5', 'GAP:6', 'UL:7', 'P:10'], [false]]);
+});
+
+test('the labels are worked out once per numbering, and typing keeps their elements', () => {
+  load('one\n\ntwo\n\nthree\n');
+  showLineNumbers(true);
+  const v = ed.view(), proto = Object.getPrototypeOf(doc()), real = proto.textBetween, label = v.dom.querySelector('[data-gap]');
+  let reads = 0;   // a block's text read with line-map's leaf text, as working out where its lines end does
+  proto.textBetween = function (...args) { if (this.type.name !== 'doc' && typeof args[3] === 'function') reads++; return real.apply(this, args); };
+  try {
+    v.dispatch(v.state.tr.setSelection(TextSelection.create(doc(), 7)));
+    for (const ch of 'abc') v.dispatch(v.state.tr.insertText(ch));
+    const typed = reads, read = (saved(), reads);
+    v.dispatch(v.state.tr.insertText('d'));
+    assert.deepEqual([typed, reads > read, v.dom.querySelector('[data-gap]') === label], [0, true, true]);
+  } finally { proto.textBetween = real; showLineNumbers(false); }
 });
