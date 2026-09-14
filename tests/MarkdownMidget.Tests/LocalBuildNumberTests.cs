@@ -118,27 +118,139 @@ public class LocalBuildNumberTests : IClassFixture<BuildNumberProbes>, IDisposab
 
     // ===== which counter file a build uses =====
 
+    [Theory]
+    [InlineData("repo")]              // a clone's root
+    [InlineData("subdirectory")]      // where the project actually sits
+    [InlineData("worktree")]          // .git is a FILE naming .git/worktrees/<name>
+    [InlineData("nested-worktree")]   // a worktree added from inside a worktree
+    [InlineData("submodule")]         // its own repository at .git/modules/<name>
+    [InlineData("superproject")]      // and the repository that holds it
+    [InlineData("bare")]              // no work tree at all: the directory IS the repository
+    [InlineData("path-with-spaces")]
+    public void TheCounterLandsWhereGitItselfSaysTheRepositoryIs(string shape)
+    {
+        // The resolver walks the filesystem instead of running git (review R2-F1),
+        // so the thing worth proving is that the walk answers what git answers - for
+        // every shape, measured against git itself rather than against what this
+        // test's author believes git does.
+        var resolved = _probes.Resolutions[shape];
+
+        Assert.Equal(BuildNumberProbes.SharedCounterName, Path.GetFileName(resolved));
+        Assert.Equal(_probes.GitCommonDirs[shape],
+                     Path.GetFullPath(Path.GetDirectoryName(resolved)!),
+                     ignoreCase: true);
+    }
+
     [Fact]
     public void EveryWorktreeOfOneRepositorySharesOneCounter()
     {
         // The number's job is to say WHICH exe this is. Two checkouts of one
         // repository numbering independently would put 0.11.0.7 on two different
-        // binaries — so the counter is resolved from `git rev-parse
-        // --git-common-dir`, which is the same directory for a clone and for every
-        // worktree linked to it.
-        Assert.Equal(_probes.Resolutions["repo"], _probes.Resolutions["worktree"]);
+        // binaries.
         Assert.Equal(_probes.Resolutions["repo"], _probes.Resolutions["subdirectory"]);
+        Assert.Equal(_probes.Resolutions["repo"], _probes.Resolutions["worktree"]);
+        Assert.Equal(_probes.Resolutions["repo"], _probes.Resolutions["nested-worktree"]);
         Assert.StartsWith(Path.Combine(_probes.GitRepo, ".git") + Path.DirectorySeparatorChar,
             _probes.Resolutions["repo"], StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void WithoutAGitRepositoryTheCounterFallsBackToTheCheckout()
+    public void ASubmoduleCountsInItsOwnRepositoryRatherThanItsSuperprojects()
     {
-        // A source copy with no .git, or a machine with no git on PATH: numbering
-        // still works, per checkout, which is what a single checkout means anyway.
+        // A submodule is a repository, and its binaries are its own: sharing the
+        // superproject's sequence would be a different kind of wrong answer to
+        // "which build is this?".
+        Assert.NotEqual(_probes.Resolutions["superproject"], _probes.Resolutions["submodule"]);
+        Assert.Contains(Path.Combine(".git", "modules"), _probes.Resolutions["submodule"],
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    // A .git file's gitdir, and a gitdir's commondir, are each relative to the file
+    // that names them - or absolute. Both shapes are what git writes; neither can be
+    // staged by running git on demand, so both are built by hand.
+    [InlineData("relative-link", "relative-common")]
+    [InlineData("absolute-link", "absolute-common")]
+    public void ALinkedRepositoryDirectoryIsFollowedThroughToTheCommonOne(string shape, string expected)
+    {
+        Assert.Equal(Path.Combine(_probes.Root, expected, BuildNumberProbes.SharedCounterName),
+                     _probes.Resolutions[shape], ignoreCase: true);
+    }
+
+    [Fact]
+    public void FindingTheRepositoryNeedsNoGitOnThePath()
+    {
+        // Round 1 ran `git rev-parse` here, which could hang the build outright: it
+        // drained one pipe then the other before waiting, so a git that filled stderr
+        // blocked forever and the timeout never arrived (review R2-F1). There is no
+        // child process any more, and the way to show that from outside is to take
+        // git away - with only the dotnet directory on PATH, the repository is still
+        // found, where anything that shelled out would fall back to the checkout.
+        var dotnet = DotnetDirectory();
+        Assert.False(File.Exists(Path.Combine(dotnet, "git.exe")), "this PATH still has a git on it");
+
+        var dir = Path.Combine(_probes.Root, "no-git-path-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        _dirs.Add(dir);
+        var project = Path.Combine(dir, "resolve.proj");
+        var result = Path.Combine(dir, "resolved.txt");
+        File.WriteAllText(project, $"""
+            <Project>
+              <Import Project="{BuildNumberProbes.TargetsFile}" />
+              <Target Name="Resolve">
+                <ResolveLocalBuildNumberFile StartDirectory="$(ProbeStart)"
+                                             FallbackFile="$(ProbeFallback)"
+                                             FileName="$(LocalBuildNumberSharedName)">
+                  <Output TaskParameter="CounterFile" PropertyName="Resolved" />
+                </ResolveLocalBuildNumberFile>
+                <WriteLinesToFile File="$(ProbeResult)" Lines="$(Resolved)" Overwrite="true" />
+              </Target>
+            </Project>
+            """);
+
+        var (exit, output) = _probes.Run(dir, [
+            project, "-t:Resolve",
+            "-p:ProbeStart=" + _probes.GitProbeDir,
+            "-p:ProbeFallback=" + Path.Combine(dir, "fallback-counter"),
+            "-p:ProbeResult=" + result,
+        ], new Dictionary<string, string> { ["PATH"] = dotnet });
+        Assert.True(exit == 0, output);
+
+        Assert.Equal(_probes.Resolutions["subdirectory"], File.ReadAllText(result).Trim(), ignoreCase: true);
+        Assert.DoesNotContain("MMBN0003", output, StringComparison.Ordinal);
+
+        // And the structural half, which no PATH can hide: the task that does this
+        // starts no process at all, so there is no pipe to fill and no wait to miss.
+        var targets = File.ReadAllText(BuildNumberProbes.TargetsFile);
+        var task = targets[targets.IndexOf("TaskName=\"ResolveLocalBuildNumberFile\"", StringComparison.Ordinal)..];
+        task = task[..task.IndexOf("</UsingTask>", StringComparison.Ordinal)];
+        Assert.DoesNotContain("Process", task, StringComparison.Ordinal);
+    }
+
+    /// <summary>The directory holding dotnet.exe — the only thing these no-git runs
+    /// keep on PATH. Asserted rather than guessed: a wrong answer here would make the
+    /// test above pass for the wrong reason.</summary>
+    private static string DotnetDirectory()
+    {
+        var root = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (string.IsNullOrEmpty(root) || !File.Exists(Path.Combine(root, "dotnet.exe")))
+            // ...\dotnet\shared\Microsoft.NETCore.App\<version>\System.Private.CoreLib.dll
+            root = Path.GetFullPath(Path.Combine(
+                Path.GetDirectoryName(typeof(object).Assembly.Location)!, "..", "..", ".."));
+        Assert.True(File.Exists(Path.Combine(root, "dotnet.exe")), "no dotnet.exe under " + root);
+        return root;
+    }
+
+    [Fact]
+    public void WithoutAGitRepositoryTheCounterFallsBackToTheCheckoutAndSaysSoOutLoud()
+    {
+        // A source copy with no .git: numbering still works, per checkout, which is
+        // what a single checkout means anyway. But it must SAY so. A silent fallback
+        // is how the review's F-2 comes back: one transient failure and a build is
+        // numbered from a different sequence, printed exactly like a legitimate one.
         Assert.Equal(_probes.FallbackCounter, _probes.Resolutions["not-a-repository"]);
-        Assert.Equal(_probes.FallbackCounter, _probes.Resolutions["no-git-executable"]);
+        Assert.Contains("warning MMBN0003", _probes.ResolutionOutput, StringComparison.Ordinal);
+        Assert.Contains(_probes.FallbackCounter, _probes.ResolutionOutput, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -318,18 +430,33 @@ public class LocalBuildNumberTests : IClassFixture<BuildNumberProbes>, IDisposab
     [Fact]
     public void EveryWarningCarriesACodeSoItCanBeDemotedUnderWarnAsError()
     {
-        // MSBuild task warnings become errors under -warnaserror, which would turn
-        // "your counter file is odd" into a failed build. Both warnings carry a code
-        // so MSBuildWarningsAsMessages can demote them, and README says so.
-        // Both of them, and as MSBuild's own "warning <code>:" prefix rather than
-        // text inside a message — that prefix is what MSBuildWarningsAsMessages
-        // matches on.
+        // As MSBuild's own "warning <code>" prefix rather than text inside a message:
+        // that prefix is what MSBuildWarningsAsMessages matches on.
         Assert.Contains("warning MMBN0001", _probes.AllocationOutput, StringComparison.Ordinal);
         Assert.Contains("warning MMBN0002", _probes.AllocationOutput, StringComparison.Ordinal);
+        Assert.Contains("warning MMBN0003", _probes.ResolutionOutput, StringComparison.Ordinal);
+    }
 
-        var readme = ReadmeBuildSection();
-        Assert.Contains("MMBN0001", readme, StringComparison.Ordinal);
-        Assert.Contains("MSBuildWarningsAsMessages", readme, StringComparison.Ordinal);
+    [Fact]
+    public void TheRemedyTheReadmePrintsForWarnAsErrorIsACommandLineThatWorks()
+    {
+        // Round 1 shipped `-p:MSBuildWarningsAsMessages=MMBN0001;MMBN0002`, which
+        // MSBuild splits on the semicolon and rejects with MSB1006 (review R2-F2).
+        // Grepping the README for "MMBN0001" could never have caught that, so this
+        // test takes the switch the README prints, verbatim, and runs it.
+        var remedy = DocumentedDemotionSwitch();
+        var harness = NewHarness();
+        var counter = _probes.NewCounter();
+        File.WriteAllText(counter, "banana");   // guarantees the MMBN0001 warning
+
+        // Without the remedy, -warnaserror really does fail this build: otherwise
+        // the remedy would be proving nothing.
+        var (promoted, promotedOutput) = RunAllocate(harness, counter, ["-warnaserror"]);
+        Assert.True(promoted != 0, "-warnaserror did not fail a build that warns:\n" + promotedOutput);
+
+        var (demoted, demotedOutput) = RunAllocate(harness, counter, ["-warnaserror", remedy]);
+        Assert.True(demoted == 0, "the README's remedy did not work:\n" + demotedOutput);
+        Assert.Equal("banana", File.ReadAllText(counter).Trim());
     }
 
     [Fact]
@@ -337,7 +464,9 @@ public class LocalBuildNumberTests : IClassFixture<BuildNumberProbes>, IDisposab
     {
         // A backup tool with the lock file open, or a build that will not finish.
         // Waiting forever would hang the build; failing would stop it; so it gives
-        // up after its timeout, says so, and builds.
+        // up after its timeout, says so, and builds. What it says is the error it
+        // actually got, by exception type so the assertion survives a machine whose
+        // Windows speaks another language.
         var counter = _probes.NewCounter();
         var harness = NewHarness();
         using (File.Open(counter + ".lock", FileMode.Create, FileAccess.ReadWrite, FileShare.None))
@@ -346,8 +475,36 @@ public class LocalBuildNumberTests : IClassFixture<BuildNumberProbes>, IDisposab
 
             Assert.Equal(0, allocated.Number);
             Assert.Contains("MMBN0001", allocated.Output, StringComparison.Ordinal);
+            Assert.Contains("IOException", allocated.Output, StringComparison.Ordinal);
         }
         Assert.False(File.Exists(counter), "a build that could not take the lock wrote the counter anyway");
+    }
+
+    [Fact]
+    public void ALockPathThatCannotBeOpenedAtAllGivesUpAtOnceAndBlamesTheRightThing()
+    {
+        // Round 1 caught UnauthorizedAccessException in the retry loop - right for
+        // the sub-millisecond window where Windows reports a file pending deletion
+        // that way, wrong for a path that will never open. Every build then paid the
+        // whole timeout and was told "another process held it" while nothing did
+        // (review R2-F3). A directory where the lock file should be is that
+        // permanent failure, with no ACL for a test to set up.
+        var counter = _probes.NewCounter();
+        Directory.CreateDirectory(counter + ".lock");
+        var harness = NewHarness();
+
+        var clock = Stopwatch.StartNew();
+        // A 30-second budget it must NOT spend: the timeout path would take at least
+        // that, and the fast path costs one MSBuild start.
+        var allocated = Allocate(harness, counter, timeoutSeconds: 30);
+        clock.Stop();
+
+        Assert.Equal(0, allocated.Number);
+        Assert.Contains("MMBN0001", allocated.Output, StringComparison.Ordinal);
+        Assert.Contains("UnauthorizedAccessException", allocated.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("could not be taken within", allocated.Output);   // nothing held it
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15),
+            $"an unopenable lock path cost {clock.Elapsed.TotalSeconds:N1}s of a 30s budget");
     }
 
     [Fact]
@@ -471,6 +628,24 @@ public class LocalBuildNumberTests : IClassFixture<BuildNumberProbes>, IDisposab
     }
 
     [Fact]
+    public void TheseTestsCleanUpAfterThemselvesIncludingGitsReadOnlyObjects()
+    {
+        // Git writes loose objects read-only. Directory.Delete(recursive) throws part
+        // way through on the first one and leaves the rest, which is how round 1's
+        // fix leaked one temp directory per suite run (review R2-F5). The attribute
+        // is the cause: nothing holds these files.
+        var fixture = Path.Combine(_probes.Root, "readonly-fixture-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(Path.Combine(fixture, "objects", "ab"));
+        var loose = Path.Combine(fixture, "objects", "ab", "cdef1234");
+        File.WriteAllText(loose, "loose object");
+        File.SetAttributes(loose, FileAttributes.ReadOnly);
+
+        BuildNumberProbes.Delete(fixture);
+
+        Assert.False(Directory.Exists(fixture), "a read-only file kept the temp directory alive");
+    }
+
+    [Fact]
     public void TheseTestsDoNotRunBesideTheWindowTests()
     {
         // They spawn four MSBuilds at once; the window tests wait on real Win32
@@ -551,18 +726,38 @@ public class LocalBuildNumberTests : IClassFixture<BuildNumberProbes>, IDisposab
     private Allocated Allocate(string harness, string counter, int timeoutSeconds = 15,
                                string fileVersion = "0.11.0", string informationalVersion = "0.11.0-dev")
     {
+        var (exit, output) = RunAllocate(harness, counter, [], timeoutSeconds, fileVersion, informationalVersion);
+        Assert.True(exit == 0, output);
+        return BuildNumberProbes.ReadAllocation(counter, Path.Combine(Path.GetDirectoryName(harness)!, "result.txt"),
+                                                output);
+    }
+
+    /// <summary>An allocation whose exit code is the test's business — for the cases
+    /// where failing (or not failing) IS the assertion.</summary>
+    private (int Exit, string Output) RunAllocate(string harness, string counter, IEnumerable<string> extra,
+                                                  int timeoutSeconds = 15, string fileVersion = "0.11.0",
+                                                  string informationalVersion = "0.11.0-dev")
+    {
         var dir = Path.GetDirectoryName(harness)!;
-        var result = Path.Combine(dir, "result.txt");
-        var (exit, output) = _probes.Run(dir, [
+        return _probes.Run(dir, [
             harness, "-t:Allocate",
             "-p:LocalBuildNumberFile=" + counter,
             "-p:LocalBuildNumberTimeoutSeconds=" + timeoutSeconds,
             "-p:ProbeFileVersion=" + fileVersion,
             "-p:ProbeInformationalVersion=" + informationalVersion,
-            "-p:ProbeResult=" + result,
+            "-p:ProbeResult=" + Path.Combine(dir, "result.txt"),
+            .. extra,
         ]);
-        Assert.True(exit == 0, output);
-        return BuildNumberProbes.ReadAllocation(counter, result, output);
+    }
+
+    /// <summary>The exact command-line switch README tells the reader to use when a
+    /// build runs with -warnaserror. Taken from the README so the test cannot pass
+    /// while the documented line is something else.</summary>
+    private static string DocumentedDemotionSwitch()
+    {
+        var match = Regex.Match(ReadmeBuildSection(), @"`(-p:MSBuildWarningsAsMessages=[^`\s]+)`");
+        Assert.True(match.Success, "README's Build & run section prints no MSBuildWarningsAsMessages switch");
+        return match.Groups[1].Value;
     }
 
     private static void Git(string workDir, string arguments) => BuildNumberProbes.Git(workDir, arguments);
@@ -605,6 +800,9 @@ public sealed class BuildNumberProbes : IDisposable
     public string AllocationOutput { get; }
     public IReadOnlyDictionary<string, string> Decisions { get; }
     public IReadOnlyDictionary<string, string> Resolutions { get; }
+    /// <summary>What git itself answers for the shapes git can be asked about.</summary>
+    public IReadOnlyDictionary<string, string> GitCommonDirs { get; }
+    public string ResolutionOutput { get; }
 
     public BuildNumberProbes()
     {
@@ -618,7 +816,7 @@ public sealed class BuildNumberProbes : IDisposable
 
         (Allocations, AllocationOutput) = RunAllocations();
         Decisions = RunDecisions();
-        (GitRepo, GitProbeDir, Resolutions) = RunResolutions();
+        (GitRepo, GitProbeDir, Resolutions, GitCommonDirs, ResolutionOutput) = RunResolutions();
     }
 
     public void Dispose() => Delete(Root);
@@ -792,15 +990,22 @@ public sealed class BuildNumberProbes : IDisposable
         return results;
     }
 
-    private (string Repo, string ProbeInRepo, IReadOnlyDictionary<string, string>) RunResolutions()
+    /// <summary>
+    /// Every repository shape the resolver has to answer for, each one built by git
+    /// itself where git is what creates the shape, and two built by hand for the
+    /// link forms git writes only in situations a test cannot stage (a relative
+    /// <c>gitdir:</c>, an absolute <c>commondir</c>).
+    ///
+    /// Every real-git case also records what `git rev-parse` answers for the
+    /// git-common-dir option, so the walk is compared against the thing it replaced
+    /// rather than against what this test's author believed git does.
+    /// </summary>
+    private (string Repo, string ProbeInRepo,
+             IReadOnlyDictionary<string, string> Resolved,
+             IReadOnlyDictionary<string, string> GitSays,
+             string Output) RunResolutions()
     {
-        var repo = Path.Combine(Root, "repo");
-        Directory.CreateDirectory(repo);
-        Git(repo, "init");
-        // A commit, so `git worktree add` has something to check out.
-        File.WriteAllText(Path.Combine(repo, "readme.txt"), "probe\n");
-        Git(repo, "add -A");
-        Git(repo, "-c user.email=probe@example.com -c user.name=Probe commit -m probe");
+        var repo = NewGitRepo(Path.Combine(Root, "repo"));
 
         // A probe project inside the repository, for the end-to-end path test.
         var probeInRepo = Path.Combine(repo, "probe");
@@ -809,29 +1014,79 @@ public sealed class BuildNumberProbes : IDisposable
             File.Copy(file, Path.Combine(probeInRepo, Path.GetFileName(file)), overwrite: true);
         Run(probeInRepo, [Path.Combine(probeInRepo, "Probe.csproj"), "-t:Restore"]);
 
+        // A linked worktree, and a worktree added from inside that worktree: both
+        // carry a .git FILE, and both must land on the original repository.
         var worktree = Path.Combine(Root, "repo-worktree");
         Git(repo, "worktree add --detach \"" + worktree + "\"");
-        var subdirectory = Path.Combine(repo, "probe");
+        var nested = Path.Combine(Root, "repo-worktree-nested");
+        Git(worktree, "worktree add --detach \"" + nested + "\"");
+
+        // A submodule is its own repository, kept at .git/modules/<name> of the
+        // superproject: it gets its own counter, which is what git reports too.
+        var sub = NewGitRepo(Path.Combine(Root, "sub"));
+        var super = NewGitRepo(Path.Combine(Root, "super"));
+        Git(super, "-c protocol.file.allow=always -c user.email=probe@example.com -c user.name=Probe " +
+                   "submodule add \"" + sub.Replace('\\', '/') + "\" sub");
+
+        // No work tree at all. `git rev-parse` answers "." there, and the walk has
+        // to recognise a directory that IS a git directory.
+        var bare = Path.Combine(Root, "bare.git");
+        Directory.CreateDirectory(bare);
+        Git(bare, "init --bare");
+
+        // Paths with spaces broke every quoting scheme the spawned version had to
+        // get right; the walk has no command line at all, which is the point.
+        var spaced = NewGitRepo(Path.Combine(Root, "repo with spaces"));
+
+        // Hand-built link forms. Relative first: a .git file pointing up and across,
+        // whose gitdir then points somewhere else again through commondir - both
+        // relative, each resolved against the file that names it.
+        var relativeWorktree = Path.Combine(Root, "relative-link");
+        var relativeGitDir = Path.Combine(Root, "relative-gitdir");
+        var relativeCommon = Path.Combine(Root, "relative-common");
+        Directory.CreateDirectory(relativeWorktree);
+        Directory.CreateDirectory(relativeGitDir);
+        Directory.CreateDirectory(relativeCommon);
+        File.WriteAllText(Path.Combine(relativeWorktree, ".git"), "gitdir: ../relative-gitdir\n");
+        File.WriteAllText(Path.Combine(relativeGitDir, "commondir"), "../relative-common\n");
+
+        // And absolute: the shape git writes when the repository was named by an
+        // absolute path.
+        var absoluteWorktree = Path.Combine(Root, "absolute-link");
+        var absoluteGitDir = Path.Combine(Root, "absolute-gitdir");
+        var absoluteCommon = Path.Combine(Root, "absolute-common");
+        Directory.CreateDirectory(absoluteWorktree);
+        Directory.CreateDirectory(absoluteGitDir);
+        Directory.CreateDirectory(absoluteCommon);
+        File.WriteAllText(Path.Combine(absoluteWorktree, ".git"), "gitdir: " + absoluteGitDir + "\n");
+        File.WriteAllText(Path.Combine(absoluteGitDir, "commondir"), absoluteCommon + "\n");
+
         var notARepository = Path.Combine(Root, "not-a-repository");
         Directory.CreateDirectory(notARepository);
 
-        var cases = new (string Name, string Start, string Git)[]
+        // name -> where the build would be, and whether git can be asked about it.
+        var cases = new (string Name, string Start, bool AskGit)[]
         {
-            ("repo", repo, ""),
-            ("worktree", worktree, ""),
-            ("subdirectory", subdirectory, ""),
-            ("not-a-repository", notARepository, ""),
-            ("no-git-executable", repo, "git-that-is-not-installed-mm"),
+            ("repo", repo, true),
+            ("subdirectory", probeInRepo, true),
+            ("worktree", worktree, true),
+            ("nested-worktree", nested, true),
+            ("submodule", Path.Combine(super, "sub"), true),
+            ("superproject", super, true),
+            ("bare", bare, true),
+            ("path-with-spaces", spaced, true),
+            ("relative-link", relativeWorktree, false),
+            ("absolute-link", absoluteWorktree, false),
+            ("not-a-repository", notARepository, false),
         };
 
         var dir = Path.Combine(Root, "resolutions");
         Directory.CreateDirectory(dir);
         var items = new StringBuilder();
-        foreach (var (name, start, git) in cases)
+        foreach (var (name, start, _) in cases)
             items.AppendLine($"""
                     <Case Include="{name}">
                       <StartDirectory>{start}</StartDirectory>
-                      <GitExecutable>{git}</GitExecutable>
                       <Result>{Path.Combine(dir, name + ".resolved")}</Result>
                     </Case>
                 """);
@@ -846,8 +1101,7 @@ public sealed class BuildNumberProbes : IDisposable
               <Target Name="ResolveAll" Outputs="%(Case.Identity)">
                 <ResolveLocalBuildNumberFile StartDirectory="%(Case.StartDirectory)"
                                              FallbackFile="{FallbackCounter}"
-                                             FileName="$(LocalBuildNumberSharedName)"
-                                             GitExecutable="%(Case.GitExecutable)">
+                                             FileName="$(LocalBuildNumberSharedName)">
                   <Output TaskParameter="CounterFile" PropertyName="Resolved" />
                 </ResolveLocalBuildNumberFile>
                 <WriteLinesToFile File="%(Case.Result)" Lines="$(Resolved)" Overwrite="true" />
@@ -858,10 +1112,32 @@ public sealed class BuildNumberProbes : IDisposable
         var (exit, output) = Run(dir, [project, "-t:ResolveAll"]);
         Assert.True(exit == 0, output);
 
-        var results = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (name, _, _) in cases)
-            results[name] = File.ReadAllText(Path.Combine(dir, name + ".resolved")).Trim();
-        return (repo, probeInRepo, results);
+        var resolved = new Dictionary<string, string>(StringComparer.Ordinal);
+        var gitSays = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, start, askGit) in cases)
+        {
+            resolved[name] = File.ReadAllText(Path.Combine(dir, name + ".resolved")).Trim();
+            if (askGit) gitSays[name] = GitCommonDir(start);
+        }
+        return (repo, probeInRepo, resolved, gitSays, output);
+    }
+
+    private static string NewGitRepo(string path)
+    {
+        Directory.CreateDirectory(path);
+        Git(path, "init");
+        File.WriteAllText(Path.Combine(path, "readme.txt"), "probe\n");
+        Git(path, "add -A");
+        Git(path, "-c user.email=probe@example.com -c user.name=Probe commit -m probe");
+        return path;
+    }
+
+    /// <summary>What git itself calls the repository's common directory, as an
+    /// absolute path — the oracle the walk is measured against.</summary>
+    public static string GitCommonDir(string workDir)
+    {
+        var answer = GitOutput(workDir, "rev-parse --git-common-dir").Trim();
+        return Path.GetFullPath(Path.IsPathRooted(answer) ? answer : Path.Combine(workDir, answer));
     }
 
     // ===== running things =====
@@ -887,10 +1163,14 @@ public sealed class BuildNumberProbes : IDisposable
 
         // Most of these tests are about what a LOCAL build does, and a CI runner
         // exports the first three to every child process — so each case states its
-        // own mode instead of inheriting the machine's. The MSBUILD* variables are
-        // the ones the outer `dotnet test` leaked into this process: a nested build
-        // that inherits its parent's SDK paths and node settings is a well-known way
-        // to get a build that only fails on someone else's machine.
+        // own mode instead of inheriting the machine's. That part is load-bearing:
+        // without it every "is this numbered" assertion inverts on CI.
+        //
+        // The MSBUILD* removal is a precaution, not a fix for an observed failure:
+        // the outer `dotnet test` leaks its own SDK and node-reuse settings into this
+        // process, and a nested build that inherits them is a known way to get a
+        // build that only misbehaves on someone else's machine. No test here can
+        // demonstrate it, and it costs nothing, so it stays.
         foreach (var name in new[]
                  {
                      "GITHUB_ACTIONS", "CI", "TF_BUILD", "ContinuousIntegrationBuild", "UseLocalBuildNumber",
@@ -913,7 +1193,12 @@ public sealed class BuildNumberProbes : IDisposable
         return (process.ExitCode, stdout.Result + stderr.Result);
     }
 
-    public static void Git(string workDir, string arguments)
+    public static void Git(string workDir, string arguments) => GitOutput(workDir, arguments);
+
+    /// <summary>Runs git and returns its standard output. Both pipes are drained
+    /// before the wait: a child that fills one while nobody reads the other never
+    /// exits, and the wait's timeout never arrives.</summary>
+    public static string GitOutput(string workDir, string arguments)
     {
         var psi = new ProcessStartInfo("git", arguments)
         {
@@ -928,6 +1213,7 @@ public sealed class BuildNumberProbes : IDisposable
         Assert.True(process.WaitForExit(60_000), "git " + arguments + " did not finish");
         Task.WaitAll(output, error);
         Assert.True(process.ExitCode == 0, "git " + arguments + " failed: " + error.Result + output.Result);
+        return output.Result;
     }
 
     public static Allocated ReadAllocation(string counter, string result, string output)
@@ -946,14 +1232,48 @@ public sealed class BuildNumberProbes : IDisposable
         return match.Groups[1].Value.Trim();
     }
 
+    /// <summary>
+    /// Remove a throwaway directory, read-only files included.
+    ///
+    /// Git writes loose objects with the read-only attribute set, and
+    /// Directory.Delete then throws UnauthorizedAccessException part way through and
+    /// leaves the rest behind — which is how a suite that makes git repositories
+    /// leaks one temp directory per run. The attribute is the whole cause; nothing is
+    /// holding these files. A second attempt covers the one real race, an antivirus
+    /// scanner still reading a file this run just wrote.
+    /// </summary>
     public static void Delete(string path)
     {
-        try
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
-            else if (File.Exists(path)) File.Delete(path);
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                    {
+                        try { File.SetAttributes(file, FileAttributes.Normal); } catch { /* deleted under us */ }
+                    }
+                    Directory.Delete(path, recursive: true);
+                }
+                else if (File.Exists(path))
+                {
+                    File.SetAttributes(path, FileAttributes.Normal);
+                    File.Delete(path);
+                }
+                return;
+            }
+            catch when (attempt < 2)
+            {
+                Thread.Sleep(100);
+            }
+            catch
+            {
+                // Still there: a leaked temp directory is not worth failing a test
+                // run over, and TheseTestsCleanUpAfterThemselves is what stops the
+                // ordinary cause from coming back.
+            }
         }
-        catch { /* a locked obj file, or a worktree git still has open, is not a test failure */ }
     }
 }
 

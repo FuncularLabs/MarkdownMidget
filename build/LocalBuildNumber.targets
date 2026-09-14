@@ -17,9 +17,10 @@
                                                        Properties > Details > Product version,
                                                        and Help > About inside the app
 
-    Where the counter lives. In the repository's own directory — the one
-    `git rev-parse` reports for the git-common-dir option — so a clone and every
-    worktree linked to it share ONE counter. A counter per checkout was the first design and it was
+    Where the counter lives. In the repository's own directory — the one git calls
+    the common directory, found by reading the filesystem rather than by running git
+    (see ResolveLocalBuildNumberFile) — so a clone and every worktree linked to it
+    share ONE counter. A counter per checkout was the first design and it was
     wrong: two checkouts of one repository would each reach 7, and 0.11.0.7 would
     then name two different binaries, which is the one thing this feature exists to
     prevent. Worktree builds advancing the owner's number is the point, not a cost.
@@ -49,9 +50,6 @@
     <!-- Used only when there is no git repository to ask: then the checkout IS the
          repository as far as anyone can tell. Git-ignored; see .gitignore. -->
     <LocalBuildNumberFallbackFile Condition="'$(LocalBuildNumberFallbackFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..', '.local-build-number'))</LocalBuildNumberFallbackFile>
-    <!-- Overridable so a build can be pointed at a counter of its own (the tests do
-         this, and never touch the repository's). -->
-    <LocalBuildNumberGitExecutable Condition="'$(LocalBuildNumberGitExecutable)' == ''">git</LocalBuildNumberGitExecutable>
     <!-- How long to wait for another build that is holding the counter. Long
          enough for a parallel build to finish its read-write; short enough that a
          stuck lock file costs a warning rather than a hang. -->
@@ -81,18 +79,35 @@
 
   <!--
     Which counter file this build uses: the repository's, or the checkout's when
-    there is no repository to ask.
+    there is no repository to be found.
 
-    The git-common-dir option is the question that has one answer for a clone and
-    for every worktree linked to it (the plain git-dir option does not: a worktree
-    gets its own .git/worktrees/[name]). A relative answer - git says ".git" when
-    asked from the top of a work tree - is resolved against the directory we asked
-    from.
+    This reads the filesystem; it does not run git. The first version ran
+    `git rev-parse` for the git-common-dir option and could hang the build forever -
+    it read one pipe then the other before waiting, so a git that filled stderr
+    (GIT_TRACE, a corporate wrapper, a safe.directory warning storm) blocked with
+    nobody draining the other pipe and the timeout never arrived. A build must not be
+    hostage to a child process for a convenience feature, so there is no child
+    process: the same answer is three file reads.
 
-    Anything unexpected falls back rather than failing: no git on PATH, a directory
-    that is not a repository, a git too old to know the option, a directory that
-    does not exist. Numbering per checkout is a mild loss; a build that cannot start
-    because git is missing is not acceptable for a convenience feature.
+    What git reports is derived like this, and this walk does the same:
+      .git is a DIRECTORY            -> that is the repository directory
+      .git is a FILE                 -> "gitdir: <path>", relative to the file's own
+                                        directory or absolute (a linked worktree, a
+                                        submodule)
+      that directory has `commondir` -> the directory the whole repository shares,
+                                        relative to the gitdir or absolute (this is
+                                        what makes every worktree count as one)
+      no .git at all, but HEAD +
+      objects + refs are right here  -> a bare repository IS its own directory
+
+    Two things `git rev-parse` honours that this does not: GIT_DIR / GIT_COMMON_DIR,
+    and GIT_CEILING_DIRECTORIES. A build run under those would be numbered from the
+    checkout it actually sits in, which for numbering exes is the better answer
+    anyway - and neither is set in any build this repository documents.
+
+    Anything unexpected falls back to the per-checkout counter and WARNS (MMBN0003):
+    a silent fallback is how "two exes with one number" comes back, because a build
+    numbered from the other sequence prints exactly like a legitimate one.
   -->
   <UsingTask TaskName="ResolveLocalBuildNumberFile" TaskFactory="RoslynCodeTaskFactory"
              AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
@@ -100,58 +115,83 @@
       <StartDirectory ParameterType="System.String" Required="true" />
       <FallbackFile ParameterType="System.String" Required="true" />
       <FileName ParameterType="System.String" Required="true" />
-      <GitExecutable ParameterType="System.String" />
       <CounterFile ParameterType="System.String" Output="true" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System" />
-      <Using Namespace="System.Diagnostics" />
       <Using Namespace="System.IO" />
       <Code Type="Fragment" Language="cs"><![CDATA[
         CounterFile = FallbackFile;
         string why = null;
         try
         {
-            ProcessStartInfo psi = new ProcessStartInfo(
-                string.IsNullOrEmpty(GitExecutable) ? "git" : GitExecutable,
-                "rev-parse --git-common-dir");
-            psi.WorkingDirectory = StartDirectory;
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            psi.UseShellExecute = false;
-            psi.CreateNoWindow = true;
+            string start = Path.GetFullPath(StartDirectory);
+            string gitDir = null;
 
-            using (Process git = Process.Start(psi))
+            for (DirectoryInfo here = new DirectoryInfo(start); here != null; here = here.Parent)
             {
-                // Both streams are a line long; reading them before the wait is
-                // what stops a full pipe from deadlocking the build.
-                string output = git.StandardOutput.ReadToEnd();
-                git.StandardError.ReadToEnd();
-                if (!git.WaitForExit(15000))
+                string dotGit = Path.Combine(here.FullName, ".git");
+
+                if (Directory.Exists(dotGit)) { gitDir = dotGit; break; }
+
+                if (File.Exists(dotGit))
                 {
-                    try { git.Kill(); } catch { }
-                    why = "git did not answer within 15 seconds";
-                }
-                else if (git.ExitCode != 0)
-                {
-                    why = StartDirectory + " is not inside a git repository (git exited " + git.ExitCode + ")";
-                }
-                else
-                {
-                    string dir = output.Trim();
-                    if (dir.Length == 0)
+                    string named = null;
+                    foreach (string line in File.ReadAllLines(dotGit))
                     {
-                        why = "git named no repository directory";
+                        string trimmed = line.Trim();
+                        if (trimmed.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            named = trimmed.Substring("gitdir:".Length).Trim();
+                            break;
+                        }
                     }
-                    else
+                    if (string.IsNullOrEmpty(named)) { why = dotGit + " names no gitdir"; break; }
+                    gitDir = Path.GetFullPath(Path.IsPathRooted(named)
+                        ? named
+                        : Path.Combine(here.FullName, named));
+                    break;
+                }
+
+                // A bare repository, or a git directory entered directly: no .git
+                // entry, but the three things every git directory has.
+                if (File.Exists(Path.Combine(here.FullName, "HEAD"))
+                    && Directory.Exists(Path.Combine(here.FullName, "objects"))
+                    && Directory.Exists(Path.Combine(here.FullName, "refs")))
+                {
+                    gitDir = here.FullName;
+                    break;
+                }
+            }
+
+            if (why != null)
+            {
+                // Already explained above.
+            }
+            else if (gitDir == null)
+            {
+                why = "no .git directory or file at or above " + start;
+            }
+            else if (!Directory.Exists(gitDir))
+            {
+                why = gitDir + ", named as the repository directory, does not exist";
+            }
+            else
+            {
+                string commonFile = Path.Combine(gitDir, "commondir");
+                if (File.Exists(commonFile))
+                {
+                    string named = File.ReadAllText(commonFile).Trim();
+                    if (named.Length > 0)
                     {
-                        // Relative to where we asked, when git answers ".git".
-                        if (!Path.IsPathRooted(dir)) dir = Path.Combine(StartDirectory, dir);
-                        dir = Path.GetFullPath(dir);
-                        if (Directory.Exists(dir)) CounterFile = Path.Combine(dir, FileName);
-                        else why = "git named " + dir + ", which is not a directory";
+                        string common = Path.GetFullPath(Path.IsPathRooted(named)
+                            ? named
+                            : Path.Combine(gitDir, named));
+                        if (Directory.Exists(common)) gitDir = common;
+                        else why = common + ", named by " + commonFile + ", does not exist";
                     }
                 }
+                if (why == null) CounterFile = Path.Combine(gitDir, FileName);
             }
         }
         catch (Exception ex)
@@ -160,8 +200,9 @@
         }
 
         if (why != null)
-            Log.LogMessage(MessageImportance.Low,
-                "Local build numbers are counted per checkout in " + CounterFile + ": " + why + ".");
+            Log.LogWarning(null, "MMBN0003", null, null, 0, 0, 0, 0,
+                "Local build numbers are being counted per checkout in {0}, not once per repository: {1}. " +
+                "Two checkouts can then stamp one number on two different binaries.", CounterFile, why);
       ]]></Code>
     </Task>
   </UsingTask>
@@ -175,10 +216,15 @@
     cannot also be the thing being locked.
 
     Every failure here is a warning and an unnumbered build, never a build error of
-    its own. Under -warnaserror MSBuild promotes any warning, so both carry a code
-    that can be demoted: MMBN0001 (this build took no number) and MMBN0002 (it took
-    one, but the file version could not carry it), either of which can be listed in
-    -p:MSBuildWarningsAsMessages. Losing the number costs the owner a glance at a
+    its own. Under -warnaserror MSBuild promotes any warning, so each carries a code
+    that can be demoted: MMBN0001 (this build took no number), MMBN0002 (it took one,
+    but the file version could not carry it) and MMBN0003 (the repository directory
+    could not be found, so the number came from the checkout's own counter). They go
+    in one switch, and its separator has to be escaped, because MSBuild splits a -p:
+    value on semicolons before the property is ever assigned and rejects the
+    remainder as a switch of its own (MSB1006):
+    -p:MSBuildWarningsAsMessages=MMBN0001%3BMMBN0002%3BMMBN0003
+    Losing the number costs the owner a glance at a
     timestamp; failing the build over a counter file would be absurd. A number is
     never invented for a counter that could not be read: reusing 1 after a corrupt
     file would hand out numbers that exes already carry.
@@ -216,28 +262,54 @@
             string dir = Path.GetDirectoryName(CounterFile);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
+            Exception lastFailure = null;
+            DateTime? deniedSince = null;
             while (held == null)
             {
                 try
                 {
                     // DeleteOnClose is what makes the lock end with the process that
                     // holds it: a build killed mid-allocation leaves no file for the
-                    // next one to wait 15 seconds on.
+                    // next one to wait out the whole timeout on.
                     held = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite,
                                           FileShare.None, 1, FileOptions.DeleteOnClose);
                 }
                 catch (Exception ex)
                 {
-                    // IOException: another build is between its read and its write,
-                    // which is the whole point of the lock. UnauthorizedAccessException:
-                    // Windows reports a file that is pending deletion that way, so the
-                    // moment a holder lets go looks like a permission failure for an
-                    // instant - treating it as fatal would drop numbers under exactly
-                    // the contention this exists for. Both wait; neither waits forever.
                     if (!(ex is IOException || ex is UnauthorizedAccessException)) throw;
+                    lastFailure = ex;
+
+                    if (ex is UnauthorizedAccessException)
+                    {
+                        // Windows reports a file pending deletion as access-denied, so
+                        // the instant a holder lets go looks like a permission failure -
+                        // treating that as fatal would drop numbers under exactly the
+                        // contention the lock exists for. But that window is
+                        // sub-millisecond: a whole second of it is not a race, it is a
+                        // path that will never open, and spending the full timeout on it
+                        // (on EVERY build) and then blaming a rival process is worse than
+                        // saying what actually happened.
+                        if (deniedSince == null) deniedSince = DateTime.UtcNow;
+                        if (DateTime.UtcNow - deniedSince.Value >= TimeSpan.FromSeconds(1))
+                        {
+                            problem = lockPath + " cannot be opened: " +
+                                      ex.GetType().Name + ": " + ex.Message;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        deniedSince = null;
+                    }
+
                     if (DateTime.UtcNow >= deadline)
                     {
-                        problem = "another process held " + lockPath + " for more than " + timeout + " seconds";
+                        // What went wrong, not a guess about who did it: the first
+                        // version asserted a rival process even when the path was
+                        // simply unopenable and nothing held anything.
+                        problem = "the lock " + lockPath + " could not be taken within " + timeout +
+                                  "s (last error: " + lastFailure.GetType().Name + ": " +
+                                  lastFailure.Message + ")";
                         break;
                     }
                     Thread.Sleep(20);
@@ -341,8 +413,7 @@
     <ResolveLocalBuildNumberFile Condition="'$(LocalBuildNumberFile)' == ''"
                                  StartDirectory="$(MSBuildProjectDirectory)"
                                  FallbackFile="$(LocalBuildNumberFallbackFile)"
-                                 FileName="$(LocalBuildNumberSharedName)"
-                                 GitExecutable="$(LocalBuildNumberGitExecutable)">
+                                 FileName="$(LocalBuildNumberSharedName)">
       <Output TaskParameter="CounterFile" PropertyName="LocalBuildNumberFile" />
     </ResolveLocalBuildNumberFile>
 

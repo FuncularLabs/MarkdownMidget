@@ -191,21 +191,29 @@ Markdown Midget** after launching: if the two numbers differ, the copy is not th
 build you just made.
 
 **One counter per repository, not per checkout.** It lives in the repository's own
-directory — `.git/mm-local-build-number`, found with `git rev-parse
---git-common-dir` — so a clone and every worktree linked to it take numbers from
-the same sequence and no number is ever issued twice. (Two separate *clones* are
-two repositories and number independently.) **Delete that file to start again at
-1**; a missing counter is the normal first-build state. Without git — a source copy,
-or no git on `PATH` — it falls back to `.local-build-number` in the checkout, which
-is git-ignored.
+directory — `.git/mm-local-build-number`, the directory git calls the common one —
+so a clone and every worktree linked to it take numbers from the same sequence and
+no number is ever issued twice. (Two separate *clones* are two repositories and
+number independently, as does a submodule.) The build finds that directory by
+reading `.git` itself, not by running git, so nothing here depends on git being
+installed, on `PATH`, or on answering promptly. **Delete that file to start again at
+1**; a missing counter is the normal first-build state. With no repository to find —
+a source copy with no `.git` — it falls back to `.local-build-number` in the
+checkout (git-ignored) and says so.
 
-A counter that is corrupt (half written by a build that died) or held by another
-process never fails a build: it warns (`MMBN0001`, or `MMBN0002` when only the file
-version could not carry the number) and that build is unnumbered (`0.11.0` /
-`0.11.0-dev`, exactly as before this existed) rather than restarting at numbers
-older exes already carry. Under `-warnaserror` those warnings would fail the build
-like any other, so demote them with
-`-p:MSBuildWarningsAsMessages=MMBN0001;MMBN0002` if you build that way.
+Three things warn, and each leaves you with a working build rather than a failed
+one:
+
+| Code | What happened |
+| --- | --- |
+| `MMBN0001` | This build took no number: the counter is corrupt, at its ceiling, or its lock could not be taken. It reports `0.11.0` / `0.11.0-dev`, exactly as before this feature existed — never a number from a fresh sequence that older exes already carry. |
+| `MMBN0002` | It took a number, but the file version could not carry it. |
+| `MMBN0003` | The repository directory could not be found, so the number came from this checkout's own counter — two checkouts could then stamp one number on two binaries. |
+
+Under `-warnaserror` those would fail the build like any other warning, so demote
+them with `-p:MSBuildWarningsAsMessages=MMBN0001%3BMMBN0002%3BMMBN0003` if you
+build that way. The `%3B` is required: MSBuild splits a `-p:` value on real
+semicolons and then rejects the rest as an unknown switch (`MSB1006`).
 
 Every build invocation takes a number, including one where nothing changed — so a
 freshly published exe can never carry the number of the one before it. The cost is
