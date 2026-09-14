@@ -9,8 +9,8 @@ window) — close it whenever you like and your work is untouched.
 ## The two views
 
 - **WYSIWYG** (default) — edit formatted text directly, like a word processor.
-- **Markdown source** — edit the raw markdown. Toggle with the `{ }` / document
-  button on the toolbar or **View ▸ Edit Markdown Source** (**Ctrl+E**).
+- **Markdown source** — edit the raw markdown. Switch with the formatted / `##` pair
+  of buttons on the View toolbar or **View ▸ Edit Markdown Source** (**Ctrl+E**).
 
 Both views drive the same document; switching syncs your edits across.
 
@@ -50,7 +50,7 @@ From left to right:
   cursor into the block (then it shows for editing).
 - **Bulleted list / Numbered list / Block quote / Horizontal rule**.
 - **Insert link / Insert picture / Insert table**.
-- **Source toggle** and the **¶** formatting-marks toggle.
+- **Formatted view / Markdown source** pair (the view you're in is highlighted) and the **¶** formatting-marks toggle.
 
 Toolbar buttons never take keyboard focus, so clicking them won't move your cursor
 or drop your selection.

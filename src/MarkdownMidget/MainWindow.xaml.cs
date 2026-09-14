@@ -28,10 +28,6 @@ public partial class MainWindow : Window
             ?.InformationalVersion ?? "0.0.0");
     private static readonly string ProductDesc = "Markdown Midget " + AppVersion;
 
-    // Segoe Fluent Icons glyphs for the source/WYSIWYG toggle.
-    private static readonly string GlyphSource = char.ConvertFromUtf32(0xE943); // braces {} = markdown source
-    private static readonly string GlyphRich = char.ConvertFromUtf32(0xE8A1);   // rendered content card = formatted (WYSIWYG) view
-
     private string? _currentPath;
     private string? _displayName; // title for dropped content that has no path
     private bool _dirty;
@@ -147,7 +143,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         RegisterShortcuts();
         InitAccessKeys();
-        SourceToggle.Content = GlyphSource; // start in WYSIWYG; button offers source view
+        SyncViewToggles(); // start in WYSIWYG
         _dirtyTimer.Tick += async (_, _) => { _dirtyTimer.Stop(); await UpdateDirtyAsync(); };
 
         // Settings first: LoadRecent and BuildRecentMenu both consult _recentLimit,
@@ -1053,15 +1049,24 @@ public partial class MainWindow : Window
         await SetSourceModeAsync(!_sourceMode);
     }
 
+    // The toolbar's view pair: each button asks for its own view, so the one already showing is a no-op.
+    private async void ViewPair_Click(object sender, RoutedEventArgs e) => await SetSourceModeAsync(sender == SourceViewToggle);
+
+    /// <summary>The View menu tick and the toolbar's view pair show the view that is showing.</summary>
+    private void SyncViewToggles()
+    {
+        SourceViewToggle.IsChecked = MenuViewSource.IsChecked = _sourceMode;
+        FormattedViewToggle.IsChecked = !_sourceMode;
+    }
+
     private async Task SetSourceModeAsync(bool on)
     {
-        if (on == _sourceMode) return;
+        if (on == _sourceMode) { SyncViewToggles(); return; }   // a click on the showing view's button unchecked it
         if (_closed)
         {
             // No document to flip between views. Put the controls back — a click has
             // already flipped them, and nothing below will resync them.
-            SourceToggle.IsChecked = _sourceMode;
-            MenuViewSource.IsChecked = _sourceMode;
+            SyncViewToggles();
             return;
         }
 
@@ -1092,8 +1097,7 @@ public partial class MainWindow : Window
                     "markdown view wasn't opened. Your work is unaffected.",
                     "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
                 // The toggle button flipped itself on the click; put it back.
-                SourceToggle.IsChecked = _sourceMode;
-                MenuViewSource.IsChecked = _sourceMode;
+                SyncViewToggles();
                 return;
             }
             // …and show the FILE's own spelling of it while the document is still
@@ -1138,8 +1142,7 @@ public partial class MainWindow : Window
                 MessageBox.Show(this, "Couldn't hand your markdown back to the formatted " +
                     "view, so it's been left as it is. Your edits are still here.",
                     "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
-                SourceToggle.IsChecked = _sourceMode;
-                MenuViewSource.IsChecked = _sourceMode;
+                SyncViewToggles();
                 return;
             }
             // Nothing was edited, so the document leaving this view is the same saved
@@ -1157,18 +1160,10 @@ public partial class MainWindow : Window
         }
 
         _sourceMode = on;
-        SourceToggle.IsChecked = on;
-        MenuViewSource.IsChecked = on;
+        SyncViewToggles();
         StatusMode.Text = on ? "Markdown source" : "WYSIWYG";
         if (on) ShowCaret(SourceBox.CaretLineColumn());
         else _ = RunEditorAsync("window.MDM.reportSelection()");   // its Ln/Col, now the view is this one
-
-        // The button shows the view it switches TO: in source mode show the
-        // rendered-content glyph (-> formatted); in WYSIWYG show braces (-> source).
-        SourceToggle.Content = on ? GlyphRich : GlyphSource;
-        SourceToggle.ToolTip = on
-            ? "Switch to formatted / WYSIWYG view (Ctrl+E)"
-            : "Edit markdown source (Ctrl+E)";
 
         // Word wrap applies to the source view only.
         UpdateWrapToggleUi();

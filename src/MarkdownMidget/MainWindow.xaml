@@ -42,6 +42,11 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- Icon toggles: checked shows as the background highlight alone. The toolbar theme's
+             1px border crowds a 21px icon, and its triggers colour it but never size it. -->
+        <Style x:Key="ToolCharBorderless" TargetType="{x:Type ButtonBase}" BasedOn="{StaticResource ToolChar}">
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
 
         <!-- Native editor context menus (shown on right-click / Menu key in WYSIWYG). -->
         <ContextMenu x:Key="TableContextMenu" Opened="ContextMenu_Opened">
@@ -312,24 +317,38 @@
                     <!-- View toggles: usable in read-only. -->
                     <ToolBar Band="0" BandIndex="2">
                         <Separator />
-                        <ToggleButton x:Name="SourceToggle" Style="{StaticResource ToolGlyph}"
-                                      ToolTip="Edit markdown source (Ctrl+E)"
-                                      Click="ToggleSource_Click" />
+                        <!-- The view pair: the view showing is checked (SyncViewToggles). A page of round-ended bars and a
+                             picture (sun and mountain are even-odd cut-outs), and a ## slanted by a one-pixel step. -->
+                        <ToggleButton x:Name="FormattedViewToggle" Style="{StaticResource ToolCharBorderless}"
+                                      ToolTip="Formatted view (Ctrl+E)" AutomationProperties.Name="Formatted view" Click="ViewPair_Click">
+                            <Path Width="21" Height="21" SnapsToDevicePixels="True"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  Data="M2,1H19A1,1 0 0 1 19,3H2A1,1 0 0 1 2,1Z M13,5H19A1,1 0 0 1 19,7H13A1,1 0 0 1 13,5Z M13,8H19A1,1 0 0 1 19,10H13A1,1 0 0 1 13,8Z M13,11H17A1,1 0 0 1 17,13H13A1,1 0 0 1 13,11Z
+                                        M2,15H19A1,1 0 0 1 19,17H2A1,1 0 0 1 2,15Z M2,18H13A1,1 0 0 1 13,20H2A1,1 0 0 1 2,18Z
+                                        M2.5,5H8.5A1.5,1.5 0 0 1 10,6.5V11.5A1.5,1.5 0 0 1 8.5,13H2.5A1.5,1.5 0 0 1 1,11.5V6.5A1.5,1.5 0 0 1 2.5,5Z M6,8A1,1 0 1 0 8,8A1,1 0 1 0 6,8Z M2,12V10H3V9H5V10H7V11H9V12Z" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="SourceViewToggle" Style="{StaticResource ToolCharBorderless}"
+                                      ToolTip="Markdown source (Ctrl+E)" AutomationProperties.Name="Markdown source" Click="ViewPair_Click">
+                            <Path Width="21" Height="21" SnapsToDevicePixels="True"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  Data="F1 M3,4h2v7h-2z M2,11h2v6h-2z M7,4h2v7h-2z M6,11h2v6h-2z M2,7h8v2h-8z M1,12h8v2h-8z
+                                        M13,4h2v7h-2z M12,11h2v6h-2z M17,4h2v7h-2z M16,11h2v6h-2z M12,7h8v2h-8z M11,12h8v2h-8z" />
+                        </ToggleButton>
                         <ToggleButton x:Name="WrapToggle" Style="{StaticResource ToolGlyph}"
                                       ToolTip="Word wrap (source view only)"
                                       Click="WordWrapButton_Click" Content="&#xE751;" />
-                        <ToggleButton x:Name="LineNumbersToggle" Style="{StaticResource ToolChar}"
+                        <ToggleButton x:Name="LineNumbersToggle" Style="{StaticResource ToolCharBorderless}"
                                       ToolTip="Line numbers" AutomationProperties.Name="Line numbers" Click="LineNumbers_Click">
-                            <!-- A frame of numbered lines, 111-113, with text bars: 3x5-pixel digits
+                            <!-- A frame of numbered lines, 41-43, with text bars: 3x5-pixel digits
                                  snapped to whole pixels so they stay sharp at toolbar size, and all of
                                  it in the button's Foreground, like the glyph buttons beside it. -->
                             <Path Width="21" Height="21" SnapsToDevicePixels="True"
                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                   Data="M0,0H21V21H0Z M1,1H20V20H1Z
-                                        M2,3h1v1h-1z M3,2h1v5h-1z M5,3h1v1h-1z M6,2h1v5h-1z M8,3h1v1h-1z M9,2h1v5h-1z
-                                        M2,9h1v1h-1z M3,8h1v5h-1z M5,9h1v1h-1z M6,8h1v5h-1z M8,8h2v1h-2z M10,9h1v1h-1z M9,10h1v1h-1z M8,11h1v1h-1z M8,12h3v1h-3z
-                                        M2,15h1v1h-1z M3,14h1v5h-1z M5,15h1v1h-1z M6,14h1v5h-1z M8,14h2v1h-2z M10,15h1v1h-1z M9,16h1v1h-1z M10,17h1v1h-1z M8,18h2v1h-2z
-                                        M13,3h6v1h-6z M13,9h6v1h-6z M13,11h3v1h-3z M13,15h5v1h-5z" />
+                                        M2,2h1v3h-1z M3,4h1v1h-1z M4,2h1v5h-1z M6,3h1v1h-1z M7,2h1v5h-1z
+                                        M2,8h1v3h-1z M3,10h1v1h-1z M4,8h1v5h-1z M6,8h2v1h-2z M8,9h1v1h-1z M7,10h1v1h-1z M6,11h1v1h-1z M6,12h3v1h-3z
+                                        M2,14h1v3h-1z M3,16h1v1h-1z M4,14h1v5h-1z M6,14h2v1h-2z M8,15h1v1h-1z M7,16h1v1h-1z M8,17h1v1h-1z M6,18h2v1h-2z
+                                        M11,3h8v1h-8z M11,9h8v1h-8z M11,11h4v1h-4z M11,15h7v1h-7z" />
                         </ToggleButton>
                         <ToggleButton x:Name="MarksToggle" Style="{StaticResource ToolChar}"
                                       ToolTip="Show formatting marks (¶)"
