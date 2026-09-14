@@ -5,9 +5,9 @@ living document — items move up, down, or off as priorities shift. Shipped wor
 lives in [CHANGELOG.md](CHANGELOG.md); anything planned in detail lives in
 [docs/plans/](docs/plans/).
 
-Rough buckets: **Next** (likely soon), **Later** (wanted, not scheduled),
-**Someday / Big** (real projects), **Won't unless asked** (known limits we've
-deliberately parked).
+Rough buckets: **Next** (likely soon) and **Someday / Big** (real projects). Ideas
+not planned, and the deliberate limits, are in
+[docs/parked-ideas.md](docs/parked-ideas.md).
 
 ---
 
@@ -63,17 +63,21 @@ order of risk:
 - **No installer.** Decided 2026-09-10: portable-only 1.0, stated in README/HELP;
   the installer is the 1.1 headline (#8, closed).
 
-Then 1.0 itself adds no features: it writes every deliberate limit down (see the
-last section) and makes the README's promise true as written.
-**Done 2026-09-13 (1.0.0-beta1, #9)**: HELP's *Known limits* section, the "Won't
-unless asked" list at the foot of this file, and a README opening paragraph that
-says what a trip through the formatted view does change. The beta is cut in the
-repository — version, CHANGELOG section and these docs — and not yet tagged;
-1.0.0 follows after dogfooding.
+Then 1.0 itself adds no features: it writes every deliberate limit down and makes
+the README's promise true as written.
+**Done 2026-09-13 (1.0.0-beta1, #9)**: HELP's *Known limits* section, the
+["Won't unless asked"](docs/parked-ideas.md#wont-unless-asked-known-limits-parked-deliberately)
+list (at the foot of this file until 2026-09-14), and a README opening paragraph that
+says what a trip through the formatted view does change. The beta was tagged
+`v1.0.0-beta1` and published as a GitHub prerelease on 2026-09-13; 1.0.0 follows
+after dogfooding.
 
 ## Next
 
 ### Themes — shipped in 0.7.0
+
+**Not Next work — kept as the design record.** Nothing here is planned; its one open
+question (below) matters only if a second theme ever wants a font size.
 
 Delivered: **View ▸ Theme**, seven built-in palettes, user CSS in `themes\custom`,
 and invalid files listed-but-disabled with the first error in the tooltip. The
@@ -110,13 +114,26 @@ the pins being absent where reasoning said they existed.
 
 ### Updating while several windows are open
 
+**Still open** (checked against CHANGELOG and the code, 2026-09-14):
+
+- **Unsaved changes across an update restart.** Help ▸ Apply vX.Y.Z Update still
+  asks save / discard / cancel first, as closing does. The design is a snapshot
+  through the crash-recovery store, then relaunch and adopt (see *Don't lose unsaved
+  work* below). One window at a time needs no registry; every window in one go does.
+- **Help ▸ Apply vX.Y.Z Update for portable copies.** Designed in
+  [the 2026-08-13 decision](#decided-2026-08-13--how-a-portable-sibling-learns-it-is-superseded),
+  not built: today the item appears only in installed copies. Needs no registry.
+- **Siblings updating themselves**, told rather than each noticing when its Help
+  menu opens. **Needs the cross-instance registry.**
+
+Shipped, so not listed: the document and view mode carried across an update restart,
+the installed-copy menu item, and About showing installed vs running (all 0.8.0).
+
 **The failure itself is fixed in 0.6.4; the ergonomics are still open.** A window
 that has nothing to do now says so and tells you to restart it — worked out before
 downloading anything — and a window that genuinely does need the update steps
 around an older window's parked copy rather than colliding with it, re-deciding
-the name if it loses the race for one. What remains needs the cross-instance
-registry: siblings still don't update themselves, and a window that needs
-restarting still has to be restarted by hand.
+the name if it loses the race for one. What remains is the list above.
 
 Original report: update from one instance, forget the others are open, hit Update
 in a second one, and it fails with *"Cannot create a file when that file already
@@ -203,7 +220,8 @@ snapshotting through the crash-recovery store) and the **portable marker** (the
 "Decided 2026-08-13" design below — installed mode ships first, and the menu item
 simply doesn't appear for portable copies until the marker lands).
 
-- **Reopen the document across an update-restart.** Today both restart paths call
+- ~~**Reopen the document across an update-restart.**~~ **Done in 0.8.0**; the
+  unsaved-changes half is still open (above). Was: both restart paths call
   `Process.Start(exe)` with **no arguments** (`UpdateService.cs`, in
   `ApplyInstalledAndRestart` and `ApplyPortableAndRestart`), so the open file is
   simply dropped and the new instance lands on the splash. The mechanism already
@@ -213,7 +231,8 @@ simply doesn't appear for portable copies until the marker lands).
   the crash-recovery store first, then relaunch, so the buffer comes back still
   unsaved rather than prompting mid-update.
 
-- **"Help ▸ Apply vX.Y.Z update" in the siblings.** When another instance has
+- ~~**"Help ▸ Apply vX.Y.Z update" in the siblings.**~~ **Done in 0.8.0 for installed
+  copies; portable is still open (above).** When another instance has
   already swapped the binary, an old window should offer a one-click relaunch into
   it — no download, no signature check, no update flow, because the new file is
   already there and was verified by whoever installed it. **The detection is already
@@ -294,7 +313,8 @@ If the marker is lost (profile cleared, a different user account), portable simp
 never offers the menu item and the user does what they do today. Acceptable
 degradation, and stated so nobody treats its absence as a bug.
 
-- **Show installed vs running in the About box when they differ.** Currently it shows
+- ~~**Show installed vs running in the About box when they differ.**~~ **Done in
+  0.8.0.** Was: it shows
   the running version only (`Version 0.7.0  (installed)`), and the on-disk version
   appears solely as transient status text during a check. When the two differ, both
   belong on screen permanently — that is the state where a user is most likely to be
@@ -333,10 +353,14 @@ can later be broken out into a standalone OSS library:
   icons are third-party code — the exact crash surface — so the safe default
   is static glyphs), thumbnails, search.
 
-Not worth doing right away — it would complicate the immediate goal. The
-in-app picker ships first; extraction happens if/when it proves itself.
+**Still open:** the extraction itself, not started, and the deferred questions above.
+The in-app picker shipped first, in 0.9.0; extraction happens if and when it proves
+itself.
 
 ### Real installer / uninstaller
+
+**The 1.1 headline** (decided 2026-09-10, #8): 1.0 ships portable-only, and README
+and HELP's *Known limits* say so. Not started.
 
 A proper signed installer that behaves like software users expect on Windows —
 **not** the current one-off "Register as .md editor" AppData-copy flow.
@@ -372,9 +396,11 @@ portable copy keeps using the in-app updater's swap. Detecting "how was I
 installed?" is part of this work. Share the swap/registration logic rather than
 duplicating it.
 
-Not started — parked deliberately until the update flow has proven itself in the
-wild. Likely wants its own de-risk spike (MSIX + WebView2 + file associations)
-before scoping.
+**Still open, all of it:** a de-risk spike (MSIX + WebView2 + file associations) to
+choose WiX or MSIX before scoping; then the ARP entry and uninstall, the second
+signed artifact, and the updater hand-off above. Checking that no other copy is
+running before replacing files wants the cross-instance registry (per-user installs
+only; see [docs/plans/queued-features.md](docs/plans/queued-features.md)).
 
 ### Make multiple instances behave like one application
 
@@ -383,6 +409,11 @@ explicitly not wanted right now — the point is that each document is a real
 window the OS can tile, snap, alt-tab and put on its own monitor. What's missing
 is that the separate instances don't behave as though they belong to the same
 application.
+
+**Still open:** the cross-instance registry itself (the per-file claim from #1 is its
+first piece) and, on top of it, a Window menu and crash recovery that restores the
+window arrangement; plus a decision on one shared-user-state layer in place of
+per-feature fixes.
 
 Concrete things that fall out of being N unrelated processes today:
 
@@ -413,75 +444,3 @@ individual symptoms.
 
 If tabs ever do arrive they should be a *view* over that same registry — never
 the reason to collapse back to a single process.
-
----
-
-## Later
-
-All sized and ordered in
-[docs/plans/queued-features.md](docs/plans/queued-features.md), which also explains
-why the cross-instance registry is worth pulling forward — three of these wait on
-the same missing piece — and how the work should land: one user-visible feature per
-release, with infrastructure riding along with whatever needs it.
-
-- **Spell check follow-ups** (the 0.5.0 stack shipped en-US only, app-private
-  dictionary): language selection, and an optional one-way "import words from
-  Word's CUSTOM.DIC" — import only, never write back. Sharing the OS dictionary
-  was considered and deliberately rejected as too risky.
-
-- ~~**Find & Replace.**~~ **Done 2026-09-11 (1.0.0-beta1, #5)**: not a tab — a
-  Replace field and Replace / Replace All buttons in the Find dialog, scoped to the
-  selection, honouring the current search mode, one undo step per Replace All.
-- ~~**Independent code-view theme.**~~ **Done 2026-09-10 (0.10.0)**, in a
-  simpler shape than first scoped: no second theme format and no second list. One
-  list of themes; **View ▸ Theme ▸ Same Theme for Both Views** (on by default) and,
-  when off, View ▸ Theme changes only the view you're in. The source view's theme is
-  resolved in a hidden same-origin frame so it never touches the page. The
-  standalone-palette-file design is retired.
-- **.NET 8 build + portable self-contained build.** The multi-target plan (net8 /
-  net10 / portable ~63 MB) is scoped and the code already compiles for net8; just
-  needs the csproj multi-target + extra publish profiles + release-workflow matrix.
-- ~~**Editor round-trip test harness.**~~ **Done 2026-09-11 (1.0.0-beta1, #2)**:
-  `editor-src/test/roundtrip.test.mjs` mounts the shipped editor in jsdom
-  (ProseMirror + the Milkdown plugins) under `node --test` and runs markdown in →
-  editor → markdown out: an idempotence invariant over a corpus (the audit fixture,
-  README and HELP), one assertion per measured rewrite, and one named case per
-  pinned convention. Was: the HTML sanitize policy and the C# image-serving boundary
-  had unit tests, but the markdown round trip was covered only by manual dogfooding.
-- **Editor bundle lazy-load.** Mermaid pulled the bundle from ~560 KB to ~3.9 MB
-  (exe 2.9 → 6.4 MB). Code-split Mermaid so it loads only when a `mermaid` block
-  is present — switches esbuild to ESM chunks + adapts the HTML/extraction.
-
----
-
-## Won't unless asked (known limits, parked deliberately)
-
-Filled from the 2026-09-10 audit. These are stated, not hidden; each is a choice.
-The user-facing statement of them is HELP's **Known limits** section, which says
-what each one costs a reader and what to do instead; this list is the decision.
-
-- **Spell check is en-US only, and the UI is English only.** Language selection
-  is under Later; localisation is not planned.
-- **Task-list checkboxes render but cannot be inserted from the UI.** The GFM
-  preset supports `- [ ]`; there is no menu or toolbar item for it. Cheap to add
-  if asked.
-- **The source view is Consolas 14, no font, size or zoom control.** Zoom is the
-  formatted view's. Now that the source view is coloured this will be asked for.
-- **PDF is the only export.** No HTML or Word export; the markdown file *is* the
-  portable form.
-- **One document per window, no tabs, no Window menu.** Deliberate SDI; see the
-  cross-instance registry under Someday.
-- **A document that passes through the formatted view is saved in the app's
-  markdown conventions.** Pinned and documented since #2: reference-style links
-  become inline, setext headings become ATX, indented code becomes fenced, an
-  underscore in an image's alt text is escaped — and emphasis that opens or
-  closes on punctuation touching an emoji keeps its text but may lose its marks.
-  (Tight lists no longer loosen; that one was fixed rather than parked.) A
-  document opened and saved entirely in the source view is written back as typed:
-  since #2 the source view opens on the file's own text rather than the editor's
-  re-serialisation of it, so Ctrl+E before the formatted view changes anything is
-  the way round this limit. Preserving each document's own style *through the
-  formatted view* would be a second serialiser to test and is not planned.
-- **Mermaid ships in the bundle** whether or not a document uses it (lazy-load is
-  under Later).
-
