@@ -80,7 +80,8 @@ or drop your selection.
   arrowing/clicking into the paragraph that always follows the last block, or — if
   the code block is the very first thing in the document — by pressing **↑** on its
   first line to insert a paragraph above.
-- **Links** show styled, with the URL as a hover tooltip.
+- **Links** show styled, with the URL as a hover tooltip. **Ctrl+click** a link to a heading in
+  the same document (`#known-limits`) to jump there; in a read-only window, such as Help, just click.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
   in the editor and travel with the file. Pasting a picture from the clipboard — a
   screenshot, say — works in the Markdown source view too, and embeds it the same

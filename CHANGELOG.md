@@ -16,6 +16,7 @@ changes between alpha tags.
   view, together or per view. Lines are lines of the markdown; see Help, *The two views*.
   Go to Line reaches every line in the formatted view too, blank lines and fences included,
   and its margin shows every line once: each block's range of lines, and the lines between blocks.
+- **A `#link` to a heading in the same document jumps there**: Ctrl+click it, or click it in a read-only window such as Help.
 
 ### Fixed
 
