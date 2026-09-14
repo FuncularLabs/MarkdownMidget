@@ -185,48 +185,24 @@ the one it replaced:
 | The app, **Help ▸ About Markdown Midget** | `Version 0.11.0-dev+build.57` |
 | The app's title bar, after the document name | `\| Markdown Midget v0.11.0-dev+build.57` |
 
-The build prints the number too (`MarkdownMidget local build #57 - ...`). Check the
-exe's Properties before copying it over an installed copy, and **Help ▸ About
-Markdown Midget** after launching: if the two numbers differ, the copy is not the
-build you just made.
+The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
+Properties before copying it over an installed copy and **Help ▸ About Markdown
+Midget** after launching: if the numbers differ, the copy is not the build you made.
 
-**One counter per repository, not per checkout.** It lives in the repository's own
-directory — `.git/mm-local-build-number`, the directory git calls the common one —
-so a clone and every worktree linked to it take numbers from the same sequence and
-no number is ever issued twice. (Two separate *clones* are two repositories and
-number independently, as does a submodule.) The build finds that directory by
-reading `.git` itself, not by running git, so nothing here depends on git being
-installed, on `PATH`, or on answering promptly. **Delete that file to start again at
-1**; a missing counter is the normal first-build state. With no repository to find —
-a source copy with no `.git` — it falls back to `.local-build-number` in the
-checkout (git-ignored) and says so.
+The counter is the **repository's**, not the checkout's — `.git/mm-local-build-number`
+— so a clone and all its worktrees take numbers from one sequence and no number is
+issued twice. **Delete that file to start again at 1.** A source copy with no `.git`
+falls back to `.local-build-number` in the checkout (git-ignored) and warns.
 
-Three things warn, and each leaves you with a working build rather than a failed
-one:
-
-| Code | What happened |
-| --- | --- |
-| `MMBN0001` | This build took no number: the counter is corrupt, at its ceiling, or its lock could not be taken. It reports `0.11.0` / `0.11.0-dev`, exactly as before this feature existed — never a number from a fresh sequence that older exes already carry. |
-| `MMBN0002` | It took a number, but the file version could not carry it. |
-| `MMBN0003` | The repository directory could not be found, so the number came from this checkout's own counter — two checkouts could then stamp one number on two binaries. |
-
-Under `-warnaserror` those would fail the build like any other warning, so demote
-them with `-p:MSBuildWarningsAsMessages=MMBN0001%3BMMBN0002%3BMMBN0003` if you
-build that way. The `%3B` is required: MSBuild splits a `-p:` value on real
-semicolons and then rejects the rest as an unknown switch (`MSB1006`).
-
-Every build invocation takes a number, including one where nothing changed — so a
-freshly published exe can never carry the number of the one before it. The cost is
-that the version attribute changes each time, so the compiler runs each time: a
-no-op build goes from about 1.1s to 2.2s for the app and from 1.3s to 2.7s for the
-test project, so a `dotnet test` cycle pays about a second and a half. The suite
-pays more: `LocalBuildNumberTests` drives real MSBuild processes (including four at
-once, to prove two builds can never take one number) and takes about 16s against
-the other 1420 tests' 6s, so a full run is about 27s. It has its own non-parallel
-collection, so it does not compete with the window tests for the desktop. CI and
-release builds are excluded (`GITHUB_ACTIONS`, `CI`, `TF_BUILD`,
-`ContinuousIntegrationBuild`), so a released exe reports exactly what the tag said;
-`-p:UseLocalBuildNumber=false` does the same locally. The mechanism is
+Every build takes a number, even when nothing changed, so a fresh publish is always
+identifiable; the changed attribute costs a recompile, about a second. CI and release
+builds take none (`GITHUB_ACTIONS`, `CI`, `TF_BUILD`, `ContinuousIntegrationBuild`),
+so a released exe reports what the tag said; `-p:UseLocalBuildNumber=false` does the
+same locally. A build that cannot number itself warns — `MMBN0001` (no number: the
+counter is corrupt, at its ceiling, or locked) or `MMBN0003` (no repository found, so
+the checkout's counter was used) — and builds anyway. Under `-warnaserror` demote them
+with `-p:MSBuildWarningsAsMessages=MMBN0001%3BMMBN0003`; the `%3B` is required,
+because MSBuild splits a `-p:` value on real semicolons (`MSB1006`). The mechanism is
 `build/LocalBuildNumber.targets`, imported by the app project only.
 
 To measure line coverage, use the Microsoft collector that `Microsoft.NET.Test.Sdk`
