@@ -1467,4 +1467,23 @@ public class SourceEditorTests
         Assert.False(canUndo);
         Assert.Equal(0, caret);
     }
+
+    // ===== 5. the caret's line and column, for the status bar (#10) =====
+
+    [Fact]
+    public void TheCaretsLineAndColumnAreOneBasedAndEveryMoveIsReported()
+    {
+        var (start, moved, raised) = On(ed =>
+        {
+            var start = ed.CaretLineColumn();
+            var raised = 0;
+            ed.CaretMoved += (_, _) => raised++;
+            ed.CaretIndex = 5;   // "ab\n\tc|d": line 2, after a tab and a letter
+            return (start, ed.CaretLineColumn(), raised);
+        }, "ab\n\tcd", laidOut: false);
+
+        Assert.Equal((1, 1), start);
+        Assert.Equal((2, 3), moved);
+        Assert.NotEqual(0, raised);
+    }
 }

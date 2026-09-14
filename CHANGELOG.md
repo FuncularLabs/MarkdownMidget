@@ -9,6 +9,11 @@ changes between alpha tags.
 
 ## [Unreleased]
 
+### Added
+
+- **The cursor's line and column in the status bar, and Go to Line (Ctrl+G)**, in
+  both views (#10). Lines are lines of the markdown; see Help, *The two views*.
+
 ## [1.0.0-beta1] - 2026-09-13
 
 The first 1.0 prerelease. 1.0 is not feature-maximal: it is the release where the

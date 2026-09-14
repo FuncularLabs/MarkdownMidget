@@ -19,8 +19,11 @@ import {
 import { settleDocument } from './settle.js';
 import { readHeads, readFull, planDroppedRead, postAnswer } from './file-drop.js';
 import { ceilingFrom, refusalMessage } from './picture-paste.js';
-import { NodeSelection } from '@milkdown/kit/prose/state';
+import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
+import {
+  beginLoad, endLoad, forgetLoad, markdownWithLines, ensureLines, lineStatus, lineTarget,
+} from './line-map.js';
 
 import {
   toggleStrongCommand,
@@ -66,6 +69,7 @@ const COMMANDS = {
 let editor = null;
 let editorView = null;
 let suppressChange = false;
+const serialize = () => editor.action(getMarkdown());
 
 // Returns whether the message actually went. Almost every caller ignores that —
 // a 'change' or 'contextmenu' the host missed is not worth a second thought — but
@@ -208,6 +212,7 @@ function postSelectionState(state) {
       strike: markActive(state, m.strike_through || m.strikethrough),
       code: markActive(state, m.inlineCode || m.inline_code),
     },
+    ...lineStatus(state),   // the status bar's Ln/Col (#10); absent when the document has no numbering
   });
 }
 
@@ -456,6 +461,7 @@ function resolveThemeIsolated(css) {
 const MDM = {
   async create(initialMarkdown, options) {
     const root = document.getElementById('app');
+    beginLoad();
     editor = await createEditor({
       root,
       initialMarkdown,
@@ -482,6 +488,7 @@ const MDM = {
     // this is the other door rather than the one the bug came through.
     suppressChange = true;
     try { settleDocument(editorView); } finally { suppressChange = false; }
+    endLoad(editorView.state.doc, initialMarkdown || '');
     installContextMenus(editorView);
     installFileDrop();
     postHistory();
@@ -501,8 +508,22 @@ const MDM = {
 
   getMarkdown() {
     if (!editor) return '';
-    return editor.action(getMarkdown());
+    const { markdown, rebuilt } = markdownWithLines(editorView.state.doc, serialize);
+    if (rebuilt) postSelectionState(editorView.state);   // the status bar's line catches up (#10)
+    return markdown;
   },
+
+  // Go to Line (#10): the host asks how many lines there are, then goes to one.
+  lineCount() { return (editorView && ensureLines(editorView.state.doc, serialize)?.lines) || 0; },
+  goToLine(n) {
+    if (!editorView || !ensureLines(editorView.state.doc, serialize)) return false;
+    const { state } = editorView;
+    editorView.dispatch(state.tr.setSelection(Selection.near(state.doc.resolve(lineTarget(state.doc, n)))).scrollIntoView());
+    return this.focus();
+  },
+  // A save made the file the saved markdown, so number by that from now on.
+  lineBaseSaved() { forgetLoad(); this.getMarkdown(); },
+  reportSelection() { if (editorView) postSelectionState(editorView.state); },
 
   /**
    * Phase two of a file drop: the full bytes of the files the host's plan chose.
@@ -540,6 +561,7 @@ const MDM = {
     if (!editor) return;
     suppressChange = true;
     try {
+      beginLoad();   // number it by this text while it is untouched (#10)
       editor.action(replaceAll(md || '', flush));
       if (flush) editorView = editor.ctx.get(editorViewCtx); // state was recreated
       // Inside the suppressed window on purpose: settling is part of installing the
@@ -548,11 +570,13 @@ const MDM = {
       // host, whose clean baseline was taken a moment earlier, calls the document
       // modified (#5 NF-5).
       settleDocument(editorView);
+      endLoad(editorView.state.doc, md || '');
     } finally {
       // markdownUpdated fires synchronously during the action above.
       suppressChange = false;
     }
     postHistory();
+    if (editorView) postSelectionState(editorView.state);   // the new document's Ln/Col (#10)
   },
 
   undo() { if (editorView) { undo(editorView.state, editorView.dispatch); this.focus(); } },

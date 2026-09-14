@@ -90,6 +90,7 @@ public partial class MainWindow
         // it and has no status bar to say so in, so the window says it — in the words
         // the drop, Insert ▸ Picture and the formatted view's paste all use.
         SourceBox.PictureRefused += FlashStatus;
+        SourceBox.CaretMoved += (_, _) => { if (_sourceMode) ShowCaret(SourceBox.CaretLineColumn()); };
     }
 
     /// <summary>

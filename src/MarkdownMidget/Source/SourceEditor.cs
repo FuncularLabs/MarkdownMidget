@@ -28,7 +28,7 @@ namespace MarkdownMidget.Source;
 /// Line-number convention, stated once because it is the easy thing to get wrong:
 /// AvalonEdit counts document lines from 1; the TextBox API this replaces counts
 /// display lines from 0. Every method here takes and returns the 0-based form and
-/// converts at the boundary.
+/// converts at the boundary, except the status bar's CaretLineColumn.
 /// </summary>
 public class SourceEditor : TextEditor
 {
@@ -317,6 +317,23 @@ public class SourceEditor : TextEditor
         var count = LineCount;
         if (count <= 0) return;
         base.ScrollToLine(Math.Clamp(lineIndex, 0, count - 1) + 1);
+    }
+
+    // ===== the caret's line and column, for the status bar (#10) =====
+
+    /// <summary>Raised whenever the caret moves.</summary>
+    public event EventHandler CaretMoved
+    {
+        add => TextArea.Caret.PositionChanged += value;
+        remove => TextArea.Caret.PositionChanged -= value;
+    }
+
+    /// <summary>The caret's line as the status bar shows it — 1-based, the one exception to
+    /// this class's 0-based rule — and its column by <see cref="LineColumn.Column"/>.</summary>
+    public (int Line, int Column) CaretLineColumn()
+    {
+        var line = Document.GetLineByOffset(CaretOffset);
+        return (line.LineNumber, LineColumn.Column(Document.GetText(line.Offset, CaretOffset - line.Offset)));
     }
 
     // ===== hit-testing and glyph geometry =====

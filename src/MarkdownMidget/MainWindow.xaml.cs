@@ -507,6 +507,8 @@ public partial class MainWindow : Window
                         bool On(string k) => m.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
                         SyncMarkToggles(On("bold"), On("italic"), On("underline"), On("strike"), On("code"));
                     }
+                    if (d.RootElement.TryGetProperty("line", out var ln) && d.RootElement.TryGetProperty("col", out var cl))
+                        ShowCaret((ln.GetInt32(), cl.GetInt32()));
                 }
                 break;
             case "history":
@@ -1135,6 +1137,8 @@ public partial class MainWindow : Window
         SourceToggle.IsChecked = on;
         MenuViewSource.IsChecked = on;
         StatusMode.Text = on ? "Markdown source" : "WYSIWYG";
+        if (on) ShowCaret(SourceBox.CaretLineColumn());
+        else _ = RunEditorAsync("window.MDM.reportSelection()");   // its Ln/Col, now the view is this one
 
         // The button shows the view it switches TO: in source mode show the
         // rendered-content glyph (-> formatted); in WYSIWYG show braces (-> source).
@@ -1766,6 +1770,7 @@ public partial class MainWindow : Window
         else if (!wantEncrypted && _docPassword is not null) { _docPassword = null; ClearBackupKey(); }
         _cleanMarkdown = markdown; // new clean baseline; undo history is left intact
         _diskBaseline = DocumentText.Fold(markdown);   // what the file holds now, as Detect reads it back
+        if (!_sourceMode && _editorReady) _ = RunEditorAsync("window.MDM.lineBaseSaved()");   // number by it (#10)
         _dirty = false;
         UpdateTitle();
         if (pathChanged) StartWatching(path);
@@ -2646,6 +2651,7 @@ public partial class MainWindow : Window
         if (on) { UndoBtn.IsEnabled = UndoMenu.IsEnabled = false; RedoBtn.IsEnabled = RedoMenu.IsEnabled = false; }
         StatusMode.Text = on ? "No document" : (_sourceMode ? "Markdown source" : "WYSIWYG");
         ApplyCountText();   // no document, no count
+        if (on) StatusCaret.Text = string.Empty;
     }
 
     // ===== External change detection (FileSystemWatcher + backup + prompt) =====
@@ -5439,6 +5445,43 @@ public partial class MainWindow : Window
 
     private string _countText = string.Empty;
 
+    /// <summary>The caret's Ln/Col in the status bar (#10). The formatted view's column is
+    /// counted in text rather than markdown, and its tooltip says so.</summary>
+    private void ShowCaret((int Line, int Column) at)
+    {
+        StatusCaret.Text = _closed ? string.Empty : LineColumn.StatusText(at.Line, at.Column);
+        StatusCaret.ToolTip = _sourceMode ? null : LineColumn.FormattedColumnTip;
+    }
+
+    /// <summary>Edit ▸ Go to Line… (Ctrl+G): a line of the markdown, in either view.</summary>
+    private async void GoToLine_Click(object sender, RoutedEventArgs e)
+    {
+        if (_closed) return;
+        var sourceView = _sourceMode;
+        var count = sourceView ? SourceBox.LineCount : await EditorCallAsync("window.MDM.lineCount()");
+        if (count < 1) { FlashStatus("Line numbers aren't available for this document."); return; }
+        var dlg = InputDialog.Single(this, "Go to Line", $"Line number (1–{count}):", "");
+        if (dlg.ShowDialog() == true && !_closed && _sourceMode == sourceView
+            && LineColumn.ParseLine(dlg.Value1, sourceView ? SourceBox.LineCount : count) is { } line)
+        {
+            if (!sourceView) await EditorCallAsync($"window.MDM.goToLine({line})");
+            else
+            {
+                SourceBox.CaretIndex = SourceBox.GetCharacterIndexFromLineIndex(line - 1);
+                SourceBox.ScrollToLine(line - 1);
+            }
+        }
+        RefocusEditor();
+    }
+
+    /// <summary>A number from the editor, or 0 when it can't answer — a WebView2 that has
+    /// died throws instead.</summary>
+    private async Task<int> EditorCallAsync(string script)
+    {
+        try { return _editorReady && int.TryParse(await RunEditorAsync(script), out var n) ? n : 0; }
+        catch { return 0; }
+    }
+
     /// <summary>Marks the current content as the clean baseline (after open/save/new).</summary>
     private async Task SetCleanBaselineAsync()
     {
@@ -5506,6 +5549,7 @@ public partial class MainWindow : Window
         Bind(Key.P, ModifierKeys.Control, (_, _) => Print_Click(this, new RoutedEventArgs()));
         Bind(Key.K, ModifierKeys.Control, (_, _) => Link_Click(this, new RoutedEventArgs()));
         Bind(Key.F, ModifierKeys.Control, (_, _) => Find_Click(this, new RoutedEventArgs()));
+        Bind(Key.G, ModifierKeys.Control, (_, _) => GoToLine_Click(this, new RoutedEventArgs()));
         Bind(Key.F3, ModifierKeys.None, (_, _) => FindNextRequested(forward: true));
         Bind(Key.F3, ModifierKeys.Shift, (_, _) => FindNextRequested(forward: false));
         Bind(Key.F1, ModifierKeys.None, (_, _) => Help_Click(this, new RoutedEventArgs()));

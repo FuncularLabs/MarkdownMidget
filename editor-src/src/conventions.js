@@ -15,6 +15,7 @@ import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { bulletListSchema } from '@milkdown/kit/preset/commonmark';
 import { extendListItemSchemaForTask } from '@milkdown/kit/preset/gfm';
 import { defaultHandlers } from 'mdast-util-to-markdown';
+import { recordingRoot } from './line-map.js';
 
 /**
  * The hard-break form. CommonMark allows two spellings: a backslash before the
@@ -231,6 +232,7 @@ export function conventions(ctx) {
     ...SERIALIZER_OPTIONS,
     handlers: {
       ...prev.handlers,
+      root: recordingRoot(prev.handlers.root || defaultHandlers.root),   // block lines for #10 (line-map.js)
       break: hardBreak,
       text: intrawordUnderscores(prev.handlers.text || defaultHandlers.text),
       emphasis: encodedAttention('emphasis'),

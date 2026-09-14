@@ -27,6 +27,7 @@ import { htmlRender } from './html-render.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { conventions, tightBulletList, tightListItem } from './conventions.js';
 import { refusedPictureSize } from './picture-paste.js';
+import { lineCapture, lineMap } from './line-map.js';
 
 import {
   wrapInHeadingCommand,
@@ -278,6 +279,8 @@ export function createEditor({
     .use(spellDecorate)
     .use(selectionState(onSelectionState))
     .use(pictureCeiling(maxPictureBytes, onPictureRefused))
+    .use(lineCapture)
+    .use(lineMap)
     .use(splitHeadingCommand)
     .use(headingEnterKeymap)
     .use(exitBlockCommand)

@@ -14,6 +14,14 @@ window) — close it whenever you like and your work is untouched.
 
 Both views drive the same document; switching syncs your edits across.
 
+The status bar shows the cursor's line and column (`Ln 400, Col 50`), and **Edit ▸
+Go to Line…** (**Ctrl+G**) jumps to a line. Lines are lines of the markdown in both
+views. In the formatted view, Col counts the characters of text before the cursor on
+its line; markdown symbols such as #, **, list markers, backslashes and link addresses
+are not counted. An untouched document is numbered as its file is; once you edit or
+save it there, lines follow the markdown the formatted view saves, which is what it
+then holds and can differ from the file (see *Markdown conventions*).
+
 ## Toolbar
 
 From left to right:
@@ -48,6 +56,7 @@ or drop your selection.
 | Insert link | Ctrl+K |
 | Exit a code block (new paragraph below) | Ctrl+Enter |
 | Toggle markdown source | Ctrl+E |
+| Go to line | Ctrl+G |
 
 ## Editing behaviors
 

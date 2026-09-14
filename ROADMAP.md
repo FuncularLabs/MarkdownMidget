@@ -74,6 +74,12 @@ after dogfooding.
 
 ## Next
 
+### Line numbers (#10)
+
+Phase 1 is in: the cursor's line and column in the status bar, and Go to Line
+(Ctrl+G), in both views. Phase 2 is open: line-number margins, with a View-menu
+toggle and toolbar button that can differ per view, as themes can.
+
 ### Themes — shipped in 0.7.0
 
 **Not Next work — kept as the design record.** Nothing here is planned; its one open

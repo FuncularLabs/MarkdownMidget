@@ -135,6 +135,7 @@
                         <MenuItem Header="Select _All" InputGestureText="Ctrl+A" Click="SelectAll_Click" />
                         <Separator />
                         <MenuItem Header="_Find…" InputGestureText="Ctrl+F" Click="Find_Click" />
+                        <MenuItem Header="_Go to Line…" InputGestureText="Ctrl+G" Click="GoToLine_Click" />
                         <Separator />
                         <MenuItem x:Name="MenuReadOnly" Header="_Read Only"
                                   IsCheckable="True" Click="ReadOnly_Click" />
@@ -373,8 +374,11 @@
                 <TextBlock x:Name="StatusCount" Text="" Foreground="#FF5B6570" />
             </StatusBarItem>
             <StatusBarItem DockPanel.Dock="Right">
-                <TextBlock x:Name="StatusZoom" Text="100%" ToolTip="Zoom (Ctrl+scroll). Click to reset."
-                           Cursor="Hand" MouseLeftButtonUp="StatusZoom_Reset" Margin="0,0,6,0" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="StatusCaret" Margin="0,0,16,0" />
+                    <TextBlock x:Name="StatusZoom" Text="100%" ToolTip="Zoom (Ctrl+scroll). Click to reset."
+                               Cursor="Hand" MouseLeftButtonUp="StatusZoom_Reset" Margin="0,0,6,0" />
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
 
