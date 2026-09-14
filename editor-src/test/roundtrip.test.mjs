@@ -256,6 +256,42 @@ describe('ConventionsArePinned', () => {
   });
 });
 
+describe('ParagraphAfterNestedListKeepsItsBlankLine', () => {
+  // #11. A paragraph or table after an item's nested list needs a blank line
+  // before it, or it re-opens as a lazy continuation of that list's last item.
+  // The parser reads an item inside a quote as tight even with the blank `>`
+  // line, an item the editor builds can be tight too, and the serialiser joined
+  // a tight item's children with no blank line. conventions.js's join rule.
+  test('inside a quote: the issue\'s example', () => {
+    assert.equal(survives('> - b\n>   - b2\n>\n>   b-cont\n'), '> - b\n>   - b2\n>\n>   b-cont\n');
+  });
+
+  test('outside a quote', () => {
+    assert.equal(survives('- b\n  - b2\n\n  b-cont\n'), '- b\n\n  - b2\n\n  b-cont\n');
+  });
+
+  test('inside a quote: ordered, deeper, loose, an item after, a quote tail, a table', () => {
+    for (const md of ['> 1. b\n>    1. b2\n>\n>    b-cont\n', '> - a\n>   - b\n>     - c\n>\n>     b-cont\n',
+      '> - b\n>   - b1\n>\n>   - b2\n>\n>   b-cont\n', '> - b\n>   - b2\n>\n>   b-cont\n> - c\n',
+      '> - b\n>   - b2\n>\n>     > q\n>\n>   para\n',
+      '> - b\n>   - b2\n>\n>   | x | y |\n>   | - | - |\n>   | 1 | 2 |\n']) {
+      assert.equal(survives(md), md);
+    }
+  });
+
+  test('made in the editor outside a quote', () => {
+    ed.roundTrip('- b\n  - b2');
+    const view = ed.view();
+    const end = 2 + view.state.doc.child(0).child(0).content.size;  // the end of item b, after its nested list
+    view.dispatch(view.state.tr.insert(end, view.state.schema.nodes.paragraph.create(null, view.state.schema.text('b-cont'))));
+    const out = ed.markdown();
+    assert.match(out, /^- b\n {2}- b2\n\n {2}b-cont\n/);
+    ed.roundTrip(out);
+    const item = ed.view().state.doc.child(0).child(0);
+    assert.deepEqual(item.content.content.map((n) => n.type.name), ['paragraph', 'bullet_list', 'paragraph']);
+  });
+});
+
 describe('IntrawordUnderscoreSurvives', () => {
   // R3. An underscore run with a word character on BOTH sides can neither open
   // nor close emphasis (CommonMark's flanking rules for `_`), so escaping it

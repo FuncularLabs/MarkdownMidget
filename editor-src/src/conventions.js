@@ -225,11 +225,28 @@ function plainAttention(node, option, state, info, fence) {
   return open + content + tracker.move(fence);
 }
 
+// ---- a paragraph after a nested list keeps its blank line (#11) -------------
+//
+// mdast-util-to-markdown joins a tight item's children with no blank line, and
+// the parser reads an item inside a quote as tight even across a blank `>`
+// line. A paragraph (or a table) written straight after a list whose last block
+// is a paragraph re-opens as a lazy continuation of that paragraph, so it gets
+// a blank line whatever the item's spread. Tails that take no lazy line — a
+// fence, say — keep the default, so a tight item stays tight.
+const lazyTail = (node) => node.type === 'paragraph'
+  || (['list', 'listItem', 'blockquote'].includes(node.type) && node.children.length > 0 && lazyTail(node.children.at(-1)));
+
+/** A join rule (the last one registered is asked first): one blank line where a lazy continuation would take the next block. */
+function blankLineAfterLazyList(left, right) {
+  if (left.type === 'list' && (right.type === 'paragraph' || right.type === 'table') && lazyTail(left)) return 1;
+}
+
 /** Milkdown config: install the options and handlers above. */
 export function conventions(ctx) {
   ctx.update(remarkStringifyOptionsCtx, (prev) => ({
     ...prev,
     ...SERIALIZER_OPTIONS,
+    join: [...(prev.join || []), blankLineAfterLazyList],
     handlers: {
       ...prev.handlers,
       root: recordingRoot(prev.handlers.root || defaultHandlers.root),   // block lines for #10 (line-map.js)
