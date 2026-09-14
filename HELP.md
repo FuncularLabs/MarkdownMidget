@@ -553,6 +553,8 @@ behind it.
   adopts that too. A new document saves LF.
 - **File ▸ Open Recent** lists the files you last opened or saved (10 by default;
   change it in **Edit ▸ Settings…**), with a **Clear Recent** option.
+- **A large file** (250 KB or more) takes a few seconds to open in the formatted view, so
+  opening one there suggests the **Markdown source view** (Ctrl+E), which opens it much faster.
 - **File ▸ Close** (Ctrl+W) closes the current document and shows a gray "drop a
   file here" placeholder. The window stays open and still accepts dropped files.
 - **External change detection:** if a file you have open is modified by another

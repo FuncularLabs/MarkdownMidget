@@ -442,6 +442,9 @@
                                    FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,10" />
                         <ProgressBar IsIndeterminate="True" Width="220" Height="6"
                                      Background="#FF3B4252" Foreground="#FF88C0D0" BorderThickness="0" />
+                        <TextBlock x:Name="BusyStep" Foreground="#FFD8DEE9" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                        <TextBlock x:Name="BusyHint" Visibility="Collapsed" Foreground="#FF88C0D0" FontSize="12" TextWrapping="Wrap" MaxWidth="260"
+                                   TextAlignment="Center" Margin="0,6,0,0" Text="Large file — the Markdown source view (Ctrl+E) opens it much faster." />
                     </StackPanel>
                 </Border>
             </Grid>

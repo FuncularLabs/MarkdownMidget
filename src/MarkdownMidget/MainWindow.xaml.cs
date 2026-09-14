@@ -996,6 +996,7 @@ public partial class MainWindow : Window
         {
             _painted = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _pendingBaseline = null;   // this install moves the editor's settled snapshot on: no earlier load's placeholder may be filled from it
+            BusyStatus(_sourceMode ? "Preparing document…" : "Building formatted view…");   // no yield: the await below frees the UI thread to paint it
             await RunEditorAsync(EditorScripts.SetMarkdown(markdown, ++_loadToken));
             phase = TimingLog.Lap("install", "setMarkdown", phase);
             // setMarkdown settles the document before it returns (editor-src/src/settle.js):
@@ -1007,6 +1008,7 @@ public partial class MainWindow : Window
             // would differ from the formatted view's markdown by one blank line and the
             // document would read as modified the moment the views were swapped (#5 NF-5).
             // Read here only in the source view, which shows it; the formatted view goes on after its first paint and takes its baseline when first needed (TakePendingBaselineAsync).
+            BusyStatus(_sourceMode ? "Finishing up…" : "Drawing page…");
             if (!_sourceMode) { await Task.WhenAny(_painted.Task, Task.Delay(2000)); phase = TimingLog.Lap("install", "painted", phase); }
             else { settled = await RunEditorAsync("window.MDM.getSettledMarkdown()"); phase = TimingLog.Lap("install", "getSettledMarkdown", phase); }
             if (settled is not null) markdown = settled;
@@ -1322,6 +1324,7 @@ public partial class MainWindow : Window
             // Open Recent and multi-file drops - the password prompt therefore
             // covers every one of those entry points at once.
             var opening = TimingLog.Start();
+            BusyStatus("Reading file…");
             var bytes = await File.ReadAllBytesAsync(path);
             opening = TimingLog.Lap("open", "read", opening);
             if (Secure.SecureMarkdownFormat.LooksLikeContainer(bytes))
@@ -1339,6 +1342,7 @@ public partial class MainWindow : Window
                         // Task.Run: the KDF is deliberately ~half a second of work.
                         var text = await Task.Run(() => Secure.SecureMarkdownFormat.Decrypt(bytes, pw));
                         ShowBusy($"Opening {Path.GetFileName(path)}…");
+                        BusyStatus("Checking encoding…", bytes.Length);   // the container is the plaintext plus a fixed overhead
                         // Detect on the plaintext: the line ending lives inside the
                         // container (Save puts it there); a byte-order mark does not.
                         await LoadDocumentAsync(DocumentText.Detect(text), path, pw);
@@ -1362,6 +1366,7 @@ public partial class MainWindow : Window
             {
                 // The same BOM-detecting decode File.ReadAllTextAsync used, plus the
                 // file's line ending and mark remembered so Save can put them back.
+                BusyStatus("Checking encoding…", bytes.Length);
                 var decoded = DocumentText.Detect(bytes);
                 TimingLog.Lap("open", "detect", opening);
                 await LoadDocumentAsync(decoded, path);
@@ -3298,10 +3303,27 @@ public partial class MainWindow : Window
     private void ShowBusy(string text)
     {
         BusyText.Text = text;
+        BusyStep.Text = string.Empty; BusyHint.Visibility = Visibility.Collapsed;   // each open says its own
         BusyOverlay.Visibility = Visibility.Visible;
     }
 
-    private void HideBusy() => BusyOverlay.Visibility = Visibility.Collapsed;
+    private void HideBusy()
+    {
+        BusyOverlay.Visibility = Visibility.Collapsed;
+        if (StatusNote.Text == _busyNote) StatusNote.Text = string.Empty;   // a note flashed meanwhile stays
+        _busyNote = null;
+    }
+
+    private string? _busyNote;
+    /// <summary>Says what an open is doing now; given the file's <paramref name="bytes"/>, whether it offers the source view. The overlay
+    /// can't paint over the formatted view's WebView2 (an HwndHost), so while that view shows, the status bar says it instead.</summary>
+    private void BusyStatus(string step, long bytes = -1)
+    {
+        if (bytes >= 0) BusyHint.Visibility = LargeFile.ShouldHint(bytes, _sourceMode) ? Visibility.Visible : Visibility.Collapsed;
+        BusyStep.Text = step;
+        if (BusyOverlay.Visibility == Visibility.Visible && Web.Visibility == Visibility.Visible)
+            { _noteTimer.Stop(); StatusNote.Text = _busyNote = BusyHint.Visibility == Visibility.Visible ? $"{step} {BusyHint.Text}" : step; }   // a flashed note's timer must not blank it mid-open
+    }
 
     // ===== Find (modeless dialog, F3 / Shift+F3 navigation) =====
 
@@ -5145,6 +5167,7 @@ public partial class MainWindow : Window
             // The editor hands the file's bytes over, so its line ending and
             // byte-order mark are detected exactly as File ▸ Open detects them, and
             // both are the convention the eventual Save As writes back.
+            BusyStatus("Checking encoding…", bytes.Length);   // a drop on the formatted view is a large file opening there too
             var dropped = DocumentText.Detect(bytes);
             await SetDocumentMarkdownAsync(dropped.Text);
             _lineEnding = dropped.Ending;
