@@ -471,6 +471,7 @@ public partial class MainWindow : Window
                 break;
             case "ready":
                 _editorReady = true;
+                if (TimingLog.Enabled) { TimingLog.Write("startup", "editorReady", (DateTime.Now - Process.GetCurrentProcess().StartTime).TotalMilliseconds); _ = RunEditorAsync("window.MDM.timing(true)"); }
                 _ = RunEditorAsync($"window.MDM.setPageWidth({JsLiteral(_pageWidth)})");
                 // Native (browser) spell check stays OFF — the app runs its own engine
                 // with a private dictionary; squiggles come from host-computed ranges.
@@ -484,6 +485,11 @@ public partial class MainWindow : Window
                 RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
                 _ = ApplyLandingStateAsync();
+                break;
+            case "timing":   // the editor's own phases, posted only after MDM.timing(true)
+                using (var timed = JsonDocument.Parse(e.WebMessageAsJson))
+                    if (timed.RootElement.TryGetProperty("lines", out var timedLines))
+                        foreach (var p in timedLines.EnumerateArray()) TimingLog.Write("editor", p[0].GetString() ?? "", p[1].GetDouble());
                 break;
             case "change":
                 if (!_sourceMode)
@@ -980,6 +986,7 @@ public partial class MainWindow : Window
         // late is the stale answer this helper exists to prevent.
         ForgetWysiwygFindIndex();
         string? settled = null;
+        var phase = TimingLog.Start();
         // Editor first, source box second. If the script throws, both surfaces are
         // left showing the OLD document — which is what _currentPath still says, since
         // callers assign it after this returns. Setting the source box first would
@@ -988,6 +995,7 @@ public partial class MainWindow : Window
         if (_editorReady)
         {
             await RunEditorAsync($"window.MDM.setMarkdown({JsLiteral(markdown)})");
+            phase = TimingLog.Lap("install", "setMarkdown", phase);
             // setMarkdown settles the document before it returns (editor-src/src/settle.js):
             // one that ends in anything but a paragraph or a heading — a list, a table, a
             // code block, a blockquote, a thematic break — gains the editor's trailing empty
@@ -997,6 +1005,7 @@ public partial class MainWindow : Window
             // would differ from the formatted view's markdown by one blank line and the
             // document would read as modified the moment the views were swapped (#5 NF-5).
             settled = await RunEditorAsync("window.MDM.getMarkdown()");
+            phase = TimingLog.Lap("install", "getMarkdown", phase);
             if (settled is not null) markdown = settled;
         }
         // The box mirrors the settled serialisation the editor just handed back, which
@@ -1010,6 +1019,7 @@ public partial class MainWindow : Window
         // already showing. A document dropped on the formatted view has no file behind
         // it, so under the same rule the editor's text is the one to show.
         SourceBox.Text = markdown;
+        TimingLog.Lap("install", "sourceBox.set", phase);
         // Count here rather than in each caller: installing content doesn't raise a
         // 'change' message, so a freshly opened document would otherwise show no
         // count at all until the first keystroke.
@@ -1061,6 +1071,8 @@ public partial class MainWindow : Window
         // switch that fails below leaves the view where it was and still bumps: a
         // drop is abandoned that need not have been, which is the safe way round.
         _viewGeneration++;
+        var switching = TimingLog.Start();
+        string? landed = null;   // switching to the formatted view: the editor's answer, which the dirty check below reuses
 
         if (on)
         {
@@ -1087,7 +1099,9 @@ public partial class MainWindow : Window
             // their file, and a save from there wrote the rewrite. Once the
             // formatted view HAS changed the document, `latest` is the only copy of
             // that work and is what arrives.
+            switching = TimingLog.Lap("toSource", "getMarkdown", switching);
             SourceBox.Text = SourceText.For(latest, _cleanMarkdown, _diskBaseline);
+            TimingLog.Lap("toSource", "sourceBox.set", switching);
             Web.Visibility = Visibility.Collapsed;
             SourceBox.Visibility = Visibility.Visible;
             SourceBox.Focus();
@@ -1112,7 +1126,8 @@ public partial class MainWindow : Window
             // it would hand back SourceBox.Text, since _sourceMode is still true until
             // below.) Null means the editor could not be asked, which is the same
             // "it didn't land" this has always refused to switch views on.
-            var landed = await SetDocumentMarkdownAsync(SourceBox.Text);
+            landed = await SetDocumentMarkdownAsync(SourceBox.Text);
+            TimingLog.Lap("toFormatted", "install", switching);
             if (landed is null)
             {
                 MessageBox.Show(this, "Couldn't hand your markdown back to the formatted " +
@@ -1157,7 +1172,7 @@ public partial class MainWindow : Window
         if (on) _squiggles?.SetRanges(Array.Empty<(int, int)>()); // previous ranges are stale for this text
         if (on) SetUndoRedoEnabled(true, true); // the source TextBox manages its own undo
         RefocusEditor();
-        _ = UpdateDirtyAsync();
+        _ = UpdateDirtyAsync(landed);   // formatted: the editor's answer above, not a second serialisation of the same text
         RequestSpellCheckSoon();
     }
 
@@ -1303,7 +1318,9 @@ public partial class MainWindow : Window
             // chokepoint for the Open dialog, file association, command line,
             // Open Recent and multi-file drops - the password prompt therefore
             // covers every one of those entry points at once.
+            var opening = TimingLog.Start();
             var bytes = await File.ReadAllBytesAsync(path);
+            opening = TimingLog.Lap("open", "read", opening);
             if (Secure.SecureMarkdownFormat.LooksLikeContainer(bytes))
             {
                 HideBusy();   // the prompt shouldn't sit under a busy overlay
@@ -1342,7 +1359,9 @@ public partial class MainWindow : Window
             {
                 // The same BOM-detecting decode File.ReadAllTextAsync used, plus the
                 // file's line ending and mark remembered so Save can put them back.
-                await LoadDocumentAsync(DocumentText.Detect(bytes), path);
+                var decoded = DocumentText.Detect(bytes);
+                TimingLog.Lap("open", "detect", opening);
+                await LoadDocumentAsync(decoded, path);
                 loaded = true;
             }
             // The new document is on screen: now, and not before, the old claim goes.
@@ -1408,6 +1427,8 @@ public partial class MainWindow : Window
         // close a modified document without asking and with no crash copy — the
         // failure this whole feature exists to prevent, caused by its own guard.
         _suppressDirty = true;
+        string? settled = null;   // the editor's serialisation of it, which the clean baseline below is taken from
+        var phase = TimingLog.Start();
         try
         {
             // The document being replaced is gone: every caller has already asked,
@@ -1421,7 +1442,8 @@ public partial class MainWindow : Window
             // computed against the OLD document and must never decorate this one.
             _spellGeneration++;
             await ApplyDocBaseAsync(path);            // resolve relative images first
-            await SetDocumentMarkdownAsync(doc.Text); // setMarkdown flushes undo history
+            TimingLog.Lap("open", "setDocBase", phase);   // the install logs its own phases
+            settled = await SetDocumentMarkdownAsync(doc.Text); // setMarkdown flushes undo history
             _currentPath = path;
             _lineEnding = doc.Ending;
             _hadBom = doc.HadBom;
@@ -1436,7 +1458,9 @@ public partial class MainWindow : Window
             _displayName = null;
         }
         finally { _suppressDirty = false; }
-        await SetCleanBaselineAsync();
+        // In the formatted view the editor's answer above IS the baseline: asking again serialised the whole document a
+        // second time for the same text. The source view, or no answer, asks as before.
+        await SetCleanBaselineAsync(_sourceMode ? null : settled);
         // The source view already showing? Then the install above put the editor's
         // settled serialisation in front of the user — the rewrite Ctrl+E no longer
         // shows (#2) — and no Ctrl+E is coming to replace it. Ctrl+E's rule is
@@ -5450,13 +5474,13 @@ public partial class MainWindow : Window
             ? SourceText.IsUnmodified(current, _cleanMarkdown, _diskBaseline)
             : string.Equals(current, _cleanMarkdown, StringComparison.Ordinal);
 
-    private async Task UpdateDirtyAsync()
+    private async Task UpdateDirtyAsync(string? editorAnswer = null)   // editorAnswer: the formatted view's markdown, just read
     {
         if (_suppressDirty) return;
         // A failed read must not be mistaken for an empty document: that would clear
         // the modified flag, and an unmodified document is one the app throws away
         // without asking — taking the crash copy with it. Keep the last known state.
-        var current = await TryGetDocumentMarkdownAsync();
+        var current = editorAnswer ?? await TryGetDocumentMarkdownAsync();
         if (current is null) return;
         var dirty = !IsUnmodifiedText(current);
         if (dirty != _dirty)
@@ -5530,7 +5554,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Marks the current content as the clean baseline (after open/save/new).</summary>
-    private async Task SetCleanBaselineAsync()
+    private async Task SetCleanBaselineAsync(string? editorAnswer = null)
     {
         // Keep the previous baseline if the editor can't be asked. Adopting "" would
         // make every later comparison read as "there are unsaved changes" — the safe
@@ -5551,7 +5575,8 @@ public partial class MainWindow : Window
         // re-reads the disk before it reloads, and a drop still compares the path,
         // what the window can take, and which view it is in.
         // (AnEmptyDocumentsBaselineMovesWithoutTheReferencePinSeeingIt pins this.)
-        var markdown = await TryGetDocumentMarkdownAsync();
+        // (An answer the caller already had from the editor is copied, so the baseline is an instance of its own.)
+        var markdown = editorAnswer is not null ? new string(editorAnswer.AsSpan()) : await TryGetDocumentMarkdownAsync();
         _cleanMarkdown = markdown ?? new string(_cleanMarkdown.AsSpan());
         _dirty = false;
         UpdateTitle();

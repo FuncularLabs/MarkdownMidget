@@ -481,7 +481,7 @@ public class RecoveredViewWiringTests
         // produces a later snapshot. Ctrl+E raises no change message of its own; what
         // arms the tick is the dirty check the switch ends with.
         RepoSources.AssertRunsUnconditionally(Body("private async Task SetSourceModeAsync("),
-            "_ = UpdateDirtyAsync();", after: "_sourceMode = on;");
+            "_ = UpdateDirtyAsync(landed);", after: "_sourceMode = on;");
         RepoSources.AssertRunsUnconditionally(Body("private async Task UpdateDirtyAsync("),
             "if (dirty) _backupDirty = true;", after: "var dirty = !IsUnmodifiedText(current);");
     }

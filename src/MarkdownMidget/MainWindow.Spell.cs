@@ -215,6 +215,7 @@ public partial class MainWindow
         // edit-recording itself, so a slow round-trip gets rebased instead of
         // landing stale.
         if (!_editorReady) return;
+        var spelling = TimingLog.Start();
         var json = await RunEditorAsync(
             $"window.MDM.getSpellText({(!_skipCodeSpell ? "true" : "false")})");
         if (string.IsNullOrEmpty(json)) return;
@@ -231,6 +232,7 @@ public partial class MainWindow
         if (gen != _spellGeneration) return;   // a different document loaded meanwhile
         var body = string.Join(",", ranges.Select(r => $"{{\"from\":{r.From},\"to\":{r.To}}}"));
         await RunEditorAsync($"window.MDM.setSpellRanges([{body}])");
+        TimingLog.Lap("spell", "roundTrip", spelling);
     }
 
     private void ClearSquiggles()

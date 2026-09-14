@@ -237,6 +237,19 @@ test('a block a structural edit may have moved has no margin number until the ne
   assert.deepEqual(reads, [[true, 'P:1'], 1, [true, 'P:1', 'P:3', 'P:5', 'P:7'], true, 1]);
 });
 
+test('the margin redraws for a setting or a numbering that changed, and dispatches nothing for one that did not', () => {
+  load('One\n\nTwo\n');
+  showLineNumbers(true);
+  const v = ed.view(), reads = [], dispatched = (act) => { const before = v.state; act(); reads.push(v.state !== before); };
+  dispatched(() => showLineNumbers(true));   // a redraw is a transaction: a new state
+  v.dispatch(v.state.tr.insertText('x', 2));   // Oxne: the same blocks on the same lines
+  dispatched(saved);
+  v.dispatch(v.state.tr.split(3));   // Ox|ne: a block more
+  dispatched(saved);
+  dispatched(() => showLineNumbers(false));
+  assert.deepEqual(reads, [false, false, true, true]);
+});
+
 test('a document whose blocks do not pair with its parse gets no numbers rather than wrong ones', () => {
   load('# one\n\ntwo\n');
   assert.equal(caret('two').line, 3);

@@ -33,6 +33,7 @@ let current = null;     // { doc, entries: [{ pos, type, line, skip }], lines }:
 let staleFrom = null;   // blocks starting here or later may have moved since it was built
 let gutter = false;     // View ▸ Line Numbers: numbers in the margin (gutterNumbers)
 let gutterView = null;  // the view they are drawn in
+let drawn = {};         // the margin last built: { doc, current, staleFrom } it was built from, and its set
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
@@ -77,8 +78,8 @@ export function beginLoad() { capturing = true; captured = null; }
 /** The document is installed: number it by the text it was loaded from. */
 export function endLoad(doc, text) { capturing = false; staleFrom = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
 
-/** View ▸ Line Numbers: show or hide the numbers in the margin. */
-export function showLineNumbers(on) { gutter = !!on; redraw(); }
+/** View ▸ Line Numbers: show or hide the numbers in the margin. The setting it already has redraws nothing. */
+export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on; redraw(); }
 
 // The margin follows a new numbering at once: a transaction with no steps is no edit, no history and no change for the host.
 const redraw = () => gutterView?.dispatch(gutterView.state.tr);
@@ -100,14 +101,19 @@ function pair(doc, records, lines) {
   return ok && entries.length >= records.length ? { doc, entries, lines } : null;
 }
 
-/** The markdown the editor would save, rebuilding the numbering from it when the document has changed since. */
+// The same blocks at the same positions on the same lines: the margin drawn from one is the margin drawn from the other.
+const sameNumbers = (a, b) => a === b || (!!a && !!b && a.lines === b.lines && a.entries.length === b.entries.length
+  && a.entries.every((e, i) => e.pos === b.entries[i].pos && e.type === b.entries[i].type && e.line === b.entries[i].line));
+
+/** The markdown the editor would save, rebuilding the numbering from it when the document has changed since; the margin is
+ *  redrawn only when that changed what it shows: blocks that were waiting for their numbers (staleFrom), or other numbers. */
 export function markdownWithLines(doc, serialize) {
   if (current?.doc === doc) return { markdown: serialize(), rebuilt: false };
   recording = [];
   try {
-    const markdown = serialize();
+    const markdown = serialize(), before = current, waiting = staleFrom !== null;
     current = pair(doc, recording, linesIn(markdown)); staleFrom = null;
-    if (gutter) redraw();
+    if (gutter && (waiting || !sameNumbers(before, current))) redraw();
     return { markdown, rebuilt: true };
   } finally {
     recording = null;
@@ -219,6 +225,7 @@ export function lineTarget(doc, want) {
  *  own entry), none on a line already numbered, as a list's first item is, and none while a load is pairing. */
 function gutterNumbers(doc) {
   if (!gutter || !current || capturing) return null;
+  if (drawn.doc === doc && drawn.current === current && drawn.staleFrom === staleFrom) return drawn.set;   // nothing moved
   const decos = [];
   let shown = 0;
   for (const e of current.entries) {
@@ -229,5 +236,6 @@ function gutterNumbers(doc) {
     // A mermaid block's code is hidden until the caret is in it, so its number also stands before its diagram.
     if (/^mermaid$/i.test(node.attrs.language ?? '')) decos.push(Decoration.widget(end, () => { const s = document.createElement('span'); s.dataset.line = e.line; return s; }, { side: -1, key: `mdm-line:${e.line}` }));
   }
-  return DecorationSet.create(doc, decos);
+  drawn = { doc, current, staleFrom, set: DecorationSet.create(doc, decos) };
+  return drawn.set;
 }

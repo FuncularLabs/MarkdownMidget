@@ -458,6 +458,16 @@ function resolveThemeIsolated(css) {
   return probeTheme(doc, frame.contentWindow);
 }
 
+// Opt-in timings (MDM.timing, MDM_TIMING=1 on the host): [phase, ms] notes, posted in one message two frames later, painted.
+let timings = null, paintFrom = 0;
+function note(phase, from) {
+  if (!timings || timings.push([phase, Math.round(performance.now() - from)]) > 1) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (paintFrom) timings.push(['painted', Math.round(performance.now() - paintFrom)]);   // from the setMarkdown's start
+    paintFrom = 0; postToHost({ type: 'timing', lines: timings.splice(0) });
+  }));
+}
+
 const MDM = {
   async create(initialMarkdown, options) {
     const root = document.getElementById('app');
@@ -508,10 +518,13 @@ const MDM = {
 
   getMarkdown() {
     if (!editor) return '';
+    const t0 = performance.now();
     const { markdown, rebuilt } = markdownWithLines(editorView.state.doc, serialize);
     if (rebuilt) postSelectionState(editorView.state);   // the status bar's line catches up (#10)
+    note(rebuilt ? 'getMarkdown.rebuilt' : 'getMarkdown', t0);
     return markdown;
   },
+  timing(on) { timings = on ? [] : null; },   // the host's MDM_TIMING=1 (TimingLog.cs)
 
   // Go to Line (#10): the host asks how many lines there are, then goes to one.
   lineCount() { return (editorView && ensureLines(editorView.state.doc, serialize)?.lines) || 0; },
@@ -560,10 +573,12 @@ const MDM = {
   // document so undo can't reach back past the freshly opened/new content.
   setMarkdown(md, flush = true) {
     if (!editor) return;
+    const t0 = performance.now(); if (timings) paintFrom = t0;
     suppressChange = true;
     try {
       beginLoad();   // number it by this text while it is untouched (#10)
       editor.action(replaceAll(md || '', flush));
+      note('setMarkdown.parse', t0);
       if (flush) editorView = editor.ctx.get(editorViewCtx); // state was recreated
       // Inside the suppressed window on purpose: settling is part of installing the
       // document, not a change to report. See settle.js — without it the trailing
@@ -578,6 +593,7 @@ const MDM = {
     }
     postHistory();
     if (editorView) postSelectionState(editorView.state);   // the new document's Ln/Col (#10)
+    note('setMarkdown', t0);
   },
 
   undo() { if (editorView) { undo(editorView.state, editorView.dispatch); this.focus(); } },

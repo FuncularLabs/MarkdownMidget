@@ -17,29 +17,34 @@ function mark(ch, kind) {
   };
 }
 
+// Drawn by one function per kind and keyed, so ProseMirror keeps the spans already drawn instead of drawing every one again
+// on each transaction (widgets of a kind are interchangeable, as a key requires); and built once per document.
+const WIDGETS = { break: mark('↵', 'break'), tab: mark('→', 'tab'), para: mark('¶', 'para') };
+const spec = (kind, side) => ({ side, ignoreSelection: true, key: `mdm-mark-${kind}` });
+const built = new WeakMap();
+
 export const formattingMarks = $prose(() => new Plugin({
   key: new PluginKey('mdmFormattingMarks'),
   props: {
     decorations(state) {
+      if (built.has(state.doc)) return built.get(state.doc);   // a selection or an empty transaction keeps its document
       const decos = [];
       state.doc.descendants((node, pos) => {
         if (node.type.name === 'hardbreak') {
-          decos.push(Decoration.widget(pos, mark('↵', 'break'),
-            { side: -1, ignoreSelection: true }));
+          decos.push(Decoration.widget(pos, WIDGETS.break, spec('break', -1)));
         } else if (node.isText && node.text && node.text.includes('\t')) {
           // A tab arrow (→) for each tab character.
           for (let i = node.text.indexOf('\t'); i !== -1; i = node.text.indexOf('\t', i + 1)) {
-            decos.push(Decoration.widget(pos + i, mark('→', 'tab'),
-              { side: -1, ignoreSelection: true }));
+            decos.push(Decoration.widget(pos + i, WIDGETS.tab, spec('tab', -1)));
           }
         } else if (node.isTextblock &&
                    (node.type.name === 'paragraph' || node.type.name === 'heading')) {
           const end = pos + node.nodeSize - 1; // just inside the block's close
-          decos.push(Decoration.widget(end, mark('¶', 'para'),
-            { side: 1, ignoreSelection: true }));
+          decos.push(Decoration.widget(end, WIDGETS.para, spec('para', 1)));
         }
       });
-      return DecorationSet.create(state.doc, decos);
+      built.set(state.doc, DecorationSet.create(state.doc, decos));
+      return built.get(state.doc);
     },
   },
 }));
