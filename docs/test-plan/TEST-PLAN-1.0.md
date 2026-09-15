@@ -41,6 +41,7 @@ Work on **copies**. Several tests save, and a save from the formatted view can r
    - `large-600kb.md` (about 600 KB) and `large-3mb.md` (about 3 MB): table- and list-heavy documents with long cells. Every paragraph starts and ends with the misspelling `Qwzxvy`.
    - `drop-01.md` to `drop-12.md`: small documents for drop tests.
    - `picture.png`: a picture for the drop test.
+   - `front-matter-bom-crlf.md`: front matter with a UTF-8 byte-order mark and CRLF line endings, for FM-02 and SRC-08. It's generated because the repository allows no committed file to start with a byte-order mark.
 
 3. For the zip test, right-click `drop-01.md` in File Explorer and choose **Compress to ZIP file**.
 
@@ -288,7 +289,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 1. Open the document and turn on spell check. Wait for the squiggles.
 2. Scroll to the top, the middle and the end. At each place, check several paragraphs.
 - **Expected:** Every `Qwzxvy` and `qwzxvy` is underlined, and nothing else is. No underline is shifted onto a neighbouring word, including on paragraphs about 16 KB apart.
-- **Type:** Both. Automated: `SpellingTests.Chunks_BreakAtALineBreak_PreferringABlankLine`, `SpellingTests.Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk`, and `SpellingTests.CheckInChunks_GivesTheRangesOfOneWholeTextCall`. Human: the Windows spell checker and squiggle placement.
+- **Type:** Both. Automated: `SpellChunkTests.Chunks_BreakAtALineBreak_PreferringABlankLine`, `SpellChunkTests.Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk`, and `SpellChunkTests.CheckInChunks_GivesTheRangesOfOneWholeTextCall`. Human: the Windows spell checker and squiggle placement.
 
 ### PERF — Opening performance
 
@@ -362,7 +363,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Type:** Both. Automated: `front-matter.test.mjs` "front matter opens as no edit and saves byte for byte …" and "… its words are code to spell check". Human: the look and the tooltip.
 
 #### FM-02 A save is byte-identical, including after editing a value
-- **Change:** Fixed: front matter · **Documents:** `front-matter.md`, `front-matter-blank-lines.md`, `front-matter-bom-crlf.md`, `front-matter-at-eof.md` · **Settings:** formatted view
+- **Change:** Fixed: front matter · **Documents:** `front-matter.md`, `front-matter-blank-lines.md`, `%TEMP%\mdm-test-docs\front-matter-bom-crlf.md` (generated, see 1.2), `front-matter-at-eof.md` · **Settings:** formatted view
 1. Open each document, choose **File ▸ Save As…** and save under a new name. Compare with `fc.exe /b`.
 2. In `front-matter.md`, change `draft: true` to `draft: false` and save. Compare with the original.
 - **Expected:** In step 1, the files are identical, except `front-matter-at-eof.md`, which gains only a final newline. The byte-order mark and CRLF endings are kept. In step 2, only the `draft:` line differs.
@@ -633,7 +634,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Type:** Human. The backup timer and folder.
 
 #### SRC-08 Line endings and the byte-order mark are kept
-- **Change:** source preservation · **Documents:** `front-matter-bom-crlf.md`; a CRLF copy of the corpus made with the commands below · **Settings:** formatted view
+- **Change:** source preservation · **Documents:** `%TEMP%\mdm-test-docs\front-matter-bom-crlf.md` (generated, see 1.2); a CRLF copy of the corpus made with the commands below · **Settings:** formatted view
 
   ```powershell
   $t = [IO.File]::ReadAllText("$env:TEMP\mdm-test-copies\source-keep-roundtrip.md") -replace "`n", "`r`n"
@@ -648,6 +649,98 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 ## 4. Run log
 
 For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
+
+### Build 284 (1.0.0-beta1+build.284) — 2026-09-15
+
+Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.claude\worktrees\test-plan` (product code = master a4577ae = build 284). The branch moved from 3a02d04 to 0fb923a during the run. That commit changed one line of section 5 of the plan (the escaped-pipe limit) and nothing else, so the results are unaffected.
+
+- `dotnet test tests/MarkdownMidget.Tests`: 1532 passed, 1 failed (`dotnet-284.trx`). The failure isn't a plan-named test: `SourceEncodingTests.NoTextFileStartsWithAByteOrderMark` reports "UTF-8 byte-order mark at the start of: docs/test-plan/documents/front-matter-bom-crlf.md", so the fixture itself trips the repo's no-BOM rule. All 36 plan-named C# tests passed.
+- `npm test` (editor-src, spec reporter): 397 pass, 0 fail (`npm-284.txt`). Every plan-named jsdom title was found and passed.
+- Fixture round-trip check: `roundtrip-284.mjs`, output in `roundtrip-284.txt`, saved bytes in `rt\`. It loads with a stripped BOM and folds endings to LF, then saves with the original endings and BOM, as `DocumentText.Detect`/`Encode` do. Pass 2 reopens pass 1's bytes.
+- Not re-run: the WEB **link replay**. It needs a new .NET harness around `LinkOpening.TryValidate`, which this run doesn't build. The plan records it as confirmed on master a4577ae, the same commit as build 284.
+- SRC: build 284 doesn't include source-keep, so every SRC test is N/A, as section 3 says.
+
+| ID | Result | By | Note |
+|---|---|---|---|
+| LIN-01 | | Claude (2026-09-15) | auto PASS — human pending. `LineColumnTests.TheStatusTextNamesTheLineAndColumn`, `TheColumnCountsCharactersTheWayAReaderDoes` (6 cases), line-map "the caret's line in a nested list…" all pass. |
+| LIN-02 | | Claude (2026-09-15) | auto PASS — human pending. line-map "the margin numbers top-level blocks…" and "the margin redraws…" pass. |
+| LIN-03 | | Claude (2026-09-15) | auto PASS — human pending. line-map range, gap-label, nested-list range and "every line … once and in order" tests pass. |
+| LIN-04 | | Claude (2026-09-15) | auto PASS — human pending. line-map Go to Line tests (3 titles) and `LineColumnTests.GoToLineClampsANumberAndRefusesAnythingElse` (9 cases) pass. |
+| LIN-05 | | Claude (2026-09-15) | auto PASS — human pending. line-map "an untouched document is numbered by the text it was loaded from" and "after an edit, and after a save…" pass. |
+| LIN-06 | | Claude (2026-09-15) | auto PASS — human pending. line-map "a table or a code fence ending a file with no final newline…" passes. |
+| VIEW-01 | | | |
+| VIEW-02 | | Claude (2026-09-15) | auto PASS — human pending. `LargeFileTests.The_threshold_is_250_KB`, `A_file_opening_formatted_is_offered…` (4 cases), `A_file_opening_into_the_source_view_is_never_offered_it` (2 cases) pass. |
+| ANC-01 | | Claude (2026-09-15) | auto PASS — human pending. anchor-links "HELP's Known limits link: a plain click edits, Ctrl+click jumps…" passes. |
+| ANC-02 | | Claude (2026-09-15) | auto PASS — human pending. Same anchor-links test (read-only half) passes. |
+| ANC-03 | | Claude (2026-09-15) | auto PASS — human pending. anchor-links "a repeated heading takes its numbered anchor…" and "an unmatched or malformed fragment does nothing…" pass. |
+| ANC-04 | PASS | Claude (2026-09-15) | `DocAnchorLinksTests.EveryAnchorLinkLandsOnAHeadingThatExists` (HELP, README, CHANGELOG, ROADMAP), `ARepeatedHeadingGetsGitHubsNumberedAnchors`, anchor-links "a slug is DocAnchorLinksTests' slug" pass. |
+| LNK-01 | | Claude (2026-09-15) | auto PASS — human pending. link-at "a right-click on a link reports its mark href…" and `CopyLinkTests.CopyLinkWritesExactlyTheHref…` pass. Link replay not re-run (see WEB-06). |
+| LNK-02 | | Claude (2026-09-15) | auto PASS — human pending. link-at "a right-click off a link or on a raw-HTML <a> reports none…" passes. |
+| LNK-03 | | | |
+| LNK-04 | | Claude (2026-09-15) | auto PASS — human pending. link-at "… a linked picture reports its link …" passes. |
+| LNK-05 | | | |
+| LNK-06 | | Claude (2026-09-15) | auto PASS — human pending. link-at "… with no target the caret decides" passes. |
+| LNK-07 | | Claude (2026-09-15) | auto PASS — human pending. `CopyLinkTests.CopyLinkWritesExactlyTheHrefAndAClipboardAnotherProgramHoldsIsANoteNotACrash` passes. |
+| WEB-01 | | Claude (2026-09-15) | auto PASS — human pending. web-links "Ctrl+click posts openLink with the mark's href…" and `LinkOpeningTests.AnOverlongUrlIsRefusedAndALongOneIsShownWhole` pass. |
+| WEB-02 | | Claude (2026-09-15) | auto PASS — human pending. web-links "… a plain click in the editable view posts nothing" and "… in a read-only view a plain click posts the web link" pass. |
+| WEB-03 | | Claude (2026-09-15) | auto PASS — human pending. web-links "a relative, file:, javascript: or mailto: link is refused…" and `LinkOpeningTests.EverythingElseIsRefused` (31 cases) pass. |
+| WEB-04 | | Claude (2026-09-15) | auto PASS — human pending. `LinkOpeningTests.WebLinksAreAccepted` (10 cases) and `HostsThatCannotShowInPunycodeAreRefused` (17 cases) pass. Link replay not re-run (see WEB-06). |
+| WEB-05 | | Claude (2026-09-15) | auto PASS — human pending. `LinkOpeningTests.EverythingElseIsRefused`, `PaddingCannotHideAHostOrAnAttachment` (2 cases), `HostsThatCannotShowInPunycodeAreRefused` pass. Link replay not re-run (see WEB-06). |
+| WEB-06 | | Claude (2026-09-15) | auto BLOCKED — human pending. This test's only automated part is the link replay (links.md addresses through `LinkOpening.TryValidate`). This run didn't re-run it because it needs a new .NET harness. The plan records it as confirmed on master a4577ae, the same commit as build 284. |
+| MENU-01 | | Claude (2026-09-15) | auto PASS — human pending. `MenuAccessKeysTests.OnlyAMenusOwnOpeningIsItsOwn` and `MenuAccessKeysTests+OnARealMenu.ANestedSubmenuOpeningReachesTheParentButIsNotItsOwn` pass. |
+| SPL-01 | | Claude (2026-09-15) | auto PASS — human pending. The three tests live in class `SpellChunkTests`, not `SpellingTests` as the plan says: `Chunks_BreakAtALineBreak_PreferringABlankLine` (LF, CRLF), `Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk`, `CheckInChunks_GivesTheRangesOfOneWholeTextCall` pass. |
+| PERF-01 | | Claude (2026-09-15) | auto PASS — human pending. load-state.test.mjs, parser-types.test.mjs (whole files, 0 fail in the suite) and marks "a keystroke keeps every ¶ node already drawn…" pass. |
+| PERF-02 | | Claude (2026-09-15) | auto PASS — human pending. `TimingLogTests.A_line_is_the_time_of_day_sequence_phase_and_whole_milliseconds_in_any_culture` passes. |
+| SWT-01 | | Claude (2026-09-15) | auto PASS — human pending. `SwitchBusyTests.TheLightboxShowsOnlyOverAStillInstallingSourceViewNoOpenHasCovered` and `EditorScriptsTests.ASwitchsPaintWaitAsksForItsOwnLoadsPaintedAfterAFrame` pass. |
+| SWT-02 | | | |
+| SWT-03 | | | |
+| SWT-04 | | Claude (2026-09-15) | auto PASS — human pending. `SwitchBusyTests.OnlyTheSwitchUnderWayOwnsTheIndicator` passes. |
+| SWT-05 | | | |
+| SWT-06 | | | |
+| SWT-07 | | | |
+| FM-01 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "front matter opens as no edit and saves byte for byte…" and "… its words are code to spell check" pass. |
+| FM-02 | | Claude (2026-09-15) | auto PASS — human pending. Fixture check: front-matter.md (242 B), front-matter-blank-lines.md (77 B) and front-matter-bom-crlf.md (103 B, BOM + CRLF kept) are byte-identical. front-matter-at-eof.md gains only a final LF (72 → 73 B). All are stable on pass 2. The front-matter "opens as no edit and saves byte for byte…" test passes. |
+| FM-03 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "Enter and typing edit its text…" passes. |
+| FM-04 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "… input rules and the toolbar cannot make it another block…" passes. |
+| FM-05 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "its lines, and the lines of the blocks after it, are numbered and reached by Go to Line…" passes. |
+| TBL-01 | | Claude (2026-09-15) | auto PASS — human pending. table-fidelity "…: byte-identical; edited, saved, reopened and saved again" (12 cases) pass. Fixture check: tables.md 1158 → 1143 B. Differences are only in "Aligned, a centred column written left-justified", "Empty cells written by earlier versions", "No outer pipes" and "CJK", all expected. Stable on pass 2. |
+| TBL-02 | | Claude (2026-09-15) | auto PASS — human pending. table-fidelity "aligned, a cell grows" and "Prettier, a cell grows past its width" pass. |
+| TBL-03 | PASS | Claude (2026-09-15) | roundtrip InlineBreakSurvives "a cell holding only a break loads as an empty cell" passes. Fixture check: `\| <br /> \| text \|` → `\| \| text \|` and `\| text \| <br /> \|` → `\| text \| \|`, and pass 2 is unchanged. |
+| TBL-04 | | Claude (2026-09-15) | auto PASS — human pending. table-fidelity "a new table: aligned, columns at least 3 wide…" passes. |
+| TBL-05 | PASS | Claude (2026-09-15) | table-fidelity "wide-cell repro: the save is the size of the file…" passes. Fixture check: large-600kb.md (generated, 619,574 B) is byte-identical after a no-edit save, and stable on pass 2 (3.3 s in jsdom). |
+| TBL-06 | FAIL | Claude (2026-09-15) | Expected FAIL (section 5 candidate). The fixture check re-centres the centred column on the first save. L12 `\| Name  \| Note   \|` → `\| Name  \|  Note  \|`, and L14 `\| apple \| red    \|` → `\| apple \|   red  \|`. Pass 2 is stable (no further change). |
+| TBL-07 | PASS | Claude (2026-09-15) | Fixture check. No outer pipes: `a \| b` / `--- \| ---` / `1 \| 2` → `\|a\|b\|` / `\|---\|---\|` / `\|1\|2\|`. CJK: `\| 林檎 \| 3  \|` → `\| 林檎 \| 3 \|`. Pass 2 changes nothing more. |
+| BR-01 | | Claude (2026-09-15) | auto PASS — human pending. roundtrip InlineBreakSurvives "an inline break renders as a line break" passes. |
+| BR-02 | PASS | Claude (2026-09-15) | roundtrip InlineBreakSurvives "the line ending before an inline break is kept…" passes. Fixture check: br-forms.md (534 B) is byte-identical and stable on pass 2. With "Edited " typed at the first text, exactly one line differs. |
+| BR-03 | PASS | Claude (2026-09-15) | roundtrip InlineBreakSurvives "guard: a whole-paragraph <br /> is still an empty line" passes. |
+| LST-01 | PASS | Claude (2026-09-15) | roundtrip ListItemLeadingBlockSurvives (suite) passes. Fixture check: list-leading-blocks.md (530 B) is byte-identical and stable on pass 2. |
+| LST-02 | PASS | Claude (2026-09-15) | roundtrip ParagraphAfterNestedListKeepsItsBlankLine "inside a quote: the issue…", "outside a quote" and "inside a quote: ordered, deeper, loose…" pass. Fixture check: issue-11-list-paragraph.md (336 B) is byte-identical and stable on pass 2. |
+| LST-03 | | Claude (2026-09-15) | auto PASS — human pending. roundtrip ParagraphAfterNestedListKeepsItsBlankLine "made in the editor outside a quote" passes. |
+| OPN-01 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.The_first_file_opens_here_only_when_the_window_has_no_document` (4 cases) passes. |
+| OPN-02 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.A_window_has_no_document_only_when_nothing_is_in_it_or_on_its_way` (9 cases) passes. |
+| OPN-03 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.Only_dropped_documents_open_each_as_the_path_the_drop_carried_under_its_own_name` and file-drop "postWithFiles hands the host the dropped files…" pass. |
+| OPN-04 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.A_drop_starts_at_most_ten_instances_names_the_rest_and_a_failed_start_is_a_status_note` passes. |
+| OPN-05 | | Claude (2026-09-15) | auto PASS — human pending. `DropRoutingTests.OtherAndUnreadableFilesAreRefused` and `DropRoutingTests.PicturesInsertInDropOrder` pass. |
+| OPN-06 | | | |
+| OPN-07 | | Claude (2026-09-15) | auto PASS — human pending. `OpenGuardTests.SecondAcquireSeesTheHolder` and `OpenRoutingTests.The_first_file_opens_here_only_when_the_window_has_no_document` (same-path case `c:\DOCS\A.md`) pass. |
+| OPN-08 | | | |
+| OPN-09 | | | |
+| BIG-01 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Over_512_KB_of_UTF8_both_start_off_in_both_views_and_the_note_naming_the_menus_shows_once_per_document` passes. |
+| BIG-02 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Exactly_512_KB_follows_the_saved_settings` and `Turning_one_on_is_the_documents_own_choice_and_sticks…` pass. |
+| BIG-03 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Turning_one_on_is_the_documents_own_choice_and_sticks_and_a_small_document_follows_the_saved_settings_again` passes. |
+| BIG-04 | PASS | Claude (2026-09-15) | `LargeDocumentTests.A_load_or_switch_over_5_seconds_turns_both_off_with_the_note` passes (5000 ms → not off; 5001 ms → off). |
+| BIG-05 | | | |
+| BIG-06 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Closing_forgets_the_document_so_the_no_document_screen_follows_the_saved_settings` passes. |
+| BIG-07 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Keeping_the_document_under_a_new_name_keeps_its_choices` passes. |
+| BIG-08 | | | |
+| SRC-01 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-02 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-03 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-04 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-05 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-06 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-07 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
+| SRC-08 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
 
 ### Build ___ (1.0.0-…+build.N) — date
 

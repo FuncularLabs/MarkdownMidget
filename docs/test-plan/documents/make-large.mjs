@@ -1,7 +1,8 @@
 // Writes synthetic test files for docs/test-plan/TEST-PLAN-1.0.md. No dependencies; Node 18 or later.
 //   node make-large.mjs [folder]      (default: %TEMP%\mdm-test-docs)
 // Output: large-600kb.md and large-3mb.md (table- and list-heavy, long cells, a misspelling
-// at the start and end of every paragraph), drop-01.md … drop-12.md, and picture.png.
+// at the start and end of every paragraph), drop-01.md … drop-12.md, picture.png, and
+// front-matter-bom-crlf.md (a byte-order mark and CRLF endings, which the repository can't hold).
 // Don't commit the output.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -59,4 +60,6 @@ for (let n = 1; n <= 12; n++) {
   writeFileSync(join(dir, `drop-${id}.md`), `# Drop test ${id}\n\nThis window should show drop-${id}.md.\n`);
 }
 writeFileSync(join(dir, 'picture.png'), png(160, 40));
-console.log(`${join(dir, 'drop-01.md')} … drop-12.md, picture.png`);
+const frontMatter = '---\ntitle: Byte-order mark and CRLF line endings\nlist:\n  - one\n  - two\n---\n\nBody paragraph.\n';
+writeFileSync(join(dir, 'front-matter-bom-crlf.md'), '﻿' + frontMatter.replace(/\n/g, '\r\n'));
+console.log(`${join(dir, 'drop-01.md')} … drop-12.md, picture.png, front-matter-bom-crlf.md`);
