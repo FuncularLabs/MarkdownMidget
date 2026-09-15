@@ -545,7 +545,9 @@ conventions, whatever style it was written in:
 
 Saving from the formatted view keeps untouched text as written: these conventions
 apply only to the top-level blocks you changed (for a list item, its whole list),
-and a document saved with no edits is saved exactly as it was.
+and a document saved with no edits is saved exactly as it was. A document with a link
+definition inside a quote or list, or with a label defined twice, is saved whole in
+these conventions once changed, as is a change too large to check quickly.
 
 What is converted: a reference-style link (`[text][ref]` plus its definition line)
 becomes an inline link and the definition line is dropped; a setext heading

@@ -27,21 +27,20 @@ const lines = (md) => md.split('\n').length;
 const run = (tr) => v().dispatch(tr);
 /** The top-level block whose text includes `text`. */
 const top = (text) => { let hit; doc().forEach((node, pos, i) => { if (!hit && node.textContent.includes(text)) hit = { node, pos, i, end: pos + node.nodeSize }; }); assert.ok(hit, text); return hit; };
-const typeAt = (text, what = 'X') => { const b = top(text); run(v().state.tr.insertText(what, b.pos + 1 + b.node.textContent.indexOf(text))); };
+/** The position of the first text `text` begins in, at any depth. */
+const textAt = (text) => { let at = -1; doc().descendants((n, pos) => { if (at < 0 && n.isText && n.text.includes(text)) at = pos + n.text.indexOf(text); }); assert.ok(at >= 0, text); return at; };
+const typeAt = (text, what = 'X') => run(v().state.tr.insertText(what, textAt(text)));
 /** The edited document, opened again from `md`, is the document that was edited. */
 const reopens = (md, label) => { const edited = doc(); assert.ok(load(md).eq(edited), `${label}: ${JSON.stringify(md)} opens as another document`); };
+/** The save opens as a whole serialisation of the edited document opens (which may not be the document: bold split around code, a list loosened by a dropped definition). */
+const opensAsToday = (md, label) => { const today = serialize(); assert.ok(load(md).eq(load(today)), `${label}: ${JSON.stringify(md)} opens other than ${JSON.stringify(today)}`); };
 /** `out` is `orig` with nothing changed but the block `block`: the text before it and after it are the original's. */
 const onlyChanged = (orig, out, block, label) => {
   const at = orig.indexOf(block);
   assert.ok(at >= 0, `${label}: ${block}`);
   assert.ok(out.startsWith(orig.slice(0, at)) && out.endsWith(orig.slice(at + block.length)), `${label}: ${JSON.stringify(out)}`);
 };
-const caretLine = (text) => {
-  let at = -1;
-  doc().descendants((n, pos) => { if (at < 0 && n.isText && n.text.includes(text)) at = pos + n.text.indexOf(text); });
-  run(v().state.tr.setSelection(TextSelection.create(doc(), at)));
-  return lineStatus(v().state).line;
-};
+const caretLine = (text) => { run(v().state.tr.setSelection(TextSelection.create(doc(), textAt(text)))); return lineStatus(v().state).line; };
 const goRead = (n) => { run(v().state.tr.setSelection(Selection.near(doc().resolve(lineTarget(doc(), n))))); pinLine(v().state, n); return lineStatus(v().state).line; };
 const sweep = () => [...Array(ensureLines(doc(), serialize, parse).lines).keys()].map((i) => i + 1).filter((n) => goRead(n) !== n);   // lines Go to Line misses
 
@@ -123,8 +122,7 @@ test('typing in one paragraph changes that paragraph\'s lines and nothing else',
   typeAt('edit');
   const ruled = save();
   onlyChanged(RULED, ruled, 'edit **bold `code` bold** me\n', 'an edit below a rule');
-  const today = serialize();   // bold split around code does not read back as one run, from a whole serialisation either: the save opens as that does
-  assert.ok(load(ruled).eq(load(today)), `an edit below a rule: ${JSON.stringify(ruled)} opens other than ${JSON.stringify(today)}`);
+  opensAsToday(ruled, 'an edit below a rule');
 });
 
 const STRUCTURAL = [
@@ -165,15 +163,25 @@ const HAZARDS = [
   ['the block before an html block edited', 'Lead *para*\n\n<div>\n*x*\n</div>\n\nafter\n', () => typeAt('para'), (out) => assert.ok(out.includes('\n\n<div>\n*x*\n</div>\n\nafter\n'))],
   ['the block before an open html comment edited', 'Lead\n\n<!-- open\n\nstill open -->\n\nafter\n', () => typeAt('Lead')],
   ['a fenced block edited to leave its fence open', 'Lead\n\n```\ncode\n```\n\nafter\n', () => { const f = top('code'); run(v().state.tr.insertText('```\nmore', f.pos + 1)); }],
+  // The review's inputs: a definition inside an edited quote or list still serves the text after it; a rule that ends up first is
+  // no front matter; a label defined twice keeps the definition that comes first.
+  ['a definition inside an edited quote', '> quote [x][q]\n>\n> [q]: /q\n\nA\n\nB\n\nC\n\nTail [x][q].\n', () => typeAt('quote', 'Z')],
+  ['a definition inside an edited list', '- item\n\n  [l]: /l\n\nA\n\nB\n\nC\n\nSee [y][l].\n', () => typeAt('item', 'Z')],
+  ['a rule left first by deleting the block above it', 'Intro\n\n---\n\nmiddle\n\n---\n\nend\n', () => { const b = top('Intro'); run(v().state.tr.delete(b.pos, b.end)); },
+    (out) => assert.equal(out, '***\n\nmiddle\n\n---\n\nend\n')],
+  ['a rule left first by moving the block above it last', 'Intro\n\n---\n\nmiddle\n\n---\n\nend\n', () => { const b = top('Intro'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(tr.doc.content.size, b.node)); },
+    (out) => assert.ok(out.startsWith('***\n\nmiddle\n\n---\n\nend\n'), out)],
+  ['the paragraph after a reference edited, its definition far above', '[ref]: /r\n\nA\n\nA2\n\nB [ref]\n\nC\n', () => typeAt('C'), (out) => assert.ok(out.startsWith('[ref]: /r\n\nA\n\nA2\n\nB [ref]\n\n'), out)],
+  ['a block moved above a label defined twice', 'See [a].\n\n[a]: /one\n\nMiddle.\n\n[a]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [a].\n', () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
 ];
 
 for (const [name, md, act, expect = () => {}] of HAZARDS) {
-  test(`neighbour hazard: ${name}; the save opens as the document`, () => {
+  test(`neighbour hazard: ${name}; the save opens as a whole serialisation does`, () => {
     load(md);
     act();
     const out = save();
     expect(out);
-    reopens(out, name);
+    opensAsToday(out, name);
   });
 }
 
@@ -205,6 +213,22 @@ test('Go to Line and the status bar read the saved lines after a save that kept 
   assert.deepEqual([ensureLines(doc(), serialize, parse).lines, caretLine('last'), sweep()], [lines(edited), at('last', edited), []]);
   const next = save();
   assert.deepEqual([next, caretLine('line'), sweep()], [edited, at('line', edited), []]);
+});
+
+test('cost: a second read of the same document serialises and parses nothing; a change too large to check cheaply is written whole, unparsed', () => {
+  const calls = { serialize: 0, parse: 0 }, counted = (d) => (calls.serialize++, serialize(d)), parsed = (md) => (calls.parse++, parse(md));
+  const reads = () => markdownWithLines(doc(), counted, parsed).markdown;
+  load(`Intro *a*\n\n${Array.from({ length: 400 }, (_, i) => `- item ${i} lorem ipsum dolor sit amet`).join('\n')}\n\nOutro *b*\n`);   // one list of 400 items
+  typeAt('item 200 ');
+  const first = reads(), once = { ...calls }, again = reads();
+  assert.deepEqual([once, calls, again, first], [{ serialize: 1, parse: 0 }, { serialize: 1, parse: 0 }, first, serialize()]);
+  const notes = Array.from({ length: 60 }, (_, i) => `Para ${i} note[^n${i}] and [r${i}], lorem ipsum dolor sit amet consectetur adipiscing elit sed do.`).join('\n\n');
+  load(`${notes}\n\n${Array.from({ length: 60 }, (_, i) => `[r${i}]: /r${i}`).join('\n')}\n\n${Array.from({ length: 60 }, (_, i) => `[^n${i}]: Note ${i}.`).join('\n\n')}\n`);
+  const tr = v().state.tr;   // every third paragraph edited at once, as Replace All does
+  for (let i = 57; i >= 0; i -= 3) tr.insertText('Z', textAt(`Para ${i} `));
+  run(tr);
+  calls.parse = 0;
+  assert.deepEqual([reads(), calls.parse], [serialize(), 0]);
 });
 
 test('performance: an untouched document serialises nothing; a one-block edit costs about one serialisation', (t) => {

@@ -40,7 +40,6 @@ let drawn = {};         // the margin last built: { doc, current, staleFrom } it
 let pin = null;         // Go to Line's line for a caret on a line with no place of its own: { doc, head, line } (pinLine)
 let settled = null;     // the document the last load installed (settledMarkdown)
 let tops = null;        // while recording: each top-level block's markdown, in order (source-keep.js)
-let defs = null;        // the load's link definitions at top level, and whether its parse found a definition inside a block
 let baseline = null;    // the text blocks are kept from (source-keep.js): the load's, then each save's
 let out = null;         // the last markdown read, with where its blocks lie: the next save's baseline (forgetLoad)
 
@@ -69,16 +68,12 @@ export const recordingRoot = (base) => (node, parent, state, info) => {
 };
 
 /** Milkdown's parse of a document being loaded: each block with the line it starts on. */
-export const lineCapture = $remark('mdmLineCapture', () => () => (tree, file) => {
+export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
   if (!capturing) return;
   captured = [];
-  defs = { list: [], nested: false };
   const walk = (node) => {
     for (const c of node.children || []) {
       const { start, end } = c.position || {};
-      if (c.type === 'definition' || c.type === 'footnoteDefinition') {
-        if (node !== tree || !start) defs.nested = true; else if (c.type === 'definition') defs.list.push(String(file).slice(start.offset, end.offset));
-      }
       if (!BLOCK[c.type]) continue;   // a link definition, say: no block of its own
       const fenced = c.type === 'code' && start && end.line - start.line + 1 > c.value.split('\n').length;
       captured.push({ type: c.type, line: start?.line, skip: fenced ? 1 : 0, top: node === tree, from: start?.offset, to: end?.offset });
@@ -93,7 +88,7 @@ export function beginLoad() { capturing = true; captured = null; }
 /** The document is installed: number it by the text it was loaded from. */
 export function endLoad(doc, text) {
   settled = doc; capturing = false; staleFrom = null; pin = null; out = null; current = pair(doc, captured, linesIn(text));
-  baseline = current && baseFrom(doc, text, captured, defs.list, defs.nested);
+  baseline = current && baseFrom(doc, text, captured);
   if (gutter) redraw();
 }
 
@@ -104,7 +99,7 @@ export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on
 const redraw = () => gutterView?.dispatch(gutterView.state.tr);
 
 /** A save has made the file the saved markdown, the last read: number by that from the next read, and keep blocks from it (MDM.lineBaseSaved). */
-export function forgetLoad() { if (out) baseline = out.tops ? out : null; current = null; pin = null; }
+export function forgetLoad() { if (out) baseline = out.tops ? out : null; out = null; current = null; pin = null; }
 
 function pair(doc, records, lines) {
   if (!records) return null;
