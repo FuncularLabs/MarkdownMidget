@@ -523,7 +523,7 @@ line with `--readonly`.
 ### Markdown conventions
 
 A block you edit in the formatted view is saved in Markdown Midget's conventions,
-whatever style it was written in; the rest keeps its own text (see below):
+whatever style it was written in; the rest keeps its own text, with the exceptions below:
 
 - **Lists:** `-` bullets with one space after the marker, and `1.` numbering that
   counts up. A list directly after another list switches to `*` bullets — with the
@@ -544,10 +544,12 @@ whatever style it was written in; the rest keeps its own text (see below):
   `---` line to the next one, it is saved as a `yaml` code block, text intact.
 
 Saving from the formatted view keeps untouched text as written: these conventions
-apply only to the top-level blocks you changed (for a list item, its whole list),
-and a document saved with no edits is saved exactly as it was. A document with a link
-definition inside a quote or list, or with a label defined twice, is saved whole in
-these conventions once changed, as is a change too large to check quickly.
+apply to the top-level blocks you changed (for a list item, its whole list) and to
+a neighbouring block whose reading your edit would change, and a document saved with
+no edits is saved exactly as it was. A document with a link definition inside a
+quote, list or footnote, or with a label defined twice, is saved whole in these
+conventions once changed, as is a change too large to check quickly or one whose
+neighbours still don't read back the same after they're rewritten.
 
 What is converted: a reference-style link (`[text][ref]` plus its definition line)
 becomes an inline link (the definition line is dropped when the whole document is
@@ -784,15 +786,18 @@ into and what to do instead.
   the item never appears there. A real installer is a later release's headline.
 - **Saving from the formatted view writes the blocks you edit in Markdown Midget's
   conventions.** A document saved with no edits is saved exactly as it was, and
-  each top-level block you don't edit keeps its own text. What is written in the
+  each top-level block you don't edit keeps its own text, unless your edit would
+  change how it reads (a list typed right after another list, say): then it is
+  written in the app's conventions too. What is written in the
   app's conventions — `-` bullets, `#` headings, fenced code, inline links in place
   of reference links, `\_` for an underscore in a picture's alt text — is each
   top-level block you edit (a paragraph, heading, table or quote) with the blank
   lines either side of it, and the whole list when you edit one of its items. A
   few documents are written whole in those conventions once you change anything:
-  one with a link definition inside a quote, list or footnote, one with a label
-  defined twice, and a change too large to check quickly, such as an item in a very
-  long list. The full set of conventions is in [Markdown conventions](#markdown-conventions)
+  one with a link definition inside a quote, list or footnote; one with a label
+  defined twice; a change too large to check quickly (an item in a very long
+  list, say); and an edit whose neighbours still don't read back the same after
+  they're rewritten. The full set of conventions is in [Markdown conventions](#markdown-conventions)
   above. If a file has to come
   back exactly as it was written, work on it in the Markdown source view: open it
   while that view is showing, or press **Ctrl+E** before you touch the formatted

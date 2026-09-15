@@ -12,8 +12,8 @@ testing before the stable release of the same number.
 ## [1.0.0-rc1] - 2026-09-15
 
 The 1.0 release candidate: 1.0.0-beta1 after a round of everyday use, plus the changes below.
-Saving from the formatted view now keeps the text you didn't change exactly as written, the status
-bar shows the line and column with Go to Line and line numbers, and opening a file while this
+Saving from the formatted view now keeps the text you didn't change as written, apart from a few cases
+below; the status bar shows the line and column with Go to Line and line numbers, and opening a file while this
 window has a document starts a new window. A prerelease, so these changes get everyday use before
 1.0.0; it includes everything listed for 1.0.0-beta1.
 
@@ -40,7 +40,7 @@ window has a document starts a new window. A prerelease, so these changes get ev
 
 ### Fixed
 
-- **Saving from the formatted view keeps the text you didn't change as you wrote it**: a document saved with no edits, backed up, or switched to the Markdown source view comes back byte for byte, and after an edit only the top-level blocks you changed (a paragraph, a heading, a table, or the whole list an item is in) are written in Markdown Midget's conventions. Everywhere else, escapes, `---` rules, blank lines, bare URLs, link definitions and a missing final newline stay as they were; they used to be rewritten throughout on every save. A document with a link definition inside a quote or list, or a label defined twice, is still written in full once you change it, and so is a change too large to check quickly (an item in a very long list).
+- **Saving from the formatted view keeps the text you didn't change as you wrote it**: a document saved with no edits, backed up, or switched to the Markdown source view comes back byte for byte, and after an edit the top-level blocks you changed (a paragraph, a heading, a table, or the whole list an item is in) are written in Markdown Midget's conventions, as is a neighbouring block whose reading your edit would change (a list right after an edited list). Everywhere else, escapes, `---` rules, blank lines, bare URLs, link definitions and a missing final newline stay as they were; they used to be rewritten throughout on every save. A document with a link definition inside a quote, list or footnote, or a label defined twice, is still written in full once you change it, and so is a change too large to check quickly (an item in a very long list) or one whose neighbours still don't read back the same after they're rewritten.
 - **A markdown file dropped on the formatted view opens as the file itself**: Save writes to it, it isn't marked modified, and it goes on Open Recent. It used to open as an unsaved copy named like the file, so Save never updated the file you dropped.
 - **Right on File ▸ Open Recent or View ▸ Theme opens it at its first entry**, and Left comes back; it used to jump to the next menu.
 - **A paragraph after a nested list keeps its blank line when saved from the formatted view**, inside a quote too, so it no longer joins the list's last item when the file is opened again (#11).
