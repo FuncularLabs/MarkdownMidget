@@ -110,3 +110,43 @@ public class SpellTextMapTests
     public void MapRanges_EmptySegments_MapsNothing()
         => Assert.Empty(SpellTextMap.MapRanges(new List<SpellSegment>(), new[] { (0, 4) }));
 }
+
+public class SpellChunkTests
+{
+    private static List<string> Tiled(string text, int size)
+    {
+        var chunks = SpellService.Chunks(text, size).ToList();
+        for (int i = 0, at = 0; i < chunks.Count; at += chunks[i++].Length)
+            Assert.True(chunks[i].Start == at && chunks[i].Length > 0 && (i == chunks.Count - 1 || text[at + chunks[i].Length - 1] == '\n')
+                && (chunks[i].Length <= size || !text.AsSpan(at, chunks[i].Length - 1).Contains('\n')));
+        Assert.Equal(text.Length, chunks.Sum(c => c.Length));
+        return chunks.Select(c => text.Substring(c.Start, c.Length)).ToList();
+    }
+
+    [Theory, InlineData("\n"), InlineData("\r\n")]
+    public void Chunks_BreakAtALineBreak_PreferringABlankLine(string nl)
+    {
+        var line = "a line of words" + nl;   // four lines, a blank line, thirty lines
+        var chunks = Tiled(string.Concat(Enumerable.Repeat(line, 4)) + nl + string.Concat(Enumerable.Repeat(line, 30)), 100);
+        Assert.Equal(4 * line.Length, chunks[0].Length);   // at the blank line, not the last break before 100
+        Assert.True(chunks.Count > 5);
+    }
+
+    [Fact]
+    public void Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk()
+    {
+        var longLine = new string('x', 250) + "\n";
+        Assert.Equal(new[] { "short\n", longLine, "end" }, Tiled("short\n" + longLine + "end", 100));
+        Assert.Equal(new[] { 16_000, 16_000, 8_000 }, SpellService.Chunks(string.Concat(Enumerable.Repeat(new string('w', 99) + "\n", 400))).Select(c => c.Length));
+        Assert.Empty(Tiled("", 100));
+    }
+
+    [Fact]
+    public void CheckInChunks_GivesTheRangesOfOneWholeTextCall()
+    {
+        static List<(int, int)> Flag(string s) => System.Text.RegularExpressions.Regex.Matches(s, @"\bteh\b").Select(m => (m.Index, m.Length)).ToList();
+        var text = string.Concat(Enumerable.Range(0, 200).Select(i => i % 11 == 0 ? "\n" : "teh starts and ends teh\n"));
+        Assert.Contains(SpellService.Chunks(text, 100), c => c.Start > 0 && text.AsSpan(c.Start).StartsWith("teh") && text.AsSpan(0, c.Start).EndsWith("teh\n"));
+        Assert.Equal(Flag(text), SpellService.CheckInChunks(text, Flag, 100));
+    }
+}

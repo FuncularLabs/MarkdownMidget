@@ -179,11 +179,35 @@ internal sealed class SpellService
 
     // ---- engine core (worker thread; serialized by _gate) ----
 
-    private List<(int, int)> CheckCore(string text)
+    private List<(int, int)> CheckCore(string text) =>
+        GetChecker() is { } checker ? CheckInChunks(text, chunk => CheckChunk(checker, chunk)) : new();
+
+    /// <summary>Check time grows faster than text, so check each chunk alone and offset its ranges back. A repeated word across two chunks goes unflagged.</summary>
+    internal static List<(int Start, int Length)> CheckInChunks(string text, Func<string, List<(int, int)>> check, int size = 16_000) =>
+        Chunks(text, size).SelectMany(c => check(text.Substring(c.Start, c.Length)).Select(h => (c.Start + h.Item1, h.Item2))).ToList();
+
+    /// <summary>Pieces of at most <paramref name="size"/> chars, each ending just after a line break, at a blank
+    /// line in its second half when there is one. A longer line stays whole.</summary>
+    internal static IEnumerable<(int Start, int Length)> Chunks(string text, int size = 16_000)
     {
-        var checker = GetChecker();
+        for (int start = 0, end; start < text.Length; start = end)
+        {
+            int last = start + size - 1, cut = -1;
+            if (last < text.Length - 1)
+            {
+                cut = Math.Max(text.LastIndexOf("\n\n", last, size / 2, StringComparison.Ordinal),
+                               text.LastIndexOf("\n\r\n", last, size / 2, StringComparison.Ordinal));
+                if (cut < 0) cut = text.LastIndexOf('\n', last, size);
+                if (cut < 0) cut = text.IndexOf('\n', last + 1);
+            }
+            end = cut < 0 ? text.Length : cut + 1;
+            yield return (start, end - start);
+        }
+    }
+
+    private List<(int, int)> CheckChunk(ISpellChecker checker, string text)
+    {
         var results = new List<(int, int)>();
-        if (checker is null) return results;
         try
         {
             var errors = checker.Check(text);
