@@ -601,9 +601,13 @@ const MDM = {
     postHistory();
     if (editorView) postSelectionState(editorView.state);   // the new document's Ln/Col (#10)
     note('setMarkdown', t0);
-    const painted = () => postToHost({ type: 'painted', load });   // the host's install waits for this, and only this install's
-    if (document.hidden) painted(); else requestAnimationFrame(() => setTimeout(painted));   // a hidden page does not paint: say so now
+    // the host's install waits for this, and only this install's; a hidden page does not paint: say so now
+    if (document.hidden) postToHost({ type: 'painted', load }); else this.paintedAfterFrame(load);
   },
+
+  // 'painted' for load once the next frame is on screen. A hidden page draws no frame, so this one waits until it is shown:
+  // the host's switch from the source view asks for it just after it shows this view.
+  paintedAfterFrame(load) { requestAnimationFrame(() => setTimeout(() => postToHost({ type: 'painted', load }))); },
 
   undo() { if (editorView) { undo(editorView.state, editorView.dispatch); this.focus(); } },
   redo() { if (editorView) { redo(editorView.state, editorView.dispatch); this.focus(); } },

@@ -51,6 +51,13 @@ public class EditorScriptsTests
     }
 
     [Fact]
+    public void ASwitchsPaintWaitAsksForItsOwnLoadsPaintedAfterAFrame()
+    {
+        Assert.Equal("window.MDM.paintedAfterFrame(8)", EditorScripts.PaintedAfterFrame(8));
+        Assert.False(EditorScripts.IsPaintedFor("{\"type\":\"painted\",\"load\":7}", 8));   // the install's own, posted at once while the view was hidden
+    }
+
+    [Fact]
     public void TheDocumentGoesInAsAJavascriptStringLiteral()
     {
         // The other half of the call is the document, which is data: a quote, a

@@ -19,6 +19,7 @@ changes between alpha tags.
 - **A `#link` to a heading in the same document jumps there**: Ctrl+click it, or click it in a read-only window such as Help.
 - **Right-click a link ▸ Copy Link** copies its address as the markdown writes it (web, `mailto:`, relative or `#`), in the formatted view and in Help.
 - **Ctrl+click a web link to open it in your browser**, after a prompt that shows the full address; in a read-only window such as Help, just click. Email links don't open.
+- **Switching from the Markdown source view back to the formatted view shows the busy spinner** when it takes more than a moment, as it does on a large file; until the switch is done the source view can't be typed in.
 
 ### Fixed
 

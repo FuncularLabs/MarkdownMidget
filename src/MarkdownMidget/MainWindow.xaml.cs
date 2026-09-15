@@ -73,6 +73,7 @@ public partial class MainWindow : Window
     private string _cleanMarkdown = string.Empty;
     private TaskCompletionSource _painted = new();   // the editor has painted the document being installed (SetDocumentMarkdownAsync)
     private int _loadToken;   // which install _painted is for: SetDocumentMarkdownAsync numbers each, and the editor's painted names it
+    private long _switchBusy;   // the switch from the source view (its _viewGeneration) whose busy indicator is up or pending, 0 for none (SwitchBusy)
     private string? _pendingBaseline, _baselineFromPending;   // a formatted-view load's placeholder _cleanMarkdown, and what filled it (TakePendingBaselineAsync)
     // The file as it was last read from or written to disk, folded to LF - the
     // second baseline (issue #4). _cleanMarkdown is normally the EDITOR's
@@ -1096,20 +1097,26 @@ public partial class MainWindow : Window
             SyncViewToggles();
             return;
         }
+        if (_switchBusy != 0)
+        {
+            if (!on) { SyncViewToggles(); return; }   // the source view's text is still going in: a second press would install it again
+            EndSwitchBusy(_switchBusy);               // back to source while the formatted view draws: its indicator goes now
+        }
 
         // The view is moving, and from HERE it is unsafe for a drop to insert:
         // _sourceMode does not change until the bottom of this method, so anything
         // pinned on the flag alone sees no movement across either await below —
         // which is the whole of the window in which InsertMarkdownFragment would
         // route to the half being discarded (DropHandshake.StillApplies). Bumped
-        // past the two returns above — already in that view, and no document to flip
-        // between views; the view stays where it is in both — and before the first
+        // past the returns above — already in that view, no document to flip between
+        // views, or a switch still going in; the view stays where it is in each — and before the first
         // await, so an in-flight switch counts as much as a finished one. A
         // switch that fails below leaves the view where it was and still bumps: a
         // drop is abandoned that need not have been, which is the safe way round.
         _viewGeneration++;
         var switching = TimingLog.Start();
         string? landed = null;   // switching to the formatted view: the editor's answer, which the dirty check below reuses
+        long busy = 0;   // switching to the formatted view: this switch's number for its busy indicator (SwitchBusy)
 
         if (on)
         {
@@ -1163,7 +1170,13 @@ public partial class MainWindow : Window
             // it would hand back SourceBox.Text, since _sourceMode is still true until
             // below.) Null means the editor could not be asked, which is the same
             // "it didn't land" this has always refused to switch views on.
-            landed = await SetDocumentMarkdownAsync(SourceBox.Text);
+            // Busy from here: the lightbox over the box if this is still going after a moment, and the box read-only until the
+            // install is back, since the install writes the editor's settled text over the box and anything typed meanwhile with it.
+            busy = _switchBusy = _viewGeneration;
+            SourceBox.IsReadOnly = true;
+            _ = ShowSwitchBusySoonAsync(busy);
+            try { landed = await SetDocumentMarkdownAsync(SourceBox.Text); }
+            finally { SourceBox.IsReadOnly = _readOnly; if (landed is null) EndSwitchBusy(busy); }   // failed or threw: not under the message below
             TimingLog.Lap("toFormatted", "install", switching);
             if (landed is null)
             {
@@ -1202,6 +1215,7 @@ public partial class MainWindow : Window
         RefocusEditor();
         _ = UpdateDirtyAsync(landed);   // formatted: the editor's answer above, not a second serialisation of the same text
         RequestSpellCheckSoon();
+        if (busy != 0) _ = EndSwitchBusyWhenPaintedAsync(busy);   // the formatted view has only just been shown: its indicator waits for it to draw
     }
 
     // ===== File operations =====
@@ -3348,6 +3362,36 @@ public partial class MainWindow : Window
             { _noteTimer.Stop(); StatusNote.Text = _busyNote = BusyHint.Visibility == Visibility.Visible ? $"{step} {BusyHint.Text}" : step; }   // a flashed note's timer must not blank it mid-open
     }
 
+    /// <summary>Switch <paramref name="busy"/>'s lightbox, if it is still installing once <see cref="SwitchBusy.Delay"/> is up.</summary>
+    private async Task ShowSwitchBusySoonAsync(long busy)
+    {
+        await Task.Delay(SwitchBusy.Delay);
+        if (SwitchBusy.ShowsNow(_switchBusy, busy, _sourceMode, BusyOverlay.Visibility == Visibility.Visible)) ShowBusy(SwitchBusy.Text);
+    }
+
+    /// <summary>Ends switch <paramref name="busy"/>'s indicator once the formatted view has drawn the document, or 2 s on. That view's
+    /// WebView2 covers the lightbox from the moment it shows, so meanwhile the status bar says it (BusyStatus). Never shown, nothing to wait for.</summary>
+    private async Task EndSwitchBusyWhenPaintedAsync(long busy)
+    {
+        try
+        {
+            if (!SwitchBusy.Owns(_switchBusy, busy) || BusyOverlay.Visibility != Visibility.Visible || BusyText.Text != SwitchBusy.Text) return;
+            BusyStatus("Drawing page…");
+            var painted = _painted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            await RunEditorAsync(EditorScripts.PaintedAfterFrame(++_loadToken));   // a number of its own: the install's painted, posted at once while hidden, is not this one
+            await Task.WhenAny(painted.Task, Task.Delay(2000));
+        }
+        finally { EndSwitchBusy(busy); }
+    }
+
+    /// <summary>Switch <paramref name="busy"/>'s indicator goes, unless a later switch's has replaced it; the overlay only while it still says the switch's.</summary>
+    private void EndSwitchBusy(long busy)
+    {
+        if (!SwitchBusy.Owns(_switchBusy, busy)) return;
+        _switchBusy = 0;
+        if (BusyText.Text == SwitchBusy.Text) HideBusy();   // an open that put its own up since hides that itself
+    }
+
     // ===== Find (modeless dialog, F3 / Shift+F3 navigation) =====
 
     private void Find_Click(object sender, RoutedEventArgs e)
@@ -3600,9 +3644,9 @@ public partial class MainWindow : Window
         // The dialog greys its buttons while read-only; this is the gate on the
         // request itself. A programmatic replace goes past AvalonEdit's IsReadOnly
         // and the editor's editable flag alike, so nothing below may run read-only.
-        if (_readOnly)
+        if (_readOnly || SourceBox.IsReadOnly)   // …or a switch to the formatted view is installing the box's text, which would write over a replace
         {
-            _findDialog?.SetStatus("Read-only document — nothing replaced.");
+            _findDialog?.SetStatus(_readOnly ? "Read-only document — nothing replaced." : "Switching views — nothing replaced.");
             return;
         }
 
@@ -5271,7 +5315,7 @@ public partial class MainWindow : Window
     {
         _readOnly = on;
         MenuReadOnly.IsChecked = on;
-        SourceBox.IsReadOnly = on;
+        SourceBox.IsReadOnly = on || (_sourceMode && _switchBusy != 0);   // a switch still installing the box's text keeps it read-only until that is back
         _findDialog?.SetReadOnly(on);
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setEditable({(on ? "false" : "true")})");
