@@ -22,7 +22,7 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 const CONTAINERS = new Set(['root', 'blockquote', 'list', 'listItem', 'footnoteDefinition']);
 const BLOCK = {
   paragraph: 'paragraph', heading: 'heading', code: 'code_block', html: 'html', thematicBreak: 'hr', table: 'table',
-  blockquote: 'blockquote', list: '_list', listItem: 'list_item', footnoteDefinition: 'footnote_definition',
+  blockquote: 'blockquote', list: '_list', listItem: 'list_item', footnoteDefinition: 'footnote_definition', yaml: 'front_matter',
 };
 const PM_CONTAINERS = new Set(['blockquote', 'bullet_list', 'ordered_list', 'list_item', 'footnote_definition']);
 const segmenter = new Intl.Segmenter();
@@ -247,7 +247,7 @@ const run = (from, to) => (to - from > 1 ? `${from}–${to}` : from < to ? `${fr
 const range = (from, to) => (from < to ? `${from}–${to}` : `${from}`);   // 7, 7–8
 // A gap's label stands in the 16px margin under the block above it, clear of that block's numbers (structure.css). Under anything
 // else (a rule, a table, a mermaid diagram, a list item in its list) there is no room: its lines lead the next block's range.
-const roomy = (n) => !n || (/^(paragraph|heading|blockquote|bullet_list|ordered_list|code_block)$/.test(n.type.name) && !/^mermaid$/i.test(n.attrs.language ?? ''));
+const roomy = (n) => !n || (/^(paragraph|heading|blockquote|bullet_list|ordered_list|code_block|front_matter)$/.test(n.type.name) && !/^mermaid$/i.test(n.attrs.language ?? ''));
 
 /** Once per numbering, while shown, for each block numbered (a top-level block, a list item, or the first block after a numbered item nested
  *  deeper in its container; not one on a line already numbered, nor the empty last paragraph of a file with no final newline):

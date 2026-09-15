@@ -29,6 +29,7 @@ import { refusedPictureSize } from './picture-paste.js';
 import { lineCapture, lineMap } from './line-map.js';
 import { anchorLinks } from './anchor-links.js';
 import { webLinks } from './web-links.js';
+import { frontMatter } from './front-matter.js';
 
 import {
   wrapInHeadingCommand,
@@ -279,6 +280,7 @@ export function createEditor({
     .use(gfm)
     .use(tightBulletList)   // after the presets: the schema keeps the last definition of a node
     .use(tightListItem)
+    .use(frontMatter)       // after the presets too: a block made to fill a gap is the schema's first, and must stay a paragraph
     .use(remarkImageSize)
     .use(resizableImage)
     .use(htmlRender)

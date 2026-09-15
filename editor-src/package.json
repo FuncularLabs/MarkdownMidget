@@ -16,7 +16,8 @@
     "@milkdown/theme-nord": "^7.21.2",
     "dompurify": "^3.4.12",
     "mdast-util-to-markdown": "^2.1.2",
-    "mermaid": "^11.16.0"
+    "mermaid": "^11.16.0",
+    "remark-frontmatter": "5.0.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

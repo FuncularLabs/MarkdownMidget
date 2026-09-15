@@ -529,6 +529,12 @@ conventions, whatever style it was written in:
   any other character UTF-16 stores as a pair) is written plain, so the text is
   kept whole but the emphasis may come back as the literal `*…*` text.
 - **Hard line break:** a backslash at the end of the line.
+- **Front matter:** a YAML block between `---` lines at the very top of the file,
+  as Jekyll, Hugo and Obsidian use, is saved exactly as written. It shows as a grey
+  code block, `---` lines included, that you edit as plain text; hover it to see
+  *Front matter*. Empty lines left under its closing `---` are saved as blank
+  lines after it. If a block ends up above it, or its text no longer runs from a
+  `---` line to the next one, it is saved as a `yaml` code block, text intact.
 
 What is converted: a reference-style link (`[text][ref]` plus its definition line)
 becomes an inline link and the definition line is dropped; a setext heading

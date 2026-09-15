@@ -4,7 +4,7 @@
 // proven in the de-risk spike: positions round-trip exactly across headings,
 // lists, tables, links, blockquotes, and mark-split words.
 //
-// Code is skipped structurally (code_block nodes and inlineCode marks), which is
+// Code is skipped structurally (code blocks, front matter and inlineCode marks), which is
 // what makes "Skip Spell Check in Code" exact rather than heuristic. A "\n" gap
 // is inserted between blocks and around skipped runs so the checker never sees
 // two unrelated fragments glued into one fake word.
@@ -26,7 +26,7 @@ export function extractSpellText(doc, includeCode) {
   };
 
   doc.descendants((node, pos) => {
-    if (node.type.name === 'code_block') {
+    if (node.type.spec.code) {
       if (!includeCode) { needGap = true; return false; }
       // Code block text is one text child; positions inside it are pos+1 based.
       node.forEach((child, offset) => {
