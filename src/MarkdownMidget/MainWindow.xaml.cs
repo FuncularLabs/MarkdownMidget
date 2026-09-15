@@ -592,6 +592,14 @@ public partial class MainWindow : Window
                 // Said in the words every other route uses for the same refusal.
                 FlashStatus(PictureLimit.Notice(null));
                 break;
+            case LinkOpening.MessageType:   // a link clicked in the page (web-links.js): checked again here, confirmed, then opened
+                {
+                    using var link = JsonDocument.Parse(e.WebMessageAsJson);
+                    var url = link.RootElement.TryGetProperty("url", out var lu) ? lu.ToString() : null;
+                    Dispatcher.BeginInvoke(() => OpenLinkDialog.Confirm(this, url, FlashStatus));   // deferred, like the context menu
+                }
+                break;
+            case LinkOpening.RefusedMessageType: FlashStatus(LinkOpening.RefusedNote); break;
         }
     }
 

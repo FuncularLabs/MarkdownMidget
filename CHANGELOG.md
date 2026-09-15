@@ -18,6 +18,7 @@ changes between alpha tags.
   and its margin shows every line once: each block's range of lines, and the lines between blocks.
 - **A `#link` to a heading in the same document jumps there**: Ctrl+click it, or click it in a read-only window such as Help.
 - **Right-click a link ▸ Copy Link** copies its address as the markdown writes it (web, `mailto:`, relative or `#`), in the formatted view and in Help.
+- **Ctrl+click a web or email link to open it in your browser or email app**, after a prompt that shows the full address; in a read-only window such as Help, just click.
 
 ### Fixed
 

@@ -36,5 +36,5 @@ test('an unmatched or malformed fragment does nothing, and an external link is l
   m.roundTrip('## Here\n\n[a](#nowhere) [b](#100%) [c](https://example.com/#here)');
   m.selectText(2, 2);
   assert.equal(click('#nowhere').defaultPrevented, true); click('#100%'); assert.equal(caret(), 2);
-  assert.equal(click('https://example.com/#here').defaultPrevented, false); assert.equal(caret(), 2);
+  click('https://example.com/#here'); assert.equal(caret(), 2);   // no jump: web-links.js takes it (web-links.test.mjs)
 });

@@ -1,0 +1,16 @@
+<Window x:Class="MarkdownMidget.OpenLinkDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Open Link" SizeToContent="Height" Width="480"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <StackPanel Margin="18">
+        <TextBlock Text="Open this link in your browser or email app?" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <TextBox x:Name="UrlText" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" BorderThickness="0"
+                 Background="Transparent" Margin="0,0,0,16" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="_Open" Width="80" Margin="0,0,8,0" Click="Open_Click" />
+            <Button Content="Cancel" IsDefault="True" IsCancel="True" Width="80" />
+        </StackPanel>
+    </StackPanel>
+</Window>

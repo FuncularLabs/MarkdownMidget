@@ -28,6 +28,7 @@ import { conventions, tightBulletList, tightListItem } from './conventions.js';
 import { refusedPictureSize } from './picture-paste.js';
 import { lineCapture, lineMap } from './line-map.js';
 import { anchorLinks } from './anchor-links.js';
+import { webLinks } from './web-links.js';
 
 import {
   wrapInHeadingCommand,
@@ -287,6 +288,7 @@ export function createEditor({
     .use(prism)
     .use(linkTitle)
     .use(anchorLinks)
+    .use(webLinks)
     .use(trailing)
     .use(formattingMarks)
     .use(tableCellEditing)
