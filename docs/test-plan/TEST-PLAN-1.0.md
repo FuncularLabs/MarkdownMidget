@@ -53,7 +53,7 @@ $env:MDM_TIMING = '1'
 & "$env:LOCALAPPDATA\Programs\MarkdownMidget\MarkdownMidget.exe"
 ```
 
-Timings are appended to `%TEMP%\MarkdownMidget-timing.log`. Only windows started from that PowerShell window, and the windows they open, write to it. To stop logging, close that PowerShell window.
+Timings are appended to `%TEMP%\MarkdownMidget-timing.log`. Only windows started from that PowerShell window, and the windows they open, write to it. To stop logging, close every Markdown Midget window started from that PowerShell window, and that PowerShell window.
 
 ### 1.4 Before each run
 
@@ -148,7 +148,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Change:** commit 40710b9 (no CHANGELOG bullet) · **Documents:** `large-600kb.md`, `br-forms.md` · **Settings:** formatted view
 1. From the "No document open" screen, open `large-600kb.md`. Watch the card.
 2. Open `br-forms.md` in a new window.
-- **Expected:** The card shows the phases in order (Reading file, Checking encoding, Building formatted view, Drawing page, Finishing up). For the large file, it adds a line suggesting the Markdown source view (Ctrl+E), but nothing switches. When the formatted view is showing, the same text appears in the status bar. The small file shows no suggestion.
+- **Expected:** The card shows the phases in order: "Reading file…", "Checking encoding…", "Building formatted view…", "Drawing page…". (Opening into the source view shows "Preparing document…" and "Finishing up…" in place of the last two. This test doesn't cover that.) For the large file, it adds a line suggesting the Markdown source view (Ctrl+E), but nothing switches. When the formatted view is showing, the same text appears in the status bar. The small file shows no suggestion.
 - **Type:** Both. Automated: `LargeFileTests.The_threshold_is_250_KB`, `A_file_opening_formatted_is_offered_the_source_view_at_or_over_the_threshold`, `A_file_opening_into_the_source_view_is_never_offered_it`. Human: the card and the status bar.
 
 ### ANC — Heading links
@@ -262,7 +262,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 #### WEB-05 Risky addresses are refused with the note, never an error box
 - **Change:** Fixed (commit 23ad525): the link check · **Documents:** `links.md`, cases 32–53 and 68–76 · **Settings:** formatted view
-1. Ctrl+click every case in **Refused addresses** and **Hosts the link check refuses**.
+1. Ctrl+click every case in **Refused addresses** and **Hosts the link check refuses**, and case 32.
 - **Expected:** Each case gives the note, except 50 and 77–80, which show their dialog. The refused cases cover a user name before the host (33, 34), hosts that aren't DNS names (68–70, 72), hosts ending in a number (73–75), a fullwidth digit (76) and hyphen-ending IDN labels (32, 71). No case shows the "hit an unexpected error" box.
 - **Type:** Both. Automated: `LinkOpeningTests.EverythingElseIsRefused`, `PaddingCannotHideAHostOrAnAttachment`, `HostsThatCannotShowInPunycodeAreRefused`, and the link replay. Human: that no error box appears in the app.
 
@@ -420,7 +420,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 #### TBL-06 A centred column written left-justified
 - **Change:** Fixed: tables ("stays lined up at the column widths it was written with") · **Documents:** `tables.md` · **Settings:** none
-- **Expected:** The **Aligned, a centred column written left-justified** table saves unchanged. On master a4577ae, the fixture round-trip check re-centres its cells (`| Note   |` becomes `|  Note  |`), and a second save is stable. Record FAIL with a note until this is fixed or accepted as a known limit.
+- **Expected:** The **Aligned, a centred column written left-justified** table saves unchanged. On master a4577ae, the fixture round-trip check re-centres its cells (`| Note   |` becomes `|  Note  |`), and a second save is stable. Record FAIL with a note until this is fixed or accepted as a known limit. It is listed as a candidate in section 5.
 - **Type:** Automated (Claude). Fixture round-trip check.
 
 #### TBL-07 Known one-time changes are stable
@@ -557,9 +557,9 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Type:** Automated (Claude). `LargeDocumentTests.A_load_or_switch_over_5_seconds_turns_both_off_with_the_note`.
 
 #### BIG-05 Reloading after an external change keeps the choices
-- **Change:** Added: large documents ("A reload keeps it") · **Documents:** a copy of `large-600kb.md` · **Settings:** as BIG-01
-1. Open the copy and turn on **Show Line Numbers**.
-2. In PowerShell, append a line: `Add-Content "$env:TEMP\mdm-test-docs\large-600kb.md" "External line."`
+- **Change:** Added: large documents ("A reload keeps it") · **Documents:** `large-copy.md`, a copy of `large-600kb.md` · **Settings:** as BIG-01
+1. In PowerShell, make the copy: `Copy-Item "$env:TEMP\mdm-test-docs\large-600kb.md" "$env:TEMP\mdm-test-copies\large-copy.md"`. Open `large-copy.md` and turn on **Show Line Numbers**.
+2. In PowerShell, append a line to the same file: `Add-Content "$env:TEMP\mdm-test-copies\large-copy.md" "External line."`
 3. Reload when the app offers it.
 - **Expected:** After the reload, line numbers are still on and spell check is still off. The new line is there.
 - **Type:** Human. The commit notes the reload wiring as a manual check.
@@ -571,9 +571,9 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Type:** Both. Automated: `LargeDocumentTests.Closing_forgets_the_document_so_the_no_document_screen_follows_the_saved_settings`. Human: the close wiring.
 
 #### BIG-07 Save As in the external-change conflict keeps the choices
-- **Change:** Added: large documents · **Documents:** a copy of `large-600kb.md` · **Settings:** as BIG-01
-1. Open the copy, turn on **Show Line Numbers**, and type a word without saving.
-2. Append a line to the file from PowerShell, as in BIG-05.
+- **Change:** Added: large documents · **Documents:** `large-copy.md`, made as in BIG-05 step 1 · **Settings:** as BIG-01
+1. Open `large-copy.md`, turn on **Show Line Numbers**, and type a word without saving.
+2. In PowerShell, append a line to the same file: `Add-Content "$env:TEMP\mdm-test-copies\large-copy.md" "External line."`
 3. When the app reports the conflict, choose to save under a new name.
 - **Expected:** The document is saved under the new name, line numbers are still on, and spell check is still off.
 - **Type:** Both. Automated: `LargeDocumentTests.Keeping_the_document_under_a_new_name_keeps_its_choices`. Human: the conflict dialog.
@@ -740,11 +740,12 @@ For each build, copy the empty template below and paste it above the template. F
 - Email (`mailto:`) and file links never open. Copy them instead.
 - A table with no outer pipes gains them on its first save from the formatted view.
 - A CJK table is tidied once on its first save.
-- An aligned table with an escaped pipe loses its padding once.
+- A table whose columns line up only if an escaped pipe `\|` counts as one character (as in `| a\|bQQQQc | d   |` over `| ---------- | --- |`, where that row's pipes sit one column left of the other rows') is read as unaligned and loses its padding on its first save. A table whose pipes line up byte for byte, as in `tables.md`, keeps it.
 - A repeated word that straddles two spell-check chunks (about 16 KB each) isn't flagged.
 - A list directly after another list, whose item starts with a rule (`- a` then `+ ***`), saves as `* ***`, which reads as a rule.
 - A list item that starts with a block (a quote, fence or table) has no margin line number.
 - A file that ends at front matter's closing `---` gains a final newline on save.
 - Formatted → Source has no busy box. It measured 50–600 ms.
 - The opening card can't draw over the formatted view, so there its phases go to the status bar.
+- Candidate, not yet decided: a centred table column written left-justified has its cells re-centred on the first save from the formatted view. TBL-06 is expected to FAIL until this is fixed or accepted here.
 - Until source preservation ships, a save through the formatted view writes the whole file in Markdown Midget's conventions (Help, *Known limits*).
