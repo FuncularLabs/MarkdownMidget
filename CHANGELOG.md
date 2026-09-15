@@ -19,6 +19,7 @@ changes between alpha tags.
 - **A `#link` to a heading in the same document jumps there**: Ctrl+click it, or click it in a read-only window such as Help.
 - **Right-click a link ▸ Copy Link** copies its address as the markdown writes it (web, `mailto:`, relative or `#`), in the formatted view and in Help.
 - **Ctrl+click a web link to open it in your browser**, after a prompt that shows the full address; in a read-only window such as Help, just click. Email links don't open.
+- **A document over 512 KB opens with line numbers and spell check off**, for that document and in both views, and the status bar says so once: on a large file a spell check takes seconds and the formatted view's margin numbers slow every switch. Turn either back on from **View ▸ Line Numbers ▸ Show Line Numbers** or **View ▸ Spell Check**; that holds for the document until you open another or close it, and your saved settings don't change. A document whose opening or view switch takes more than 5 seconds gets the same, from then on.
 - **Switching from the Markdown source view back to the formatted view shows the busy spinner** when it takes more than a moment, as it does on a large file; until the switch is done the source view can't be typed in.
 
 ### Changed

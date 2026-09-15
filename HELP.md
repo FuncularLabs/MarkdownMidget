@@ -403,6 +403,13 @@ a word never touches the Windows or Office custom dictionaries.
 toggles the red squiggles in both views. Your choice is remembered between
 sessions.
 
+**Large documents.** A document over 512 KB opens with spell check and line
+numbers off, for that document and in both views, and the status bar says so
+once. Turn either back on from **View ▸ Spell Check** or **View ▸ Line Numbers ▸
+Show Line Numbers**: that holds for the document until you open another or close
+it, and your saved settings stay as they were. A document whose opening or view
+switch takes more than 5 seconds gets the same, from then on.
+
 **Right-click a squiggled word** for suggestions, **Add to Dictionary** (kept in
 the app's own word list at `%LocalAppData%\MarkdownMidget\dictionary.txt`), or
 **Ignore All** (this session only). Works the same in the WYSIWYG view and the

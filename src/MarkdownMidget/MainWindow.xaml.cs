@@ -550,7 +550,7 @@ public partial class MainWindow : Window
                     // editor state, not the document. BuildSpellItemsAsync disables
                     // the document-mutating items instead.
                     SpellClick? spell = null;
-                    if (_spellCheck &&
+                    if (SpellOn &&
                         d.RootElement.TryGetProperty("spell", out var sp) && sp.ValueKind == JsonValueKind.Object)
                     {
                         var w = sp.TryGetProperty("word", out var wv) ? wv.GetString() : null;
@@ -1121,6 +1121,7 @@ public partial class MainWindow : Window
         // drop is abandoned that need not have been, which is the safe way round.
         _viewGeneration++;
         var switching = TimingLog.Start();
+        var started = Stopwatch.GetTimestamp();   // a switch this slow leaves this document's line numbers and spell check off (LargeDocument)
         string? landed = null;   // switching to the formatted view: the editor's answer, which the dirty check below reuses
         long busy = 0;   // switching to the formatted view: this switch's number for its busy indicator (SwitchBusy)
 
@@ -1222,6 +1223,7 @@ public partial class MainWindow : Window
         _ = UpdateDirtyAsync(landed);   // formatted: the editor's answer above, not a second serialisation of the same text
         RequestSpellCheckSoon();
         if (busy != 0) _ = EndSwitchBusyWhenPaintedAsync(busy);   // the formatted view has only just been shown: its indicator waits for it to draw
+        if (_large.Took(Stopwatch.GetElapsedTime(started))) ApplyLargeDocument(note: true);
     }
 
     // ===== File operations =====
@@ -1469,13 +1471,16 @@ public partial class MainWindow : Window
     /// line ending and byte-order mark Save must reproduce (issue #3).
     /// <paramref name="password"/> is non-null exactly when the document came out of a
     /// .mdenc container; every other load clears the window's encryption state.</summary>
-    private async Task LoadDocumentAsync(DocumentText.Decoded doc, string? path, string? password = null)
+    private async Task LoadDocumentAsync(DocumentText.Decoded doc, string? path, string? password = null, bool keepLargeChoices = false)   // keepLargeChoices: this document under a new name (LargeDocument)
     {
         // try/finally, because the awaits below reach into the editor and throw
         // outright when the WebView2 has died. A _suppressDirty left stuck true stops
         // dirty tracking AND backups for the rest of the session, so the app would
         // close a modified document without asking and with no crash copy — the
         // failure this whole feature exists to prevent, caused by its own guard.
+        var loading = Stopwatch.GetTimestamp();
+        var largeNote = _large.Loaded(doc.Text, keepLargeChoices || (path is not null && !_closed && string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase)));   // a reload keeps its choices
+        ApplyLargeDocument(note: false);   // before the install, so a large one is never built with its margin numbered
         _suppressDirty = true;
         var phase = TimingLog.Start();
         try
@@ -1532,6 +1537,7 @@ public partial class MainWindow : Window
         // setMarkdown doesn't surface as a 'change' message, so schedule explicitly —
         // without this, a freshly opened document shows no squiggles until edited.
         RequestSpellCheckSoon();
+        if (_large.Took(Stopwatch.GetElapsedTime(loading)) || largeNote) ApplyLargeDocument(note: true);   // the note once the open's own status has gone
     }
 
     // Resolve relative image paths (e.g. docs/logo.png) against the open document's
@@ -2703,6 +2709,7 @@ public partial class MainWindow : Window
         }
         finally { _suppressDirty = false; }
         UpdateTitle();
+        _large.Closed(); ApplyLargeDocument(note: false);   // no document: the ticks follow the saved settings again
         SetClosed(true);
         DiscardBackup();   // the user was asked and chose to let it go
         ReleaseDocumentClaim();   // nothing is open here any more for another window to find
@@ -3230,7 +3237,7 @@ public partial class MainWindow : Window
             // Already on disk with inMemory content, in this document's conventions;
             // load + retarget.
             await LoadDocumentAsync(new DocumentText.Decoded(inMemory, _lineEnding, _hadBom), picked,
-                _docEncrypted ? _docPassword : null);
+                _docEncrypted ? _docPassword : null, keepLargeChoices: true);   // the same document, now under the picked name
             RekeyDocumentClaim(picked);   // a Save As by another name: the claim moves too
         }
         else
@@ -4113,6 +4120,8 @@ public partial class MainWindow : Window
     private bool _savedMaximized;
     private bool _startWithBlankDocument;    // persisted; startup lands on a blank doc
     private bool _lineNumbers, _sourceLineNumbers, _linkLineNumbers = true;   // persisted; see LineNumbers_Click
+    private readonly LargeDocument _large = new();   // a large document's own line numbers and spell check, over the saved ones
+    private bool SpellOn => _large.SpellCheck(_spellCheck);
 
     private sealed class PrintPrefs
     {
@@ -4677,7 +4686,7 @@ public partial class MainWindow : Window
 
     private void SpellCheck_Click(object sender, RoutedEventArgs e)
     {
-        _spellCheck = MenuSpellCheck.IsChecked;
+        if (!_large.ChooseSpell(MenuSpellCheck.IsChecked)) _spellCheck = MenuSpellCheck.IsChecked;   // a large document's choice is its own: the saved setting stays
         SaveSettings();               // remember the choice across sessions
         RequestSpellCheckSoon();      // runs, or clears squiggles, per the new state
         RefocusEditor();
@@ -4750,8 +4759,11 @@ public partial class MainWindow : Window
     {
         var on = sender is MenuItem m ? m.IsChecked : LineNumbersToggle.IsChecked == true;
         var (formatted, source) = Source.ThemeLinking.TargetsFor(_linkLineNumbers, _sourceMode);
-        (_lineNumbers, _sourceLineNumbers) = (formatted ? on : _lineNumbers, source ? on : _sourceLineNumbers);
-        SavePersistentField(s => { if (formatted) s.LineNumbers = on; if (source) s.SourceLineNumbers = on; });
+        if (!_large.ChooseLines(on, formatted, source))   // a large document's choice is its own: the saved settings stay
+        {
+            (_lineNumbers, _sourceLineNumbers) = (formatted ? on : _lineNumbers, source ? on : _sourceLineNumbers);
+            SavePersistentField(s => { if (formatted) s.LineNumbers = on; if (source) s.SourceLineNumbers = on; });
+        }
         ApplyLineNumbers();
         RefocusEditor();
     }
@@ -4768,10 +4780,20 @@ public partial class MainWindow : Window
     /// <summary>Both views' numbers on screen; the menu tick and the button show the view you're in.</summary>
     private void ApplyLineNumbers()
     {
-        SourceBox.ShowLineNumbers = Source.ThemeLinking.Ticked(_linkLineNumbers, sourceMode: true, _lineNumbers, _sourceLineNumbers);
-        if (_editorReady) _ = RunEditorAsync($"window.MDM.setLineNumbers({(_lineNumbers ? "true" : "false")})");
-        LineNumbersToggle.IsChecked = MenuLineNumbers.IsChecked = Source.ThemeLinking.Ticked(_linkLineNumbers, _sourceMode, _lineNumbers, _sourceLineNumbers);
+        bool formattedOn = _large.LineNumbers(_lineNumbers, sourceView: false), sourceOn = _large.LineNumbers(_sourceLineNumbers, sourceView: true);   // a large document's own, over the saved ones
+        SourceBox.ShowLineNumbers = Source.ThemeLinking.Ticked(_linkLineNumbers, sourceMode: true, formattedOn, sourceOn);
+        if (_editorReady) _ = RunEditorAsync($"window.MDM.setLineNumbers({(formattedOn ? "true" : "false")})");
+        LineNumbersToggle.IsChecked = MenuLineNumbers.IsChecked = Source.ThemeLinking.Ticked(_linkLineNumbers, _sourceMode, formattedOn, sourceOn);
         MenuLinkLineNumbers.IsChecked = _linkLineNumbers;
+    }
+
+    /// <summary>What a load, or a slow load or switch, decided about this document's line numbers and spell check (LargeDocument): the ticks and
+    /// both margins follow now; with the note, the squiggles follow on a fresh check too.</summary>
+    private void ApplyLargeDocument(bool note)
+    {
+        MenuSpellCheck.IsChecked = SpellOn;
+        ApplyLineNumbers();
+        if (note) { RequestSpellCheckSoon(); FlashStatus(LargeDocument.Note); }
     }
 
     // ===== Drag & drop: pictures go in, markdown opens, anything else is refused =====

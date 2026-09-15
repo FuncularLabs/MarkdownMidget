@@ -186,7 +186,7 @@ public partial class MainWindow
 
     private async Task RunSpellCheckOnceAsync()
     {
-        if (!_spellCheck || _closed)
+        if (!SpellOn || _closed)
         {
             ClearSquiggles();
             return;
@@ -270,7 +270,7 @@ public partial class MainWindow
         // No _readOnly gate: read-only governs the document, not editor state, so
         // the spell block still appears — with the document-mutating items disabled
         // by BuildSpellItemsAsync and the dictionary actions kept live.
-        if (idx >= 0 && _spellCheck && _squiggles is not null)
+        if (idx >= 0 && SpellOn && _squiggles is not null)
         {
             // Take the range the ENGINE flagged, exactly as drawn. The previous
             // approach — re-tokenize with WordAt, then re-check that word alone —
