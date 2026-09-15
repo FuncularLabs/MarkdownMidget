@@ -331,6 +331,14 @@ export function conventions(ctx) {
 // theirs is the definition the schema keeps (last one wins).
 const isSpread = (v) => v === true || v === 'true';
 
+// A list item's schema wants a paragraph first, so an item that opens with a quote, fence, table, heading, rule or list is
+// read with an EMPTY paragraph before that block, and the paragraph serialiser writes an empty paragraph as `<br />`:
+// `- <br />` then the block, whose next open reads the `<br />` line as an HTML block that swallows the block. That filler
+// is not written, and the next open puts it back. An empty paragraph before another paragraph, and an item that is only an
+// empty paragraph, keep their `<br />` (roundtrip.test.mjs ListItemLeadingBlockSurvives).
+const opensWithFiller = (item) => item.childCount > 1 && item.firstChild.type.name === 'paragraph'
+  && item.firstChild.content.size === 0 && item.child(1).type.name !== 'paragraph';
+
 export const tightBulletList = bulletListSchema.extendSchema((prev) => (ctx) => {
   const base = prev(ctx);
   return {
@@ -355,7 +363,7 @@ export const tightListItem = extendListItemSchemaForTask.extendSchema((prev) => 
       runner: (state, node) => {
         if (node.attrs.checked != null) return base.toMarkdown.runner(state, node); // a task item: already a boolean
         state.openNode('listItem', undefined, { spread: isSpread(node.attrs.spread) });
-        state.next(node.content);
+        state.next(opensWithFiller(node) ? node.content.cut(node.firstChild.nodeSize) : node.content);
         state.closeNode();
       },
     },

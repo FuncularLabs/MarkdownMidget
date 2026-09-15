@@ -346,6 +346,23 @@ describe('InlineBreakSurvives', () => {
   });
 });
 
+describe('ListItemLeadingBlockSurvives', () => {
+  // A list item's schema wants a paragraph first, so `- > q` opens with an empty one before the quote, and Milkdown writes
+  // an empty paragraph as `<br />`: `- <br />` then the quote, which re-opened as an HTML block that swallowed the quote.
+  // conventions.js tightListItem writes no leading empty paragraph before a block that is not a paragraph. [in, out = in]
+  const CASES = [
+    ['- > quoted text\n'], ['1. > quoted text\n'], ['- ```js\n  code\n  ```\n'], ['- # heading\n'], ['- ***\n'],
+    ['- | a |\n  | - |\n  | 1 |\n'], ['- <div>\n  html\n  </div>\n'], ['- - nested\n'], ['- 1. nested\n'],
+    ['1. x\n   1. ```\n      code\n      ```\n'], ['- a\n  - > deep quote\n'], ['- > loose\n\n- > list\n'],
+    ['- > quote\n\n  para\n'], ['> - > inside a quote\n'],
+    ['-\n  > quote on the next line\n', '- > quote on the next line\n'],
+    ['- a\n\n+ > after another list\n', '- a\n\n* > after another list\n'],
+    // Guards, today's forms: an empty item, an item that opens with an empty paragraph, one between blocks.
+    ['-\n', '- <br />\n'], ['- a\n-\n- b\n', '- a\n- <br />\n- b\n'], ['- <br />\n\n  text\n'], ['- > q\n\n  <br />\n\n  > r\n'],
+  ];
+  for (const [md, out = md] of CASES) test(JSON.stringify(md), () => assert.equal(survives(md), out));
+});
+
 describe('IntrawordUnderscoreSurvives', () => {
   // R3. An underscore run with a word character on BOTH sides can neither open
   // nor close emphasis (CommonMark's flanking rules for `_`), so escaping it
