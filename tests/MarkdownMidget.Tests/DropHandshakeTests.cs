@@ -619,7 +619,7 @@ public class DropHandshakeTests
     {
         // The mutation the finding named: flipping this arm to "stop" would stop
         // every dropped markdown file from opening, on both surfaces — Window_Drop's
-        // loop over plan.Open and HandleDroppedFiles' HandleDroppedContentAsync both
+        // OpenFilesAsync over plan.Open and HandleDroppedFiles' OpenFilesAsync both
         // sit behind the chokepoint's answer. Nothing is said, either: the drop's own
         // plan.Notice() is what speaks for it.
         Assert.Equal(DropInsertOutcome.NothingToInsert, DropHandshake.DecideInsert(

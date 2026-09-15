@@ -544,14 +544,12 @@ image's alt text is written `\_`. A `snake_case_word` is saved as written.
 
 None of it applies to a file opened and saved only in the **Markdown source
 view**. Open it while the source view is showing — with **File ▸ Open**,
-**File ▸ Open Recent**, a drop on the source view that opens it in place, or a
+**File ▸ Open Recent** or a drop that opens it in this window, or a
 reload when it changes on disk — or press **Ctrl+E** before the formatted view
 has changed anything, and the source view shows the file as it is on disk, not
 this list's version of it, so what you save is what you typed. After the
 formatted view has changed the document, the source view shows the editor's text
-and these conventions are already in it — as it does for a markdown file dropped
-on the formatted editing area, which opens as an untitled copy with no file
-behind it.
+and these conventions are already in it.
 
 ## Files & windows
 
@@ -561,6 +559,13 @@ behind it.
   back, and if another program re-encodes the file while it is open (a
   `dos2unix`, a mark added or removed) without changing the text, the window
   adopts that too. A new document saves LF.
+- **File ▸ Open** and **File ▸ Open Recent** open the file in a **new window** when
+  this window has a document — a saved file, or anything typed or pasted — so it is
+  never replaced and nothing asks about unsaved changes. A window showing "No document
+  open", or a blank untitled document you haven't typed in, opens the file itself;
+  while a file is still opening there, or the window itself is still starting,
+  anything else you open goes to a new window.
+  Choosing the file this window already has just brings it forward.
 - **File ▸ Open Recent** lists the files you last opened or saved (10 by default;
   change it in **Edit ▸ Settings…**), with a **Clear Recent** option.
 - **A large file** (250 KB or more) takes a few seconds to open in the formatted view, so
@@ -585,17 +590,16 @@ behind it.
     document as text, costing about a third again its size in every copy and
     every save. It is the one picture limit — **Insert ▸ Picture…** and a paste
     into either view apply it too (see [Known limits](#known-limits)).
-  - A **markdown or text file** (`.md`, `.markdown`, `.txt`, `.mdenc`) **opens**.
-    Dropped on the **toolbar, menu bar or source view**, it opens in place (if the
-    current document is untitled and unmodified) or in a **new window**. Dropped on
-    the **formatted editing area**, its text opens as a new untitled document —
-    the OS doesn't reveal a dropped file's path to the editor, so **Save** will
-    prompt for a location — and that area opens one document per drop; the one
-    exception is an encrypted `.mdenc`, which that area redirects to **File ▸
-    Open** with a message, since there is no path there to prompt for the
-    password from (dropped on the toolbar, menu bar or source view it opens
-    normally, password prompt and all). A text file named `.png` is neither a
-    picture nor markdown, and is refused.
+  - A **markdown or text file** (`.md`, `.markdown`, `.txt`, `.mdenc`) **opens as
+    the file itself**, on either view or anywhere else on the window: **Save**
+    writes to it, it isn't marked modified, and it goes on Open Recent. If the
+    window has **no document** ("No document open", or a blank untitled document
+    you haven't typed in), the first file opens there;
+    otherwise **each file opens in a new window** and the document you have stays
+    as it is. At most **10 new windows** per drop — the status bar names any files
+    past that. Dropping the file this window already has just brings the window
+    forward. An encrypted `.mdenc` asks for its password in whichever window opens
+    it. A text file named `.png` is neither a picture nor markdown, and is refused.
   - **Anything else** is refused: the status bar names the file, and nothing
     changes.
   - Drop pictures and a markdown file **together** and the pictures are inserted;

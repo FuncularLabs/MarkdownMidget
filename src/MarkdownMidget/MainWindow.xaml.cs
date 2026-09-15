@@ -29,7 +29,7 @@ public partial class MainWindow : Window
     private static readonly string ProductDesc = "Markdown Midget " + AppVersion;
 
     private string? _currentPath;
-    private string? _displayName; // title for dropped content that has no path
+    private string? _displayName; // title for recovered content that has no path
     private bool _dirty;
     private bool _editorReady;
     private bool _sourceMode;
@@ -576,7 +576,13 @@ public partial class MainWindow : Window
             case "fileDrop":
                 {
                     using var d = JsonDocument.Parse(e.WebMessageAsJson);
-                    var message = DropRouting.ParseMessage(d.RootElement);
+                    // The dropped File objects ride along (postWithFiles), so a document opens as
+                    // the file itself. Read now: they belong to this event. A bridge that can't
+                    // hand them over leaves Paths null, and the drop names its documents instead.
+                    IReadOnlyList<string?>? paths;
+                    try { paths = [.. e.AdditionalObjects.Select(o => (o as CoreWebView2File)?.Path)]; }
+                    catch (Exception) { paths = null; }
+                    var message = DropRouting.ParseMessage(d.RootElement) with { Paths = paths };
                     Dispatcher.BeginInvoke(() => HandleDroppedFiles(message));
                 }
                 break;
@@ -1062,7 +1068,7 @@ public partial class MainWindow : Window
         // out to be open in another window (and that window can be focused) the
         // right outcome is for this one to close - in which case the source-view
         // flag is not applied to a window that is about to go.
-        await OpenPathAsync(path, startup: true);
+        await OpenHereAsync(path, startup: true);
         if (_startInSource && !_closed && !_yieldingToOtherWindow)
         {
             _startInSource = false;
@@ -1223,8 +1229,8 @@ public partial class MainWindow : Window
     private async Task<bool> ConfirmDiscardAsync()
     {
         if (!_dirty) return true;
-        // Same name the title bar shows. Dropped content has no path but does have a
-        // name, and asking "Save changes to Untitled?" about a file the user can see
+        // Same name the title bar shows. Recovered content can have a name but no
+        // path, and asking "Save changes to Untitled?" about a file the user can see
         // named in the title is its own small betrayal.
         var name = _currentPath is not null ? Path.GetFileName(_currentPath)
                  : _displayName ?? "Untitled";
@@ -1301,7 +1307,6 @@ public partial class MainWindow : Window
 
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
-        if (!await ConfirmDiscardAsync()) return;
         var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
         {
             Filter = Secure.SecureUi.OpenFilter(_showEncryptedInOpen),
@@ -1313,7 +1318,7 @@ public partial class MainWindow : Window
             RecentFolders = PickerRecentFolders(),
         });
         if (picked is null) return;
-        await OpenPathAsync(picked);
+        await OpenFilesAsync([picked]);
     }
 
     private async Task OpenPathAsync(string path, bool startup = false)
@@ -1749,9 +1754,9 @@ public partial class MainWindow : Window
                 Filter = Secure.SecureUi.SaveFilter,
                 DefaultExt = _docEncrypted ? Secure.SecureMarkdownFormat.Extension : ".md",
                 FilterIndex = _docEncrypted ? Secure.SecureUi.SaveFilterEncryptedIndex : 1,
-                // Dropped content already has a sensible name; offer it rather than
-                // making the user retype it. Through GetFileName even so — it reaches
-                // us from the browser and, after a recovery, from a file on disk.
+                // Recovered content may already have a sensible name; offer it rather
+                // than making the user retype it. Through GetFileName even so — it
+                // reaches us from a snapshot file on disk.
                 FileName = _currentPath is not null ? Path.GetFileName(_currentPath)
                          : (_displayName is null ? "Untitled.md" : Path.GetFileName(_displayName)),
                 InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
@@ -2096,7 +2101,7 @@ public partial class MainWindow : Window
     /// this window by looking at what's in it, and firing both off concurrently
     /// would have it read a half-applied landing state.
     /// </summary>
-    private async Task ApplyLandingStateAsync()
+    private async Task LandAsync()
     {
         // First, not last. Everything below awaits into the editor, and a script call
         // that throws would fault this task silently (it's fire-and-forget), leaving a
@@ -2138,6 +2143,16 @@ public partial class MainWindow : Window
         if (_yieldingToOtherWindow) return;   // closing; the next launch will recover
         await RecoverAsync();   // swallows its own failures
     }
+
+    /// <summary>Lands the window (LandAsync, recovery included) and only then lets it take a file in
+    /// place: until then _inPlaceOpens holds the 1 it starts at, so an open starts a new window rather
+    /// than load into an editor that is not ready, or over a recovered copy (F-2). Released once.</summary>
+    private async Task ApplyLandingStateAsync()
+    {
+        try { await LandAsync(); }
+        finally { if (!_landed) { _landed = true; _inPlaceOpens--; } }
+    }
+    private bool _landed;
 
     // ===== Already-open guard (issue #1) =====
 
@@ -4038,8 +4053,7 @@ public partial class MainWindow : Window
             BuildRecentMenu();
             return;
         }
-        if (!await ConfirmDiscardAsync()) return;
-        await OpenPathAsync(path);
+        await OpenFilesAsync([path]);
     }
 
     private void ClearRecent_Click(object sender, RoutedEventArgs e)
@@ -4767,10 +4781,11 @@ public partial class MainWindow : Window
     // only text drags (its handler marks nothing handled for a file drag) and lets a
     // file drop bubble up to Window_Drop, with the file's path. The formatted view
     // is a WebView2, a separate HWND that takes its own drops and posts them as the
-    // 'fileDrop' message, with each file's name, size and first bytes but no path
-    // (HandleDroppedFiles). Both hand their files to DropRouting and act on its
-    // plan, so the rules are in one place and tested there; what differs here is
-    // only how a picture's bytes are fetched and how a document opens.
+    // 'fileDrop' message, with each file's name, size and first bytes, and its path
+    // as an additional object (HandleDroppedFiles). Both hand their files to
+    // DropRouting and act on its plan, so the rules are in one place and tested
+    // there; both open documents through OpenFilesAsync, and differ only in how a
+    // picture's bytes are fetched.
     //
     // Neither route reads a whole file to route one. The path route reads
     // SniffLength bytes off disk; the content route is sent SniffLength bytes and
@@ -4809,18 +4824,10 @@ public partial class MainWindow : Window
         // always returned here; this is that route's answer, not a new policy.
         if (!await InsertDroppedPicturesAsync(plan, i => DropFiles.ReadAllAsync(paths[i]), then)) return;
 
-        // Documents open as a drop here always opened them: the first in this window
-        // only if it holds an untitled, unmodified document; otherwise (a file is
-        // open, or there are unsaved edits) keep it and open everything in fresh
-        // instances. The plan leaves this list empty when a picture went in.
-        var openHere = _currentPath is null && !_dirty;
-        for (var n = 0; n < plan.Open.Count; n++)
-        {
-            if (n == 0 && openHere) _ = OpenPathAsync(paths[plan.Open[0]]);
-            else OpenInNewInstance(paths[plan.Open[n]]);
-        }
-        if (plan.Notice() is { } notice) FlashStatus(notice);
+        // Documents open by OpenFilesAsync's rule, as File ▸ Open does. The plan leaves
+        // this list empty when a picture went in.
         Activate();
+        await OpenFilesAsync(plan.Open.Select(i => paths[i]), plan.Notice());
     }
 
     /// <summary>What the window can do with a dropped picture right now: the same
@@ -4999,8 +5006,7 @@ public partial class MainWindow : Window
     /// third decoded here, before anything had decided it was not even a picture.
     ///
     /// Pictures then embed through the same path as Window_Drop's; a markdown file
-    /// opens as an untitled document named after the file — one per drop, since
-    /// there is no path to hand a new window (the plan names any others).
+    /// opens by the path the editor posted with the drop, through OpenFilesAsync too.
     /// </summary>
     private async void HandleDroppedFiles(DropMessage message)
     {
@@ -5046,10 +5052,9 @@ public partial class MainWindow : Window
         // After the supersede check above, so an out-of-order fileDrop that is NOT
         // the newest drop does not claim the window on its way out.
         var then = DropPin(++_dropGeneration);
-        var plan = DropRouting.Plan(files, then.Target, oneDocument: true);
-        // The chosen pictures AND the one document that opens: this route has no
-        // path, so the document's bytes have to come from the editor too.
-        var wanted = plan.Insert.Select(p => p.Index).Concat(plan.Open.Take(1)).ToList();
+        // Documents open by the paths the drop carried, so only pictures' bytes are fetched.
+        var plan = DropRouting.Plan(files, then.Target, oneDocument: false);
+        var wanted = plan.Insert.Select(p => p.Index).ToList();
 
         var reply = await RequestDroppedBytesAsync(message.Drop, files, wanted);
         // A newer drop landed while this one was reading; that drop owns the window,
@@ -5060,7 +5065,7 @@ public partial class MainWindow : Window
         // now. Checked before ANY of the outcomes are acted on, because none of them
         // is about this document any more: a picture would go into a file that never
         // received the drop (or into a closed one, which nothing downstream tests
-        // for), a dropped .md would replace a document the user has since opened, and
+        // for), a dropped .md would be routed by a window state the drop never saw, and
         // "Couldn't read a.png" would be said about a drop that is no longer live.
         if (!DropStillApplies(then)) { FlashStatus(DropHandshake.DocumentChangedNotice); return; }
 
@@ -5076,11 +5081,10 @@ public partial class MainWindow : Window
                 ? Task.FromResult(b)
                 : Task.FromException<byte[]>(new IOException($"{files[i].Name} could not be read.")), then)) return;
 
-            if (plan.Open.Count > 0 && reply.Bytes.TryGetValue(plan.Open[0], out var content))
-                await HandleDroppedContentAsync(files[plan.Open[0]].Name, content);
+            var (open, unlocated) = OpenRouting.DocumentPaths(plan, message.Paths);
+            await OpenFilesAsync(open, plan.Notice(), unlocated);
         }
-
-        if (plan.Notice() is { } notice) FlashStatus(notice);
+        else if (plan.Notice() is { } notice) FlashStatus(notice);
         // Last, so it is what stays on screen: the notice is about files that were
         // never going to be taken, these are about ones that should have been.
         if (reply.Outcome == DropReply.Refuse)
@@ -5203,63 +5207,36 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Opens a file dropped onto the formatted view. Web content can't see the file
-    /// path, so this loads the dropped bytes as an untitled document named after the
-    /// file (Save will prompt for a location).
+    /// Where File ▸ Open, Open Recent and a drop on either view open files
+    /// (<see cref="OpenRouting.Plan"/>): in this window only when it has no document
+    /// (<see cref="OpenRouting.HasNoDocument"/>), otherwise one instance per file, never a second copy of this
+    /// window's own document. <paramref name="notices"/> are the caller's status notes.
     /// </summary>
-    private async Task HandleDroppedContentAsync(string name, byte[] bytes)
+    private async Task OpenFilesAsync(IEnumerable<string> paths, params string?[] notices)
     {
-        // The container is sniffed by content, as OpenPathAsync sniffs it — but the
-        // password prompt lives on the path route, and this route has no path to
-        // reopen from, so this isn't a prompt, it's a redirect.
-        if (Secure.SecureUi.IsEncryptedPath(name) || Secure.SecureMarkdownFormat.LooksLikeContainer(bytes))
-        {
-            MessageBox.Show(this,
-                "Encrypted documents can't be opened by dropping them here — use " +
-                "File \u25b8 Open or double-click the file instead.",
-                "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        if (!await ConfirmDiscardAsync()) return;
-        ShowBusy($"Opening {name}…");
-        try
-        {
-            StopWatching();
-            _suppressDirty = true;
-            // Same reason as LoadDocumentAsync: the document being replaced was just
-            // saved or explicitly discarded, so its crash copy goes with it. This path
-            // builds the document by hand instead of going through LoadDocumentAsync,
-            // so it needs saying twice.
-            DiscardBackup();
-            _backupDirty = false;
-            await ApplyDocBaseAsync(null); // dropped content has no folder context
-            // The editor hands the file's bytes over, so its line ending and
-            // byte-order mark are detected exactly as File ▸ Open detects them, and
-            // both are the convention the eventual Save As writes back.
-            BusyStatus("Checking encoding…", bytes.Length);   // a drop on the formatted view is a large file opening there too
-            var dropped = DocumentText.Detect(bytes);
-            await SetDocumentMarkdownAsync(dropped.Text);
-            _lineEnding = dropped.Ending;
-            _hadBom = dropped.HadBom;
-            _currentPath = null;
-            ReleaseDocumentClaim();   // the file this window showed is no longer open here
-            _displayName = name;
-            _suppressDirty = false;
-            // Dropped content exists nowhere but in this window — there is no file to
-            // compare it against and nothing to reopen if it's lost. Treat it as
-            // unsaved from the outset: closing prompts, and the crash copy actually
-            // covers it. Baselining it as "clean" made both of those silently skip it.
-            _cleanMarkdown = string.Empty;
-            _diskBaseline = string.Empty;   // no file, so no disk baseline either
-            _dirty = true;
-            _backupDirty = true;
-            UpdateTitle();
-            SetClosed(false);
-            await TryFocusDocumentAsync();   // the drop has landed; a dead editor must not undo that
-        }
-        // _suppressDirty here too: a throw partway would otherwise leave it stuck,
-        // freezing dirty tracking and backups for the rest of the session.
-        finally { HideBusy(); _suppressDirty = false; }
+        var noDocument = OpenRouting.HasNoDocument(_closed, _currentPath is null, _dirty, _cleanMarkdown, _inPlaceOpens);
+        var route = OpenRouting.Plan(paths, noDocument, _currentPath);
+        var failed = OpenRouting.LaunchAll(route.Launch, OpenRouting.StartInstance);
+        var status = string.Join("; ", notices.Append(route.Notice()).Append(failed).Where(s => !string.IsNullOrEmpty(s)));
+        if (status.Length > 0) FlashStatus(status);
+        if (route.AlreadyHere) Activate();
+        if (route.Here is { } here) await OpenHereAsync(here);
+    }
+
+    /// <summary>Opens into this window not yet finished, plus 1 until it has landed. _closed only clears once a load has
+    /// landed, so without this count a request made during the read also routed here and
+    /// replaced whatever had been typed into the first, crash copy and all.</summary>
+    private int _inPlaceOpens = 1;
+
+    /// <summary>An open into this window, counted from before its first await until it ends
+    /// however it ends: a cancelled password prompt leaves the window as it was, and the
+    /// next request may land here again. The discard prompt is a belt: a window with no
+    /// document has nothing unsaved.</summary>
+    private async Task OpenHereAsync(string path, bool startup = false)
+    {
+        _inPlaceOpens++;
+        try { if (await ConfirmDiscardAsync()) await OpenPathAsync(path, startup); }
+        finally { _inPlaceOpens--; }
     }
 
     /// <summary>Returns whether the new process actually started — WhatsNew_Click

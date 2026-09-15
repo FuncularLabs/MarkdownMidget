@@ -359,8 +359,9 @@ internal static class DropRouting
             : -1;
 }
 
-/// <summary>One <c>fileDrop</c> message: which drop it is, and its files in drop order.</summary>
-internal sealed record DropMessage(long Drop, IReadOnlyList<DroppedFile> Files);
+/// <summary>One <c>fileDrop</c> message: which drop it is, its files in drop order, and each
+/// file's path as the message's additional objects carried it (null when they did not).</summary>
+internal sealed record DropMessage(long Drop, IReadOnlyList<DroppedFile> Files, IReadOnlyList<string?>? Paths = null);
 
 /// <summary>One <c>droppedFileBytes</c> answer: which drop it is about, and the bytes
 /// of each index asked for (null where the editor could not read the file).</summary>

@@ -12,7 +12,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readBase64, readHeads, readFull, planDroppedRead, postAnswer, HEAD_BYTES } from '../src/file-drop.js';
+import { readBase64, readHeads, readFull, planDroppedRead, postAnswer, postWithFiles, HEAD_BYTES } from '../src/file-drop.js';
+
+test('postWithFiles hands the host the dropped files, and posts without them when it must', () => {
+  const sent = [];
+  postWithFiles({ postMessageWithAdditionalObjects: (m, f) => sent.push([m, f]) }, 'm', ['f']);
+  postWithFiles({ postMessageWithAdditionalObjects: () => { throw new Error('refused'); }, postMessage: (m) => sent.push([m]) }, 'n', ['f']);
+  postWithFiles({ postMessage: (m) => sent.push([m]) }, 'o', ['f']);
+  postWithFiles(undefined, 'p', ['f']);   // no host: nothing thrown
+  assert.deepEqual(sent, [['m', ['f']], ['n'], ['o']]);
+});
 
 // A FileReader stand-in that takes the outcome it should produce. Real readers are
 // asynchronous, so these are too: a reader that called back synchronously would

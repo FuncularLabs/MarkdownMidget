@@ -21,8 +21,13 @@ changes between alpha tags.
 - **Ctrl+click a web link to open it in your browser**, after a prompt that shows the full address; in a read-only window such as Help, just click. Email links don't open.
 - **Switching from the Markdown source view back to the formatted view shows the busy spinner** when it takes more than a moment, as it does on a large file; until the switch is done the source view can't be typed in.
 
+### Changed
+
+- **File ▸ Open, Open Recent and dropping a markdown or text file open it in a new window** when this window has a document, so the document you have is never replaced and there is no prompt about unsaved changes. A window showing "No document open", or a blank untitled document you haven't typed in, still opens the first file itself. A drop opens at most 10 new windows; the status bar names the rest. Opening the file this window already has just brings it forward.
+
 ### Fixed
 
+- **A markdown file dropped on the formatted view opens as the file itself**: Save writes to it, it isn't marked modified, and it goes on Open Recent. It used to open as an unsaved copy named like the file, so Save never updated the file you dropped.
 - **Right on File ▸ Open Recent or View ▸ Theme opens it at its first entry**, and Left comes back; it used to jump to the next menu.
 - **A paragraph after a nested list keeps its blank line when saved from the formatted view**, inside a quote too, so it no longer joins the list's last item when the file is opened again (#11).
 - **YAML front matter survives a save from the formatted view**: a `---` block at the top of a file is saved byte for byte and shows as a grey code block with its `---` lines; it used to become a rule and a heading.

@@ -18,7 +18,7 @@ import {
 } from './find.js';
 import { settleDocument } from './settle.js';
 import { linkAt } from './link-at.js';
-import { readHeads, readFull, planDroppedRead, postAnswer } from './file-drop.js';
+import { readHeads, readFull, planDroppedRead, postAnswer, postWithFiles } from './file-drop.js';
 import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
 import { createEditor } from './editor-factory.js';
@@ -241,8 +241,9 @@ function installContextMenus(view) {
 
 // ===== file drop =====
 //
-// The OS doesn't expose dropped-file paths to web content, so the host can't open
-// a dropped file itself — the editor has to read it. It does so in two phases, and
+// Web content never sees a dropped file's path, so the File objects are posted to the
+// host alongside phase one (postWithFiles) and the host opens a document by its path.
+// A picture's bytes are still the editor's to read. It does so in two phases, and
 // the reason is memory: reading every dropped file in full before the host has
 // said it wants any of them turned an accidentally-dropped 200 MB video into a
 // >260 MB base64 string, copied into a web message, decoded again on the host.
@@ -277,7 +278,7 @@ function installFileDrop() {
     // the message, and it must find this drop's files waiting.
     droppedFiles = files;
     const drop = ++dropSeq;
-    readHeads(files).then((read) => postToHost({ type: 'fileDrop', drop, files: read }));
+    readHeads(files).then((read) => postWithFiles(window.chrome?.webview, { type: 'fileDrop', drop, files: read }, files));
   }, true);
 }
 

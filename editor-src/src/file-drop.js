@@ -1,7 +1,7 @@
 // Reading dropped files for the host, in two phases.
 //
-// The OS doesn't expose a dropped file's path to web content, so the host can't
-// open the file itself — the editor has to read it and hand the bytes over. What
+// A dropped DOCUMENT reaches the host as its path (postWithFiles), but a picture's
+// bytes are the editor's to read and hand over. What
 // it must NOT do is read every dropped file in full before the host has said it
 // wants any of them: a 200 MB video dropped by accident became a >260 MB base64
 // string, copied again into a web message, decoded again on the host — a gigabyte
@@ -15,6 +15,17 @@
 //
 // Everything here is pure but for the FileReader it is handed: every function
 // takes the reader factory, so the whole reader can be tested in node with no DOM.
+
+/** Post phase one with the dropped File objects alongside, so the host can read each
+ *  one's real path (CoreWebView2File.Path) and open a document as the file itself.
+ *  A bridge without postMessageWithAdditionalObjects, or one that refuses the objects,
+ *  still gets the message: pictures still go in, and the host names the documents. */
+export function postWithFiles(webview, message, files) {
+  try {
+    if (typeof webview?.postMessageWithAdditionalObjects === 'function') return webview.postMessageWithAdditionalObjects(message, files);
+  } catch (_) { /* fall through, without the objects */ }
+  try { webview?.postMessage(message); } catch (_) { /* no host, or a dead WebView */ }
+}
 
 /** How many bytes of each dropped file travel in the fileDrop message.
  *
