@@ -82,7 +82,7 @@ or drop your selection.
   first line to insert a paragraph above.
 - **Links** show styled, with the URL as a hover tooltip. **Ctrl+click** a link to a heading in
   the same document (`#known-limits`) to jump there; in a read-only window, such as Help, just click.
-  A web link (`https://`) opens in your browser the same way, after a prompt that shows the full address and opens it
+  A web link (`http://` or `https://`) opens in your browser the same way, after a prompt that shows the full address and opens it
   only on **Open**. Other links don't open: email links (`mailto:`), and links to files, such as another `.md` file.
   **Right-click a link ▸ Copy Link** copies its address exactly as the markdown writes it, in the formatted view and Help.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
@@ -522,8 +522,8 @@ line with `--readonly`.
 
 ### Markdown conventions
 
-A document that passes through the formatted view is saved in Markdown Midget's
-conventions, whatever style it was written in:
+A block you edit in the formatted view is saved in Markdown Midget's conventions,
+whatever style it was written in; the rest keeps its own text (see below):
 
 - **Lists:** `-` bullets with one space after the marker, and `1.` numbering that
   counts up. A list directly after another list switches to `*` bullets — with the
@@ -550,7 +550,8 @@ definition inside a quote or list, or with a label defined twice, is saved whole
 these conventions once changed, as is a change too large to check quickly.
 
 What is converted: a reference-style link (`[text][ref]` plus its definition line)
-becomes an inline link and the definition line is dropped; a setext heading
+becomes an inline link (the definition line is dropped when the whole document is
+written); a setext heading
 (underlined with `===` or `---`) becomes a `#` heading; an indented code block
 becomes fenced; `## Heading ##` loses its trailing hashes; an underscore in an
 image's alt text is written `\_`. A `snake_case_word` is saved as written.
@@ -781,11 +782,18 @@ into and what to do instead.
   for a window that was open while another window updated, belongs to that
   installed copy alone: a portable exe never changes under a running window, so
   the item never appears there. A real installer is a later release's headline.
-- **A document that passes through the formatted view is saved in Markdown
-  Midget's conventions, not in yours.** Your content is kept; its spelling is
-  ours — `-` bullets, `#` headings, fenced code, inline links in place of
-  reference links, `\_` for an underscore in a picture's alt text. The whole list
-  is in [Markdown conventions](#markdown-conventions) above. If a file has to come
+- **Saving from the formatted view writes the blocks you edit in Markdown Midget's
+  conventions.** A document saved with no edits is saved exactly as it was, and
+  each top-level block you don't edit keeps its own text. What is written in the
+  app's conventions — `-` bullets, `#` headings, fenced code, inline links in place
+  of reference links, `\_` for an underscore in a picture's alt text — is each
+  top-level block you edit (a paragraph, heading, table or quote) with the blank
+  lines either side of it, and the whole list when you edit one of its items. A
+  few documents are written whole in those conventions once you change anything:
+  one with a link definition inside a quote, list or footnote, one with a label
+  defined twice, and a change too large to check quickly, such as an item in a very
+  long list. The full set of conventions is in [Markdown conventions](#markdown-conventions)
+  above. If a file has to come
   back exactly as it was written, work on it in the Markdown source view: open it
   while that view is showing, or press **Ctrl+E** before you touch the formatted
   view. Either way the source view shows the file as it is on disk, and a document

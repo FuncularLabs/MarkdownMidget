@@ -16,12 +16,14 @@ raw-markdown source editing.
 Built on **.NET / WPF** hosting a **WebView2** control. The editing surface is
 [Milkdown](https://milkdown.dev/) (a ProseMirror-based WYSIWYG markdown editor),
 so markdown is the literal document model rather than an import/export format:
-your text is the file, not a translation of it. What a trip through the formatted
-view does change is *style* — a save writes Markdown Midget's own conventions
-(`-` bullets, `#` headings, fenced code, inline links in place of reference
-links), listed in [Markdown conventions](HELP.md#markdown-conventions) along with
-the one case where emphasis can come back as literal text, and pinned by a
-round-trip test suite. To keep a file's own style, press **Ctrl+E** before the
+your text is the file, not a translation of it. A save from the formatted view
+keeps the text you didn't change as written, and a save with no edits leaves the
+file exactly as it was. What an edit does change is *style*: the blocks you edit
+are written in Markdown Midget's own conventions (`-` bullets, `#` headings, fenced
+code, inline links in place of reference links), listed in
+[Markdown conventions](HELP.md#markdown-conventions) along with the one case where
+emphasis can come back as literal text, and pinned by a round-trip test suite. To
+keep a file's own style everywhere, press **Ctrl+E** before the
 formatted view changes anything: the Markdown source view opens on the file as it
 is on disk, and a document edited and saved only there is written back as typed.
 Once the formatted view has changed the document, the source view shows the
@@ -36,7 +38,7 @@ Builds are on the
 grab `MarkdownMidget-vX.Y.Z-…-net10.exe` from the entry marked **Latest**. That's
 the newest stable release, and it's what the badge above tracks.
 
-A prerelease (`-beta`) may sit above it on the page while a feature is being
+A prerelease (`-beta` or `-rc`) may sit above it on the page while a feature is being
 proven; take that one only if you want what's coming rather than what's settled.
 Markdown Midget can also update itself: **Help ▸ About Markdown Midget** lists the
 newest release and any newer prerelease separately, so it's always clear which
@@ -102,9 +104,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**1.0.0-beta1 — the first 1.0 prerelease; 0.10.0 is still the latest stable**, so
+**1.0.0-rc1 — the 1.0 release candidate; 0.10.0 is still the latest stable**, so
 the badge above and the entry marked **Latest** on the releases page both point at
-0.10.0 until the promote. In daily use and signed on every release.
+0.10.0 until 1.0.0. In daily use and signed on every release.
 Windows-only for now; the editor core is web-based, so a cross-platform shell
 (MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
 deliberate limit written down in [HELP.md ▸ Known limits](HELP.md#known-limits);
@@ -183,9 +185,9 @@ the one it replaced:
 | Where | Looks like |
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-beta1+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-beta1+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-beta1+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc1+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc1+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc1+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -296,10 +298,9 @@ is deferred from this first iteration. Notable deferrals / divergences:
 - **Drag & drop** is routed by what the file *is*, not by what it is called:
   dropping a **picture** (PNG, JPEG, GIF, WebP, BMP — recognised by its magic
   bytes) inserts it at the caret, exactly as Insert ▸ Picture would, leaving the
-  document you have open alone; dropping a **markdown or text file** opens it in
-  place when the window holds an untitled, unmodified document, otherwise in a new
-  instance (the formatted editing area, which never sees a path, opens it as one
-  untitled document per drop instead); **anything else** is refused by name in the
+  document you have open alone; dropping a **markdown or text file** opens the file
+  itself, in this window when it has no document and otherwise in a new window (at
+  most 10 per drop); **anything else** is refused by name in the
   status bar and changes nothing. Drop pictures and a markdown file together and
   the pictures win. Files can also be passed on the command line.
 - **Read-only mode:** Edit ▸ Read Only locks the document; also available via the
@@ -316,6 +317,12 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.0-rc1** *(prerelease)* — **The 1.0 release candidate.** A save from the
+  formatted view now keeps the text you didn't change as written, and only the
+  blocks you edit take the app's conventions. The status bar shows the **line and
+  column**, with **Go to Line** (Ctrl+G) and line numbers in the margin. Opening a
+  file while this window has a document starts a **new window**, and **Ctrl+click**
+  opens a web link after you confirm.
 - **v1.0.0-beta1** *(prerelease)* — **1.0, as far as a beta.** A save through the
   formatted view no longer rewrites your markdown's style behind your back: the
   conventions it does write are pinned by a round-trip suite and listed in Help,

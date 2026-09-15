@@ -11,7 +11,7 @@ not planned, and the deliberate limits, are in
 
 ---
 
-## 1.0 (cut as 1.0.0-beta1 on 2026-09-13; 0.10.0 was promoted 2026-09-10)
+## 1.0 (cut as 1.0.0-beta1 on 2026-09-13 and 1.0.0-rc1 on 2026-09-15; 0.10.0 was promoted 2026-09-10)
 
 The 2026-09-10 readiness audit, planned in detail in
 [docs/plans/release-1.0.md](docs/plans/release-1.0.md). The verdict was "close on
@@ -69,12 +69,12 @@ the README's promise true as written.
 ["Won't unless asked"](docs/parked-ideas.md#wont-unless-asked-known-limits-parked-deliberately)
 list (at the foot of this file until 2026-09-14), and a README opening paragraph that
 says what a trip through the formatted view does change. The beta was tagged
-`v1.0.0-beta1` and published as a GitHub prerelease on 2026-09-13; 1.0.0 follows
-after dogfooding.
+`v1.0.0-beta1` and published as a GitHub prerelease on 2026-09-13; the 1.0.0-rc1
+cut is dated 2026-09-15, and 1.0.0 follows after dogfooding.
 
 ## Next
 
-### Line numbers (#10)
+### Line numbers (#10) — in 1.0.0-rc1
 
 Both phases are in: the cursor's line and column in the status bar and Go to Line
 (Ctrl+G), in both views; and line-number margins, with a View-menu toggle and
