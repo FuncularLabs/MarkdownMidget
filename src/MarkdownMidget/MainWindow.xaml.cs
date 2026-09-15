@@ -2718,6 +2718,7 @@ public partial class MainWindow : Window
     private void SetClosed(bool on)
     {
         _closed = on;
+        _findDialog?.SetReadOnly(_readOnly, noDocument: on);   // a showing dialog greys or restores Replace
         ClosedSplash.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         // Entering the state: focus off the editor before it is hidden, onto the splash
         // now that it can take it. Left in a collapsed WebView2, focus took Alt+F4 with
@@ -3418,7 +3419,7 @@ public partial class MainWindow : Window
 
     private void Find_Click(object sender, RoutedEventArgs e) => OpenFind(replace: false);
 
-    /// <summary>Edit ▸ Replace… and Ctrl+H: Find's dialog, with the cursor in Replace with. Read-only, the dialog greys
+    /// <summary>Edit ▸ Replace… and Ctrl+H: Find's dialog, with the cursor in Replace with. Read-only or with no document, the dialog greys
     /// Replace and puts the cursor in Find what, and OnReplaceRequested refuses a replace whatever asked for it.</summary>
     private void Replace_Click(object sender, RoutedEventArgs e) => OpenFind(replace: true);
 
@@ -3429,7 +3430,7 @@ public partial class MainWindow : Window
             _findDialog = new FindDialog { Owner = this };
             _findDialog.FindRequested += OnFindRequested;
             _findDialog.ReplaceRequested += OnReplaceRequested;
-            _findDialog.SetReadOnly(_readOnly);
+            _findDialog.SetReadOnly(_readOnly, noDocument: _closed);
             _findDialog.Closed2 += (_, _) =>
             {
                 _findDialog = null;
@@ -3670,12 +3671,13 @@ public partial class MainWindow : Window
 
     private async void OnReplaceRequested(object? sender, ReplaceRequest req)
     {
-        // The dialog greys its buttons while read-only; this is the gate on the
+        // The dialog greys its buttons while read-only or with no document; this is the gate on the
         // request itself. A programmatic replace goes past AvalonEdit's IsReadOnly
         // and the editor's editable flag alike, so nothing below may run read-only.
-        if (_readOnly || SourceBox.IsReadOnly)   // …or a switch to the formatted view is installing the box's text, which would write over a replace
+        if (_closed || _readOnly || SourceBox.IsReadOnly)   // …or a switch to the formatted view is installing the box's text, which would write over a replace
         {
-            _findDialog?.SetStatus(_readOnly ? "Read-only document — nothing replaced." : "Switching views — nothing replaced.");
+            _findDialog?.SetStatus(_closed ? "No document open — nothing replaced."
+                : _readOnly ? "Read-only document — nothing replaced." : "Switching views — nothing replaced.");
             return;
         }
 
@@ -5322,7 +5324,7 @@ public partial class MainWindow : Window
         _readOnly = on;
         MenuReadOnly.IsChecked = on;
         SourceBox.IsReadOnly = on || (_sourceMode && _switchBusy != 0);   // a switch still installing the box's text keeps it read-only until that is back
-        _findDialog?.SetReadOnly(on);
+        _findDialog?.SetReadOnly(on, noDocument: _closed);
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.setEditable({(on ? "false" : "true")})");
 

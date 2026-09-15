@@ -25,6 +25,7 @@ public partial class FindDialog : Window
     private const string ReplaceTip = "The current match, then find the next";
     private const string ReplaceAllTip = "Every match — within the selection when there is one — as one undo step";
     private const string ReadOnlyTip = "The document is read-only.";
+    private const string NoDocumentTip = "No document is open.";
 
     public FindDialog()
     {
@@ -84,16 +85,22 @@ public partial class FindDialog : Window
 
     /// <summary>
     /// Replace and Replace All are greyed while the document is read-only, the way
-    /// the Format menu is; the host also refuses the request itself, so this is the
-    /// visible half of that gate, not the only one.
+    /// the Format menu is, or no document is open; the host also refuses the request
+    /// itself, so this is the visible half of that gate, not the only one.
     /// </summary>
-    public void SetReadOnly(bool readOnly)
+    public void SetReadOnly(bool readOnly, bool noDocument = false)
     {
+        var blocked = ReplaceBlockedTip(readOnly, noDocument);
+        readOnly = blocked is not null;   // no document is refused like read-only, so Ctrl+H puts the cursor where Ctrl+F does
         _readOnly = readOnly;
         ReplaceButton.IsEnabled = ReplaceAllButton.IsEnabled = !readOnly;
-        ReplaceButton.ToolTip = readOnly ? ReadOnlyTip : ReplaceTip;
-        ReplaceAllButton.ToolTip = readOnly ? ReadOnlyTip : ReplaceAllTip;
+        ReplaceButton.ToolTip = readOnly ? blocked : ReplaceTip;
+        ReplaceAllButton.ToolTip = readOnly ? blocked : ReplaceAllTip;
     }
+
+    /// <summary>Why Replace can't run, as the greyed buttons' tooltip, or null when it can.</summary>
+    public static string? ReplaceBlockedTip(bool readOnly, bool noDocument) =>
+        noDocument ? NoDocumentTip : readOnly ? ReadOnlyTip : null;
 
     private FindRequest CurrentRequest(bool forward) => new(
         Query, CurrentMode, MatchCaseOn, WholeWordOn, WrapOn, forward);

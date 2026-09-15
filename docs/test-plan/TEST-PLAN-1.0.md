@@ -178,9 +178,10 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Change:** Added: "Ctrl+H now opens Replace" · **Documents:** `br-forms.md` · **Settings:** any
 1. Open Help (F1) and press Ctrl+H. Close the dialog and choose **Edit ▸ Replace…**.
 2. In `br-forms.md`, turn on **Edit ▸ Read Only**, press Ctrl+H, type in both boxes and press Enter.
-3. Press Ctrl+W. At "No document open", press Ctrl+F, close the dialog, then press Ctrl+H.
-- **Expected:** In steps 1 and 2 the cursor is in **Find what**, **Replace** and **Replace All** are greyed with the tooltip "The document is read-only.", and the document doesn't change. In step 3 Ctrl+H does exactly what Ctrl+F does.
-- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`. Human: the dialog, the menu and the keypress.
+3. Press Ctrl+W. At "No document open", press Ctrl+F, close the dialog, then press Ctrl+H, then choose **Edit ▸ Replace…**.
+4. Leave the dialog open, open `br-forms.md` and turn off **Edit ▸ Read Only**. Then press Ctrl+W.
+- **Expected:** In steps 1 and 2 the cursor is in **Find what**, **Replace** and **Replace All** are greyed with the tooltip "The document is read-only.", and the document doesn't change. In step 3 Ctrl+H does exactly what Ctrl+F does: the cursor is in **Find what** and both Replace buttons are greyed with the tooltip "No document is open."; Enter still presses **Find Next**, which finds nothing. In step 4 both buttons work once the document is editable, and grey again after Ctrl+W.
+- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`, `FindDialogFocusTests.ReplaceIsGreyedWhenReadOnlyOrNoDocument`. Human: the dialog, the menu and the keypress.
 
 ### TIP — Toolbar tooltips
 

@@ -19,6 +19,10 @@ testing before the stable release of the same number.
 - **The formatted view and Markdown source buttons now sit in one faint box**, with a thin line between them, so it's clear you pick one or the other. The buttons and icons are the same size as before.
 - **Toolbar buttons now explain themselves when greyed out**: a disabled button still shows its tooltip, which says when it's available, such as *Word wrap (source view only)* or *Bold (Ctrl+B) — editable documents only*.
 
+### Fixed
+
+- **Replace is now greyed out when no document is open**: at "No document open", the Find and Replace dialog greys *Replace* and *Replace All* as it does in a read-only document, and they come back when you open one. Before, you could press them.
+
 ## [1.0.0-rc1] - 2026-09-15
 
 The 1.0 release candidate: 1.0.0-beta1 after a round of everyday use, plus the changes below.
