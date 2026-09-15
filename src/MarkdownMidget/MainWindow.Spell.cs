@@ -307,13 +307,14 @@ public partial class MainWindow
 
     /// <summary>WYSIWYG right-click on a misspelled word (info arrives with the
     /// contextmenu message): dynamic menu with the spelling actions + standard items.</summary>
-    private async Task ShowSpellContextMenuAsync(double x, double y, SpellClick click)
+    private async Task ShowSpellContextMenuAsync(double x, double y, SpellClick click, string? link)
     {
         var menu = new ContextMenu();
         foreach (var it in await BuildSpellItemsAsync(click, WysiwygReplace(click)))
             menu.Items.Add(it);
         menu.Items.Add(MakeItem("Cu_t", () => Cut_Click(this, new RoutedEventArgs())));
         menu.Items.Add(MakeItem("_Copy", () => Copy_Click(this, new RoutedEventArgs())));
+        if (!string.IsNullOrEmpty(link)) menu.Items.Add(MakeItem("Copy _Link", () => CopyLink(link)));
         menu.Items.Add(MakeItem("_Paste", () => Paste_Click(this, new RoutedEventArgs())));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeItem("Select _All", () => SelectAll_Click(this, new RoutedEventArgs())));

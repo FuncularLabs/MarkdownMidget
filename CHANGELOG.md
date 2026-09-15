@@ -17,6 +17,7 @@ changes between alpha tags.
   Go to Line reaches every line in the formatted view too, blank lines and fences included,
   and its margin shows every line once: each block's range of lines, and the lines between blocks.
 - **A `#link` to a heading in the same document jumps there**: Ctrl+click it, or click it in a read-only window such as Help.
+- **Right-click a link ▸ Copy Link** copies its address as the markdown writes it (web, `mailto:`, relative or `#`), in the formatted view and in Help.
 
 ### Fixed
 

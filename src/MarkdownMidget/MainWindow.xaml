@@ -72,13 +72,16 @@
                 <MenuItem Header="Ro_w" Tag="selRow" Click="TableCmd_Click" />
                 <MenuItem Header="Ta_ble" Tag="selTable" Click="TableCmd_Click" />
             </MenuItem>
+            <MenuItem Header="Copy _Link" Tag="copyLink" Click="CopyLink_Click" Visibility="Collapsed" />
         </ContextMenu>
         <ContextMenu x:Key="ImageContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="_Resize…" Click="ImageResize_Click" />
+            <MenuItem Header="Copy _Link" Tag="copyLink" Click="CopyLink_Click" Visibility="Collapsed" />
         </ContextMenu>
         <ContextMenu x:Key="TextContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="Cu_t" Click="Cut_Click" />
             <MenuItem Header="_Copy" Click="Copy_Click" />
+            <MenuItem Header="Copy _Link" Tag="copyLink" Click="CopyLink_Click" Visibility="Collapsed" />
             <MenuItem Header="_Paste" Click="Paste_Click" />
             <Separator />
             <MenuItem Header="Select _All" Click="SelectAll_Click" />

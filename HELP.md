@@ -82,6 +82,7 @@ or drop your selection.
   first line to insert a paragraph above.
 - **Links** show styled, with the URL as a hover tooltip. **Ctrl+click** a link to a heading in
   the same document (`#known-limits`) to jump there; in a read-only window, such as Help, just click.
+  **Right-click a link ▸ Copy Link** copies its address exactly as the markdown writes it, in the formatted view and Help.
 - **Pictures** are embedded into the markdown as base64 data URIs, so they render
   in the editor and travel with the file. Pasting a picture from the clipboard — a
   screenshot, say — works in the Markdown source view too, and embeds it the same

@@ -17,6 +17,7 @@ import {
   findReplace as fReplace, findReplaceAll as fReplaceAll, findCaptureScope as fCaptureScope,
 } from './find.js';
 import { settleDocument } from './settle.js';
+import { linkAt } from './link-at.js';
 import { readHeads, readFull, planDroppedRead, postAnswer } from './file-drop.js';
 import { ceilingFrom, refusalMessage } from './picture-paste.js';
 import { NodeSelection, Selection } from '@milkdown/kit/prose/state';
@@ -154,19 +155,20 @@ function requestContextMenu(view, clientX, clientY, img) {
   // misspelling, so cells full of flagged words (product codes, surnames) had no
   // reachable table commands at all.
   const spell = spellAt(view, clientX, clientY);
+  const link = linkAt(view, img);   // Copy Link rides along the same way; `img` is the click's target, or null from the keyboard
   if (img && img.tagName === 'IMG') {
     try {
       const pos = view.posAtDOM(img, 0);
       view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos)));
     } catch (_) { /* edge */ }
-    postToHost({ type: 'contextmenu', menu: 'image', x: clientX, y: clientY, ...imageInfo(img) });
+    postToHost({ type: 'contextmenu', menu: 'image', x: clientX, y: clientY, link, ...imageInfo(img) });
     return;
   }
   if (focusTableCell(view, clientX, clientY)) {
-    postToHost({ type: 'contextmenu', menu: 'table', x: clientX, y: clientY, spell });
+    postToHost({ type: 'contextmenu', menu: 'table', x: clientX, y: clientY, spell, link });
     return;
   }
-  postToHost({ type: 'contextmenu', menu: 'text', x: clientX, y: clientY, spell });
+  postToHost({ type: 'contextmenu', menu: 'text', x: clientX, y: clientY, spell, link });
 }
 
 // Word-protocol test for "is this mark on at the current selection": a

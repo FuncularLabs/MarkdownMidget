@@ -535,6 +535,7 @@ public partial class MainWindow : Window
                     var menu = d.RootElement.TryGetProperty("menu", out var mv) ? mv.GetString() ?? "text" : "text";
                     var x = d.RootElement.TryGetProperty("x", out var vx) ? vx.GetDouble() : 0;
                     var y = d.RootElement.TryGetProperty("y", out var vy) ? vy.GetDouble() : 0;
+                    var link = d.RootElement.TryGetProperty("link", out var lk) && lk.ValueKind == JsonValueKind.String ? lk.GetString() : null;   // link-at.js
                     if (menu == "image")
                     {
                         int Get(string k) => d.RootElement.TryGetProperty(k, out var v) ? v.GetInt32() : 0;
@@ -566,9 +567,9 @@ public partial class MainWindow : Window
                     // and HELP.md keeps its squiggles inside tables, so that
                     // fallback was exactly the reported repro.
                     if (spell is { } si && (menu == "text" || _readOnly))
-                        Dispatcher.BeginInvoke(async () => await ShowSpellContextMenuAsync(x, y, si));
+                        Dispatcher.BeginInvoke(async () => await ShowSpellContextMenuAsync(x, y, si, link));
                     else
-                        Dispatcher.BeginInvoke(async () => await ShowEditorContextMenuAsync(menu, x, y, spell));
+                        Dispatcher.BeginInvoke(async () => await ShowEditorContextMenuAsync(menu, x, y, spell, link));
                 }
                 break;
             case "fileDrop":
@@ -612,7 +613,7 @@ public partial class MainWindow : Window
     /// actions when the click also landed on a misspelling — so a squiggle inside a
     /// table cell keeps both its spelling actions and the table commands.
     /// </summary>
-    private async Task ShowEditorContextMenuAsync(string menu, double x, double y, SpellClick? spell)
+    private async Task ShowEditorContextMenuAsync(string menu, double x, double y, SpellClick? spell, string? link)
     {
         var key = (!_readOnly && menu == "table") ? "TableContextMenu"
                 : (!_readOnly && menu == "image") ? "ImageContextMenu"
@@ -643,7 +644,21 @@ public partial class MainWindow : Window
                 if (spellSep is not null) spellSep.Visibility = Visibility.Collapsed;
             }
         }
+        if (cm.Items.OfType<MenuItem>().FirstOrDefault(m => (m.Tag as string) == "copyLink") is { } copyLink)   // shown on a link only
+            (copyLink.Visibility, copyLink.CommandParameter) = (string.IsNullOrEmpty(link) ? Visibility.Collapsed : Visibility.Visible, link);
         ShowMenuOverEditor(cm, x, y);
+    }
+
+    private void CopyLink_Click(object sender, RoutedEventArgs e) => CopyLink((sender as MenuItem)?.CommandParameter as string);
+
+    private void CopyLink(string? href) { if (!string.IsNullOrEmpty(href) && CopyLinkTo(href, Clipboard.SetText) is { } note) FlashStatus(note); }
+
+    /// <summary>Copy Link's clipboard write, <paramref name="setText"/> being Clipboard.SetText outside tests. WPF tries a clipboard
+    /// another program holds open ten times, 100 ms apart, before it throws; the throw becomes a status note, not a crash.</summary>
+    internal static string? CopyLinkTo(string href, Action<string> setText)
+    {
+        try { setText(href); return null; }
+        catch (ExternalException) { return "The link wasn't copied: another program is using the clipboard. Try again."; }
     }
 
     /// <summary>Open a menu over the WebView2 surface with the focus dance the
