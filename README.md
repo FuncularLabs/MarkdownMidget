@@ -17,8 +17,8 @@ Built on **.NET / WPF** hosting a **WebView2** control. The editing surface is
 [Milkdown](https://milkdown.dev/) (a ProseMirror-based WYSIWYG markdown editor),
 so markdown is the literal document model rather than an import/export format:
 your text is the file, not a translation of it. A save from the formatted view
-keeps the text you didn't change as written, except where an edit changes how a
-neighbouring block reads, and a save with no edits leaves the file exactly as it
+keeps the text you didn't change as written, except sometimes near an edit, and a
+save with no edits leaves the file exactly as it
 was. What an edit does change is *style*: the blocks you edit are written in
 Markdown Midget's own conventions (`-` bullets, `#` headings, fenced code, inline
 links in place of reference links), listed in
@@ -320,7 +320,7 @@ The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 
 - **v1.0.0-rc1** *(prerelease)* — **The 1.0 release candidate.** A save from the
   formatted view now keeps the text you didn't change as written: the blocks you
-  edit, and occasionally a neighbour, take the app's conventions (see
+  edit, and sometimes blocks near them, take the app's conventions (see
   [Known limits](HELP.md#known-limits)). The status bar shows the **line and
   column**, with **Go to Line** (Ctrl+G) and line numbers in the margin. Opening a
   file while this window has a document starts a **new window**, and **Ctrl+click**

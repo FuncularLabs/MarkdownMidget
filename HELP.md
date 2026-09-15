@@ -544,9 +544,9 @@ whatever style it was written in; the rest keeps its own text, with the exceptio
   `---` line to the next one, it is saved as a `yaml` code block, text intact.
 
 Saving from the formatted view keeps untouched text as written: these conventions
-apply to the top-level blocks you changed (for a list item, its whole list) and to
-a neighbouring block whose reading your edit would change, and a document saved with
-no edits is saved exactly as it was. A document with a link definition inside a
+apply to the top-level blocks you changed (for a list item, its whole list), and
+sometimes to blocks near your edit, when the edit would change how a block beside it
+reads; a document saved with no edits is saved exactly as it was. A document with a link definition inside a
 quote, list or footnote, or with a label defined twice, is saved whole in these
 conventions once changed, as is a change too large to check quickly or one whose
 neighbours still don't read back the same after they're rewritten.
@@ -786,9 +786,9 @@ into and what to do instead.
   the item never appears there. A real installer is a later release's headline.
 - **Saving from the formatted view writes the blocks you edit in Markdown Midget's
   conventions.** A document saved with no edits is saved exactly as it was, and
-  each top-level block you don't edit keeps its own text, unless your edit would
-  change how it reads (a list typed right after another list, say): then it is
-  written in the app's conventions too. What is written in the
+  each top-level block you don't edit keeps its own text, though blocks near an
+  edit are sometimes written in the app's conventions too (for instance when a
+  list sits right after the list you edited). What is written in the
   app's conventions — `-` bullets, `#` headings, fenced code, inline links in place
   of reference links, `\_` for an underscore in a picture's alt text — is each
   top-level block you edit (a paragraph, heading, table or quote) with the blank
