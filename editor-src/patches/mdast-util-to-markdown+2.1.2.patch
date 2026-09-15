@@ -1,0 +1,15 @@
+diff --git a/node_modules/mdast-util-to-markdown/lib/util/container-phrasing.js b/node_modules/mdast-util-to-markdown/lib/util/container-phrasing.js
+index 3b4dc46..da87cc5 100644
+--- a/node_modules/mdast-util-to-markdown/lib/util/container-phrasing.js
++++ b/node_modules/mdast-util-to-markdown/lib/util/container-phrasing.js
+@@ -66,7 +66,9 @@ export function containerPhrasing(parent, state, info) {
+     if (
+       results.length > 0 &&
+       (before === '\r' || before === '\n') &&
+-      child.type === 'html'
++      child.type === 'html' &&
++      // Markdown Midget: keep the eol before a <br>; br starts no type 1-6 html block and type 7 cannot interrupt a paragraph (roundtrip.test.mjs InlineBreakSurvives)
++      !/^<br\s*\/?\s*>$/i.test(child.value)
+     ) {
+       results[results.length - 1] = results[results.length - 1].replace(
+         /(\r?\n|\r)$/,

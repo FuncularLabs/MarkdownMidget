@@ -292,6 +292,60 @@ describe('ParagraphAfterNestedListKeepsItsBlankLine', () => {
   });
 });
 
+describe('InlineBreakSurvives', () => {
+  // Since v0.10.0 Milkdown's remarkPreserveEmptyLine deleted EVERY `<br>` html node, so `line one<br>line two`
+  // saved as `line oneline two`. patches/@milkdown+preset-commonmark+7.21.2.patch deletes one only as ALL of a
+  // paragraph or a table cell: the empty-line marker, and the empty cell earlier versions saved as `<br />`.
+  const PLACES = {
+    'mid-paragraph': (br) => `line one${br}line two\n`,
+    'end of paragraph': (br) => `line one${br}\n`,
+    'table cell mid-text': (br) => `| h${' '.repeat(br.length + 1)} |\n| ${'-'.repeat(br.length + 2)} |\n| a${br}b |\n`,
+    'list item': (br) => `- a${br}b\n`,
+    'blockquote': (br) => `> a${br}b\n`,
+  };
+  for (const [place, make] of Object.entries(PLACES)) {
+    test(place, () => {
+      for (const md of ['<br>', '<br/>', '<br />'].map(make)) {
+        assert.equal(survives(md), md, 'load then save');
+        const view = ed.view();
+        view.dispatch(view.state.tr.insert(view.state.doc.content.size, view.state.schema.nodes.paragraph.create(null, view.state.schema.text('tail'))));
+        assert.equal(ed.markdown(), `${md}\ntail\n`, 'save after an unrelated edit');
+      }
+    });
+  }
+
+  test('an inline break renders as a line break', () => {
+    ed.roundTrip('line one<br>line two');
+    assert.equal(ed.view().dom.querySelector('p > .mdm-html')?.innerHTML, '<br>');
+  });
+
+  test('guard: a whole-paragraph <br /> is still an empty line', () => {
+    assert.equal(survives('a\n\n<br />\n\nb\n'), 'a\n\n<br />\n\nb\n');
+    assert.deepEqual(ed.view().state.doc.content.content.map((n) => n.childCount), [1, 0, 1]);
+    assert.equal(survives('a\n\n<br>\n\nb\n'), 'a\n\n<br />\n\nb\n');
+  });
+
+  test('a cell holding only a break loads as an empty cell', () => {
+    // Stable either way; what the empty cell saves as is the table serialiser's call (`<br />` again, on its own).
+    for (const br of ['<br />', '<br>']) { survives(`| h |\n| - |\n| ${br} |\n`); assert.equal(ed.view().state.doc.child(0).child(1).child(0).child(0).childCount, 0, br); }
+  });
+
+  test('guard: a break that is all of a heading, emphasis or link is kept', () => {
+    // Not a list item's or a quote's: the html transformer wraps those in a paragraph, so `- <br>` is the marker.
+    for (const md of ['# <br>\n', '### <br />\n', '*<br>*\n', '[<br/>](u)\n']) assert.equal(survives(md), md);
+  });
+
+  test('the line ending before an inline break is kept (patches/mdast-util-to-markdown)', () => {
+    // Two trailing spaces come back as `\`, the HARD_BREAK convention, as for any hard break.
+    for (const [md, out = md] of [['a\\\n<br>b\n'], ['a  \n<br>b\n', 'a\\\n<br>b\n'], ['a\n<br>b\n'], ['Roses\\\n<br>\nViolets\n']]) assert.equal(survives(md), out);
+  });
+
+  test('guard: before other inline html a line ending is still a space, or the html would open a block', () => {
+    ed.roundTrip('a <div>x</div>'); ed.view().dispatch(ed.view().state.tr.insertText('\n', 2, 3));  // a soft line ending before `<div>`
+    assert.equal(survives(ed.markdown()), 'a <div>x</div>\n'); assert.equal(ed.view().state.doc.childCount, 1, 'no html block');
+  });
+});
+
 describe('IntrawordUnderscoreSurvives', () => {
   // R3. An underscore run with a word character on BOTH sides can neither open
   // nor close emphasis (CommonMark's flanking rules for `_`), so escaping it

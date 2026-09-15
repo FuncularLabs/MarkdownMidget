@@ -1,0 +1,12 @@
+diff --git a/node_modules/@milkdown/preset-commonmark/lib/index.js b/node_modules/@milkdown/preset-commonmark/lib/index.js
+index 3832b79..f46436d 100644
+--- a/node_modules/@milkdown/preset-commonmark/lib/index.js
++++ b/node_modules/@milkdown/preset-commonmark/lib/index.js
+@@ -414,6 +414,7 @@ function visitEmptyLine(ast) {
+ 		if (!parents.length) return;
+ 		const parent = parents[parents.length - 1];
+ 		if (!parent) return;
++		if (!["paragraph", "tableCell"].includes(parent.type) || parent.children.length !== 1) return; // Markdown Midget: only the empty-line or empty-cell marker, never an inline <br> (editor-src/test/roundtrip.test.mjs InlineBreakSurvives)
+ 		const index = parent.children.indexOf(node);
+ 		if (index === -1) return;
+ 		parent.children.splice(index, 1);
