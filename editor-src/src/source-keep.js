@@ -18,7 +18,7 @@
 // inside a block (a quote, a list item), which serves every block after it, or with a label defined twice, where order decides.
 const SEP = /\n+(?:<!---->\n+)?/y;   // what the serialiser writes between top-level blocks (mdast-util-to-markdown containerFlow)
 const FENCE = /^(?:---|\+\+\+)[ \t]*(?:\n|$)/;   // front matter's opening line, at the top of a text
-const DEF = String.raw`^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t])))*[ \t]*\[((?:[^\]\\\n]|\\.)+)\]:`;   // a line a definition may open, in any container
+const DEF = String.raw`^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t])))*[ \t]*\[(?:((?:[^\]\\\n]|\\.)+)\]:|(?:[^\]\\\n]|\\.)*$)`;   // a line a definition may open, in any container; or a label left open, which the next line may close
 const REF = /\[\^?((?:[^\]\\\n]|\\.)+)\]/g;   // every label a text may name, and more
 const CONTAINER = /^(blockquote|bullet_list|ordered_list|footnote_definition)$/;
 const label = (s) => s.replace(/[\t\n\r ]+/g, ' ').trim().toLowerCase().toUpperCase();   // as CommonMark matches labels
@@ -34,12 +34,12 @@ export function baseFrom(doc, text, recs) {
   if (tops.length !== doc.childCount || !tidy(tops, text.length)) return null;
   const linkDefs = [], labels = [];   // the parse drops definitions (remark-inline-links): they are read from the text between blocks
   for (let k = -1; k < tops.length; k++) {
-    const gap = text.slice(k < 0 ? 0 : tops[k].to, k + 1 < tops.length ? tops[k + 1].from : text.length), found = [...gap.matchAll(new RegExp(DEF, 'gm'))].map((d) => label(d[1]));
+    const gap = text.slice(k < 0 ? 0 : tops[k].to, k + 1 < tops.length ? tops[k + 1].from : text.length), found = [...gap.matchAll(new RegExp(DEF, 'gm'))].map((d) => (d[1] === undefined ? '' : label(d[1])));   // '': split over lines, so any label
     if (found.length) { linkDefs.push({ labels: found, text: gap.split('\n').filter((l) => /\S/.test(l)).join('\n') }); labels.push(...found); }
   }
   const nested = tops.some((t, i) => CONTAINER.test(doc.child(i).type.name)   // a footnote's own first line is no definition inside it
     && new RegExp(DEF, 'm').test(text.slice(t.from, t.to).replace(doc.child(i).type.name === 'footnote_definition' ? /^[^\n]*/ : /^(?!)/, '')));
-  return { doc, markdown: text, recs, tops, linkDefs, unsafe: nested || new Set(labels).size < labels.length };
+  return { doc, markdown: text, recs, tops, linkDefs, unsafe: nested || labels.includes('') || new Set(labels).size < labels.length };
 }
 
 /** Where each of `n` top-level outputs lies in `md`, or null when they cannot be found in order. */

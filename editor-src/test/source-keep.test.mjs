@@ -172,7 +172,12 @@ const HAZARDS = [
   ['a rule left first by moving the block above it last', 'Intro\n\n---\n\nmiddle\n\n---\n\nend\n', () => { const b = top('Intro'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(tr.doc.content.size, b.node)); },
     (out) => assert.ok(out.startsWith('***\n\nmiddle\n\n---\n\nend\n'), out)],
   ['the paragraph after a reference edited, its definition far above', '[ref]: /r\n\nA\n\nA2\n\nB [ref]\n\nC\n', () => typeAt('C'), (out) => assert.ok(out.startsWith('[ref]: /r\n\nA\n\nA2\n\nB [ref]\n\n'), out)],
-  ['a block moved above a label defined twice', 'See [a].\n\n[a]: /one\n\nMiddle.\n\n[a]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [a].\n', () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
+  // A label split over lines, which a definition may have: inside a quote or list item, and defined twice.
+  ['a split-label definition inside an edited quote', '> quote\n>\n> [foo\n> bar]: /q\n\nA\n\nB\n\nC\n\nTail [x][foo bar].\n', () => typeAt('quote', 'Z')],
+  ['a split-label definition inside an edited list', '- item\n\n  [foo\n  bar]: /l\n\nA\n\nB\n\nC\n\nSee [y][foo bar].\n', () => typeAt('item', 'Z')],
+  ['a block moved above a label defined twice, once split', 'See [foo bar].\n\n[foo\nbar]: /one\n\nMiddle.\n\n[foo bar]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [foo bar].\n',
+    () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
+  ['a block moved above a label defined twice','See [a].\n\n[a]: /one\n\nMiddle.\n\n[a]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [a].\n', () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
 ];
 
 for (const [name, md, act, expect = () => {}] of HAZARDS) {
