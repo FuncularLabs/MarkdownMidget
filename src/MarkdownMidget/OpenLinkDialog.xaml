@@ -6,10 +6,12 @@
         ShowInTaskbar="False" Icon="/Assets/midget-256.png">
     <StackPanel Margin="18">
         <TextBlock Text="Open this link in your browser or email app?" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
-        <TextBox x:Name="UrlText" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" BorderThickness="0"
-                 Background="Transparent" Margin="0,0,0,16" />
+        <!-- The whole address, never cut (LinkOpening.MaxLength caps it); a long one scrolls. -->
+        <TextBox x:Name="UrlText" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" Padding="3"
+                 MaxHeight="180" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="_Open" Width="80" Margin="0,0,8,0" Click="Open_Click" />
+            <!-- No access key: WPF can fire one without Alt, and a stray O must not open the link. -->
+            <Button Content="Open" Width="80" Margin="0,0,8,0" Click="Open_Click" />
             <Button Content="Cancel" IsDefault="True" IsCancel="True" Width="80" />
         </StackPanel>
     </StackPanel>
