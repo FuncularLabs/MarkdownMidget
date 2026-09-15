@@ -39,7 +39,7 @@ public partial class FindDialog : Window
         // Before the host subscribes, so putting the text back raises no search.
         QueryBox.Text = s_lastQuery;
         ReplaceBox.Text = s_lastReplacement;
-        Loaded += (_, _) => { QueryBox.Focus(); QueryBox.SelectAll(); };
+        Loaded += (_, _) => FocusBox();
         Closed += (_, _) =>
         {
             s_lastQuery = QueryBox.Text;
@@ -59,11 +59,24 @@ public partial class FindDialog : Window
     public bool WholeWordOn => WholeWord.IsChecked == true;
     public bool WrapOn => WrapAround.IsChecked == true;
 
-    public void FocusQuery()
+    /// <summary>Ctrl+F / Edit ▸ Find…: the cursor in Find what.</summary>
+    public void FocusQuery() { _replaceAsked = false; Activate(); FocusBox(); }
+
+    /// <summary>Ctrl+H / Edit ▸ Replace…: the cursor in Replace with, unless the document is read-only.</summary>
+    public void FocusReplace() { _replaceAsked = true; Activate(); FocusBox(); }
+
+    /// <summary>Replace with takes the cursor when Replace was asked for and the document can change. Read-only,
+    /// Replace is greyed and the host refuses one, so the cursor goes where Find puts it.</summary>
+    public static bool FocusesReplaceBox(bool replaceAsked, bool readOnly) => replaceAsked && !readOnly;
+
+    private bool _replaceAsked;   // the last Ctrl+F or Ctrl+H: Loaded can land after the host's call, and honours it
+    private bool _readOnly;
+
+    private void FocusBox()
     {
-        Activate();
-        QueryBox.Focus();
-        QueryBox.SelectAll();
+        var box = FocusesReplaceBox(_replaceAsked, _readOnly) ? ReplaceBox : QueryBox;
+        box.Focus();
+        box.SelectAll();
     }
 
     /// <summary>Updates the status line with "Match m of n" or an error.</summary>
@@ -76,6 +89,7 @@ public partial class FindDialog : Window
     /// </summary>
     public void SetReadOnly(bool readOnly)
     {
+        _readOnly = readOnly;
         ReplaceButton.IsEnabled = ReplaceAllButton.IsEnabled = !readOnly;
         ReplaceButton.ToolTip = readOnly ? ReadOnlyTip : ReplaceTip;
         ReplaceAllButton.ToolTip = readOnly ? ReadOnlyTip : ReplaceAllTip;

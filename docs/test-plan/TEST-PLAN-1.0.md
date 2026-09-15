@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -151,6 +151,29 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 2. Open `br-forms.md` in a new window.
 - **Expected:** The card shows the phases in order: "Reading file…", "Checking encoding…", "Building formatted view…", "Drawing page…". (Opening into the source view shows "Preparing document…" and "Finishing up…" in place of the last two. This test doesn't cover that.) For the large file, it adds a line suggesting the Markdown source view (Ctrl+E), but nothing switches. When the formatted view is showing, the same text appears in the status bar. The small file shows no suggestion.
 - **Type:** Both. Automated: `LargeFileTests.The_threshold_is_250_KB`, `A_file_opening_formatted_is_offered_the_source_view_at_or_over_the_threshold`, `A_file_opening_into_the_source_view_is_never_offered_it`. Human: the card and the status bar.
+
+### FND — Find and Replace shortcuts
+
+#### FND-01 Ctrl+H opens Replace in both views
+- **Change:** Added: "Ctrl+H now opens Replace" · **Documents:** `br-forms.md` · **Settings:** formatted view
+1. Click in the text and press Ctrl+H. Close the dialog, press Ctrl+E, click in the text and press Ctrl+H again.
+2. Click back in the document, leaving the dialog open, and press Ctrl+H.
+- **Expected:** Each time the Find and Replace dialog opens, or comes to the front, with the cursor in **Replace with** and its text selected. Nothing is typed into the document, and neither the browser nor the Style box (Ctrl+Shift+H) reacts.
+- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`. Human: the real keypress in WebView2 and in the source view.
+
+#### FND-02 Edit ▸ Replace… sits under Find…
+- **Change:** Added: "Edit ▸ Replace… now sits under Find…" · **Documents:** `br-forms.md` · **Settings:** any
+1. Press Alt+E, then L.
+- **Expected:** **Replace…** is directly under **Find…**, shows `Ctrl+H` and has its L underlined. L opens the dialog as in FND-01; no other Edit item takes it.
+- **Type:** Human. A WPF menu; `MenuAccessKeysTests` covers Alt handling, not clashes between items.
+
+#### FND-03 Read-only, Help and no document
+- **Change:** Added: "Ctrl+H now opens Replace" · **Documents:** `br-forms.md` · **Settings:** any
+1. Open Help (F1) and press Ctrl+H. Close the dialog and choose **Edit ▸ Replace…**.
+2. In `br-forms.md`, turn on **Edit ▸ Read Only**, press Ctrl+H, type in both boxes and press Enter.
+3. Press Ctrl+W. At "No document open", press Ctrl+F, close the dialog, then press Ctrl+H.
+- **Expected:** In steps 1 and 2 the cursor is in **Find what**, **Replace** and **Replace All** are greyed with the tooltip "The document is read-only.", and the document doesn't change. In step 3 Ctrl+H does exactly what Ctrl+F does.
+- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`. Human: the dialog, the menu and the keypress.
 
 ### ANC — Heading links
 
@@ -1108,6 +1131,9 @@ Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.cl
 | SRC-06 | | | |
 | SRC-07 | | | |
 | SRC-08 | | | |
+| FND-01 | | | |
+| FND-02 | | | |
+| FND-03 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

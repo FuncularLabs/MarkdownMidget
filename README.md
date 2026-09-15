@@ -308,7 +308,7 @@ is deferred from this first iteration. Notable deferrals / divergences:
   `--readonly` command-line switch. Help ▸ View Help opens the bundled
   [HELP.md](HELP.md) read-only in a new instance.
 - **Printing** (Ctrl+P) and **PDF export**, with header/footer and colour-code-block
-  options, and **Find & Replace** (Ctrl+F, F3) in Normal / Extended / Wildcards /
+  options, and **Find & Replace** (Ctrl+F, Ctrl+H, F3) in Normal / Extended / Wildcards /
   Regex modes, in both views. Replace All is one undo step, and is scoped to the
   selected text when there is some.
 - Deferred: page setup, text colour. *(Theming shipped in 0.7.0.)*

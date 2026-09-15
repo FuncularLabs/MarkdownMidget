@@ -143,6 +143,7 @@
                         <MenuItem Header="Select _All" InputGestureText="Ctrl+A" Click="SelectAll_Click" />
                         <Separator />
                         <MenuItem Header="_Find…" InputGestureText="Ctrl+F" Click="Find_Click" />
+                        <MenuItem Header="Rep_lace…" InputGestureText="Ctrl+H" Click="Replace_Click" />
                         <MenuItem Header="_Go to Line…" InputGestureText="Ctrl+G" Click="GoToLine_Click" />
                         <Separator />
                         <MenuItem x:Name="MenuReadOnly" Header="_Read Only"

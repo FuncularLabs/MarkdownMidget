@@ -3416,7 +3416,13 @@ public partial class MainWindow : Window
 
     // ===== Find (modeless dialog, F3 / Shift+F3 navigation) =====
 
-    private void Find_Click(object sender, RoutedEventArgs e)
+    private void Find_Click(object sender, RoutedEventArgs e) => OpenFind(replace: false);
+
+    /// <summary>Edit ▸ Replace… and Ctrl+H: Find's dialog, with the cursor in Replace with. Read-only, the dialog greys
+    /// Replace and puts the cursor in Find what, and OnReplaceRequested refuses a replace whatever asked for it.</summary>
+    private void Replace_Click(object sender, RoutedEventArgs e) => OpenFind(replace: true);
+
+    private void OpenFind(bool replace)
     {
         if (_findDialog is null)
         {
@@ -3436,7 +3442,8 @@ public partial class MainWindow : Window
             _findDialog.Show();
         }
         CaptureReplaceScope();
-        _findDialog.FocusQuery();
+        if (replace) _findDialog.FocusReplace();
+        else _findDialog.FocusQuery();
     }
 
     /// <summary>
@@ -5748,6 +5755,7 @@ public partial class MainWindow : Window
         Bind(Key.P, ModifierKeys.Control, (_, _) => Print_Click(this, new RoutedEventArgs()));
         Bind(Key.K, ModifierKeys.Control, (_, _) => Link_Click(this, new RoutedEventArgs()));
         Bind(Key.F, ModifierKeys.Control, (_, _) => Find_Click(this, new RoutedEventArgs()));
+        Bind(Key.H, ModifierKeys.Control, (_, _) => Replace_Click(this, new RoutedEventArgs()));
         Bind(Key.G, ModifierKeys.Control, (_, _) => GoToLine_Click(this, new RoutedEventArgs()));
         Bind(Key.F3, ModifierKeys.None, (_, _) => FindNextRequested(forward: true));
         Bind(Key.F3, ModifierKeys.Shift, (_, _) => FindNextRequested(forward: false));

@@ -9,6 +9,11 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Added
+
+- **Ctrl+H now opens Replace**, as in other editors: the Find and Replace dialog opens with the cursor in *Replace with*, in either view. In a read-only document, such as Help, Replace stays greyed out and the cursor goes to *Find what*.
+- **Edit ▸ Replace…** now sits under **Find…**, and does what Ctrl+H does.
+
 ## [1.0.0-rc1] - 2026-09-15
 
 The 1.0 release candidate: 1.0.0-beta1 after a round of everyday use, plus the changes below.

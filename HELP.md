@@ -68,6 +68,7 @@ or drop your selection.
 | Insert link | Ctrl+K |
 | Exit a code block (new paragraph below) | Ctrl+Enter |
 | Toggle markdown source | Ctrl+E |
+| Find / Replace | Ctrl+F / Ctrl+H |
 | Go to line | Ctrl+G |
 
 ## Editing behaviors
@@ -124,6 +125,8 @@ and heading ends, **↵** at manual line breaks, and **→** for tabs.
 ## Find
 
 **Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find and Replace dialog.
+**Edit ▸ Replace…** (or **Ctrl+H**) opens it with the cursor in **Replace with**; in a
+read-only document, such as this Help window, Replace is greyed out and the cursor goes to **Find what**.
 **F3** jumps to the next match, **Shift+F3** to the previous. The status line
 shows **`Match m of n`**. Find works in either the WYSIWYG or the Markdown source
 view, and so does Replace (below).
@@ -259,7 +262,7 @@ The dialog has a **Replace with** box under **Find what**, and two buttons:
   the search reached and reporting it as all of them; narrow the search.
   Find moves the selection onto each match as you type, so what counts is the
   selection *you* made: the one there when you opened the dialog (or pressed
-  Ctrl+F again), or one you make afterwards. The status bar reports how many
+  Ctrl+F or Ctrl+H again), or one you make afterwards. The status bar reports how many
   were replaced.
 
 The replacement follows the search mode:
