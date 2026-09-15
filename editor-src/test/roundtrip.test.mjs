@@ -124,8 +124,8 @@ describe('MeasuredRewritesAreReproduced', () => {
     assert.match(out, /a snake_case_word and/);
   });
 
-  test('the table is reformatted to the widest cell', () => {
-    assert.match(out, /^\| Left \| Right \|\n\| :--- \| ----: \|\n\| a {4}\| {5}b \|$/m);
+  test('the table keeps its layout, delimiter row as written (was reformatted to the widest cell)', () => {
+    assert.match(out, /^\| Left \| Right \|\n\|:-----\|------:\|\n\| a {4}\| {5}b \|$/m);
   });
 
   test('a tight bullet list stays tight', () => {
@@ -316,7 +316,7 @@ describe('IntrawordUnderscoreSurvives', () => {
   test('inside a table cell too', () => {
     assert.equal(
       ed.roundTrip('| a | b |\n|---|---|\n| c_d | e |'),
-      '| a   | b |\n| --- | - |\n| c_d | e |\n');
+      '| a | b |\n|---|---|\n| c_d | e |\n');
   });
 
   test('guard: _italic_ and __bold__ still round-trip', () => {

@@ -7,13 +7,15 @@
 //
 // Three things live here: the remark-stringify options and handlers the editor
 // serialises with (`conventions`, a Milkdown config — the hard-break form, the
-// underscore rule of R3 and the emphasis/strong encoding are handlers), and the
-// schema fix that keeps tight lists tight (`tightBulletList`, `tightListItem`).
+// underscore rule of R3, the emphasis/strong encoding and the table layout are handlers), and the
+// schema fixes that keep tight lists tight (`tightBulletList`, `tightListItem`) and tables as read (`tableFidelity`).
 // All are wired in by editor-factory.js.
 
 import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
+import { $remark } from '@milkdown/kit/utils';
 import { bulletListSchema } from '@milkdown/kit/preset/commonmark';
-import { extendListItemSchemaForTask } from '@milkdown/kit/preset/gfm';
+import { extendListItemSchemaForTask, tableSchema, tableCellSchema, tableHeaderSchema } from '@milkdown/kit/preset/gfm';
+import { gfmTableToMarkdown } from 'mdast-util-gfm-table';
 import { defaultHandlers } from 'mdast-util-to-markdown';
 import { recordingRoot } from './line-map.js';
 
@@ -241,6 +243,62 @@ function blankLineAfterLazyList(left, right) {
   if (left.type === 'list' && (right.type === 'paragraph' || right.type === 'table') && lazyTail(left)) return 1;
 }
 
+// ---- a table keeps the layout it was read in --------------------------------
+// remark-gfm padded every cell to the widest in its column: a long cell multiplied a file's size, and every table
+// written unpadded was rewritten. A parsed table is `aligned` when all its lines, delimiter row included, have their
+// unescaped pipes at the same offsets, `padded` when its header has a space just after a pipe; it keeps its delimiter
+// row and each column's width (tableLayout), and its node keeps all four through edits (keepTableLayout). An aligned
+// table's column is as wide as it was read or as its widest cell, whichever is wider (a new table's: at least 3). The
+// delimiter row is written as read while it still fits (the same columns and alignments; in an aligned table, the same
+// pipe offsets); otherwise an unaligned table's delimiters are `---` `:--` `--:` `:-:`. A table made in the editor or
+// pasted as HTML (null) is aligned unless a cell is over NEW_TABLE_CELL_MAX characters. Each form reads back as itself.
+export const NEW_TABLE_CELL_MAX = 80;
+const offsetsOf = (line) => [...line.matchAll(/\\.|\|/g)].filter((m) => m[0] === '|').map((m) => m.index);   // unescaped pipes
+const pipesAt = (line) => offsetsOf(line).join();
+const threeDashes = (row) => row.replace(/(:?)-+(:?)/g, (m, a, b) => a + '-'.repeat(3 - a.length - b.length) + b);
+const tableLayout = $remark('mdmTableLayout', () => () => (tree, file) => {
+  const text = String(file ?? ''), walk = (node) => node.children?.forEach((child) => {
+    const { start, end } = child.position ?? {};
+    if (child.type === 'table' && start && text) {   // each line after the first less its container's prefix
+      const lines = text.slice(start.offset, end.offset).split(/\r\n|\r|\n/).map((line, i) => (i ? line.slice(start.column - 1) : line));
+      const head = offsetsOf(lines[0]), padded = head.slice(0, -1).some((o) => lines[0][o + 1] === ' ');
+      Object.assign(child, { aligned: lines.every((line) => pipesAt(line) === pipesAt(lines[0])), padded, delimiter: lines[1],
+        widths: head.slice(1).map((o, i) => Math.max(0, o - head[i] - 1 - (padded ? 2 : 0))) });
+    }
+    walk(child);
+  });
+  walk(tree);
+});
+const keepTableLayout = tableSchema.extendSchema((prev) => (ctx) => {
+  const base = prev(ctx);   // Milkdown's own runners (preset-gfm), carrying the layout in and out
+  return { ...base, attrs: { ...base.attrs, aligned: { default: null }, padded: { default: null }, delimiter: { default: null }, widths: { default: null } },
+    parseMarkdown: { match: base.parseMarkdown.match, runner: (state, node, type) => state.openNode(type, { aligned: node.aligned, padded: node.padded, delimiter: node.delimiter, widths: node.widths })
+      .next(node.children.map((row, i) => ({ ...row, align: node.align, isHeader: i === 0 }))).closeNode() },
+    toMarkdown: { match: base.toMarkdown.match, runner: (state, node) => state.openNode('table', undefined, {
+      align: node.firstChild.content.content.map((cell) => cell.attrs.alignment), ...node.attrs }).next(node.content).closeNode() } };
+});
+// An empty cell is written empty: Milkdown writes an empty paragraph that is not the document's last block as `<br />`.
+const emptyCellStaysEmpty = (schema) => schema.extendSchema((prev) => (ctx) => {
+  const base = prev(ctx), runner = (state, node) => (node.childCount === 1 && !node.firstChild.content.size
+    ? state.openNode('tableCell').closeNode() : base.toMarkdown.runner(state, node));
+  return { ...base, toMarkdown: { match: base.toMarkdown.match, runner } };
+});
+export const tableFidelity = [tableLayout, keepTableLayout, emptyCellStaysEmpty(tableCellSchema), emptyCellStaysEmpty(tableHeaderSchema)].flat();
+
+/** remark-gfm's table handler in the table's layout (a new table's from its longest cell), its delimiter row as read while that fits. */
+function tableByLayout(node, parent, state, info) {
+  const aligned = node.aligned ?? !node.children.some((row) => row.children.some((cell) => state.handlers.tableCell(cell, row, state, info).length > NEW_TABLE_CELL_MAX));
+  // An aligned table gets a last row of placeholder cells, one per column at its least width, dropped from the output.
+  const widths = node.widths?.length === node.align.length ? node.widths : node.align.map(() => 3);
+  const least = { type: 'tableRow', children: widths.map((width) => ({ type: 'tableCell', children: [{ type: 'text', value: 'x'.repeat(width) }] })) };
+  const out = gfmTableToMarkdown({ tablePipeAlign: aligned, tableCellPadding: node.padded === false ? false : undefined })
+    .handlers.table(aligned ? { ...node, children: [...node.children, least] } : node, parent, state, info);
+  const [head, delimiterRow, ...body] = out.split('\n'), shape = (row) => threeDashes(row).replaceAll(' ', '');
+  if (aligned) body.pop();
+  const kept = node.delimiter != null && shape(node.delimiter) === shape(delimiterRow) && (!aligned || pipesAt(node.delimiter) === pipesAt(head));
+  return [head, kept ? node.delimiter : aligned ? delimiterRow : threeDashes(delimiterRow), ...body].join('\n');
+}
+
 /** Milkdown config: install the options and handlers above. */
 export function conventions(ctx) {
   ctx.update(remarkStringifyOptionsCtx, (prev) => ({
@@ -254,6 +312,7 @@ export function conventions(ctx) {
       text: intrawordUnderscores(prev.handlers.text || defaultHandlers.text),
       emphasis: encodedAttention('emphasis'),
       strong: encodedAttention('strong'),
+      table: tableByLayout,
     },
   }));
 }

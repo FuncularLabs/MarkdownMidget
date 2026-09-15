@@ -26,6 +26,7 @@ changes between alpha tags.
 - **Right on File ▸ Open Recent or View ▸ Theme opens it at its first entry**, and Left comes back; it used to jump to the next menu.
 - **A paragraph after a nested list keeps its blank line when saved from the formatted view**, inside a quote too, so it no longer joins the list's last item when the file is opened again (#11).
 - **YAML front matter survives a save from the formatted view**: a `---` block at the top of a file is saved byte for byte and shows as a grey code block with its `---` lines; it used to become a rule and a heading.
+- **Saving from the formatted view keeps each table's layout**: a table with its columns lined up stays lined up at the column widths it was written with, one written without padding stays unpadded, the delimiter row (`---`, `|:--|`, …) is kept as written, and a new table is lined up unless a cell is longer than 80 characters. A file with long table cells no longer grows several times over, and an empty cell is no longer saved as `<br />`.
 
 ## [1.0.0-beta1] - 2026-09-13
 

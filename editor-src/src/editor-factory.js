@@ -24,7 +24,7 @@ import { mermaidBlock } from './mermaid.js';
 import { spellDecorate } from './spell-decorate.js';
 import { htmlRender } from './html-render.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
-import { conventions, tightBulletList, tightListItem } from './conventions.js';
+import { conventions, tightBulletList, tightListItem, tableFidelity } from './conventions.js';
 import { refusedPictureSize } from './picture-paste.js';
 import { lineCapture, lineMap } from './line-map.js';
 import { anchorLinks } from './anchor-links.js';
@@ -281,6 +281,7 @@ export function createEditor({
     .use(tightBulletList)   // after the presets: the schema keeps the last definition of a node
     .use(tightListItem)
     .use(frontMatter)       // after the presets too: a block made to fill a gap is the schema's first, and must stay a paragraph
+    .use(tableFidelity)     // after the presets too: tables keep their layout, empty cells stay empty
     .use(remarkImageSize)
     .use(resizableImage)
     .use(htmlRender)

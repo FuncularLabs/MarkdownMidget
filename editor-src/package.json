@@ -15,6 +15,7 @@
     "@milkdown/plugin-prism": "^7.21.2",
     "@milkdown/theme-nord": "^7.21.2",
     "dompurify": "^3.4.12",
+    "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-to-markdown": "^2.1.2",
     "mermaid": "^11.16.0",
     "remark-frontmatter": "5.0.0"
