@@ -366,8 +366,9 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Change:** Fixed: front matter · **Documents:** `front-matter.md`, `front-matter-blank-lines.md`, `%TEMP%\mdm-test-docs\front-matter-bom-crlf.md` (generated, see 1.2), `front-matter-at-eof.md` · **Settings:** formatted view
 1. Open each document, choose **File ▸ Save As…** and save under a new name. Compare with `fc.exe /b`.
 2. In `front-matter.md`, change `draft: true` to `draft: false` and save. Compare with the original.
-- **Expected:** In step 1, the files are identical, except `front-matter-at-eof.md`, which gains only a final newline. The byte-order mark and CRLF endings are kept. In step 2, only the `draft:` line differs.
-- **Type:** Both. Automated: the fixture round-trip check (byte-identical for the first three on master a4577ae) and `front-matter.test.mjs` "front matter opens as no edit and saves byte for byte …". Human: the host's save, byte-order mark and line endings.
+3. In `front-matter-at-eof.md`, add `, edited` to the end of the `title:` line. Save under a new name and compare. Reopen that file and save it again.
+- **Expected:** In step 1, every file is identical, `front-matter-at-eof.md` included. The byte-order mark and CRLF endings are kept. In step 2, only the `draft:` line differs. In step 3, the `title:` line differs and the file gains a final newline. The second save changes nothing.
+- **Type:** Both. Automated: the fixture round-trip check (byte-identical for all four on master 437ccc9) and `front-matter.test.mjs` "front matter opens as no edit and saves byte for byte …". Human: the host's save, byte-order mark and line endings.
 
 #### FM-03 Enter after the closing `---` still saves as front matter
 - **Change:** Fixed: front matter · **Documents:** `front-matter.md` · **Settings:** formatted view
@@ -392,7 +393,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 #### TBL-01 A no-edit save keeps each table's layout
 - **Change:** Fixed: "Saving from the formatted view keeps each table's layout" · **Documents:** `tables.md` · **Settings:** formatted view
 1. Open the document and save it under a new name with **File ▸ Save As…**. Compare with `fc.exe /b`.
-- **Expected:** Only these sections differ: **Empty cells written by earlier versions** (TBL-03), **Aligned, a centred column written left-justified** (TBL-06), **No outer pipes** and **CJK** (TBL-07). The aligned, unaligned, unpadded, Prettier, empty-cell, narrow-column, escaped-pipe and long-cell tables are identical.
+- **Expected:** The file is identical, every table included. Tables change only after they're edited: TBL-02, TBL-03, TBL-06 and TBL-07 cover what an edit changes.
 - **Type:** Both. Automated: `table-fidelity.test.mjs` "…: byte-identical; edited, saved, reopened and saved again" (aligned, unaligned, GitHub styles, empty cells, Prettier …) and the fixture round-trip check. Human: one save through the app.
 
 #### TBL-02 Editing a cell changes only that row, unless the column widens
@@ -402,9 +403,11 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** In step 1, only the `apple` row differs. In step 2, that column widens in every row of that table only, and the delimiter row widens to match.
 - **Type:** Both. Automated: `table-fidelity.test.mjs` "aligned, a cell grows" and "Prettier, a cell grows past its width". Human: editing in the real view.
 
-#### TBL-03 Old `| <br /> |` cells open and save empty
+#### TBL-03 Old `| <br /> |` cells now open empty, and save as `| |` once their table is edited
 - **Change:** Fixed: "an empty cell is no longer saved as `<br />`" · **Documents:** `tables.md` · **Settings:** formatted view
-- **Expected:** In **Empty cells written by earlier versions**, the `<br />` cells show empty and save as `| |`. A second save changes nothing.
+1. Open the document and save it under a new name with no edit.
+2. In **Empty cells written by earlier versions**, change `h2` to `h2X`. Save, then reopen the saved file and save it again.
+- **Expected:** In **Empty cells written by earlier versions**, the `<br />` cells show empty. In step 1, the file is identical. In step 2, only that table's header row and its two `<br />` rows change, to `| | text |` and `| text | |`. The second save changes nothing.
 - **Type:** Automated (Claude). `roundtrip.test.mjs` InlineBreakSurvives "a cell holding only a break loads as an empty cell", and the fixture round-trip check.
 
 #### TBL-04 A new table saves aligned, with columns at least 3 wide
@@ -419,15 +422,19 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** A no-edit save is the same size as the file, and identical to it.
 - **Type:** Automated (Claude). `table-fidelity.test.mjs` "wide-cell repro: the save is the size of the file …", and the fixture round-trip check on `large-600kb.md` (identical on master a4577ae).
 
-#### TBL-06 A centred column written left-justified
+#### TBL-06 A centred column written left-justified now keeps its layout until the table is edited
 - **Change:** Fixed: tables ("stays lined up at the column widths it was written with") · **Documents:** `tables.md` · **Settings:** none
-- **Expected:** The **Aligned, a centred column written left-justified** table saves unchanged. On master a4577ae, the fixture round-trip check re-centres its cells (`| Note   |` becomes `|  Note  |`), and a second save is stable. Record FAIL with a note until this is fixed or accepted as a known limit. It is listed as a candidate in section 5.
-- **Type:** Automated (Claude). Fixture round-trip check.
+1. Save the document with no edit.
+2. In **Aligned, a centred column written left-justified**, change `red` to `pink`. Save, then reopen and save again.
+- **Expected:** In step 1, the table is identical. In step 2, the `Note` header and the edited row are re-centred: `| Note   |` becomes `|  Note  |`, and the cell saves as `|  pink  |`. The `fig` row is identical, and the second save changes nothing. Section 5 lists this re-centring as a candidate limitation.
+- **Type:** Automated (Claude). Fixture round-trip check, with and without the edit.
 
-#### TBL-07 Known one-time changes are stable
+#### TBL-07 Outer pipes and CJK tidying now happen only after an edit, and are stable
 - **Change:** Fixed: tables · **Documents:** `tables.md` · **Settings:** none
-- **Expected:** The **No outer pipes** table gains outer pipes (`|a|b|`), and the **CJK** table is tidied (`| 3  |` becomes `| 3 |`). A second save changes nothing more.
-- **Type:** Automated (Claude). Fixture round-trip check, second pass.
+1. Save the document with no edit.
+2. In **No outer pipes**, change `2` to `3`. In **CJK**, change `3` to `4`. Save, then reopen and save again.
+- **Expected:** In step 1, both tables are identical. In step 2, **No outer pipes** gains outer pipes (`|a|b|`, `|---|---|`, `|1|3|`), and the edited **CJK** row loses its extra padding (`| 3  |` becomes `| 4 |`). The second save changes nothing.
+- **Type:** Automated (Claude). Fixture round-trip check, with the edits and a second pass.
 
 ### BR — Inline line breaks
 
@@ -923,14 +930,14 @@ Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.cl
 - An inline raw-HTML `<a>` isn't clickable and has no Copy Link (`links.md` case 66).
 - Copy Link and Ctrl+click aren't available in the Markdown source view.
 - Email (`mailto:`) and file links never open. Copy them instead.
-- A table with no outer pipes gains them on its first save from the formatted view.
-- A CJK table is tidied once on its first save.
-- A table whose pipes don't line up byte for byte (for example because a tool counted `\|` as one character) is saved unaligned on its first save; one that lines up byte for byte, as in `tables.md`, keeps its padding.
+- A table with no outer pipes gains them once that table is edited in the formatted view.
+- A CJK table is tidied once that table is edited.
+- A table whose pipes don't line up byte for byte (for example because a tool counted `\|` as one character) is saved unaligned once that table is edited; one that lines up byte for byte, as in `tables.md`, keeps its padding.
 - A repeated word that straddles two spell-check chunks (about 16 KB each) isn't flagged.
 - A list directly after another list, whose item starts with a rule (`- a` then `+ ***`), saves as `* ***`, which reads as a rule.
 - A list item that starts with a block (a quote, fence or table) has no margin line number.
-- A file that ends at front matter's closing `---` gains a final newline on save.
+- A file that ends at front matter's closing `---` gains a final newline once its front matter is edited.
 - Formatted → Source has no busy box. It measured 50–600 ms.
 - The opening card can't draw over the formatted view, so there its phases go to the status bar.
-- Candidate, not yet decided: a centred table column written left-justified has its cells re-centred on the first save from the formatted view. TBL-06 is expected to FAIL until this is fixed or accepted here.
-- Until source preservation ships, a save through the formatted view writes the whole file in Markdown Midget's conventions (Help, *Known limits*).
+- Candidate, not yet decided: a centred table column written left-justified has its cells re-centred once that table is edited in the formatted view. TBL-06 step 2 checks this behaviour.
+- A save through the formatted view writes only the top-level blocks you edited in Markdown Midget's conventions, apart from the cases listed in Help, *Markdown conventions*.
