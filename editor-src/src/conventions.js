@@ -1,7 +1,7 @@
 // The serialiser's conventions (release plan 0.12, R2).
 //
-// A document that passes through the formatted view is saved in these forms,
-// whatever it was written in. Each one is pinned by a case in
+// The blocks an edit in the formatted view changed are saved in these forms,
+// whatever they were written in; source-keep.js keeps the rest as read. Each one is pinned by a case in
 // test/roundtrip.test.mjs (ConventionsArePinned); change a line here and that
 // case goes red, which is the point of it.
 //

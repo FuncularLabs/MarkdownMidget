@@ -3,7 +3,7 @@
 // pulls markdown with getMarkdown() and pushes it with setMarkdown(). The
 // WordPad-style toolbar in the WPF shell drives formatting through cmd().
 
-import { editorViewCtx, serializerCtx } from '@milkdown/kit/core';
+import { editorViewCtx, serializerCtx, parserCtx } from '@milkdown/kit/core';
 import { undo, redo } from '@milkdown/kit/prose/history';
 import { callCommand, replaceAll, getMarkdown, insert } from '@milkdown/kit/utils';
 import { insertTableAction, runTableCommand, focusTableCell } from './tables.js';
@@ -71,6 +71,7 @@ let editor = null;
 let editorView = null;
 let suppressChange = false;
 const serialize = (doc) => editor.action(doc ? (ctx) => ctx.get(serializerCtx)(doc) : getMarkdown());   // the live document's, or `doc`'s
+const parse = (markdown) => editor.action((ctx) => ctx.get(parserCtx)(markdown));   // what markdown opens as: a save's check on the blocks it kept (source-keep.js)
 
 // Returns whether the message actually went. Almost every caller ignores that —
 // a 'change' or 'contextmenu' the host missed is not worth a second thought — but
@@ -522,7 +523,7 @@ const MDM = {
   getMarkdown(settledOnly) {
     if (!editor) return '';
     const t0 = performance.now();
-    const { markdown, rebuilt } = (settledOnly ? settledMarkdown : markdownWithLines)(editorView.state.doc, serialize);
+    const { markdown, rebuilt } = (settledOnly ? settledMarkdown : markdownWithLines)(editorView.state.doc, serialize, parse);   // Save, Save As, backups, Ctrl+E
     if (rebuilt) postSelectionState(editorView.state);   // the status bar's line catches up (#10)
     note(rebuilt ? 'getMarkdown.rebuilt' : 'getMarkdown', t0);
     return markdown;
@@ -532,9 +533,9 @@ const MDM = {
   timing(on) { timings = on ? [] : null; },   // the host's MDM_TIMING=1 (TimingLog.cs)
 
   // Go to Line (#10): the host asks how many lines there are, then goes to one.
-  lineCount() { return (editorView && ensureLines(editorView.state.doc, serialize)?.lines) || 0; },
+  lineCount() { return (editorView && ensureLines(editorView.state.doc, serialize, parse)?.lines) || 0; },
   goToLine(n) {
-    if (!editorView || !ensureLines(editorView.state.doc, serialize)) return false;
+    if (!editorView || !ensureLines(editorView.state.doc, serialize, parse)) return false;
     const { state } = editorView;
     editorView.dispatch(state.tr.setSelection(Selection.near(state.doc.resolve(lineTarget(state.doc, n)))).scrollIntoView());
     pinLine(editorView.state, n); postSelectionState(editorView.state);   // a blank line, a fence or a rule reads as the line asked for

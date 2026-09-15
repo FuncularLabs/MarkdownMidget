@@ -4,7 +4,8 @@
 // An untouched document is numbered by the text it was loaded from (the file on open,
 // the source box's text after Ctrl+E), read from Milkdown's own parse (lineCapture).
 // Once edited, or saved (forgetLoad), it is numbered by the markdown the editor would
-// save, read from the serialiser's own line tracking (recordingRoot, in conventions.js).
+// save: the serialiser's own line tracking (recordingRoot, in conventions.js) for the blocks it writes, and the
+// baseline's lines for the blocks kept as read (source-keep.js), each moved to the line it lands on.
 // Either list of blocks is paired in order with the ProseMirror blocks, and a list that
 // does not pair numbers nothing rather than something wrong. Between rebuilds lineMap
 // keeps the positions on their blocks, so the column and the line inside a block stay
@@ -17,6 +18,7 @@ import { $prose, $remark } from '@milkdown/kit/utils';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
 import { ReplaceStep, AddMarkStep, RemoveMarkStep } from '@milkdown/kit/prose/transform';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
+import { baseFrom, render } from './source-keep.js';
 
 // The mdast blocks that hold blocks, and the ProseMirror block each mdast block becomes.
 const CONTAINERS = new Set(['root', 'blockquote', 'list', 'listItem', 'footnoteDefinition']);
@@ -37,6 +39,10 @@ let gutterView = null;  // the view they are drawn in
 let drawn = {};         // the margin last built: { doc, current, staleFrom } it was built from, and its set
 let pin = null;         // Go to Line's line for a caret on a line with no place of its own: { doc, head, line } (pinLine)
 let settled = null;     // the document the last load installed (settledMarkdown)
+let tops = null;        // while recording: each top-level block's markdown, in order (source-keep.js)
+let defs = null;        // the load's link definitions at top level, and whether its parse found a definition inside a block
+let baseline = null;    // the text blocks are kept from (source-keep.js): the load's, then each save's
+let out = null;         // the last markdown read, with where its blocks lie: the next save's baseline (forgetLoad)
 
 const linesIn = (text) => text.split(/\r\n|\r|\n/).length;
 const chars = (s) => (/^[\x00-\x7f]*$/.test(s) ? s.length : [...segmenter.segment(s)].length);
@@ -51,8 +57,10 @@ export const recordingRoot = (base) => (node, parent, state, info) => {
   for (const [type, handle] of Object.entries(handlers)) {
     if (type === 'root' || typeof handle !== 'function') continue;
     const wrapped = (n, p, s, i) => {
-      if (p && CONTAINERS.has(p.type)) recording.push({ type: n.type, line: i.now.line, skip: n.type === 'code' ? 1 : 0 });
-      return handle(n, p, s, i);
+      if (p && CONTAINERS.has(p.type)) recording.push({ type: n.type, line: i.now.line, skip: n.type === 'code' ? 1 : 0, top: p === node });
+      const md = handle(n, p, s, i);
+      if (p === node) tops.push(md);
+      return md;
     };
     wrapped.peek = handle.peek;
     state.handlers[type] = wrapped;
@@ -61,15 +69,19 @@ export const recordingRoot = (base) => (node, parent, state, info) => {
 };
 
 /** Milkdown's parse of a document being loaded: each block with the line it starts on. */
-export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
+export const lineCapture = $remark('mdmLineCapture', () => () => (tree, file) => {
   if (!capturing) return;
   captured = [];
+  defs = { list: [], nested: false };
   const walk = (node) => {
     for (const c of node.children || []) {
-      if (!BLOCK[c.type]) continue;   // a link definition, say: no block of its own
       const { start, end } = c.position || {};
+      if (c.type === 'definition' || c.type === 'footnoteDefinition') {
+        if (node !== tree || !start) defs.nested = true; else if (c.type === 'definition') defs.list.push(String(file).slice(start.offset, end.offset));
+      }
+      if (!BLOCK[c.type]) continue;   // a link definition, say: no block of its own
       const fenced = c.type === 'code' && start && end.line - start.line + 1 > c.value.split('\n').length;
-      captured.push({ type: c.type, line: start?.line, skip: fenced ? 1 : 0 });
+      captured.push({ type: c.type, line: start?.line, skip: fenced ? 1 : 0, top: node === tree, from: start?.offset, to: end?.offset });
       if (CONTAINERS.has(c.type)) walk(c);
     }
   };
@@ -79,7 +91,11 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
 export function beginLoad() { capturing = true; captured = null; }
 
 /** The document is installed: number it by the text it was loaded from. */
-export function endLoad(doc, text) { settled = doc; capturing = false; staleFrom = null; pin = null; current = pair(doc, captured, linesIn(text)); if (gutter) redraw(); }
+export function endLoad(doc, text) {
+  settled = doc; capturing = false; staleFrom = null; pin = null; out = null; current = pair(doc, captured, linesIn(text));
+  baseline = current && baseFrom(doc, text, captured, defs.list, defs.nested);
+  if (gutter) redraw();
+}
 
 /** View ▸ Line Numbers: show or hide the numbers in the margin. The setting it already has redraws nothing. */
 export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on; redraw(); }
@@ -87,8 +103,8 @@ export function showLineNumbers(on) { if (gutter === !!on) return; gutter = !!on
 // The margin follows a new numbering at once: a transaction with no steps is no edit, no history and no change for the host.
 const redraw = () => gutterView?.dispatch(gutterView.state.tr);
 
-/** A save has made the file the saved markdown: number by that from the next read (MDM.lineBaseSaved). */
-export function forgetLoad() { current = null; pin = null; }
+/** A save has made the file the saved markdown, the last read: number by that from the next read, and keep blocks from it (MDM.lineBaseSaved). */
+export function forgetLoad() { if (out) baseline = out.tops ? out : null; current = null; pin = null; }
 
 function pair(doc, records, lines) {
   if (!records) return null;
@@ -110,22 +126,27 @@ const sameNumbers = (a, b) => a === b || (!!a && !!b && a.lines === b.lines && a
 
 /** The markdown the editor would save, rebuilding the numbering from it when the document has changed since; the margin is
  *  redrawn only when that changed what it shows: blocks that were waiting for their numbers (staleFrom), or other numbers. */
-export function markdownWithLines(doc, serialize) {
-  if (current?.doc === doc) return { markdown: serialize(), rebuilt: false };
-  recording = [];
-  try {
-    const markdown = serialize(), before = current, waiting = staleFrom !== null;
-    current = pair(doc, recording, linesIn(markdown)); staleFrom = null;
-    if (gutter && (waiting || !sameNumbers(before, current))) redraw();
-    return { markdown, rebuilt: true };
-  } finally {
-    recording = null;
-  }
+/** `parse` (markdown to a document) keeps the blocks an edit left alone as their baseline text (source-keep.js); without it the document is serialised whole. */
+export function markdownWithLines(doc, serialize, parse) {
+  if (current?.doc === doc && out?.doc === doc) return { markdown: out.markdown, rebuilt: false };
+  const before = current, waiting = staleFrom !== null;
+  out = render(doc, recorded(serialize), parse && baseline, parse);
+  if (current?.doc === doc) return { markdown: out.markdown, rebuilt: false };
+  current = pair(doc, out.recs, linesIn(out.markdown)); staleFrom = null;
+  if (gutter && (waiting || !sameNumbers(before, current))) redraw();
+  return { markdown: out.markdown, rebuilt: true };
 }
+
+// The serialiser's markdown of `doc` (the live document's without), with the blocks' lines and each top-level block's markdown.
+const recorded = (serialize, doc) => () => {
+  recording = []; tops = [];
+  try { return { markdown: serialize(doc), recs: recording, tops }; } finally { recording = tops = null; }
+};
 
 /** The markdown of the document the last load installed (MDM.getSettledMarkdown, the host's clean baseline, read after the first paint):
  *  while untouched, the read above; once edited, that document's own markdown, leaving the live numbering to the next read. */
-export const settledMarkdown = (doc, serialize) => (settled && settled !== doc ? { markdown: serialize(settled), rebuilt: false } : markdownWithLines(doc, serialize));
+export const settledMarkdown = (doc, serialize, parse) => (settled && settled !== doc
+  ? { markdown: render(settled, recorded(serialize, settled), parse && baseline, parse).markdown, rebuilt: false } : markdownWithLines(doc, serialize, parse));
 
 /** Whether `doc` differs, node for node, from the document the last load installed (MDM.changedSinceLoad, the host's dirty check): a selection,
  *  a decoration or a transaction with no steps makes no new document, and an edit undone makes an equal one. Nodes an edit left alone are shared,
@@ -133,8 +154,8 @@ export const settledMarkdown = (doc, serialize) => (settled && settled !== doc ?
 export const changedSinceLoad = (doc) => settled !== doc && !settled?.eq(doc);
 
 /** The numbering for `doc`, rebuilt first when it is stale (Go to Line), or null. */
-export function ensureLines(doc, serialize) {
-  if (current?.doc !== doc) markdownWithLines(doc, serialize);
+export function ensureLines(doc, serialize, parse) {
+  if (current?.doc !== doc) markdownWithLines(doc, serialize, parse);
   return current;
 }
 
