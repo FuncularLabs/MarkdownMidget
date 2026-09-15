@@ -96,6 +96,11 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
       if (!BLOCK[c.type]) continue;   // a link definition, say: no block of its own
       const fenced = c.type === 'code' && start && end.line - start.line + 1 > c.value.split('\n').length;
       captured.push({ type: c.type, line: start?.line, skip: fenced ? 1 : 0, top: node === tree, from: start?.offset, to: end?.offset });
+      // The schema fills in an empty paragraph, no block of the text's, first in an item that opens with none (list_item is `paragraph block*`) and in
+      // an empty quote or footnote (`block+`): on the line of what follows it, or its own.
+      const first = c.children?.[0];
+      if (c.type === 'listItem' ? first?.type !== 'paragraph' : !first && (c.type === 'blockquote' || c.type === 'footnoteDefinition'))
+        captured.push({ type: 'paragraph', line: first?.position?.start.line ?? start?.line, skip: 0, top: false });
       if (CONTAINERS.has(c.type)) walk(c);
     }
   };

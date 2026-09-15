@@ -11,7 +11,7 @@ import { joinBackward } from '@milkdown/kit/prose/commands';
 import { undo } from '@milkdown/kit/prose/history';
 import { mountEditor } from './jsdom-editor.mjs';
 import { settleDocument } from '../src/settle.js';
-import { beginLoad, endLoad, forgetLoad, markdownWithLines, settledMarkdown, ensureLines, lineStatus, lineTarget, pinLine } from '../src/line-map.js';
+import { beginLoad, endLoad, forgetLoad, markdownWithLines, settledMarkdown, changedSinceLoad, ensureLines, lineStatus, lineTarget, pinLine } from '../src/line-map.js';
 
 let ed;
 before(async () => { ed = await mountEditor(); });
@@ -210,6 +210,39 @@ for (const [name, md, act] of TYPED_LABELS) {
     const want = hrefs(doc());
     assert.deepEqual(hrefs(load(save())), want);
   });
+}
+
+// A list item that opens with a block reads with an empty paragraph before it (list_item is `paragraph block*`), and a document ending in a list,
+// a table, a fence or a quote with one after it (settle.js): neither is the text's. The last paragraph of LEADS is one the serialiser rewrites.
+const LEADS = '- > quoted\n\n1. - nested\n\n> - # heading\n\nPlain words\n\nA * b _ c\n\n';
+const ENDINGS = [   // [ending, whether the editor reads an empty paragraph after it]
+  ['a task list', '- [ ] a\n- [x] b\n', true], ['a list', '- a\n- b\n', true], ['a table', '| a | b |\n| - | - |\n| 1 | 2 |\n', true],
+  ['a code fence', '```js\nx\n```\n', true], ['a blockquote', '> q\n', true], ['a heading', '# H\n', false], ['an HTML block', '<div>\nhi\n</div>\n', false],
+];
+for (const [name, end, trailing] of ENDINGS) {
+  test(`a document ending in ${name}, with list items that open with a block, opens clean, saves unchanged and keeps its ending through edits`, () => {
+    const md = LEADS + end;
+    load(md);
+    assert.equal(changedSinceLoad(doc()), false, 'opens clean');
+    assert.equal(save(), md, 'saved untouched');
+    assert.deepEqual([doc().lastChild.type.name === 'paragraph' && !doc().lastChild.content.size, sweep()], [trailing, []]);
+    load(md);
+    typeAt('Plain');
+    assert.equal(save(), md.replace('Plain', 'XPlain'), 'an edit elsewhere');
+    if (!trailing) return;
+    load(md);   // an edit inside the last block: the serialiser's, ended as it ends a text, with no blank line for the paragraph read after it
+    run(v().state.tr.insertText('Z', Selection.near(doc().resolve(doc().content.size - 3), -1).from));
+    const edited = save();
+    assert.ok(edited.startsWith(LEADS) && edited.includes('Z') && /[^\n]\n$/.test(edited), `an edit inside the last block: ${JSON.stringify(edited)}`);
+    load(md);
+    run(v().state.tr.insertText('Typed', doc().content.size - 1));
+    assert.equal(changedSinceLoad(doc()), true, 'typed into the trailing paragraph');
+    assert.equal(save(), `${md}\nTyped\n`, 'the typed text saved');
+  });
+}
+
+for (const md of ['- a\n\n+ ***\n\nAfter the lists.\n', '- a\n\n+ ***\n', '- a\n-\n\nText after an empty item\n', 'Text\n\n>\n\nText after an empty quote\n', 'A note[^1].\n\n[^1]:\n\nText after an empty footnote\n']) {
+  test(`${JSON.stringify(md)}, with an item that opens with no paragraph, opens clean and saves unchanged`, () => { load(md); assert.deepEqual([changedSinceLoad(doc()), save()], [false, md]); });
 }
 
 test('save, edit, save, edit, save: each save changes only the block edited since the last', () => {

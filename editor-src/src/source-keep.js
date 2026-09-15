@@ -87,9 +87,11 @@ export function render(doc, serialize, base, parse) {
       const b = k < 0 ? -1 : where.has(k) ? where.get(k) : next < m ? where.get(next) - 1 : n - 1;
       extra.set(b, extra.has(b) ? `${extra.get(b)}\n${text}` : text);
     }
+    // An empty paragraph last (settle.js) writes nothing, so the join before it, where it is the serialiser's, ends the text as the serialiser ends one.
+    const end = n > 1 && doc.child(n - 1).type.name === 'paragraph' && !doc.child(n - 1).content.size ? n - 2 : n - 1;
     const sepText = (b) => {
-      const s = verbatim(b) ? bsep(b < 0 ? -1 : src[b]) : ssep(b), x = extra.get(b);
-      return !x ? s : b === n - 1 ? `${s.replace(/\n*$/, '\n\n')}${x}\n` : `${s}${x}\n\n`;
+      const s = verbatim(b) ? bsep(b < 0 ? -1 : src[b]) : b === end && end < n - 1 ? ssep(b).replace(/\n+$/, '\n') : ssep(b), x = extra.get(b);
+      return !x ? s : b >= end ? `${s.replace(/\n*$/, '\n\n')}${x}\n` : `${s}${x}\n\n`;
     };
     if (keep[0] && doc.child(0).type.name !== 'front_matter' && FENCE.test(sepText(-1) + texts[0])) { keep[0] = false; tries--; continue; }
     const notes = [];
