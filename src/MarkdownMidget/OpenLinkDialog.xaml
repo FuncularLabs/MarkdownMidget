@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ShowInTaskbar="False" Icon="/Assets/midget-256.png">
     <StackPanel Margin="18">
-        <TextBlock Text="Open this link in your browser or email app?" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <TextBlock Text="Open this link in your browser?" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
         <!-- The whole address, never cut (LinkOpening.MaxLength caps it); a long one scrolls. -->
         <TextBox x:Name="UrlText" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" Padding="3"
                  MaxHeight="180" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16" />
