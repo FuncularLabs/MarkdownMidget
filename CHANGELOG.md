@@ -17,6 +17,7 @@ testing before the stable release of the same number.
 ### Changed
 
 - **The formatted view and Markdown source buttons now sit in one faint box**, with a thin line between them, so it's clear you pick one or the other. The buttons and icons are the same size as before.
+- **Toolbar buttons now explain themselves when greyed out**: a disabled button still shows its tooltip, which says when it's available, such as *Word wrap (source view only)* or *Bold (Ctrl+B) — editable documents only*.
 
 ## [1.0.0-rc1] - 2026-09-15
 

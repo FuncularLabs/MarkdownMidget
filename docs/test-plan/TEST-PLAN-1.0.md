@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -181,6 +181,14 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 3. Press Ctrl+W. At "No document open", press Ctrl+F, close the dialog, then press Ctrl+H.
 - **Expected:** In steps 1 and 2 the cursor is in **Find what**, **Replace** and **Replace All** are greyed with the tooltip "The document is read-only.", and the document doesn't change. In step 3 Ctrl+H does exactly what Ctrl+F does.
 - **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`. Human: the dialog, the menu and the keypress.
+
+### TIP — Toolbar tooltips
+
+#### TIP-01 A greyed-out toolbar button shows a tooltip that says when it's available
+- **Change:** Changed: "Toolbar buttons now explain themselves when greyed out" · **Documents:** `br-forms.md` · **Settings:** formatted view
+1. Hover over every toolbar button and the Style box: in the formatted view, in the source view (Ctrl+E), with no document open (Ctrl+W), and in Help (F1).
+- **Expected:** Each one shows its tooltip, greyed out or not, with its shortcut where it had one. A greyed-out one says when it's available: **Word wrap (source view only)**, "editable documents only" on Save and the formatting controls, and Undo and Redo say when there is something to undo or redo. The tooltips look as before.
+- **Type:** Human. WPF tooltips on disabled controls have no test.
 
 ### ANC — Heading links
 
@@ -1142,6 +1150,7 @@ Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.cl
 | FND-02 | | | |
 | FND-03 | | | |
 | VIEW-03 | | | |
+| TIP-01 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

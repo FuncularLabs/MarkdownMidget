@@ -20,6 +20,8 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="IsTabStop" Value="False" />
+            <!-- Greyed out, a button still shows its tooltip, which says when it is available. -->
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
             <Style.Triggers>
                 <!-- WPF's default disabled look for glyph text barely dims; a user
                      reading the toolbar could not tell Undo from Redo (dogfooding,
@@ -37,6 +39,7 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.35" />
@@ -267,11 +270,11 @@
                     <ToolBar Band="0" BandIndex="0">
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="New (Ctrl+N)" Click="New_Click" Content="&#xE7C3;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Open (Ctrl+O)" Click="Open_Click" Content="&#xED25;" />
-                        <Button x:Name="SaveBtn" Style="{StaticResource ToolGlyph}" ToolTip="Save (Ctrl+S)" Click="Save_Click" Content="&#xE74E;" />
+                        <Button x:Name="SaveBtn" Style="{StaticResource ToolGlyph}" ToolTip="Save (Ctrl+S) — editable documents only; Save As works on a read-only one" Click="Save_Click" Content="&#xE74E;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Save As… (Ctrl+Shift+S)" Click="SaveAs_Click" Content="&#xEA35;" />
                         <Separator />
-                        <Button x:Name="UndoBtn" Style="{StaticResource ToolGlyph}" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click" Content="&#xE7A7;" />
-                        <Button x:Name="RedoBtn" Style="{StaticResource ToolGlyph}" ToolTip="Redo (Ctrl+Y)" Click="Redo_Click" Content="&#xE7A6;" />
+                        <Button x:Name="UndoBtn" Style="{StaticResource ToolGlyph}" ToolTip="Undo (Ctrl+Z) — when there's an edit to undo in an editable document" Click="Undo_Click" Content="&#xE7A7;" />
+                        <Button x:Name="RedoBtn" Style="{StaticResource ToolGlyph}" ToolTip="Redo (Ctrl+Y) — after an undo, in an editable document" Click="Redo_Click" Content="&#xE7A6;" />
                     </ToolBar>
 
                     <!-- Formatting: disabled wholesale in read-only mode. -->
@@ -279,7 +282,7 @@
                         <!-- Paragraph style: replaces WordPad's font-size box ("Styles, not size"). -->
                         <TextBlock Text="Style:" VerticalAlignment="Center" Margin="4,0,4,0" />
                         <ComboBox x:Name="StyleCombo" Width="162" IsTabStop="False"
-                                  ToolTip="Block style (Ctrl+Shift+H)"
+                                  ToolTip="Block style (Ctrl+Shift+H) — editable documents only" ToolTipService.ShowOnDisabled="True"
                                   SelectionChanged="StyleCombo_Changed">
                             <ComboBoxItem Content="Paragraph" Tag="paragraph" IsSelected="True" />
                             <ComboBoxItem Content="H1 &#8212; Heading 1" Tag="h1" />
@@ -300,13 +303,13 @@
                              protocol) — the editor reports mark states and SyncMarkToggles
                              applies them, so a click's visual flip is confirmed or reverted
                              by the editor's answer rather than trusted. -->
-                        <ToggleButton x:Name="BoldToggle" Style="{StaticResource ToolGlyph}" ToolTip="Bold (Ctrl+B)" Click="Bold_Click" Content="&#xE8DD;" />
-                        <ToggleButton x:Name="ItalicToggle" Style="{StaticResource ToolGlyph}" ToolTip="Italic (Ctrl+I)" Click="Italic_Click" Content="&#xE8DB;" />
-                        <ToggleButton x:Name="UnderlineToggle" Style="{StaticResource ToolGlyph}" ToolTip="Underline (Ctrl+U)" Click="Underline_Click" Content="&#xE8DC;" />
-                        <ToggleButton x:Name="StrikeToggle" Style="{StaticResource ToolGlyph}" ToolTip="Strikethrough" Click="Strike_Click" Content="&#xEDE0;" />
+                        <ToggleButton x:Name="BoldToggle" Style="{StaticResource ToolGlyph}" ToolTip="Bold (Ctrl+B) — editable documents only" Click="Bold_Click" Content="&#xE8DD;" />
+                        <ToggleButton x:Name="ItalicToggle" Style="{StaticResource ToolGlyph}" ToolTip="Italic (Ctrl+I) — editable documents only" Click="Italic_Click" Content="&#xE8DB;" />
+                        <ToggleButton x:Name="UnderlineToggle" Style="{StaticResource ToolGlyph}" ToolTip="Underline (Ctrl+U) — editable documents only" Click="Underline_Click" Content="&#xE8DC;" />
+                        <ToggleButton x:Name="StrikeToggle" Style="{StaticResource ToolGlyph}" ToolTip="Strikethrough — editable documents only" Click="Strike_Click" Content="&#xEDE0;" />
                         <!-- Hybrid code button: main click = inline code, chevron = code block language. -->
-                        <ToggleButton x:Name="CodeToggle" Style="{StaticResource ToolChar}" ToolTip="Inline code" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Code block…" Click="CodeBlockMenu_Click"
+                        <ToggleButton x:Name="CodeToggle" Style="{StaticResource ToolChar}" ToolTip="Inline code — editable documents only" Click="Code_Click" FontFamily="Consolas" Content="&lt;/&gt;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Code block… — editable documents only" Click="CodeBlockMenu_Click"
                                 MinWidth="16" FontSize="10" Content="&#xE70D;">
                             <Button.ContextMenu>
                                 <ContextMenu>
@@ -321,17 +324,17 @@
                             </Button.ContextMenu>
                         </Button>
                         <Separator />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Bulleted list" Click="Bullet_Click" Content="&#xE8FD;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Numbered list" Click="Ordered_Click">
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Bulleted list — editable documents only" Click="Bullet_Click" Content="&#xE8FD;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Numbered list — editable documents only" Click="Ordered_Click">
                             <Image Source="/Assets/numbered-list-64.png" Width="16" Height="16"
                                    RenderOptions.BitmapScalingMode="HighQuality" />
                         </Button>
-                        <Button Style="{StaticResource ToolChar}" ToolTip="Block quote" Click="Quote_Click" FontSize="18" Content="&#x275D;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Horizontal rule" Click="Hr_Click" Content="&#xE738;" />
+                        <Button Style="{StaticResource ToolChar}" ToolTip="Block quote — editable documents only" Click="Quote_Click" FontSize="18" Content="&#x275D;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Horizontal rule — editable documents only" Click="Hr_Click" Content="&#xE738;" />
                         <Separator />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert link (Ctrl+K)" Click="Link_Click" Content="&#xE71B;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert picture" Click="Picture_Click" Content="&#xEB9F;" />
-                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert table" Click="InsertTable_Click" Content="&#xE80A;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert link (Ctrl+K) — editable documents only" Click="Link_Click" Content="&#xE71B;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert picture — editable documents only" Click="Picture_Click" Content="&#xEB9F;" />
+                        <Button Style="{StaticResource ToolGlyph}" ToolTip="Insert table — editable documents only" Click="InsertTable_Click" Content="&#xE80A;" />
                     </ToolBar>
 
                     <!-- View toggles: usable in read-only. -->
