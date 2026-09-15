@@ -740,7 +740,7 @@ For each build, copy the empty template below and paste it above the template. F
 - Email (`mailto:`) and file links never open. Copy them instead.
 - A table with no outer pipes gains them on its first save from the formatted view.
 - A CJK table is tidied once on its first save.
-- A table whose columns line up only if an escaped pipe `\|` counts as one character (as in `| a\|bQQQQc | d   |` over `| ---------- | --- |`, where that row's pipes sit one column left of the other rows') is read as unaligned and loses its padding on its first save. A table whose pipes line up byte for byte, as in `tables.md`, keeps it.
+- A table whose pipes don't line up byte for byte (for example because a tool counted `\|` as one character) is saved unaligned on its first save; one that lines up byte for byte, as in `tables.md`, keeps its padding.
 - A repeated word that straddles two spell-check chunks (about 16 KB each) isn't flagged.
 - A list directly after another list, whose item starts with a rule (`- a` then `+ ***`), saves as `* ***`, which reads as a rule.
 - A list item that starts with a block (a quote, fence or table) has no margin line number.
