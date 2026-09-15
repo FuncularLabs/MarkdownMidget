@@ -543,6 +543,10 @@ conventions, whatever style it was written in:
   lines after it. If a block ends up above it, or its text no longer runs from a
   `---` line to the next one, it is saved as a `yaml` code block, text intact.
 
+Saving from the formatted view keeps untouched text as written: these conventions
+apply only to the top-level blocks you changed (for a list item, its whole list),
+and a document saved with no edits is saved exactly as it was.
+
 What is converted: a reference-style link (`[text][ref]` plus its definition line)
 becomes an inline link and the definition line is dropped; a setext heading
 (underlined with `===` or `---`) becomes a `#` heading; an indented code block
@@ -555,8 +559,8 @@ view**. Open it while the source view is showing — with **File ▸ Open**,
 reload when it changes on disk — or press **Ctrl+E** before the formatted view
 has changed anything, and the source view shows the file as it is on disk, not
 this list's version of it, so what you save is what you typed. After the
-formatted view has changed the document, the source view shows the editor's text
-and these conventions are already in it.
+formatted view has changed the document, the source view shows the editor's text,
+with these conventions already in the blocks it changed.
 
 ## Files & windows
 

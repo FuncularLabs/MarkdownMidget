@@ -28,6 +28,7 @@ changes between alpha tags.
 
 ### Fixed
 
+- **Saving from the formatted view keeps the text you didn't change as you wrote it**: a document saved with no edits, backed up, or switched to the Markdown source view comes back byte for byte, and after an edit only the top-level blocks you changed (a paragraph, a heading, a table, or the whole list an item is in) are written in Markdown Midget's conventions. Everywhere else, escapes, `---` rules, blank lines, bare URLs, link definitions and a missing final newline stay as they were; they used to be rewritten throughout on every save.
 - **A markdown file dropped on the formatted view opens as the file itself**: Save writes to it, it isn't marked modified, and it goes on Open Recent. It used to open as an unsaved copy named like the file, so Save never updated the file you dropped.
 - **Right on File ▸ Open Recent or View ▸ Theme opens it at its first entry**, and Left comes back; it used to jump to the next menu.
 - **A paragraph after a nested list keeps its blank line when saved from the formatted view**, inside a quote too, so it no longer joins the list's last item when the file is opened again (#11).
