@@ -61,5 +61,5 @@ for (let n = 1; n <= 12; n++) {
 }
 writeFileSync(join(dir, 'picture.png'), png(160, 40));
 const frontMatter = '---\ntitle: Byte-order mark and CRLF line endings\nlist:\n  - one\n  - two\n---\n\nBody paragraph.\n';
-writeFileSync(join(dir, 'front-matter-bom-crlf.md'), '﻿' + frontMatter.replace(/\n/g, '\r\n'));
+writeFileSync(join(dir, 'front-matter-bom-crlf.md'), '\uFEFF' + frontMatter.replace(/\n/g, '\r\n'));
 console.log(`${join(dir, 'drop-01.md')} … drop-12.md, picture.png, front-matter-bom-crlf.md`);
