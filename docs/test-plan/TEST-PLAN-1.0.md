@@ -742,6 +742,98 @@ Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.cl
 | SRC-07 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
 | SRC-08 | N/A | Claude (2026-09-15) | Build 284 (a4577ae) predates source-keep. |
 
+### Build 304 (1.0.0-beta1+build.304) — 2026-09-15
+
+Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.claude\worktrees\source-keep` on branch `runlog-304`. The product code is master 437ccc9, which is build 304 and the first build with source-keep.
+
+- `dotnet test tests/MarkdownMidget.Tests`: 1533 passed, 0 failed (`dotnet.trx`). All 38 plan-named C# tests were found and passed. Build 284's one failure (`SourceEncodingTests.NoTextFileStartsWithAByteOrderMark`) is gone, because the BOM fixture is now generated instead of committed.
+- `npm test` (editor-src, spec reporter): 438 pass, 0 fail (`npm.txt`). All 47 plan-named jsdom titles were found and passed.
+- Fixture round-trip check: `roundtrip-304.mjs`, output in `roundtrip-304.txt`. It loads the way `MDM.setMarkdown` does (beginLoad, replaceAll, `settleDocument`, endLoad) and saves the way the host does (`MDM.getMarkdown`, then `lineBaseSaved`). The BOM and line endings are handled as `DocumentText.Detect` and `Encode` do. Pass 2 reopens pass 1's bytes. It covers all 13 committed fixtures, the generated `front-matter-bom-crlf.md` and `large-600kb.md`, and a CRLF copy of `source-keep-roundtrip.md`. The CRLF copy is for information only, because SRC-08 is a human test. In jsdom its no-edit save is identical, and an edit to the last paragraph changes only that line and keeps CRLF throughout.
+- Not re-run: the WEB **link replay**, for the same reason as build 284.
+- Stale expectations: with source-keep, a no-edit save is byte-identical. FM-02 (`front-matter-at-eof.md`), TBL-01, TBL-03, TBL-06 and TBL-07 still expect changes on the first save that no longer happen. They are recorded as PASS, with notes. The test definitions are unchanged.
+
+| ID | Result | By | Note |
+|---|---|---|---|
+| LIN-01 | | Claude (2026-09-15) | auto PASS — human pending. `LineColumnTests.TheStatusTextNamesTheLineAndColumn`, `TheColumnCountsCharactersTheWayAReaderDoes` and line-map "the caret's line in a nested list…" pass. |
+| LIN-02 | | Claude (2026-09-15) | auto PASS — human pending. line-map "the margin numbers top-level blocks…" and "the margin redraws…" pass. |
+| LIN-03 | | Claude (2026-09-15) | auto PASS — human pending. line-map range, gap-label, nested-list range and "every line … once and in order" tests pass. |
+| LIN-04 | | Claude (2026-09-15) | auto PASS — human pending. line-map Go to Line tests (3 titles) and `LineColumnTests.GoToLineClampsANumberAndRefusesAnythingElse` pass. |
+| LIN-05 | | Claude (2026-09-15) | auto PASS — human pending. line-map "an untouched document is numbered by the text it was loaded from" and "after an edit, and after a save…" pass. |
+| LIN-06 | | Claude (2026-09-15) | auto PASS — human pending. line-map "a table or a code fence ending a file with no final newline…" passes. |
+| VIEW-01 | | | |
+| VIEW-02 | | Claude (2026-09-15) | auto PASS — human pending. `LargeFileTests.The_threshold_is_250_KB`, `A_file_opening_formatted_is_offered…` and `A_file_opening_into_the_source_view_is_never_offered_it` pass. |
+| ANC-01 | | Claude (2026-09-15) | auto PASS — human pending. anchor-links "HELP's Known limits link: a plain click edits, Ctrl+click jumps…" passes. |
+| ANC-02 | | Claude (2026-09-15) | auto PASS — human pending. Same anchor-links test (read-only half) passes. |
+| ANC-03 | | Claude (2026-09-15) | auto PASS — human pending. anchor-links "a repeated heading takes its numbered anchor…" and "an unmatched or malformed fragment does nothing…" pass. |
+| ANC-04 | PASS | Claude (2026-09-15) | `DocAnchorLinksTests.EveryAnchorLinkLandsOnAHeadingThatExists`, `ARepeatedHeadingGetsGitHubsNumberedAnchors` and anchor-links "a slug is DocAnchorLinksTests' slug" pass. |
+| LNK-01 | | Claude (2026-09-15) | auto PASS — human pending. link-at "a right-click on a link reports its mark href…" and `CopyLinkTests.CopyLinkWritesExactlyTheHref…` pass. Link replay not re-run (see WEB-06). |
+| LNK-02 | | Claude (2026-09-15) | auto PASS — human pending. link-at "a right-click off a link or on a raw-HTML <a> reports none…" passes. |
+| LNK-03 | | | |
+| LNK-04 | | Claude (2026-09-15) | auto PASS — human pending. link-at "… a linked picture reports its link …" passes. |
+| LNK-05 | | | |
+| LNK-06 | | Claude (2026-09-15) | auto PASS — human pending. link-at "… with no target the caret decides" passes. |
+| LNK-07 | | Claude (2026-09-15) | auto PASS — human pending. `CopyLinkTests.CopyLinkWritesExactlyTheHrefAndAClipboardAnotherProgramHoldsIsANoteNotACrash` passes. |
+| WEB-01 | | Claude (2026-09-15) | auto PASS — human pending. web-links "Ctrl+click posts openLink with the mark's href…" and `LinkOpeningTests.AnOverlongUrlIsRefusedAndALongOneIsShownWhole` pass. |
+| WEB-02 | | Claude (2026-09-15) | auto PASS — human pending. web-links "… a plain click in the editable view posts nothing" and "… in a read-only view a plain click posts the web link" pass. |
+| WEB-03 | | Claude (2026-09-15) | auto PASS — human pending. web-links "a relative, file:, javascript: or mailto: link is refused…" and `LinkOpeningTests.EverythingElseIsRefused` pass. |
+| WEB-04 | | Claude (2026-09-15) | auto PASS — human pending. `LinkOpeningTests.WebLinksAreAccepted` and `HostsThatCannotShowInPunycodeAreRefused` pass. Link replay not re-run (see WEB-06). |
+| WEB-05 | | Claude (2026-09-15) | auto PASS — human pending. `LinkOpeningTests.EverythingElseIsRefused`, `PaddingCannotHideAHostOrAnAttachment` and `HostsThatCannotShowInPunycodeAreRefused` pass. Link replay not re-run (see WEB-06). |
+| WEB-06 | | Claude (2026-09-15) | auto BLOCKED — human pending. This test's only automated part is the link replay, which runs the links.md addresses through `LinkOpening.TryValidate`. It needs a new .NET harness, which this run doesn't build. The plan last records it as confirmed on master a4577ae. |
+| MENU-01 | | Claude (2026-09-15) | auto PASS — human pending. `MenuAccessKeysTests.OnlyAMenusOwnOpeningIsItsOwn` and `ANestedSubmenuOpeningReachesTheParentButIsNotItsOwn` pass. |
+| SPL-01 | | Claude (2026-09-15) | auto PASS — human pending. `SpellChunkTests.Chunks_BreakAtALineBreak_PreferringABlankLine`, `Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk` and `CheckInChunks_GivesTheRangesOfOneWholeTextCall` pass. |
+| PERF-01 | | Claude (2026-09-15) | auto PASS — human pending. load-state.test.mjs and parser-types.test.mjs (whole files, 0 fail in the suite) and marks "a keystroke keeps every ¶ node already drawn…" pass. |
+| PERF-02 | | Claude (2026-09-15) | auto PASS — human pending. `TimingLogTests.A_line_is_the_time_of_day_sequence_phase_and_whole_milliseconds_in_any_culture` passes. |
+| SWT-01 | | Claude (2026-09-15) | auto PASS — human pending. `SwitchBusyTests.TheLightboxShowsOnlyOverAStillInstallingSourceViewNoOpenHasCovered` and `EditorScriptsTests.ASwitchsPaintWaitAsksForItsOwnLoadsPaintedAfterAFrame` pass. |
+| SWT-02 | | | |
+| SWT-03 | | | |
+| SWT-04 | | Claude (2026-09-15) | auto PASS — human pending. `SwitchBusyTests.OnlyTheSwitchUnderWayOwnsTheIndicator` passes. |
+| SWT-05 | | | |
+| SWT-06 | | | |
+| SWT-07 | | | |
+| FM-01 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "front matter opens as no edit and saves byte for byte…" and "… its words are code to spell check" pass. |
+| FM-02 | | Claude (2026-09-15) | auto PASS — human pending. Fixture check: front-matter.md (242 B), front-matter-blank-lines.md (77 B), front-matter-bom-crlf.md (103 B, BOM and CRLF kept) and front-matter-at-eof.md (72 B) are all byte-identical and stable on pass 2. Step 2's edit (`draft: true` → `draft: false`) changes only that line. The front-matter "opens as no edit and saves byte for byte…" test passes. **Stale expectation:** the plan says front-matter-at-eof.md gains a final newline, and section 5 lists that as a limit. With source-keep, it doesn't. |
+| FM-03 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "Enter and typing edit its text…" passes. |
+| FM-04 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "… input rules and the toolbar cannot make it another block…" passes. |
+| FM-05 | | Claude (2026-09-15) | auto PASS — human pending. front-matter "its lines, and the lines of the blocks after it, are numbered and reached by Go to Line…" passes. |
+| TBL-01 | | Claude (2026-09-15) | auto PASS — human pending. table-fidelity "…: byte-identical; edited, saved, reopened and saved again" (12 cases) pass. Fixture check: tables.md (1158 B) is byte-identical and stable on pass 2. **Stale expectation:** the plan expects four sections to differ (TBL-03, TBL-06, TBL-07). With source-keep, none of them do on a no-edit save. |
+| TBL-02 | | Claude (2026-09-15) | auto PASS — human pending. table-fidelity "aligned, a cell grows" and "Prettier, a cell grows past its width" pass. |
+| TBL-03 | PASS | Claude (2026-09-15) | roundtrip InlineBreakSurvives "a cell holding only a break loads as an empty cell" passes. Fixture check: a no-edit save keeps `\| <br /> \| text \|` as written. After a cell in that table is edited, the rows save as `\| \| text \|` and `\| textX \| \|`, and a reopen and save is stable. **Stale expectation:** the plan says the `<br />` cells save as `\| \|` on any save. With source-keep, that happens only once the table is edited. |
+| TBL-04 | | Claude (2026-09-15) | auto PASS — human pending. table-fidelity "a new table: aligned, columns at least 3 wide…" passes. |
+| TBL-05 | PASS | Claude (2026-09-15) | table-fidelity "wide-cell repro: the save is the size of the file…" passes. Fixture check: large-600kb.md (generated, 619,574 B) is byte-identical after a no-edit save and stable on pass 2 (2.6 s in jsdom). |
+| TBL-06 | PASS | Claude (2026-09-15) | Fixture check: a no-edit save leaves the table unchanged, and pass 2 is stable. **Stale expectation:** the plan expects FAIL, with the cells re-centred. With source-keep, that happens only after the table is edited. Appending X to a cell still gives `\| Name  \|   Note  \|`, so the section 5 candidate still applies to edited tables. |
+| TBL-07 | PASS | Claude (2026-09-15) | Fixture check: a second save changes nothing. **Stale expectation:** the plan says a first save adds outer pipes to **No outer pipes** and tidies **CJK**. With source-keep, a no-edit save leaves both as written. After an edit, **No outer pipes** gains them (`\|a\|b\|` / `\|---\|---\|` / `\|1\|2X\|`) and is stable when reopened and saved. An edit in **CJK** changed only its row, and was also stable. |
+| BR-01 | | Claude (2026-09-15) | auto PASS — human pending. roundtrip InlineBreakSurvives "an inline break renders as a line break" passes. |
+| BR-02 | PASS | Claude (2026-09-15) | roundtrip InlineBreakSurvives "the line ending before an inline break is kept…" passes. Fixture check: br-forms.md (534 B) is byte-identical and stable on pass 2. With "Edited " typed at the first text, only that line differs. |
+| BR-03 | PASS | Claude (2026-09-15) | roundtrip InlineBreakSurvives "guard: a whole-paragraph <br /> is still an empty line" passes. |
+| LST-01 | FAIL | Claude (2026-09-15) | roundtrip ListItemLeadingBlockSurvives (suite) passes, but the fixture check doesn't. A no-edit save of list-leading-blocks.md adds a `\n` at the end of the file (530 → 531 B): after the closing task list, `- [x] a done task item\n` becomes `…item\n\n`. Nothing else changes, and pass 2 is stable at 531 B. In jsdom the plain serialiser gives 530 B. After `settleDocument` (run by `MDM.setMarkdown`), the document ends in an empty paragraph, and the save writes a blank line for it. Build 284's check didn't run `settleDocument`, so it would not have shown this. |
+| LST-02 | PASS | Claude (2026-09-15) | roundtrip ParagraphAfterNestedListKeepsItsBlankLine "inside a quote: the issue…", "outside a quote" and "inside a quote: ordered, deeper, loose…" pass. Fixture check: issue-11-list-paragraph.md (336 B) is byte-identical and stable on pass 2. |
+| LST-03 | | Claude (2026-09-15) | auto PASS — human pending. roundtrip ParagraphAfterNestedListKeepsItsBlankLine "made in the editor outside a quote" passes. |
+| OPN-01 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.The_first_file_opens_here_only_when_the_window_has_no_document` passes. |
+| OPN-02 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.A_window_has_no_document_only_when_nothing_is_in_it_or_on_its_way` passes. |
+| OPN-03 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.Only_dropped_documents_open_each_as_the_path_the_drop_carried_under_its_own_name` and file-drop "postWithFiles hands the host the dropped files…" pass. |
+| OPN-04 | | Claude (2026-09-15) | auto PASS — human pending. `OpenRoutingTests.A_drop_starts_at_most_ten_instances_names_the_rest_and_a_failed_start_is_a_status_note` passes. |
+| OPN-05 | | Claude (2026-09-15) | auto PASS — human pending. `DropRoutingTests.OtherAndUnreadableFilesAreRefused` and `DropRoutingTests.PicturesInsertInDropOrder` pass. |
+| OPN-06 | | | |
+| OPN-07 | | Claude (2026-09-15) | auto PASS — human pending. `OpenGuardTests.SecondAcquireSeesTheHolder` and `OpenRoutingTests.The_first_file_opens_here_only_when_the_window_has_no_document` pass. |
+| OPN-08 | | | |
+| OPN-09 | | | |
+| BIG-01 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Over_512_KB_of_UTF8_both_start_off_in_both_views_and_the_note_naming_the_menus_shows_once_per_document` passes. |
+| BIG-02 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Exactly_512_KB_follows_the_saved_settings` and `Turning_one_on_is_the_documents_own_choice_and_sticks…` pass. |
+| BIG-03 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Turning_one_on_is_the_documents_own_choice_and_sticks_and_a_small_document_follows_the_saved_settings_again` passes. |
+| BIG-04 | PASS | Claude (2026-09-15) | `LargeDocumentTests.A_load_or_switch_over_5_seconds_turns_both_off_with_the_note` passes. |
+| BIG-05 | | | |
+| BIG-06 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Closing_forgets_the_document_so_the_no_document_screen_follows_the_saved_settings` passes. |
+| BIG-07 | | Claude (2026-09-15) | auto PASS — human pending. `LargeDocumentTests.Keeping_the_document_under_a_new_name_keeps_its_choices` passes. |
+| BIG-08 | | | |
+| SRC-01 | | Claude (2026-09-15) | auto FAIL — human pending. Each document was saved with no edit through the host path: all 13 committed fixtures, front-matter-bom-crlf.md, large-600kb.md and a CRLF copy of source-keep-roundtrip.md. 15 of the 16 are byte-identical and stable on pass 2, including source-keep-roundtrip.md (1225 B) and its CRLF copy (1281 B). The exception is list-leading-blocks.md, which gains a final `\n` (530 → 531 B; see LST-01). |
+| SRC-02 | | Claude (2026-09-15) | auto PASS — human pending. Fixture check: with no edit, `MDM.getMarkdown` (what Ctrl+E shows) returns source-keep-roundtrip.md's text exactly, including `* star bullet one`, the setext underline and `~tilde~`. |
+| SRC-03 | | Claude (2026-09-15) | auto PASS — human pending. Fixture check: ` Edited.` typed at the end of the last paragraph. The save is the original with only that change (L56; 1225 → 1233 B), and a reopen and save is stable. |
+| SRC-04 | | Claude (2026-09-15) | auto PASS — human pending. Fixture check: `now` → `today` in "Bold around code". Only L10 differs, rewritten in the app's conventions: the bold is split around the code span. The lists, rules, reference definitions and HTML comment are identical, and a reopen and save is stable. |
+| SRC-05 | | Claude (2026-09-15) | auto PASS — human pending. Fixture check: `New paragraph.` inserted after "Rule written with dashes:", and the "Rule written with stars:" paragraph deleted. The save is exactly the original with that paragraph and its blank line added and that one removed (1225 → 1215 B). Blank lines between untouched blocks are kept, and a reopen and save is stable. |
+| SRC-06 | | | |
+| SRC-07 | | | |
+| SRC-08 | | | |
+
 ### Build ___ (1.0.0-…+build.N) — date
 
 | ID | Result | By | Note |
