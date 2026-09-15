@@ -3,11 +3,19 @@
 All notable changes to **Markdown Midget** are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/). While
-under active alpha development (0.1.x), the minor version may carry breaking
-changes between alpha tags.
+and this project adheres to [Semantic Versioning](https://semver.org/). A version
+with a suffix, such as `-beta1` or `-rc1`, is a prerelease: it is published for
+testing before the stable release of the same number.
 
 ## [Unreleased]
+
+## [1.0.0-rc1] - 2026-09-15
+
+The 1.0 release candidate: 1.0.0-beta1 after a round of everyday use, plus the changes below.
+Saving from the formatted view now keeps the text you didn't change exactly as written, the status
+bar shows the line and column with Go to Line and line numbers, and opening a file while this
+window has a document starts a new window. A prerelease, so these changes get everyday use before
+1.0.0; it includes everything listed for 1.0.0-beta1.
 
 ### Added
 
@@ -21,10 +29,14 @@ changes between alpha tags.
 - **Ctrl+click a web link to open it in your browser**, after a prompt that shows the full address; in a read-only window such as Help, just click. Email links don't open.
 - **A document over 512 KB opens with line numbers and spell check off**, for that document and in both views, and the status bar says so once: on a large file a spell check takes seconds and the formatted view's margin numbers slow every switch. Turn either back on from **View ▸ Line Numbers ▸ Show Line Numbers** or **View ▸ Spell Check**; that holds for the document until you open another or close it, and your saved settings don't change. A document whose opening or view switch takes more than 5 seconds gets the same, from then on.
 - **Switching from the Markdown source view back to the formatted view shows the busy spinner** when it takes more than a moment, as it does on a large file; until the switch is done the source view can't be typed in.
+- **The opening progress card now names each step** under its bar: Reading file, Checking encoding, Building formatted view, Drawing page, Finishing up. A file of 250 KB or more that opens in the formatted view also suggests the Markdown source view (Ctrl+E), which opens it much faster; nothing switches on its own. While the formatted view is showing, the same text appears in the status bar.
 
 ### Changed
 
 - **File ▸ Open, Open Recent and dropping a markdown or text file open it in a new window** when this window has a document, so the document you have is never replaced and there is no prompt about unsaved changes. A window showing "No document open", or a blank untitled document you haven't typed in, still opens the first file itself. A drop opens at most 10 new windows; the status bar names the rest. Opening the file this window already has just brings it forward.
+- **The View toolbar now has a button for each view**, formatted view and Markdown source (`##`), beside the **Line numbers** button. The view you're in is highlighted; click the other to switch, as Ctrl+E does. They replace the single `{ }` toggle.
+- **Spell check on a large document now finishes several times faster**: the text is checked in pieces that end at a line break, so no word is split. On a test machine a 512 KB document took about 2 seconds instead of 9. A word repeated across the break between two pieces isn't flagged.
+- **Typing and opening are now faster on long documents in the formatted view**: a keystroke no longer redraws every formatting mark, and neither opening a document nor the first edit converts the whole document back to markdown to check for changes.
 
 ### Fixed
 
@@ -1277,7 +1289,22 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.0-rc1...HEAD
+[1.0.0-rc1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc1
+[1.0.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-beta1
+[0.10.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.10.0
+[0.10.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.10.0-beta1
+[0.9.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.9.0
+[0.9.0-beta4]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.9.0-beta4
+[0.9.0-beta3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.9.0-beta3
+[0.9.0-beta2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.9.0-beta2
+[0.9.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.9.0-beta1
+[0.8.2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.8.2
+[0.8.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.8.1
+[0.8.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.8.0
+[0.8.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.8.0-beta1
+[0.7.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.7.0
+[0.7.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.7.0-beta1
 [0.6.4]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.4
 [0.6.3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3
 [0.6.3-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.6.3-beta1
