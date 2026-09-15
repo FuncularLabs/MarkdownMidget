@@ -110,12 +110,13 @@ export function render(doc, serialize, base, parse) {
     const reads = ({ a, z, md }) => {
       const refs = new Set([...md.matchAll(REF)].map((r) => label(r[1]))), defs = [...base.linkDefs, ...notes].filter((d) => d.labels.some((l) => refs.has(l)));
       const tail = `\n\n${defs.map((d) => d.text).join('\n\n')}`, key = `${a}:${z}:${md}${tail}`, below = (i) => (i ? 1 : 0);   // below the first block: below a paragraph
+      const own = defs.filter((d) => notes.includes(d)), alone = `\n\n${own.map((d) => d.text).join('\n\n')}`;   // a whole save writes no link definition: text alone has footnotes only
       const count = z - a + 1 - (z === n - 1 && !texts[z] ? 1 : 0);   // the trailing empty paragraph writes nothing
       if (passed.has(key)) return true;   // read already, and nothing in it has changed since
       try {
         const got = parse(`${'x\n\n'.repeat(below(a))}${md}${tail}`);
-        const ok = got.childCount === below(a) + count + defs.filter((d) => notes.includes(d)).length && [...Array(count).keys()].every((k) => got.child(below(a) + k).eq(doc.child(a + k))
-          || (!keep[a + k] && !!parse(`${'x\n\n'.repeat(below(a + k))}${texts[a + k]}${tail}`).maybeChild(below(a + k))?.eq(got.child(below(a) + k))));
+        const ok = got.childCount === below(a) + count + own.length && [...Array(count).keys()].every((k) => got.child(below(a) + k).eq(doc.child(a + k))
+          || (!keep[a + k] && !!parse(`${'x\n\n'.repeat(below(a + k))}${texts[a + k]}${alone}`).maybeChild(below(a + k))?.eq(got.child(below(a) + k))));
         if (ok) passed.add(key);
         return ok;
       } catch { return false; }

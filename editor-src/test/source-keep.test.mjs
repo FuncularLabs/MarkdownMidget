@@ -196,6 +196,22 @@ for (const [name, md, act, expect = () => {}] of HAZARDS) {
   });
 }
 
+const hrefs = (d) => { const all = []; d.descendants((n) => { for (const m of n.marks) if (m.attrs.href) all.push(m.attrs.href); }); return all; };
+const TYPED_LABELS = [   // text typed as `[label]` beside a kept definition of that label: a whole save writes no definition, so it stays text
+  ['beside a list, after a kept definition', '- item one\n\n  second para\n\nX\n\n   [d]: /d\n\nA [x][d]\n\nB\n\nFar [x][d].\n', () => run(v().state.tr.insertText('[d]: /typed ', textAt('B') + 1))],
+  // `see [1] ` typed at a paragraph's end, read before the next word: the serialiser escapes a `[` in none of text ending in a space
+  ['see [1] at a paragraph\'s end', 'Intro.\n\n[1]: /x\n\nKept [one][1].\n\nOther para.\n\nEnd.\n', () => run(v().state.tr.insertText(' see [1] ', textAt('Other para.') + 11))],
+  ['see [1] at a list item\'s end', '[1]: /x\n\n- item\n- other\n\nKept [one][1].\n', () => run(v().state.tr.insertText(' see [1] ', textAt('other') + 5))],
+];
+for (const [name, md, act] of TYPED_LABELS) {
+  test(`a typed label ${name} opens as the text typed, every link to where it went`, () => {
+    load(md);
+    act();
+    const want = hrefs(doc());
+    assert.deepEqual(hrefs(load(save())), want);
+  });
+}
+
 test('save, edit, save, edit, save: each save changes only the block edited since the last', () => {
   load(DOC);
   typeAt('Alpha');
