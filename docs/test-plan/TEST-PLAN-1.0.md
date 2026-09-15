@@ -152,6 +152,13 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** The card shows the phases in order: "Reading file…", "Checking encoding…", "Building formatted view…", "Drawing page…". (Opening into the source view shows "Preparing document…" and "Finishing up…" in place of the last two. This test doesn't cover that.) For the large file, it adds a line suggesting the Markdown source view (Ctrl+E), but nothing switches. When the formatted view is showing, the same text appears in the status bar. The small file shows no suggestion.
 - **Type:** Both. Automated: `LargeFileTests.The_threshold_is_250_KB`, `A_file_opening_formatted_is_offered_the_source_view_at_or_over_the_threshold`, `A_file_opening_into_the_source_view_is_never_offered_it`. Human: the card and the status bar.
 
+#### VIEW-03 The view pair sits in one faint box, with its icons unchanged
+- **Change:** Changed: "The formatted view and Markdown source buttons now sit in one faint box" · **Documents:** `br-forms.md` · **Settings:** formatted view
+1. Compare the toolbar with the previous build's, at 100% and 150% display scaling. Hover over and click both view buttons.
+2. Switch **View ▸ Theme** between a light and a dark theme, then turn on Windows high contrast.
+- **Expected:** A faint rounded box surrounds the two view buttons, with a thin line between them. The icons have the same size and spacing as before, the hover and pressed highlights fill the same area, and the toolbar is at most 2 pixels taller. The box and line stay faint but visible in every colour scheme.
+- **Type:** Both. Automated: `ToolBarToggleTests.AGroupedButtonKeepsTheToolbarTemplateAndSize`. Human: how it looks.
+
 ### FND — Find and Replace shortcuts
 
 #### FND-01 Ctrl+H opens Replace in both views
@@ -1134,6 +1141,7 @@ Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.cl
 | FND-01 | | | |
 | FND-02 | | | |
 | FND-03 | | | |
+| VIEW-03 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

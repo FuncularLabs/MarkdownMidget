@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:src="clr-namespace:MarkdownMidget.Source"
+        xmlns:local="clr-namespace:MarkdownMidget"
         Title="Markdown Midget" Height="720" Width="1120" MinHeight="360" MinWidth="520"
         Icon="/Assets/midget-256.png"
         WindowStartupLocation="CenterScreen"
@@ -46,6 +47,21 @@
              1px border crowds a 21px icon, and its triggers colour it but never size it. -->
         <Style x:Key="ToolCharBorderless" TargetType="{x:Type ButtonBase}" BasedOn="{StaticResource ToolChar}">
             <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <!-- Toggle groups, for buttons that make one choice between them (the view pair): use these for every such group.
+             A faint rounded box outside the buttons (its 1px adds to the group, never shrinks a button), a thin line
+             between them, and local:ToolBarToggle buttons, which keep the toolbar look inside the box. System brushes,
+             so the lines follow the Windows colours, high contrast included. -->
+        <Style x:Key="ToggleGroupBorder" TargetType="{x:Type Border}">
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+        <Style x:Key="ToggleGroupDivider" TargetType="{x:Type Rectangle}">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Fill" Value="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
 
         <!-- Native editor context menus (shown on right-click / Menu key in WYSIWYG). -->
@@ -324,20 +340,25 @@
                         <!-- The view pair: the view showing is checked (SyncViewToggles). A page of bars and a picture
                              (notched corners, sun and mountain are even-odd cut-outs), and a ## slanted by one step hidden
                              inside its lower bar. Whole-pixel rectangles drawn aliased, so they stay sharp wherever layout lands. -->
-                        <ToggleButton x:Name="FormattedViewToggle" Style="{StaticResource ToolCharBorderless}"
-                                      ToolTip="Formatted view (Ctrl+E)" AutomationProperties.Name="Formatted view" Click="ViewPair_Click">
-                            <Path Width="21" Height="21" RenderOptions.EdgeMode="Aliased"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                                  Data="M1,1H20V3H1Z M12,5H20V7H12Z M12,8H20V10H12Z M12,11H18V13H12Z M1,15H20V17H1Z M1,18H14V20H1Z
-                                        M1,5H10V13H1Z M1,5h1v1h-1z M9,5h1v1h-1z M1,12h1v1h-1z M9,12h1v1h-1z M6,6h2v2h-2z M4,9h2v1h-2z M3,10h4v1h-4z M2,11h7v1h-7z" />
-                        </ToggleButton>
-                        <ToggleButton x:Name="SourceViewToggle" Style="{StaticResource ToolCharBorderless}"
-                                      ToolTip="Markdown source (Ctrl+E)" AutomationProperties.Name="Markdown source" Click="ViewPair_Click">
-                            <Path Width="21" Height="21" RenderOptions.EdgeMode="Aliased"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                                  Data="F1 M2,4h2v8h-2z M1,12h2v5h-2z M6,4h2v8h-2z M5,12h2v5h-2z M1,7h8v2h-8z M0,12h8v2h-8z
-                                        M14,4h2v8h-2z M13,12h2v5h-2z M18,4h2v8h-2z M17,12h2v5h-2z M13,7h8v2h-8z M12,12h8v2h-8z" />
-                        </ToggleButton>
+                        <Border Style="{StaticResource ToggleGroupBorder}">
+                            <StackPanel Orientation="Horizontal">
+                                <local:ToolBarToggle x:Name="FormattedViewToggle" Style="{StaticResource ToolCharBorderless}"
+                                                     ToolTip="Formatted view (Ctrl+E)" AutomationProperties.Name="Formatted view" Click="ViewPair_Click">
+                                    <Path Width="21" Height="21" RenderOptions.EdgeMode="Aliased"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                          Data="M1,1H20V3H1Z M12,5H20V7H12Z M12,8H20V10H12Z M12,11H18V13H12Z M1,15H20V17H1Z M1,18H14V20H1Z
+                                                M1,5H10V13H1Z M1,5h1v1h-1z M9,5h1v1h-1z M1,12h1v1h-1z M9,12h1v1h-1z M6,6h2v2h-2z M4,9h2v1h-2z M3,10h4v1h-4z M2,11h7v1h-7z" />
+                                </local:ToolBarToggle>
+                                <Rectangle Style="{StaticResource ToggleGroupDivider}" />
+                                <local:ToolBarToggle x:Name="SourceViewToggle" Style="{StaticResource ToolCharBorderless}"
+                                                     ToolTip="Markdown source (Ctrl+E)" AutomationProperties.Name="Markdown source" Click="ViewPair_Click">
+                                    <Path Width="21" Height="21" RenderOptions.EdgeMode="Aliased"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                          Data="F1 M2,4h2v8h-2z M1,12h2v5h-2z M6,4h2v8h-2z M5,12h2v5h-2z M1,7h8v2h-8z M0,12h8v2h-8z
+                                                M14,4h2v8h-2z M13,12h2v5h-2z M18,4h2v8h-2z M17,12h2v5h-2z M13,7h8v2h-8z M12,12h8v2h-8z" />
+                                </local:ToolBarToggle>
+                            </StackPanel>
+                        </Border>
                         <ToggleButton x:Name="WrapToggle" Style="{StaticResource ToolGlyph}"
                                       ToolTip="Word wrap (source view only)"
                                       Click="WordWrapButton_Click" Content="&#xE751;" />

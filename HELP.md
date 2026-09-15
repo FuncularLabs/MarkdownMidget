@@ -51,7 +51,7 @@ From left to right:
   cursor into the block (then it shows for editing).
 - **Bulleted list / Numbered list / Block quote / Horizontal rule**.
 - **Insert link / Insert picture / Insert table**.
-- **Formatted view / Markdown source** pair (the view you're in is highlighted) and the **¶** formatting-marks toggle.
+- **Formatted view / Markdown source** pair, boxed together because you pick one (the view you're in is highlighted), and the **¶** formatting-marks toggle.
 
 Toolbar buttons never take keyboard focus, so clicking them won't move your cursor
 or drop your selection.
