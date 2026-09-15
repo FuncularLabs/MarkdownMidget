@@ -26,7 +26,7 @@ import { htmlRender } from './html-render.js';
 import { resizableImage, remarkImageSize } from './resizable-image.js';
 import { conventions, tightBulletList, tightListItem, tableFidelity } from './conventions.js';
 import { refusedPictureSize } from './picture-paste.js';
-import { lineCapture, lineMap } from './line-map.js';
+import { definitionCapture, lineCapture, lineMap } from './line-map.js';
 import { anchorLinks } from './anchor-links.js';
 import { webLinks } from './web-links.js';
 import { frontMatter } from './front-matter.js';
@@ -299,6 +299,7 @@ export function createEditor({
     .use(spellDecorate)
     .use(selectionState(onSelectionState))
     .use(pictureCeiling(maxPictureBytes, onPictureRefused))
+    .use(definitionCapture)   // puts itself first among the remark plugins, ahead of the preset's that drop definitions
     .use(lineCapture)
     .use(lineMap)
     .use(splitHeadingCommand)

@@ -177,6 +177,12 @@ const HAZARDS = [
   ['a split-label definition inside an edited list', '- item\n\n  [foo\n  bar]: /l\n\nA\n\nB\n\nC\n\nSee [y][foo bar].\n', () => typeAt('item', 'Z')],
   ['a block moved above a label defined twice, once split', 'See [foo bar].\n\n[foo\nbar]: /one\n\nMiddle.\n\n[foo bar]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [foo bar].\n',
     () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
+  // A definition on a footnote's first line, and a split label whose first line ends in a backslash.
+  ['a definition on an edited footnote\'s first line', 'Text[^1].\n\n[^1]: [d]: /d\n\n    more\n\nA\n\nB\n\nC\n\nSee [z][d].\n', () => typeAt('more', 'Z')],
+  ['a split-label definition on an edited footnote\'s first line', 'Text[^1].\n\n[^1]: [foo\n    bar]: /d\n\n    more\n\nA\n\nB\n\nC\n\nSee [z][foo bar].\n', () => typeAt('more', 'Z')],
+  ['a backslash-split label defined inside an edited quote', '> quote\n>\n> [foo\\\n> bar]: /q\n\nA\n\nB\n\nC\n\nTail [x][foo\\ bar].\n', () => typeAt('quote', 'Z')],
+  ['a block moved above a label defined twice, once backslash-split', 'See [foo\\ bar].\n\n[foo\\\nbar]: /one\n\nMiddle.\n\n[foo\\ bar]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [foo\\ bar].\n',
+    () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
   ['a block moved above a label defined twice','See [a].\n\n[a]: /one\n\nMiddle.\n\n[a]: /two\n\nP1\n\nP2\n\nP3\n\nP4\n\nEnd [a].\n', () => { const b = top('Middle'); const tr = v().state.tr.delete(b.pos, b.end); run(tr.insert(0, b.node)); }],
 ];
 

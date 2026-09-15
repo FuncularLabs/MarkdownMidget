@@ -18,28 +18,24 @@
 // inside a block (a quote, a list item), which serves every block after it, or with a label defined twice, where order decides.
 const SEP = /\n+(?:<!---->\n+)?/y;   // what the serialiser writes between top-level blocks (mdast-util-to-markdown containerFlow)
 const FENCE = /^(?:---|\+\+\+)[ \t]*(?:\n|$)/;   // front matter's opening line, at the top of a text
-const DEF = String.raw`^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t])))*[ \t]*\[(?:((?:[^\]\\\n]|\\.)+)\]:|(?:[^\]\\\n]|\\.)*$)`;   // a line a definition may open, in any container; or a label left open, which the next line may close
-const REF = /\[\^?((?:[^\]\\\n]|\\.)+)\]/g;   // every label a text may name, and more
-const CONTAINER = /^(blockquote|bullet_list|ordered_list|footnote_definition)$/;
-const label = (s) => s.replace(/[\t\n\r ]+/g, ' ').trim().toLowerCase().toUpperCase();   // as CommonMark matches labels
+const REF = /\[\^?((?:[^\]\\\n]|\\.)+)\]/g;   // every label a window may name, and more: the definitions and footnotes it is read with
+const label = (s) => s.replace(/[\t\n\r ]+/g, ' ').replace(/^ | $/g, '').toLowerCase().toUpperCase().toLowerCase();   // as mdast's `identifier`
 const eols = (s) => { let n = 0; for (let i = s.indexOf('\n'); i >= 0; i = s.indexOf('\n', i + 1)) n++; return n; };
 const groupsOf = (recs) => { const g = []; for (const r of recs) if (r.top) g.push([r]); else g.at(-1)?.push(r); return g; };
 const tidy = (tops, end) => tops.every((t, i) => t.from >= (i ? tops[i - 1].to : 0) && t.to >= t.from && t.to <= end);
 
-/** A load's baseline: `text`, and the records its parse found (lineCapture: `top` blocks with their offsets), paired with `doc`; null where they do not pair. */
-export function baseFrom(doc, text, recs) {
+/** A load's baseline: `text`, the records its parse found (lineCapture: `top` blocks with their offsets) paired with `doc`, and its link definitions
+ *  (line-map.js definitionCapture: { label, root, from, to }); null where they do not pair. */
+export function baseFrom(doc, text, recs, defs) {
   if (!recs || text.startsWith('﻿')) return null;
   const tops = groupsOf(recs).map((g) => ({ from: g[0].from, to: g[0].to, line: g[0].line, recs: g })), last = doc.lastChild;
   if (doc.childCount === tops.length + 1 && last.type.name === 'paragraph' && !last.content.size) tops.push({ from: text.length, to: text.length, line: 0, recs: [] });   // settle.js
   if (tops.length !== doc.childCount || !tidy(tops, text.length)) return null;
-  const linkDefs = [], labels = [];   // the parse drops definitions (remark-inline-links): they are read from the text between blocks
-  for (let k = -1; k < tops.length; k++) {
-    const gap = text.slice(k < 0 ? 0 : tops[k].to, k + 1 < tops.length ? tops[k + 1].from : text.length), found = [...gap.matchAll(new RegExp(DEF, 'gm'))].map((d) => (d[1] === undefined ? '' : label(d[1])));   // '': split over lines, so any label
-    if (found.length) { linkDefs.push({ labels: found, text: gap.split('\n').filter((l) => /\S/.test(l)).join('\n') }); labels.push(...found); }
-  }
-  const nested = tops.some((t, i) => CONTAINER.test(doc.child(i).type.name)   // a footnote's own first line is no definition inside it
-    && new RegExp(DEF, 'm').test(text.slice(t.from, t.to).replace(doc.child(i).type.name === 'footnote_definition' ? /^[^\n]*/ : /^(?!)/, '')));
-  return { doc, markdown: text, recs, tops, linkDefs, unsafe: nested || labels.includes('') || new Set(labels).size < labels.length };
+  if (!defs) return null;
+  const labels = defs.map((d) => d.label), linkDefs = defs.filter((d) => d.root).map((d) => ({ labels: [d.label], text: text.slice(d.from, d.to) }));
+  // One inside a block (a quote, a list item, a footnote) serves every block after it; of a label defined twice, the first does. A splice's output
+  // holds exactly the top-level ones, once each, and a whole serialisation none, so a save's baseline carries this forward unparsed.
+  return { doc, markdown: text, recs, tops, linkDefs, unsafe: defs.some((d) => !d.root || !(d.to >= d.from)) || new Set(labels).size < labels.length };
 }
 
 /** Where each of `n` top-level outputs lies in `md`, or null when they cannot be found in order. */

@@ -15,6 +15,7 @@
 // the blocks from where it happened on without numbers until that read (staleFrom).
 // Go to Line reaches every line: one with no place of its own reads as itself where the caret went, until it moves or is saved (pinLine).
 import { $prose, $remark } from '@milkdown/kit/utils';
+import { InitReady, remarkPluginsCtx } from '@milkdown/kit/core';
 import { Plugin, PluginKey, Selection } from '@milkdown/kit/prose/state';
 import { ReplaceStep, AddMarkStep, RemoveMarkStep } from '@milkdown/kit/prose/transform';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
@@ -40,6 +41,7 @@ let drawn = {};         // the margin last built: { doc, current, staleFrom } it
 let pin = null;         // Go to Line's line for a caret on a line with no place of its own: { doc, head, line } (pinLine)
 let settled = null;     // the document the last load installed (settledMarkdown)
 let tops = null;        // while recording: each top-level block's markdown, in order (source-keep.js)
+let definitions = null; // the link definitions the load's parse found (definitionCapture)
 let baseline = null;    // the text blocks are kept from (source-keep.js): the load's, then each save's
 let out = null;         // the last markdown read, with where its blocks lie: the next save's baseline (forgetLoad)
 
@@ -68,6 +70,23 @@ export const recordingRoot = (base) => (node, parent, state, info) => {
 };
 
 /** Milkdown's parse of a document being loaded: each block with the line it starts on. */
+/** The link definitions of a document being loaded, which the parse drops (remark-inline-links, in the commonmark preset) before any plugin
+ *  registered after it sees the tree: each with mdast's normalised label, whether it stands at the top level, and where its text is. First of all. */
+export const definitionCapture = (ctx) => async () => {
+  await ctx.wait(InitReady);
+  const plugin = { options: {}, plugin: () => (tree) => {
+    if (!capturing) return;
+    definitions = [];
+    const walk = (node) => node.children?.forEach((c) => {
+      if (c.type === 'definition') definitions.push({ label: c.identifier, root: node === tree, from: c.position?.start.offset, to: c.position?.end.offset });
+      else if (CONTAINERS.has(c.type)) walk(c);
+    });
+    walk(tree);
+  } };
+  ctx.update(remarkPluginsCtx, (rp) => [plugin, ...rp]);
+  return () => ctx.update(remarkPluginsCtx, (rp) => rp.filter((x) => x !== plugin));
+};
+
 export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
   if (!capturing) return;
   captured = [];
@@ -83,12 +102,12 @@ export const lineCapture = $remark('mdmLineCapture', () => () => (tree) => {
   walk(tree);
 });
 
-export function beginLoad() { capturing = true; captured = null; }
+export function beginLoad() { capturing = true; captured = null; definitions = null; }
 
 /** The document is installed: number it by the text it was loaded from. */
 export function endLoad(doc, text) {
   settled = doc; capturing = false; staleFrom = null; pin = null; out = null; current = pair(doc, captured, linesIn(text));
-  baseline = current && baseFrom(doc, text, captured);
+  baseline = current && baseFrom(doc, text, captured, definitions);
   if (gutter) redraw();
 }
 
