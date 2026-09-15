@@ -1,0 +1,2 @@
+# This fixture tests CRLF line endings and a byte-order mark: store it exactly as written.
+front-matter-bom-crlf.md -text
