@@ -337,6 +337,15 @@ telling them to restart and knowing whether any of them still needs to.
 Recently shipped from here: autosave / crash recovery (see CHANGELOG), which was
 the last of the usability gaps raised in the 0.6.x review.
 
+### Nits
+
+- **Toolbar tooltips should clear an enlarged mouse pointer.** WPF opens a tooltip just
+  below the pointer and assumes a standard pointer size, so with a larger pointer
+  (Windows accessibility settings) the pointer can sit over the tooltip's text. Windows
+  always draws the pointer on top, so the tooltip has to move instead. Proposed fix:
+  anchor toolbar tooltips under their button, and push them further down only when the
+  pointer is larger than standard. Low priority: few users set pointers that large.
+
 ---
 
 ## Someday / Big
