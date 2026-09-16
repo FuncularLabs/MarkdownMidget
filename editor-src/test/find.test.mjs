@@ -972,4 +972,12 @@ describe('FindWhatFromTheSelection', () => {
     scan('cat');
     assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 3);
   });
+
+  test('a footnote reference reads as the label its superscript shows', () => {
+    load('cat[^1] cat\n\ncat elsewhere\n\n[^1]: note');
+    const { from, to } = blockRange('cat cat');
+    ed.selectText(from, to);
+    assert.equal(findSelectionText(ed.view(), 501), 'cat1 cat');
+    assert.equal(scan('cat1 cat').total, 1);                                // the find index reads the same
+  });
 });

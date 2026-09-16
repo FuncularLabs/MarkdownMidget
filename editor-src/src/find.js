@@ -315,9 +315,11 @@ function afterChange(view, tr) {
 const spansLines = (view, sel) => /[\r\n]/.test(shownText(view, sel));
 
 // The selected text as the page shows it, breaks included: a soft wrap (an inline hardbreak) shows, and is
-// indexed, as a space; a hard break or an inline <br> (an html atom) starts a new line; blocks are lines.
+// indexed, as a space; a hard break or an inline <br> (an html atom) starts a new line; blocks are lines. A footnote
+// reference's <sup> shows its label; an image shows no text.
 const shownLeaf = (n) => n.type.name === 'hardbreak' ? (n.attrs.isInline ? ' ' : '\n')
   : n.type.name === 'html' ? (/<br\b/i.test(n.attrs.value) ? '\n' : '')
+  : n.type.name === 'footnote_reference' ? String(n.attrs.label ?? '')
   : n.type.spec.leafText?.(n) ?? '';
 const shownText = (view, sel) => view.state.doc.textBetween(sel.from, sel.to, '\n', shownLeaf);
 
