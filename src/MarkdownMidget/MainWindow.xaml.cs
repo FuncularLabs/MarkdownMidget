@@ -3419,11 +3419,11 @@ public partial class MainWindow : Window
 
     private void Find_Click(object sender, RoutedEventArgs e) => OpenFind(replace: false);
 
-    /// <summary>Edit ▸ Replace… and Ctrl+H: Find's dialog, with the cursor in Replace with. Read-only or with no document, the dialog greys
+    /// <summary>Edit ▸ Replace… and Ctrl+H: Find's dialog, with the cursor in Replace with once Find what has text. Read-only or with no document, the dialog greys
     /// Replace and puts the cursor in Find what, and OnReplaceRequested refuses a replace whatever asked for it.</summary>
     private void Replace_Click(object sender, RoutedEventArgs e) => OpenFind(replace: true);
 
-    private void OpenFind(bool replace)
+    private async void OpenFind(bool replace)
     {
         if (_findDialog is null)
         {
@@ -3442,7 +3442,12 @@ public partial class MainWindow : Window
             };
             _findDialog.Show();
         }
-        CaptureReplaceScope();
+        var dialog = _findDialog;
+        CaptureReplaceScope();   // before the selection fills Find what, whose search moves it, so both views keep the same scope
+        var selected = _closed ? null : _sourceMode ? (IsSourceFindSelection() ? null : SourceBox.SelectedText)   // not Find's own match, as find.js findSelectionText
+            : _editorReady ? await RunEditorAsync($"window.MDM.findSelectionText({FindEngine.SeedLimit + 1})") : null;
+        if (_findDialog != dialog) return;   // closed while the formatted view answered
+        if (FindEngine.SeedQuery(selected, dialog.CurrentMode) is { } seed) dialog.Seed(seed);
         if (replace) _findDialog.FocusReplace();
         else _findDialog.FocusQuery();
     }

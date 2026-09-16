@@ -163,15 +163,15 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 #### FND-01 Ctrl+H opens Replace in both views
 - **Change:** Added: "Ctrl+H now opens Replace" · **Documents:** `br-forms.md` · **Settings:** formatted view
-1. Click in the text and press Ctrl+H. Close the dialog, press Ctrl+E, click in the text and press Ctrl+H again.
+1. Start Markdown Midget, open the document, click in the text and press Ctrl+H. Type `form` in **Find what**, close the dialog, press Ctrl+E, click in the text and press Ctrl+H again.
 2. Click back in the document, leaving the dialog open, and press Ctrl+H.
-- **Expected:** Each time the Find and Replace dialog opens, or comes to the front, with the cursor in **Replace with** and its text selected. Nothing is typed into the document, and neither the browser nor the Style box (Ctrl+Shift+H) reacts.
-- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`. Human: the real keypress in WebView2 and in the source view.
+- **Expected:** The first Ctrl+H puts the cursor in the empty **Find what**. After that, each time the Find and Replace dialog opens, or comes to the front, the cursor is in **Replace with** with its text selected, because **Find what** has text. Nothing is typed into the document, and neither the browser nor the Style box (Ctrl+Shift+H) reacts.
+- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithOnlyWhenFindWhatHasTextAndReplaceCanRun`. Human: the real keypress in WebView2 and in the source view.
 
 #### FND-02 Edit ▸ Replace… sits under Find…
 - **Change:** Added: "Edit ▸ Replace… now sits under Find…" · **Documents:** `br-forms.md` · **Settings:** any
 1. Press Alt+E, then L.
-- **Expected:** **Replace…** is directly under **Find…**, shows `Ctrl+H` and has its L underlined. L opens the dialog as in FND-01; no other Edit item takes it.
+- **Expected:** **Replace…** is directly under **Find…**, shows `Ctrl+H` and has its L underlined. L opens the dialog as in FND-01: the cursor is in **Replace with** when **Find what** has text, and in **Find what** when it's empty. No other Edit item takes L.
 - **Type:** Human. A WPF menu; `MenuAccessKeysTests` covers Alt handling, not clashes between items.
 
 #### FND-03 Read-only, Help and no document
@@ -181,7 +181,16 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 3. Press Ctrl+W. At "No document open", press Ctrl+F, close the dialog, then press Ctrl+H, then choose **Edit ▸ Replace…**.
 4. Leave the dialog open, open `br-forms.md` and turn off **Edit ▸ Read Only**. Then press Ctrl+W.
 - **Expected:** In steps 1 and 2 the cursor is in **Find what**, **Replace** and **Replace All** are greyed with the tooltip "The document is read-only.", and the document doesn't change. In step 3 Ctrl+H does exactly what Ctrl+F does: the cursor is in **Find what** and both Replace buttons are greyed with the tooltip "No document is open."; Enter still presses **Find Next**, which finds nothing. In step 4 both buttons work once the document is editable, and grey again after Ctrl+W.
-- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithUnlessReadOnly`, `FindDialogFocusTests.ReplaceIsGreyedWhenReadOnlyOrNoDocument`. Human: the dialog, the menu and the keypress.
+- **Type:** Both. Automated: `FindDialogFocusTests.CtrlHFocusesReplaceWithOnlyWhenFindWhatHasTextAndReplaceCanRun`, `FindDialogFocusTests.ReplaceIsGreyedWhenReadOnlyOrNoDocument`. Human: the dialog, the menu and the keypress.
+
+#### FND-05 The selected text fills Find what, in both views
+- **Change:** Added: "Find and Replace now start with your selected text" · **Documents:** `br-forms.md` · **Settings:** formatted view, Normal search mode
+1. Select one word and press Ctrl+F. Close the dialog, select a phrase that includes bold text, and choose **Edit ▸ Replace…**. Leave the dialog open, select another word and press Ctrl+H.
+2. Select from one paragraph into the next and press Ctrl+F. Then click in the text without selecting and press Ctrl+F.
+3. Type `a.b+c` on a new line. Choose **Regular expression**, select `a.b+c`, press Ctrl+F, then press **Find Next**. Type `a.b.c` in **Find what**, then choose **Edit ▸ Replace…** in the main window.
+4. Press Ctrl+E and repeat steps 1 to 3 in the source view.
+- **Expected:** In step 1, **Find what** shows exactly the selected text, as the page shows it (no `**`), with its text selected; Ctrl+F puts the cursor in **Find what**, and Replace puts it in **Replace with**. In step 2 **Find what** doesn't change. In step 3 it shows `a\.b\+c`, and Find Next finds the line you typed; Replace… then leaves `a.b.c` as it is, because the selection is Find's own match. The source view behaves the same, but **Find what** shows the Markdown you selected.
+- **Type:** Both. Automated: `FindEngineTests.TheSelectionFillsFindWhatOnlyWhenItIsOneLineOfAtMostTheLimit`, `FindEngineTests.TheSeededQueryFindsTheSelectedTextItselfInEveryMode`, and `find.test.mjs` "is the text the page shows over marks, links and code, and nothing for Find's own current match". Human: the keypresses, the menu and both views.
 
 ### TIP — Toolbar tooltips
 
@@ -1241,6 +1250,7 @@ Human results only, from Paul on 2026-09-15. No automated run on this interim RC
 | FND-01 | | | |
 | FND-02 | | | |
 | FND-03 | | | |
+| FND-05 | | | |
 | VIEW-03 | | | |
 | TIP-01 | | | |
 

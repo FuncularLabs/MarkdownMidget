@@ -383,6 +383,16 @@ public static class FindEngine
         return msg;
     }
 
+    public const int SeedLimit = 500;   // the longest selection that fills Find what
+
+    /// <summary>What Find what becomes when Find or Replace opens on <paramref name="selection"/>, or null to leave it: a caret, a line
+    /// break, or over <see cref="SeedLimit"/>. Escaped so <paramref name="mode"/> finds the text itself; Regex by <see cref="EscapeLiteral"/>,
+    /// as Normal is, because Regex.Escape writes patterns the formatted view refuses.</summary>
+    public static string? SeedQuery(string? selection, Mode mode) =>
+        string.IsNullOrEmpty(selection) || selection.Length > SeedLimit || selection.AsSpan().IndexOfAny('\r', '\n') >= 0 ? null
+        : mode switch { Mode.Regex => EscapeLiteral(selection), Mode.Extended => selection.Replace(@"\", @"\\"),
+                        Mode.Wildcards => Regex.Replace(selection, @"[\\*?]", @"\$0"), _ => selection };
+
     /// <summary>What Ctrl+F does with the selection it finds: <see cref="Take"/> it as
     /// the Replace All scope, <see cref="Keep"/> whatever was already kept, or
     /// <see cref="Drop"/> it.</summary>

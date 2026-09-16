@@ -15,7 +15,7 @@ import { mountEditor } from './jsdom-editor.mjs';
 import { settleDocument } from '../src/settle.js';
 import {
   findReset, findNext, findClear, findReplace, findReplaceAll, findCaptureScope,
-  findMatchLimit, expandTemplate, dotnetGroupMap,
+  findMatchLimit, expandTemplate, dotnetGroupMap, findSelectionText,
 } from '../src/find.js';
 
 // The one table both engines answer to (#5 F-1, F-4, F-13). FindEngineTests.cs reads
@@ -941,5 +941,20 @@ describe('MalformedPatternReplacesNothing', () => {
     assert.deepEqual(findReplaceAll(ed.view(), 'x', false), { replaced: 0, skipped: 0, moved: 0, total: 0, inSelection: false });
     assert.deepEqual(findReplace(ed.view(), 'x', false, true), { replaced: 0, skipped: 0, total: 0, current: 0 });
     assert.equal(md(), 'cat (unclosed');
+  });
+});
+
+describe('FindWhatFromTheSelection', () => {
+  test('is the text the page shows over marks, links and code, and nothing for Find’s own current match', () => {
+    load('plain **bold** *it* [link](https://x.test) `code` tail\n\none\\\ntwo');
+    const { from, to } = blockRange('plain bold it link code tail');
+    ed.selectText(from, to);
+    assert.equal(findSelectionText(ed.view(), 501), 'plain bold it link code tail');
+    assert.equal(findSelectionText(ed.view(), 5), 'plain');             // no more than the host asks for
+    ed.selectText(from + 6, ed.view().state.doc.content.size - 1);     // into the next block and over its hard break
+    assert.equal(findSelectionText(ed.view(), 501), 'bold it link code tail\none\ntwo');
+    scan('co.e');
+    findNext(true);                                                     // Find's own selection of "code": a pattern must not become it
+    assert.equal(findSelectionText(ed.view(), 501), '');
   });
 });

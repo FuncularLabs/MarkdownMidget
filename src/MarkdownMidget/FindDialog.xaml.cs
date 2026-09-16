@@ -63,19 +63,22 @@ public partial class FindDialog : Window
     /// <summary>Ctrl+F / Edit ▸ Find…: the cursor in Find what.</summary>
     public void FocusQuery() { _replaceAsked = false; Activate(); FocusBox(); }
 
-    /// <summary>Ctrl+H / Edit ▸ Replace…: the cursor in Replace with, unless the document is read-only.</summary>
+    /// <summary>Ctrl+H / Edit ▸ Replace…: the cursor in Replace with, unless Find what is empty or the document is read-only.</summary>
     public void FocusReplace() { _replaceAsked = true; Activate(); FocusBox(); }
 
-    /// <summary>Replace with takes the cursor when Replace was asked for and the document can change. Read-only,
-    /// Replace is greyed and the host refuses one, so the cursor goes where Find puts it.</summary>
-    public static bool FocusesReplaceBox(bool replaceAsked, bool readOnly) => replaceAsked && !readOnly;
+    /// <summary>Find what takes the selected text (<see cref="FindEngine.SeedQuery"/>), selected; the search runs on it as if typed.</summary>
+    public void Seed(string query) { QueryBox.Text = query; QueryBox.SelectAll(); }
+
+    /// <summary>Replace with takes the cursor when Replace was asked for, Find what has text and the document can change. Otherwise
+    /// the search has to be typed first, or Replace is greyed and refused, so the cursor goes where Find puts it.</summary>
+    public static bool FocusesReplaceBox(bool replaceAsked, bool readOnly, bool queryEmpty) => replaceAsked && !readOnly && !queryEmpty;
 
     private bool _replaceAsked;   // the last Ctrl+F or Ctrl+H: Loaded can land after the host's call, and honours it
     private bool _readOnly;
 
     private void FocusBox()
     {
-        var box = FocusesReplaceBox(_replaceAsked, _readOnly) ? ReplaceBox : QueryBox;
+        var box = FocusesReplaceBox(_replaceAsked, _readOnly, QueryBox.Text.Length == 0) ? ReplaceBox : QueryBox;
         box.Focus();
         box.SelectAll();
     }

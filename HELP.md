@@ -125,8 +125,9 @@ and heading ends, **↵** at manual line breaks, and **→** for tabs.
 ## Find
 
 **Edit ▸ Find…** (or **Ctrl+F**) opens a modeless Find and Replace dialog.
-**Edit ▸ Replace…** (or **Ctrl+H**) opens it with the cursor in **Replace with**; in a
-read-only document, such as this Help window, Replace is greyed out and the cursor goes to **Find what**.
+**Edit ▸ Replace…** (or **Ctrl+H**) opens it with the cursor in **Replace with**, or in **Find what** when that's empty
+or the document is read-only, such as this Help window, where Replace is greyed out. Text selected on one line (up to
+500 characters) fills **Find what**, escaped if the search mode needs it; in the WYSIWYG view, without its Markdown.
 **F3** jumps to the next match, **Shift+F3** to the previous. The status line
 shows **`Match m of n`**. Find works in either the WYSIWYG or the Markdown source
 view, and so does Replace (below).

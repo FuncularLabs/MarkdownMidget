@@ -348,6 +348,14 @@ export function findCaptureScope(view) {
   return { from: sel.from, to: sel.to };
 }
 
+/// The selected text as shown (no markdown; '\n' between blocks and at a hard break), at most `limit` characters, for
+/// FindEngine.SeedQuery. Nothing for a node or Find's own current match: re-seeding would turn a pattern into its match.
+export function findSelectionText(view, limit) {
+  const sel = view?.state.selection;
+  if (!sel || sel.node || isCurrentMatch(view, sel)) return '';
+  return view.state.doc.textBetween(sel.from, sel.to, '\n').slice(0, limit);
+}
+
 /// The map from a .NET group NUMBER to the JavaScript one, built from a pattern
 /// source. The two engines number capture groups differently: .NET numbers the
 /// unnamed groups in source order and then the named ones, JavaScript numbers

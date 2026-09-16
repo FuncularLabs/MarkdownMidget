@@ -15,6 +15,7 @@ import { SEPARATOR } from './spell-separator.js';
 import {
   findReset as fReset, findNext as fNext, findPrev as fPrev, findClear as fClear,
   findReplace as fReplace, findReplaceAll as fReplaceAll, findCaptureScope as fCaptureScope,
+  findSelectionText as fSelectionText,
 } from './find.js';
 import { settleDocument } from './settle.js';
 import { linkAt } from './link-at.js';
@@ -767,6 +768,7 @@ const MDM = {
   findReplace(replacement, literal, wrap) { return fReplace(editorView, replacement || '', !!literal, !!wrap); },
   findReplaceAll(replacement, literal) { return fReplaceAll(editorView, replacement || '', !!literal); },
   findCaptureScope() { return fCaptureScope(editorView); },
+  findSelectionText(limit) { return fSelectionText(editorView, limit); },   // Find what from the selection
 
   // Apply width/height (px) to the currently selected image node.
   setImageSize(width, height) {

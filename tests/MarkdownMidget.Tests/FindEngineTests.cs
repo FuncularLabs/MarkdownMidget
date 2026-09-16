@@ -653,4 +653,23 @@ public class FindEngineTests
         Assert.Equal("x [$_] y", ReplaceAll("x cat y", "cat", FindEngine.Mode.Regex, "[$_]", matchCase: true));
         Assert.Equal("x [$`][$'] y", ReplaceAll("x cat y", "cat", FindEngine.Mode.Regex, "[$`][$']", matchCase: true));
     }
+
+    [Fact]
+    public void TheSelectionFillsFindWhatOnlyWhenItIsOneLineOfAtMostTheLimit()
+    {
+        Assert.Equal("cat food", FindEngine.SeedQuery("cat food", FindEngine.Mode.Normal));
+        Assert.NotNull(FindEngine.SeedQuery(new string('x', 500), FindEngine.Mode.Normal));   // with 501 below, SeedLimit is 500 exactly
+        foreach (var leftAlone in new[] { null, "", "one\ntwo", "one\rtwo", new string('x', 501) })
+            Assert.Null(FindEngine.SeedQuery(leftAlone, FindEngine.Mode.Normal));
+    }
+
+    [Theory]
+    [InlineData(FindEngine.Mode.Normal)][InlineData(FindEngine.Mode.Extended)]
+    [InlineData(FindEngine.Mode.Wildcards)][InlineData(FindEngine.Mode.Regex)]
+    public void TheSeededQueryFindsTheSelectedTextItselfInEveryMode(FindEngine.Mode mode)
+    {
+        const string selected = @"a*b?c\nd.(e)[f]{2}^$|+ #g";   // the decoy after it is what this matches read as wildcards; as Extended, \n is a newline
+        var regex = FindEngine.Build(FindEngine.SeedQuery(selected, mode)!, mode, matchCase: true, wholeWord: false);   // null: refused, as the formatted view would
+        Assert.Equal(new[] { selected }, regex!.Matches(selected + @" aZZbQc\nd.(e)[f]{2}^$|+ #g").Select(m => m.Value));
+    }
 }
