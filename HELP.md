@@ -767,6 +767,14 @@ both versions whenever they differ, so it's always clear what you're running
 versus what's installed. This applies to installed copies; a portable exe never
 changes under a running window, so the item doesn't appear there.
 
+### If .md files stopped opening in Markdown Midget after an update
+
+Updating could switch `.md` files back to another app. To choose Markdown Midget
+again, right-click a `.md` file ▸ **Open with** ▸ **Choose another app**, pick
+**Markdown Midget** and click **Always**. Or open Windows **Settings ▸ Apps ▸
+Default apps**, search for `.md` and pick **Markdown Midget**. If it isn't offered,
+run **File ▸ Windows Integration ▸ Register as .md editor…** first.
+
 ## Known limits
 
 Deliberate choices, parked rather than overlooked. Each one says what you'll run

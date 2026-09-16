@@ -71,74 +71,89 @@ internal static class RegistrationService
 
     // ===== Register / Unregister =====
 
-    /// <summary>
-    /// Register <paramref name="exePath"/> as an editor for .md. Idempotent —
-    /// existing entries under our ProgID (and stale strays) are cleaned first.
-    /// </summary>
-    public static void Register(string exePath)
+    /// <summary>The HKEY_CURRENT_USER calls registration makes, so tests can pass a fake. Get is null
+    /// when missing; Set writes a string as REG_SZ, a byte[] as REG_NONE; deletes are best-effort.</summary>
+    internal interface IRegistryValues
     {
-        DedupeStrays(keepOurProgId: true);
+        object? Get(string key, string name);
+        void Set(string key, string name, object value);
+        void DeleteTree(string key);
+        void DeleteValue(string key, string name);
+    }
+
+    private sealed class CurrentUserRegistry : IRegistryValues
+    {
+        public static readonly CurrentUserRegistry Instance = new();
+        public object? Get(string key, string name)
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(key);
+            return k?.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+        }
+        public void Set(string key, string name, object value)
+        {
+            using var k = Registry.CurrentUser.CreateSubKey(key);
+            k.SetValue(name, value, value is byte[] ? RegistryValueKind.None : RegistryValueKind.String);
+        }
+        public void DeleteTree(string key) { try { Registry.CurrentUser.DeleteSubKeyTree(key, false); } catch { } }
+        public void DeleteValue(string key, string name)
+        {
+            try { using var k = Registry.CurrentUser.OpenSubKey(key, writable: true); k?.DeleteValue(name, false); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Register <paramref name="exePath"/> as an editor for .md. Installed updates and repeat
+    /// Registers run this again, so it writes only missing or different values, in place, and
+    /// deletes nothing: deleting what a user's default (UserChoice) points at makes Windows reset
+    /// it to another app. The stray cleanup that did so now runs only in <see cref="Unregister()"/>.
+    /// </summary>
+    public static void Register(string exePath) => Register(exePath, CurrentUserRegistry.Instance, NotifyShellAssocChanged);
+
+    /// <summary>As above, against <paramref name="reg"/>; <paramref name="notifyShell"/> only if a value was written.</summary>
+    internal static void Register(string exePath, IRegistryValues reg, Action notifyShell)
+    {
+        string command = $"\"{exePath}\" \"%1\"", icon = $"\"{exePath}\",0", classes = @"Software\Classes\";
+        var changed = false;
+        void Put(string key, string name, object value)
+        {
+            var now = reg.Get(key, name);
+            if (value is byte[] bytes ? now is byte[] had && had.AsSpan().SequenceEqual(bytes) : Equals(now, value)) return;
+            reg.Set(key, name, value);
+            changed = true;
+        }
+        void PutProgId(string progId, string typeName)
+        {
+            Put(classes + progId, string.Empty, typeName);
+            Put(classes + progId, "FriendlyTypeName", typeName);
+            Put(classes + progId + @"\DefaultIcon", string.Empty, icon);
+            Put(classes + progId + @"\shell\open", "FriendlyAppName", DisplayName);
+            Put(classes + progId + @"\shell\open\command", string.Empty, command);
+        }
 
         // Our ProgID (the modern, canonical entry).
-        using (var progKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\" + ProgId)!)
-        {
-            progKey.SetValue(string.Empty, DocTypeName);
-            progKey.SetValue("FriendlyTypeName", DocTypeName);
-            using (var icon = progKey.CreateSubKey("DefaultIcon")!)
-                icon.SetValue(string.Empty, $"\"{exePath}\",0");
-            using (var open = progKey.CreateSubKey(@"shell\open"))
-                open!.SetValue("FriendlyAppName", DisplayName);
-            using (var cmd = progKey.CreateSubKey(@"shell\open\command")!)
-                cmd.SetValue(string.Empty, $"\"{exePath}\" \"%1\"");
-        }
+        PutProgId(ProgId, DocTypeName);
 
         // Also mirror under Applications\<exe> — some older Open With code paths
         // look here for the display name.
-        using (var appsKey = Registry.CurrentUser.CreateSubKey(
-            @"Software\Classes\Applications\" + ExeCanonicalName)!)
-        {
-            appsKey.SetValue("FriendlyAppName", DisplayName);
-            using (var supported = appsKey.CreateSubKey("SupportedTypes")!)
-            {
-                supported.SetValue(".md", string.Empty);
-                supported.SetValue(".mdenc", string.Empty);
-            }
-            using (var cmd = appsKey.CreateSubKey(@"shell\open\command")!)
-                cmd.SetValue(string.Empty, $"\"{exePath}\" \"%1\"");
-            using (var icon = appsKey.CreateSubKey("DefaultIcon")!)
-                icon.SetValue(string.Empty, $"\"{exePath}\",0");
-        }
+        var apps = classes + @"Applications\" + ExeCanonicalName;
+        Put(apps, "FriendlyAppName", DisplayName);
+        Put(apps + @"\SupportedTypes", ".md", string.Empty);
+        Put(apps + @"\SupportedTypes", ".mdenc", string.Empty);
+        Put(apps + @"\shell\open\command", string.Empty, command);
+        Put(apps + @"\DefaultIcon", string.Empty, icon);
 
         // Link our ProgID into the .md extension's OpenWithProgids.
-        using (var mdKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\.md")!)
-        using (var pids = mdKey.CreateSubKey("OpenWithProgids")!)
-        {
-            pids.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
-        }
+        Put(classes + @".md\OpenWithProgids", ProgId, Array.Empty<byte>());
 
         // Secure Markdown (.mdenc) rides the same registration: its own ProgID so
         // Explorer names the type honestly, same open command. Registered here
         // rather than opt-in because nothing else on the system can open one, and
         // the docs promise double-click works.
-        using (var progKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\" + SecureProgId)!)
-        {
-            progKey.SetValue(string.Empty, SecureDocTypeName);
-            progKey.SetValue("FriendlyTypeName", SecureDocTypeName);
-            using (var icon = progKey.CreateSubKey("DefaultIcon")!)
-                icon.SetValue(string.Empty, $"\"{exePath}\",0");
-            using (var open = progKey.CreateSubKey(@"shell\open"))
-                open!.SetValue("FriendlyAppName", DisplayName);
-            using (var cmd = progKey.CreateSubKey(@"shell\open\command")!)
-                cmd.SetValue(string.Empty, $"\"{exePath}\" \"%1\"");
-        }
-        using (var encKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\.mdenc")!)
-        {
-            // .mdenc has no other claimants, so the ProgID can be the default
-            // handler outright - no Default-apps ceremony needed for double-click.
-            encKey.SetValue(string.Empty, SecureProgId);
-            using var pids = encKey.CreateSubKey("OpenWithProgids")!;
-            pids.SetValue(SecureProgId, Array.Empty<byte>(), RegistryValueKind.None);
-        }
+        PutProgId(SecureProgId, SecureDocTypeName);
+        // .mdenc has no other claimants, so the ProgID can be the default
+        // handler outright - no Default-apps ceremony needed for double-click.
+        Put(classes + ".mdenc", string.Empty, SecureProgId);
+        Put(classes + @".mdenc\OpenWithProgids", SecureProgId, Array.Empty<byte>());
 
         // The Windows 11 "Default apps" page builds its list of choosable apps from
         // HKCU\Software\RegisteredApplications -> a Capabilities key. Everything
@@ -146,80 +161,48 @@ internal static class RegistrationService
         // writes the app never appears in the Default-apps chooser — the very panel
         // the register flow opens and tells the user to pick Markdown Midget from.
         // Reported in the field as "it says to set the value, but it isn't there".
-        using (var caps = Registry.CurrentUser.CreateSubKey(CapabilitiesKeyPath)!)
-        {
-            caps.SetValue("ApplicationName", DisplayName);
-            caps.SetValue("ApplicationDescription",
-                "WYSIWYG markdown editor — WordPad-style editing with markdown as the native format.");
-            using var assoc = caps.CreateSubKey("FileAssociations")!;
-            assoc.SetValue(".md", ProgId);
-            assoc.SetValue(".markdown", ProgId);
-            assoc.SetValue(".mdenc", SecureProgId);
-        }
-        using (var registered = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications")!)
-        {
-            registered.SetValue(DisplayName, CapabilitiesKeyPath);
-        }
+        Put(CapabilitiesKeyPath, "ApplicationName", DisplayName);
+        Put(CapabilitiesKeyPath, "ApplicationDescription",
+            "WYSIWYG markdown editor — WordPad-style editing with markdown as the native format.");
+        Put(CapabilitiesKeyPath + @"\FileAssociations", ".md", ProgId);
+        Put(CapabilitiesKeyPath + @"\FileAssociations", ".markdown", ProgId);
+        Put(CapabilitiesKeyPath + @"\FileAssociations", ".mdenc", SecureProgId);
+        Put(@"Software\RegisteredApplications", DisplayName, CapabilitiesKeyPath);
 
+        if (changed) notifyShell();
+    }
+
+    /// <summary>Remove all registration and dedupe strays. Safe to call twice. Explicit uninstall only.</summary>
+    public static void Unregister()
+    {
+        Unregister(CurrentUserRegistry.Instance);
+        DedupeStrays(keepOurProgId: false);
         NotifyShellAssocChanged();
     }
 
-    /// <summary>Remove all registration and dedupe strays. Safe to call twice.</summary>
-    public static void Unregister()
+    /// <summary>The removals <see cref="Unregister()"/> makes before its stray cleanup, each best-effort.</summary>
+    internal static void Unregister(IRegistryValues reg)
     {
-        // Remove our ProgID entry.
-        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\" + ProgId, throwOnMissingSubKey: false); } catch { }
-
-        // Remove our Applications\<exe> entry.
-        try { Registry.CurrentUser.DeleteSubKeyTree(
-            @"Software\Classes\Applications\" + ExeCanonicalName, throwOnMissingSubKey: false); } catch { }
-
-        // Remove the Default-apps listing (RegisteredApplications + Capabilities).
-        try
-        {
-            using var registered = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", writable: true);
-            registered?.DeleteValue(DisplayName, throwOnMissingValue: false);
-        }
+        reg.DeleteTree(@"Software\Classes\" + ProgId);
+        reg.DeleteTree(@"Software\Classes\Applications\" + ExeCanonicalName);
+        reg.DeleteValue(@"Software\RegisteredApplications", DisplayName);   // the Default-apps listing
+        reg.DeleteTree(@"Software\Funcular Labs\Markdown Midget");
+        reg.DeleteTree(@"Software\Classes\" + SecureProgId);
+        try { if (reg.Get(@"Software\Classes\.mdenc", string.Empty) as string == SecureProgId) reg.Set(@"Software\Classes\.mdenc", string.Empty, string.Empty); }
         catch { }
-        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Funcular Labs\Markdown Midget", throwOnMissingSubKey: false); } catch { }
-
-        // Remove the Secure Markdown registration.
-        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\" + SecureProgId, throwOnMissingSubKey: false); } catch { }
-        try
-        {
-            using var encKey = Registry.CurrentUser.OpenSubKey(@"Software\Classes\.mdenc", writable: true);
-            if (encKey is not null)
-            {
-                if (encKey.GetValue(string.Empty) as string == SecureProgId)
-                    encKey.SetValue(string.Empty, string.Empty);
-                using var pids = encKey.OpenSubKey("OpenWithProgids", writable: true);
-                pids?.DeleteValue(SecureProgId, throwOnMissingValue: false);
-            }
-        }
-        catch { }
-
-        // Remove our ProgID from .md OpenWithProgids.
-        try
-        {
-            using var pids = Registry.CurrentUser.OpenSubKey(
-                @"Software\Classes\.md\OpenWithProgids", writable: true);
-            pids?.DeleteValue(ProgId, throwOnMissingValue: false);
-        }
-        catch { }
-
-        DedupeStrays(keepOurProgId: false);
-        NotifyShellAssocChanged();
+        reg.DeleteValue(@"Software\Classes\.mdenc\OpenWithProgids", SecureProgId);
+        reg.DeleteValue(@"Software\Classes\.md\OpenWithProgids", ProgId);
     }
 
     /// <summary>
     /// Clean up any left-over "MarkdownMidget" references from previous manual
     /// "Open with → Choose another app" pickings so the extension menu ends up
-    /// with only our controlled entry. Called on both Register and Unregister.
+    /// with only our controlled entry. Unregister only: it deletes a UserChoice,
+    /// and keys one can point at, which resets the user's default.
     /// </summary>
     /// <param name="keepOurProgId">
-    /// When true (during Register), don't strip our fresh <see cref="ProgId"/>
-    /// from Explorer's per-user OpenWithProgids MRU. When false (Unregister),
-    /// strip it too.
+    /// When true, don't strip our <see cref="ProgId"/> from Explorer's per-user
+    /// OpenWithProgids MRU. When false (Unregister), strip it too.
     /// </param>
     private static void DedupeStrays(bool keepOurProgId = false)
     {

@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -702,6 +702,16 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** In step 1, both are identical. In step 2, only the last paragraph differs, and every line still ends in CRLF.
 - **Type:** Human. The host applies line endings and the byte-order mark.
 
+### INST — Install and update
+
+#### INST-01 Updating over an existing install keeps the .md default
+- **Change:** Fixed: "Updating Markdown Midget now keeps your file associations" · **Documents:** a copy of `br-forms.md` · **Settings:** this build installed and registered; another app that opens `.md` files installed, such as Markdown Monster or Visual Studio Code
+1. Right-click the copy ▸ **Open with** ▸ **Choose another app** ▸ **Markdown Midget** ▸ **Always**.
+2. Run **File ▸ Windows Integration ▸ Register as .md editor…** again. Then, if **Help ▸ About Markdown Midget** offers an update, click **Update**; if not, write N/A for this part in the note.
+3. After each step, double-click the copy and look at Windows **Settings ▸ Apps ▸ Default apps** for `.md`.
+- **Expected:** The copy opens in Markdown Midget each time, Settings still names Markdown Midget for `.md`, and Windows shows no notice that an app default was reset.
+- **Type:** Human. Only a person can set a Windows default app, and no test may touch the real registry. An update is carried out by the version already installed, so it proves the fix only from a build that has it.
+
 ## 4. Run log
 
 For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
@@ -1254,6 +1264,7 @@ Human results only, from Paul on 2026-09-15. No automated run on this interim RC
 | FND-05 | | | |
 | VIEW-03 | | | |
 | TIP-01 | | | |
+| INST-01 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

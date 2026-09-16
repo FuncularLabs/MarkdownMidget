@@ -22,6 +22,7 @@ testing before the stable release of the same number.
 
 ### Fixed
 
+- **Updating Markdown Midget now keeps your file associations**: if Markdown Midget opens your `.md` files, an update or registering again leaves that choice alone. Before, either could switch `.md` files back to another app. The update to this version is still done by the version you have, so check once afterwards; Help, *If .md files stopped opening in Markdown Midget after an update*, shows how to choose it again.
 - **Replace is now greyed out when no document is open**: at "No document open", the Find and Replace dialog greys *Replace* and *Replace All* as it does in a read-only document, and they come back when you open one. Before, you could press them.
 
 ## [1.0.0-rc1] - 2026-09-15
