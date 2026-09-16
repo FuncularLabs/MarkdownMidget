@@ -105,7 +105,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**1.0.0-rc1 — the 1.0 release candidate; 0.10.0 is still the latest stable**, so
+**1.0.0-rc2 — the second 1.0 release candidate; 0.10.0 is still the latest stable**, so
 the badge above and the entry marked **Latest** on the releases page both point at
 0.10.0 until 1.0.0. In daily use and signed on every release.
 Windows-only for now; the editor core is web-based, so a cross-platform shell
@@ -186,9 +186,9 @@ the one it replaced:
 | Where | Looks like |
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc1+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc1+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc1+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc2+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc2+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc2+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -310,7 +310,7 @@ is deferred from this first iteration. Notable deferrals / divergences:
 - **Printing** (Ctrl+P) and **PDF export**, with header/footer and colour-code-block
   options, and **Find & Replace** (Ctrl+F, Ctrl+H, F3) in Normal / Extended / Wildcards /
   Regex modes, in both views. Replace All is one undo step, and is scoped to the
-  selected text when there is some.
+  selected text when it spans more than one line.
 - Deferred: page setup, text colour. *(Theming shipped in 0.7.0.)*
 
 ## Recent changes
@@ -318,6 +318,12 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.0-rc2** *(prerelease)* — **The second 1.0 release candidate.** Updating or
+  registering now leaves your **`.md` default** alone. The update from an older
+  version is still done by that version, so it may reset the default one last time;
+  if it does, a notice offers **Make it the default…**, which opens Windows Settings, as
+  **File ▸ Windows Integration ▸ Make Markdown Midget the default…** does.
+  **Ctrl+H** opens Replace, and Find and Replace start with the **text you selected**.
 - **v1.0.0-rc1** *(prerelease)* — **The 1.0 release candidate.** A save from the
   formatted view now keeps the text you didn't change as written: the blocks you
   edit, and sometimes blocks near them, take the app's conventions (see
