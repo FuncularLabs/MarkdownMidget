@@ -29,21 +29,10 @@ public class DefaultAppTests
         => Assert.Equal(expected, DefaultApp.Step(offer, help, closing, recovering, unsaved).ToString());
 
     [Theory]
-    [InlineData(null, null, true)]                                              // none: rc1's Register deleted it
-    [InlineData("UserChoice", "MarkdownMidget.Document", true)]
-    [InlineData("UserChoice", @"applications\MarkdownMidget-1.0.0-rc1.exe", true)]
-    [InlineData("UserChoice", "VSCode.md", false)]                              // the user chose another app
-    [InlineData("UserChoiceLatest", "VSCode.md", false)]                        // and the newer key, either shape, wins over an older UserChoice of ours
-    [InlineData(@"UserChoiceLatest\ProgId", "VSCode.md", false)]
-    [InlineData("UserChoice", @"Applications\mkm.exe", false)]
-    public void With_no_record_the_UserChoice_ProgId_says_whether_the_default_was_ours(string? key, string? progId, bool expected)
-    {
-        const string FileExts = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\";
-        var reg = new Recorder();
-        if (key is not null) reg.Values[FileExts + key + "|ProgId"] = progId!;
-        if (key?.StartsWith("UserChoiceLatest") == true) reg.Values[FileExts + "UserChoice|ProgId"] = "MarkdownMidget.Document";
-        Assert.Equal(expected, DefaultApp.DefaultWasOurs(reg));
-    }
+    [InlineData(true, "Windows no longer opens .md files with Markdown Midget.")]   // the last run recorded that it did
+    [InlineData(null, "Windows doesn't open .md files with Markdown Midget.")]      // no record (rc1): a reset and a choice of another app look alike
+    public void The_notice_says_no_longer_only_when_the_last_run_recorded_that_md_opened_with_us(bool? before, string text)
+        => Assert.Equal(text, DefaultApp.NoticeText(before));
 
     [Fact]
     public void One_notice_at_a_time_and_the_next_can_take_it_once_released()
@@ -61,8 +50,7 @@ public class DefaultAppTests
     private sealed class Recorder : RegistrationService.IRegistryValues
     {
         public readonly List<(string Key, string Name)> Written = [];
-        public readonly Dictionary<string, object> Values = [];
-        public object? Get(string key, string name) => Values.GetValueOrDefault(key + "|" + name);
+        public object? Get(string key, string name) => null;
         public void Set(string key, string name, object value) => Written.Add((key, name));
         public void DeleteTree(string key) { }
         public void DeleteValue(string key, string name) { }

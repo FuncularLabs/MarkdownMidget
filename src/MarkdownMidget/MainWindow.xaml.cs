@@ -3329,24 +3329,27 @@ public partial class MainWindow : Window
 
     private void MakeDefault_Click(object sender, RoutedEventArgs e) => DefaultApp.OpenSettings(this);
 
-    /// <summary>After an update of the installed copy, says once that .md files no longer open with it, then records what they open
-    /// with and this version. Never writes an association. DefaultApp.Step decides show, wait or record only; while another
-    /// window shows the notice, this one waits too.</summary>
+    /// <summary>After an update of the installed copy, says once that .md files don't open with it (DefaultApp.NoticeText), then
+    /// records what they open with and this version. Never writes an association. DefaultApp.Step decides show, wait or record only.
+    /// While another window shows the notice this one waits; holding it, this one reads the record again, which a window that has
+    /// just shown it has written.</summary>
     private void OfferDefaultAfterUpdate()
     {
         var installed = RegistrationService.IsRunningFromAppDataInstall();
         if (!installed || _settingsUnknown || !TryReadSettings(out var s)) return;
         var now = DefaultApp.MdOpensWithUs();
-        var off = s?.DefaultNoticeOff == true;
-        var wasOurs = s?.MdOpensWithUs ?? DefaultApp.DefaultWasOurs(RegistrationService.CurrentUserRegistry.Instance);   // no record: ask UserChoice
-        var step = DefaultApp.Step(DefaultApp.ShouldOfferDefault(wasOurs, now, s?.LastRunVersion != AppVersion, installed, off), _isHelpWindow, _yieldingToOtherWindow, _recoverSessionId is not null, _dirty);
+        DefaultApp.NoticeStep StepFor(AppSettings? x) => DefaultApp.Step(DefaultApp.ShouldOfferDefault(x?.MdOpensWithUs, now,
+            x?.LastRunVersion != AppVersion, installed, x?.DefaultNoticeOff == true), _isHelpWindow, _yieldingToOtherWindow, _recoverSessionId is not null, _dirty);
+        var step = StepFor(s);
         var held = step == DefaultApp.NoticeStep.Show ? DefaultApp.TryHoldNotice() : null;
-        if (step == DefaultApp.NoticeStep.Wait || step == DefaultApp.NoticeStep.Show && held is null) return;
         try
         {
-            if (held is not null)
+            if (held is not null) step = TryReadSettings(out s) ? StepFor(s) : DefaultApp.NoticeStep.Wait;
+            if (step == DefaultApp.NoticeStep.Wait || step == DefaultApp.NoticeStep.Show && held is null) return;
+            var off = false;
+            if (step == DefaultApp.NoticeStep.Show)
             {
-                (var make, off) = DefaultApp.AskAfterUpdate(this);
+                (var make, off) = DefaultApp.AskAfterUpdate(this, DefaultApp.NoticeText(s?.MdOpensWithUs));
                 if (make) DefaultApp.OpenSettings(this);   // not registered: it says to register first
             }
             SavePersistentField(x => { x.MdOpensWithUs = now; x.LastRunVersion = AppVersion; x.DefaultNoticeOff |= off; });

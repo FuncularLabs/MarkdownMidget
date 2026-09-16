@@ -17,7 +17,7 @@ internal static class RegistrationService
 {
     // Stable ProgID: re-registering overwrites the same key, so we can't
     // accidentally create duplicate "MarkdownMidget" entries in Open With.
-    internal const string ProgId = "MarkdownMidget.Document";
+    private const string ProgId = "MarkdownMidget.Document";
     private const string SecureProgId = "MarkdownMidget.SecureDocument";
     internal const string DisplayName = "Markdown Midget";   // also the value name under RegisteredApplications (Settings' registeredAppUser)
     private const string DocTypeName = "Markdown Document";
@@ -84,7 +84,7 @@ internal static class RegistrationService
         IEnumerable<string> ValueNames(string key);
     }
 
-    internal sealed class CurrentUserRegistry : IRegistryValues
+    private sealed class CurrentUserRegistry : IRegistryValues
     {
         public static readonly CurrentUserRegistry Instance = new();
         public object? Get(string key, string name)

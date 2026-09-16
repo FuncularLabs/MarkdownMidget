@@ -15,7 +15,7 @@ testing before the stable release of the same number.
 - **Ctrl+H now opens Replace**, as in other editors: the Find and Replace dialog opens in either view with the cursor in *Replace with*, or in *Find what* when that's empty. In a read-only document, such as Help, Replace stays greyed out and the cursor goes to *Find what*.
 - **Edit ▸ Replace…** now sits under **Find…**, and does what Ctrl+H does.
 - **Markdown Midget now helps you set it as the .md default**: **File ▸ Windows Integration ▸ Make Markdown Midget the default…**, and a button of the same name in the Register dialog, open Windows Settings where you choose it; from Windows 11 22H2, on Markdown Midget's own page. Before, you had to find that page yourself.
-- **After an update, Markdown Midget now tells you if Windows stopped opening .md files with it**: the installed copy says so once for that version and offers **Make it the default…**, **Not now** and **Don't show this again**. It only looks, and never changes a default itself. Before, you found out when a `.md` file opened in another app.
+- **After an update, Markdown Midget now tells you if Windows doesn't open .md files with it**: the installed copy says so once and offers **Make it the default…**, **Not now** and **Don't show this again**. It only looks, and never changes a default itself. Before, you found out when a `.md` file opened in another app.
 
 ### Changed
 

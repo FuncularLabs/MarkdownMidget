@@ -37,17 +37,10 @@ internal static class DefaultApp
     internal static NoticeStep Step(bool offer, bool help, bool closing, bool recovering, bool unsaved)
         => !offer ? NoticeStep.Record : help || closing || recovering || unsaved ? NoticeStep.Wait : NoticeStep.Show;
 
-    /// <summary>With no record (rc1 kept none), whether .md's default was ours: the ProgId under UserChoiceLatest (either shape), else
-    /// UserChoice. None (rc1's Register deleted it) or ours is yes; another app's means the user chose it. Read-only.</summary>
-    internal static bool DefaultWasOurs(RegistrationService.IRegistryValues reg)
-    {
-        const string FileExts = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\";
-        string? progId;
-        try { progId = (reg.Get(FileExts + @"UserChoiceLatest\ProgId", "ProgId") ?? reg.Get(FileExts + "UserChoiceLatest", "ProgId") ?? reg.Get(FileExts + "UserChoice", "ProgId")) as string; }
-        catch { progId = null; }   // unreadable reads as none
-        return string.IsNullOrEmpty(progId) || progId.Equals(RegistrationService.ProgId, StringComparison.OrdinalIgnoreCase)
-            || progId.StartsWith(@"Applications\", StringComparison.OrdinalIgnoreCase) && System.IO.Enumeration.FileSystemName.MatchesSimpleExpression("MarkdownMidget*.exe", progId[13..]);
-    }
+    /// <summary>"No longer" only when the last run recorded that .md opened with us. With no record (rc1 kept none), a reset by
+    /// Windows and a choice of another app look alike, so the notice claims neither.</summary>
+    internal static string NoticeText(bool? previousRecord) => previousRecord == true
+        ? "Windows no longer opens .md files with Markdown Midget." : "Windows doesn't open .md files with Markdown Midget.";
 
     /// <summary>The per-session lock a showing notice holds, so a second window shows none; null if another holds it. Release on this thread.</summary>
     internal static Mutex? TryHoldNotice(string name = @"Local\MarkdownMidget.DefaultNotice")
@@ -70,14 +63,14 @@ internal static class DefaultApp
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
     private static extern int AssocQueryString(int flags, int str, string assoc, string? extra, System.Text.StringBuilder? outBuffer, ref uint outSize);
 
-    /// <summary>The notice after an update: whether Make it the default… was clicked, and its checkbox.</summary>
-    internal static (bool Make, bool DontShowAgain) AskAfterUpdate(Window owner)
+    /// <summary>The notice after an update, saying <paramref name="text"/>: whether Make it the default… was clicked, and its checkbox.</summary>
+    internal static (bool Make, bool DontShowAgain) AskAfterUpdate(Window owner, string text)
     {
         var never = new CheckBox { Content = "_Don't show this again", Margin = new Thickness(0, 14, 0, 14) };
         var make = new Button { Content = "_Make it the default…", IsDefault = true, Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(0, 0, 8, 0) };
         var dlg = new Window { Owner = owner, Title = "Markdown Midget", SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
             ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = new StackPanel { Margin = new Thickness(18), Children = {
-                new TextBlock { Text = "Windows no longer opens .md files with Markdown Midget." }, never, new StackPanel { Orientation = Orientation.Horizontal,
+                new TextBlock { Text = text }, never, new StackPanel { Orientation = Orientation.Horizontal,
                     HorizontalAlignment = HorizontalAlignment.Right, Children = { make, new Button { Content = "_Not now", IsCancel = true, MinWidth = 80 } } } } } };
         make.Click += (_, _) => dlg.DialogResult = true;
         return (dlg.ShowDialog() == true, never.IsChecked == true);   // left to right: the checkbox is read after the dialog closes
