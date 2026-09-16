@@ -311,10 +311,13 @@ function afterChange(view, tr) {
   reindex();
 }
 
-// The Replace All scope. Selected text is the scope — unless it is Find's own
+// Only a selection over a line break limits Replace All; one on a single line is what fills Find what (FindEngine.IsReplaceScope).
+const spansLines = (view, sel) => /[\r\n]/.test(view.state.doc.textBetween(sel.from, sel.to, '\n'));
+
+// The Replace All scope. Selected text over a line break is the scope — unless it is Find's own
 // selection of the current match, in which case the selection captured when the
 // dialog opened is (if the document is still the one it was captured on). A
-// caret, a node selection, or nothing captured means the whole document.
+// caret, a selection on one line, a node selection, or nothing captured means the whole document.
 function resolveScope(view) {
   const sel = view.state.selection;
   if (sel.node) return null;
@@ -322,7 +325,7 @@ function resolveScope(view) {
   // and testing `sel.empty` first read that as the user having no selection and
   // widened Replace All to the whole document (#5 F-5). Mirrors the host's
   // FindEngine.ResolveScope.
-  if (!isCurrentMatch(view, sel)) return sel.empty ? null : { from: sel.from, to: sel.to };
+  if (!isCurrentMatch(view, sel)) return spansLines(view, sel) ? { from: sel.from, to: sel.to } : null;
   if (capturedScope && capturedScope.doc === view.state.doc)
     return { from: capturedScope.from, to: capturedScope.to };
   return null;
@@ -330,7 +333,7 @@ function resolveScope(view) {
 
 /// Remember the current selection as the Replace All scope for this dialog
 /// session (the host calls this when the Find dialog opens or is refocused).
-/// A caret or a selected node drops what was kept; the selection Find itself
+/// A caret, a selection on one line or a selected node drops what was kept; the selection Find itself
 /// made keeps it (bringing the dialog back with Ctrl+F changes nothing). Returns
 /// the range kept, or null.
 export function findCaptureScope(view) {
@@ -343,7 +346,7 @@ export function findCaptureScope(view) {
       ? { from: capturedScope.from, to: capturedScope.to }
       : null;
   }
-  if (sel.empty) { capturedScope = null; return null; }
+  if (!spansLines(view, sel)) { capturedScope = null; return null; }
   capturedScope = { from: sel.from, to: sel.to, doc: view.state.doc };
   return { from: sel.from, to: sel.to };
 }

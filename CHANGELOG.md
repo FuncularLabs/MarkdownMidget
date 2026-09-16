@@ -11,7 +11,7 @@ testing before the stable release of the same number.
 
 ### Added
 
-- **Find and Replace now start with your selected text**: select a word or phrase on one line and press Ctrl+F or Ctrl+H, and *Find what* holds it, in either view. In the formatted view it's the text you see, without Markdown. A selection over more than one line, or longer than 500 characters, leaves *Find what* as it was.
+- **Find and Replace now start with your selected text**: select a word or phrase on one line and press Ctrl+F or Ctrl+H, and *Find what* holds it, in either view. In the formatted view it's the text you see, without Markdown. A selection over more than one line, or longer than 500 characters, leaves *Find what* as it was. Replace All now changes the whole document when the selection is on one line; only a selection over more than one line limits it.
 - **Ctrl+H now opens Replace**, as in other editors: the Find and Replace dialog opens in either view with the cursor in *Replace with*, or in *Find what* when that's empty. In a read-only document, such as Help, Replace stays greyed out and the cursor goes to *Find what*.
 - **Edit ▸ Replace…** now sits under **Find…**, and does what Ctrl+H does.
 

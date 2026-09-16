@@ -23,7 +23,7 @@ public partial class FindDialog : Window
     private static string s_lastReplacement = "";
 
     private const string ReplaceTip = "The current match, then find the next";
-    private const string ReplaceAllTip = "Every match — within the selection when there is one — as one undo step";
+    private const string ReplaceAllTip = "Every match — within the selection when it spans lines — as one undo step";
     private const string ReadOnlyTip = "The document is read-only.";
     private const string NoDocumentTip = "No document is open.";
 

@@ -255,8 +255,8 @@ The dialog has a **Replace with** box under **Find what**, and two buttons:
   first. Past the last match it goes round to the first when **Wrap around** is
   on, and stops when it is off.
 - **Replace All** changes every match as **one undo step** — Ctrl+Z puts the
-  whole document back. When part of the document is selected, only matches lying
-  entirely inside the selection are changed; a caret means the whole document.
+  whole document back. When the selection spans more than one line, only matches lying
+  entirely inside it are changed; a caret, or a selection on one line, means the whole document.
   In the WYSIWYG view a search stops after 50000 matches — a pattern like `\b` or
   `x*` matches at every position — and Find says so beside the count. Replace All
   then refuses and changes nothing, rather than changing the part of the document

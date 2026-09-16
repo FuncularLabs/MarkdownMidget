@@ -663,6 +663,10 @@ public class FindEngineTests
             Assert.Null(FindEngine.SeedQuery(leftAlone, FindEngine.Mode.Normal));
     }
 
+    [Fact]   // a selection on one line, however long, is the whole document: MainWindow and find.js gate the scope on this
+    public void OnlyASelectionOverALineBreakLimitsReplaceAll() => Assert.Equal(new[] { false, false, false, false, true, true },
+        new[] { null, "", "cat food", new string('x', 501), "one\ntwo", "one\r\ntwo" }.Select(FindEngine.IsReplaceScope));
+
     [Theory]
     [InlineData(FindEngine.Mode.Normal)][InlineData(FindEngine.Mode.Extended)]
     [InlineData(FindEngine.Mode.Wildcards)][InlineData(FindEngine.Mode.Regex)]

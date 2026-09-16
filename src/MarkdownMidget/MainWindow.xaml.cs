@@ -3459,7 +3459,7 @@ public partial class MainWindow : Window
     /// gone; this is it. A selection that is Find's own — the current match — is not
     /// taken as a new range (what was kept stays, so Ctrl+F to bring the dialog back
     /// changes nothing), and that is asked FIRST, because Find's selection of a
-    /// zero-width match is itself a caret; any other caret drops what was kept.
+    /// zero-width match is itself a caret; any other caret, or a selection on one line, drops what was kept.
     /// The decision is <see cref="FindEngine.CaptureDecision"/>, which the formatted
     /// view follows too. Source view: two anchors follow the range
     /// through the replacements made here, and any other edit drops it. Formatted
@@ -3478,7 +3478,7 @@ public partial class MainWindow : Window
             SourceBox.TextEdited += (_, _, _) => { if (!_applyingReplace) _sourceReplaceScope = null; };
         }
         var start = SourceBox.SelectionStart;
-        var length = SourceBox.SelectionLength;
+        var length = FindEngine.IsReplaceScope(SourceBox.SelectedText) ? SourceBox.SelectionLength : 0;   // one line: as a caret
         switch (FindEngine.CaptureDecision(length, IsSourceFindSelection()))
         {
             case FindEngine.ScopeCapture.Keep: return;              // Find's own: keep what was kept
@@ -3787,7 +3787,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// The Replace All scope in the source view: selected text is the scope — unless
+    /// The Replace All scope in the source view: selected text over a line break is the scope — unless
     /// it is Find's own selection of the current match (a caret, when that match has
     /// no width), in which case the selection kept when the dialog opened is
     /// (<see cref="CaptureReplaceScope"/>). A caret of the user's own, or nothing
@@ -3800,7 +3800,7 @@ public partial class MainWindow : Window
             ? ((int Start, int Length)?)(a.Start.Offset, a.End.Offset - a.Start.Offset)
             : null;
         return FindEngine.ResolveScope(
-            SourceBox.SelectionStart, SourceBox.SelectionLength, IsSourceFindSelection(), kept);
+            SourceBox.SelectionStart, FindEngine.IsReplaceScope(SourceBox.SelectedText) ? SourceBox.SelectionLength : 0, IsSourceFindSelection(), kept);
     }
 
     /// <summary>The count, in the status bar and in the dialog.</summary>

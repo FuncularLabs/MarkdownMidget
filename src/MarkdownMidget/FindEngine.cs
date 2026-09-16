@@ -389,9 +389,13 @@ public static class FindEngine
     /// break, or over <see cref="SeedLimit"/>. Escaped so <paramref name="mode"/> finds the text itself; Regex by <see cref="EscapeLiteral"/>,
     /// as Normal is, because Regex.Escape writes patterns the formatted view refuses.</summary>
     public static string? SeedQuery(string? selection, Mode mode) =>
-        string.IsNullOrEmpty(selection) || selection.Length > SeedLimit || selection.AsSpan().IndexOfAny('\r', '\n') >= 0 ? null
+        string.IsNullOrEmpty(selection) || selection.Length > SeedLimit || IsReplaceScope(selection) ? null
         : mode switch { Mode.Regex => EscapeLiteral(selection), Mode.Extended => selection.Replace(@"\", @"\\"),
                         Mode.Wildcards => Regex.Replace(selection, @"[\\*?]", @"\$0"), _ => selection };
+
+    /// <summary>Whether the user's selected text limits Replace All: only over a line break. A selection on one line, however long,
+    /// means the whole document, as a caret does; it is the kind <see cref="SeedQuery"/> puts in Find what (find.js spansLines).</summary>
+    public static bool IsReplaceScope(string? selection) => selection.AsSpan().IndexOfAny('\r', '\n') >= 0;
 
     /// <summary>What Ctrl+F does with the selection it finds: <see cref="Take"/> it as
     /// the Replace All scope, <see cref="Keep"/> whatever was already kept, or
@@ -404,24 +408,25 @@ public static class FindEngine
     ///
     /// "Is this Find's own selection?" is asked FIRST: Find's selection of a
     /// zero-width match is a caret, and asking "is it empty?" first read that as the
-    /// user having deselected and threw the kept range away (#5 F-5).
+    /// user having deselected and threw the kept range away (#5 F-5). <paramref name="scopeLength"/> is the
+    /// selection's length when <see cref="IsReplaceScope"/>, and 0 otherwise, in both methods.
     /// </summary>
-    public static ScopeCapture CaptureDecision(int selectionLength, bool isFindSelection)
+    public static ScopeCapture CaptureDecision(int scopeLength, bool isFindSelection)
         => isFindSelection ? ScopeCapture.Keep
-         : selectionLength <= 0 ? ScopeCapture.Drop
+         : scopeLength <= 0 ? ScopeCapture.Drop
          : ScopeCapture.Take;
 
     /// <summary>
-    /// The Replace All scope: the user's own selected text, or — when the selection is
+    /// The Replace All scope: the user's own selected text over a line break, or — when the selection is
     /// Find's own, which it is as soon as a search has run — the range kept when the
     /// dialog opened. Null means the whole document. Same reason as
     /// <see cref="CaptureDecision"/> for the order of the tests.
     /// </summary>
     public static (int Start, int Length)? ResolveScope(
-        int selectionStart, int selectionLength, bool isFindSelection, (int Start, int Length)? captured)
+        int selectionStart, int scopeLength, bool isFindSelection, (int Start, int Length)? captured)
     {
         if (!isFindSelection)
-            return selectionLength > 0 ? (selectionStart, selectionLength) : null;
+            return scopeLength > 0 ? (selectionStart, scopeLength) : null;
         return captured is { Length: > 0 } c ? c : null;
     }
 

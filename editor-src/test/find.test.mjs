@@ -5,7 +5,7 @@
 // FindEngine and hands both across; what is proved here is the editor side —
 // that a replacement lands on exactly the found range and nothing else (F3),
 // that Replace All is one transaction and so one undo step (F4), that it is
-// scoped to a selection when there is one (F2), that the group forms the host
+// scoped to a selection over a line break (F2), that the group forms the host
 // documents expand (F5), and that Replace advances to the next match (F1).
 import test, { before, beforeEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -360,34 +360,34 @@ describe('AnEditBehindTheIndexIsReScannedBeforeAnythingIsReplaced', () => {
 });
 
 describe('ReplaceAllIsScopedToTheSelection', () => {
-  test('only matches wholly inside the selected text are replaced', () => {
+  test('only matches wholly inside a selection over a line break are replaced; one on a single line is the whole document', () => {
     load('cat one\n\ncat two\n\ncat three');
     const { from, to } = blockRange('cat two');
-    ed.selectText(from, to);
+    ed.selectText(from - 2, to);                 // from the end of "cat one": over a line break
     scan('cat');
     const r = findReplaceAll(ed.view(), 'dog', true);
     assert.deepEqual(r, { replaced: 1, skipped: 0, moved: 0, total: 3, inSelection: true });
     assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
+    ed.selectText(blockRange('cat three').from, blockRange('cat three').to);   // one line, the kind that fills Find what
+    scan('cat');
+    assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 2, skipped: 0, moved: 0, total: 2, inSelection: false });
   });
 
   test('a match that ends one character past the scope is outside it', () => {
     // The edge itself: '>' rather than '>=', or a stray +1 on the scope end, lets
     // a match that overruns the selection by exactly one character through (#5 F-8).
-    load('catx');
+    load('y\n\ncatx');
     const p = blockRange('catx');
-    ed.selectText(p.from, p.from + 2);           // 'ca' — the match runs one past it
+    ed.selectText(p.from - 2, p.from + 2);       // over the line break to 'ca' — the match runs one past it
     scan('cat');
     assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 0);
-    assert.equal(md(), 'catx');
+    assert.equal(md(), 'y\n\ncatx');
 
     // One character more of selection and the same match is inside.
-    findClear();
-    load('catx');
-    const q = blockRange('catx');
-    ed.selectText(q.from, q.from + 3);
+    ed.selectText(p.from - 2, p.from + 3);
     scan('cat');
     assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 1);
-    assert.equal(md(), 'dogx');
+    assert.equal(md(), 'y\n\ndogx');
   });
 
   test('the kept range follows a replacement far longer than the match', () => {
@@ -395,7 +395,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     // was never mapped still covers. Seventeen does not (#5 F-7).
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
-    ed.selectText(two.from, two.to);
+    ed.selectText(two.from - 2, two.to);   // from the end of "cat one": over a line break
     findCaptureScope(ed.view());
     scan('cat');
     findNext(true);
@@ -411,7 +411,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
   test('a match the selection cuts through is outside it', () => {
     load('cat one\n\ncat two');
     const { from, to } = blockRange('cat two');
-    ed.selectText(from + 1, to);        // "at two"
+    ed.selectText(from - 8, from + 1);  // "at one", over the line break, to "c": both matches cut through
     scan('cat');
     assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 0);
     assert.equal(md(), 'cat one\n\ncat two');
@@ -430,8 +430,8 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
   test('the selection captured when Find opened scopes Replace All after Find has moved the selection', () => {
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
-    ed.selectText(two.from, two.to);
-    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from, to: two.to });
+    ed.selectText(two.from - 2, two.to);   // from the end of "cat one": over a line break
+    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from - 2, to: two.to });
     scan('cat');
     findNext(true);
     const one = blockRange('cat one');
@@ -444,7 +444,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
   test('the captured selection follows a Replace and is dropped by findClear and by a foreign edit', () => {
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
-    ed.selectText(two.from, two.to);
+    ed.selectText(two.from - 2, two.to);   // from the end of "cat one": over a line break
     findCaptureScope(ed.view());
     scan('cat');
     findNext(true);
@@ -459,7 +459,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     // An edit the find layer did not make: the captured scope no longer describes
     // the document, so it is dropped rather than applied to the wrong text.
     const dogTwo = blockRange('dog two');
-    ed.selectText(dogTwo.from, dogTwo.to);
+    ed.selectText(dogTwo.from - 2, dogTwo.to);
     findCaptureScope(ed.view());
     const v = ed.view();
     v.dispatch(v.state.tr.insertText('Z', 1, 1));
@@ -473,7 +473,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     // And findClear forgets it.
     load('cat one\n\ncat two');
     const b = blockRange('cat two');
-    ed.selectText(b.from, b.to);
+    ed.selectText(b.from - 2, b.to);
     findCaptureScope(ed.view());
     findClear();
     scan('cat');
@@ -489,13 +489,13 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     // pressed on one, and scoped the next Replace All to the whole document (#5 F-5).
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
-    ed.selectText(two.from, two.to);
+    ed.selectText(two.from - 2, two.to);   // from the end of "cat one": over a line break
     findCaptureScope(ed.view());
     scan('(?=cat)');
     findNext(true);
     const one = blockRange('cat one');
     ed.selectText(one.from, one.from);                // the caret Find leaves on match 1
-    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from, to: two.to });
+    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from - 2, to: two.to });
     const r = findReplaceAll(ed.view(), 'X', true);
     assert.deepEqual({ replaced: r.replaced, inSelection: r.inSelection }, { replaced: 1, inSelection: true });
     assert.equal(md(), 'cat one\n\nXcat two\n\ncat three');
@@ -504,19 +504,18 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
   test('capturing again keeps the range while the selection is Find’s, and drops it for a caret', () => {
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
-    ed.selectText(two.from, two.to);
+    ed.selectText(two.from - 2, two.to);   // from the end of "cat one": over a line break
     findCaptureScope(ed.view());
     scan('cat');
     findNext(true);
     const one = blockRange('cat one');
     ed.selectText(one.from, one.from + 3);       // Find's selection of match 1
     // Ctrl+F again with Find's selection: the kept range is still the answer.
-    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from, to: two.to });
+    assert.deepEqual(findCaptureScope(ed.view()), { from: two.from - 2, to: two.to });
     assert.equal(findReplaceAll(ed.view(), 'dog', true).inSelection, true);
     assert.equal(md(), 'cat one\n\ndog two\n\ncat three');
 
-    // Ctrl+F again after clicking in the document (a caret): nothing is kept.
-    ed.selectText(one.from, one.from);
+    ed.selectText(one.from, one.to);   // Ctrl+F again over "cat one", on one line, is a caret's: nothing is kept
     assert.equal(findCaptureScope(ed.view()), null);
     scan('cat');
     findNext(true);
@@ -562,7 +561,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     // Replace All with Find's selection and a kept range: the kept range is selected after.
     load('cat one\n\ncat two\n\ncat three');
     const two = blockRange('cat two');
-    ed.selectText(two.from, two.to);
+    ed.selectText(two.from - 2, two.to);   // from the end of "cat one": over a line break
     findCaptureScope(ed.view());
     scan('cat');
     findNext(true);
@@ -571,7 +570,7 @@ describe('ReplaceAllIsScopedToTheSelection', () => {
     findReplaceAll(ed.view(), 'tiger', true);
     sel = ed.view().state.selection;
     // The kept range, grown by the replacement inside it ("tiger" is two longer).
-    assert.deepEqual({ from: sel.from, to: sel.to }, { from: two.from, to: two.to + 2 });
+    assert.deepEqual({ from: sel.from, to: sel.to }, { from: two.from - 2, to: two.to + 2 });
     // A second Replace All in the same range, now as the user's own selection.
     scan('tiger');
     assert.deepEqual(findReplaceAll(ed.view(), 'dog', true), { replaced: 1, skipped: 0, moved: 0, total: 1, inSelection: true });
