@@ -18,7 +18,11 @@ public partial class RegisterDialog : Window
         // move — hide that option (the file lives in the app folder already).
         if (RegistrationService.IsRunningFromAppDataInstall())
             MovePanel.Visibility = Visibility.Collapsed;
+        var registered = RegistrationService.IsRegistered();   // Settings lists only a registered app
+        (MakeDefaultBtn.IsEnabled, MakeDefaultBtn.ToolTip) = (registered, DefaultApp.ButtonTip(registered));
     }
+
+    private void MakeDefault_Click(object sender, RoutedEventArgs e) => DefaultApp.OpenSettings(this);
 
     private void Ok_Click(object sender, RoutedEventArgs e) => DialogResult = true;
 }

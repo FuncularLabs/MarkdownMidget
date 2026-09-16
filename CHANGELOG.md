@@ -14,6 +14,8 @@ testing before the stable release of the same number.
 - **Find and Replace now start with your selected text**: select a word or phrase on one line and press Ctrl+F or Ctrl+H, and *Find what* holds it, in either view. In the formatted view it's the text you see, without Markdown. A selection over more than one line, or longer than 500 characters, leaves *Find what* as it was. Replace All now changes the whole document when the selection is on one line; only a selection over more than one line limits it.
 - **Ctrl+H now opens Replace**, as in other editors: the Find and Replace dialog opens in either view with the cursor in *Replace with*, or in *Find what* when that's empty. In a read-only document, such as Help, Replace stays greyed out and the cursor goes to *Find what*.
 - **Edit ▸ Replace…** now sits under **Find…**, and does what Ctrl+H does.
+- **Markdown Midget now helps you set it as the .md default**: **File ▸ Windows Integration ▸ Make Markdown Midget the default…**, and a button of the same name in the Register dialog, open Windows Settings where you choose it; from Windows 11 22H2, on Markdown Midget's own page. Before, you had to find that page yourself.
+- **After an update, Markdown Midget now tells you if Windows stopped opening .md files with it**: the installed copy says so once for that version and offers **Make it the default…**, **Not now** and **Don't show this again**. It only looks, and never changes a default itself. Before, you found out when a `.md` file opened in another app.
 
 ### Changed
 

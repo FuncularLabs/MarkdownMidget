@@ -2157,6 +2157,7 @@ public partial class MainWindow : Window
     {
         try { await LandAsync(); }
         finally { if (!_landed) { _landed = true; _inPlaceOpens--; } }
+        OfferDefaultAfterUpdate();   // after the editor, the document and any recovery
     }
     private bool _landed;
 
@@ -3288,6 +3289,7 @@ public partial class MainWindow : Window
                 RegistrationService.SaveInstallInfo(download, moved: willMove);
 
             RegistrationService.Register(exeToRegister);
+            SavePersistentField(x => (x.MdOpensWithUs, x.LastRunVersion) = (DefaultApp.MdOpensWithUs(), AppVersion));   // an install, not an update: no notice
             if (dlg.AddStartMenu) RegistrationService.CreateStartMenuShortcut(exeToRegister);
             else RegistrationService.RemoveStartMenuShortcut();
             if (dlg.AddDesktop) RegistrationService.CreateDesktopShortcut(exeToRegister);
@@ -3323,6 +3325,25 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "Couldn't complete registration:\n\n" + ex.Message,
                 "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private void MakeDefault_Click(object sender, RoutedEventArgs e) => DefaultApp.OpenSettings(this);
+
+    /// <summary>After an update of the installed copy, says once that .md files no longer open with it, then records what they open
+    /// with and this version. Never writes an association. Not over a file, recovered work or Help: the notice waits, and so does its record.</summary>
+    private void OfferDefaultAfterUpdate()
+    {
+        var installed = RegistrationService.IsRunningFromAppDataInstall();
+        if (!installed || _settingsUnknown || !TryReadSettings(out var s)) return;
+        var now = DefaultApp.MdOpensWithUs();
+        var off = s?.DefaultNoticeOff == true;
+        if (DefaultApp.ShouldOfferDefault(s?.MdOpensWithUs, now, s?.LastRunVersion != AppVersion, installed, off))
+        {
+            if (_isHelpWindow || _yieldingToOtherWindow || _recoverSessionId is not null || _currentPath is not null || _dirty) return;
+            (var make, off) = DefaultApp.AskAfterUpdate(this);
+            if (make) DefaultApp.OpenSettings(this);   // not registered: it says to register first
+        }
+        SavePersistentField(x => { x.MdOpensWithUs = now; x.LastRunVersion = AppVersion; x.DefaultNoticeOff |= off; });
     }
 
     private void UnregisterMdEditor_Click(object sender, RoutedEventArgs e)
@@ -4114,6 +4135,10 @@ public partial class MainWindow : Window
         // with WhatsNewState, not equality, so an older value after an update is the
         // ordinary case rather than something to migrate.
         public string? LastSeenChangelogVersion { get; set; }
+        // For the update notice; written only by OfferDefaultAfterUpdate and Register, so SaveSettings carries them from disk.
+        public bool? MdOpensWithUs { get; set; }
+        public string? LastRunVersion { get; set; }
+        public bool DefaultNoticeOff { get; set; }
         // Remembered window placement. Null/zero means "never saved" -> default layout.
         public double? WindowLeft { get; set; }
         public double? WindowTop { get; set; }
@@ -4318,6 +4343,7 @@ public partial class MainWindow : Window
             s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
             s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
             s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
+            (s.MdOpensWithUs, s.LastRunVersion, s.DefaultNoticeOff) = (existing?.MdOpensWithUs, existing?.LastRunVersion, existing?.DefaultNoticeOff == true);
             WriteSettings(s);
         }
         catch { /* best-effort */ }

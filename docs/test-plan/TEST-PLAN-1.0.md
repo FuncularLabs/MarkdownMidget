@@ -721,6 +721,16 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** The download is gone from Downloads, and the copy opens in the installed Markdown Midget with no error and no app chooser.
 - **Type:** Human. Windows decides what a default chosen that way runs, and no test may touch the real registry.
 
+#### INST-03 Make default, and the notice after an update
+- **Change:** Added: "Markdown Midget now helps you set it as the .md default" and "After an update, Markdown Midget now tells you if Windows stopped opening .md files with it" · **Settings:** this build installed and registered; another app that opens `.md` files installed. To stand in for an update, close Markdown Midget and set `"LastRunVersion"` to `"v0"` in `%LocalAppData%\MarkdownMidget\settings.json`.
+1. On Windows 11, then on Windows 10, click **File ▸ Windows Integration ▸ Make Markdown Midget the default…**.
+2. Unregister, keeping the installed copy; open **Register as .md editor…** and hover **Make Markdown Midget the default…**; then register again.
+3. Set `.md` to Markdown Midget and start it once. Set `.md` to the other app, stand in for an update, and start it from the Start menu: click **Not now**. Start it again.
+4. Repeat step 3, ticking **Don't show this again** before **Not now**. Then repeat step 3 once more.
+5. Repeat step 3 with a copy of the exe outside `%LocalAppData%\Programs\MarkdownMidget\`.
+- **Expected:** 1: Settings opens on Markdown Midget's page on Windows 11, and on Default apps on Windows 10. 2: the button is greyed out and its tooltip says to register first. 3: "Windows no longer opens .md files with Markdown Midget." shows on the first start only. 4: no notice in the last repeat. 5: no notice.
+- **Type:** Human. Only a person can set a Windows default app, and no test may touch the real registry, open Settings or start the app.
+
 ## 4. Run log
 
 For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
@@ -1275,6 +1285,7 @@ Human results only, from Paul on 2026-09-15. No automated run on this interim RC
 | TIP-01 | | | |
 | INST-01 | | | |
 | INST-02 | | | |
+| INST-03 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

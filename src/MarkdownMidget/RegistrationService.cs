@@ -19,7 +19,7 @@ internal static class RegistrationService
     // accidentally create duplicate "MarkdownMidget" entries in Open With.
     private const string ProgId = "MarkdownMidget.Document";
     private const string SecureProgId = "MarkdownMidget.SecureDocument";
-    private const string DisplayName = "Markdown Midget";
+    internal const string DisplayName = "Markdown Midget";   // also the value name under RegisteredApplications (Settings' registeredAppUser)
     private const string DocTypeName = "Markdown Document";
     private const string SecureDocTypeName = "Markdown Midget Encrypted Document";
     private const string ExeCanonicalName = "MarkdownMidget.exe";
