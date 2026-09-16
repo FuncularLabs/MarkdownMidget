@@ -31,6 +31,35 @@ internal static class DefaultApp
     internal static bool IsSameExe(string? resolved, string exePath) => !string.IsNullOrWhiteSpace(resolved)
         && string.Equals(Path.GetFullPath(resolved), Path.GetFullPath(exePath), StringComparison.OrdinalIgnoreCase);
 
+    internal enum NoticeStep { Record, Show, Wait }
+    /// <summary>With a notice to give (<paramref name="offer"/>), show it over a clean window, a startup file loaded unmodified included;
+    /// wait over Help, a closing window, --recover or unsaved work, recording nothing, so the evidence survives. With none, record.</summary>
+    internal static NoticeStep Step(bool offer, bool help, bool closing, bool recovering, bool unsaved)
+        => !offer ? NoticeStep.Record : help || closing || recovering || unsaved ? NoticeStep.Wait : NoticeStep.Show;
+
+    /// <summary>With no record (rc1 kept none), whether .md's default was ours: the ProgId under UserChoiceLatest (either shape), else
+    /// UserChoice. None (rc1's Register deleted it) or ours is yes; another app's means the user chose it. Read-only.</summary>
+    internal static bool DefaultWasOurs(RegistrationService.IRegistryValues reg)
+    {
+        const string FileExts = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\";
+        string? progId;
+        try { progId = (reg.Get(FileExts + @"UserChoiceLatest\ProgId", "ProgId") ?? reg.Get(FileExts + "UserChoiceLatest", "ProgId") ?? reg.Get(FileExts + "UserChoice", "ProgId")) as string; }
+        catch { progId = null; }   // unreadable reads as none
+        return string.IsNullOrEmpty(progId) || progId.Equals(RegistrationService.ProgId, StringComparison.OrdinalIgnoreCase)
+            || progId.StartsWith(@"Applications\", StringComparison.OrdinalIgnoreCase) && System.IO.Enumeration.FileSystemName.MatchesSimpleExpression("MarkdownMidget*.exe", progId[13..]);
+    }
+
+    /// <summary>The per-session lock a showing notice holds, so a second window shows none; null if another holds it. Release on this thread.</summary>
+    internal static Mutex? TryHoldNotice(string name = @"Local\MarkdownMidget.DefaultNotice")
+    {
+        Mutex? mutex = null;
+        try { mutex = new Mutex(false, name); if (mutex.WaitOne(0)) return mutex; }
+        catch (AbandonedMutexException) { return mutex; }   // a window that died showing it: this one holds it now
+        catch { /* can't tell: no notice this launch */ }
+        mutex?.Dispose();
+        return null;
+    }
+
     /// <summary>Whether opening a .md file runs the installed exe now. Read-only: AssocQueryString(ASSOCF_NONE, ASSOCSTR_EXECUTABLE).</summary>
     internal static bool MdOpensWithUs()
     {

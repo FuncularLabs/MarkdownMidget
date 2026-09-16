@@ -3330,20 +3330,28 @@ public partial class MainWindow : Window
     private void MakeDefault_Click(object sender, RoutedEventArgs e) => DefaultApp.OpenSettings(this);
 
     /// <summary>After an update of the installed copy, says once that .md files no longer open with it, then records what they open
-    /// with and this version. Never writes an association. Not over a file, recovered work or Help: the notice waits, and so does its record.</summary>
+    /// with and this version. Never writes an association. DefaultApp.Step decides show, wait or record only; while another
+    /// window shows the notice, this one waits too.</summary>
     private void OfferDefaultAfterUpdate()
     {
         var installed = RegistrationService.IsRunningFromAppDataInstall();
         if (!installed || _settingsUnknown || !TryReadSettings(out var s)) return;
         var now = DefaultApp.MdOpensWithUs();
         var off = s?.DefaultNoticeOff == true;
-        if (DefaultApp.ShouldOfferDefault(s?.MdOpensWithUs, now, s?.LastRunVersion != AppVersion, installed, off))
+        var wasOurs = s?.MdOpensWithUs ?? DefaultApp.DefaultWasOurs(RegistrationService.CurrentUserRegistry.Instance);   // no record: ask UserChoice
+        var step = DefaultApp.Step(DefaultApp.ShouldOfferDefault(wasOurs, now, s?.LastRunVersion != AppVersion, installed, off), _isHelpWindow, _yieldingToOtherWindow, _recoverSessionId is not null, _dirty);
+        var held = step == DefaultApp.NoticeStep.Show ? DefaultApp.TryHoldNotice() : null;
+        if (step == DefaultApp.NoticeStep.Wait || step == DefaultApp.NoticeStep.Show && held is null) return;
+        try
         {
-            if (_isHelpWindow || _yieldingToOtherWindow || _recoverSessionId is not null || _currentPath is not null || _dirty) return;
-            (var make, off) = DefaultApp.AskAfterUpdate(this);
-            if (make) DefaultApp.OpenSettings(this);   // not registered: it says to register first
+            if (held is not null)
+            {
+                (var make, off) = DefaultApp.AskAfterUpdate(this);
+                if (make) DefaultApp.OpenSettings(this);   // not registered: it says to register first
+            }
+            SavePersistentField(x => { x.MdOpensWithUs = now; x.LastRunVersion = AppVersion; x.DefaultNoticeOff |= off; });
         }
-        SavePersistentField(x => { x.MdOpensWithUs = now; x.LastRunVersion = AppVersion; x.DefaultNoticeOff |= off; });
+        finally { held?.ReleaseMutex(); held?.Dispose(); }
     }
 
     private void UnregisterMdEditor_Click(object sender, RoutedEventArgs e)

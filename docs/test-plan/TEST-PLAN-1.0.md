@@ -728,7 +728,10 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 3. Set `.md` to Markdown Midget and start it once. Set `.md` to the other app, stand in for an update, and start it from the Start menu: click **Not now**. Start it again.
 4. Repeat step 3, ticking **Don't show this again** before **Not now**. Then repeat step 3 once more.
 5. Repeat step 3 with a copy of the exe outside `%LocalAppData%\Programs\MarkdownMidget\`.
-- **Expected:** 1: Settings opens on Markdown Midget's page on Windows 11, and on Default apps on Windows 10. 2: the button is greyed out and its tooltip says to register first. 3: "Windows no longer opens .md files with Markdown Midget." shows on the first start only. 4: no notice in the last repeat. 5: no notice.
+6. Repeat step 3, but start it by opening a `.md` file with **Open with** ▸ **Markdown Midget**. If **Help ▸ About Markdown Midget** offers an update, also apply it with a document open.
+7. Repeat step 3, and while the notice shows, start a second Markdown Midget from the Start menu.
+8. Close Markdown Midget and delete the `"MdOpensWithUs"` entry from settings.json, as a copy updated from rc1 has none. With `.md` set to the other app (**Open with** ▸ **Choose another app** ▸ **Always**), stand in for an update and start it.
+- **Expected:** 1: Settings opens on Markdown Midget's page on Windows 11, and on Default apps on Windows 10. 2: the button is greyed out and its tooltip says to register first. 3: "Windows no longer opens .md files with Markdown Midget." shows on the first start only. 4: no notice in the last repeat. 5: no notice. 6: the notice appears once the document has loaded. 7: the second window shows no notice. 8: no notice.
 - **Type:** Human. Only a person can set a Windows default app, and no test may touch the real registry, open Settings or start the app.
 
 ## 4. Run log

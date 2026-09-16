@@ -772,8 +772,9 @@ changes under a running window, so the item doesn't appear there.
 Updating could switch `.md` files back to another app. When that happens, the
 installed copy says so once after the update: click **Make it the default…**, then
 in the Windows Settings page that opens, choose **Markdown Midget** for `.md` (on
-Windows 10, under **Choose default apps by file type**). **Not now** closes the
-notice for this version; **Don't show this again** turns it off. The same page
+Windows 10, under **Choose default apps by file type**). **Not now** closes it; it
+comes back only if Markdown Midget becomes the default and later loses it again.
+**Don't show this again** turns it off. The same page
 opens from **File ▸ Windows Integration ▸ Make Markdown Midget the default…**, or the
 button of that name in **Register as .md editor…**, once Markdown Midget is registered.
 
