@@ -9,13 +9,20 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+## [1.0.0-rc2] - 2026-09-16
+
+The second 1.0 release candidate: 1.0.0-rc1 plus the changes below. Updating or registering Markdown Midget now leaves
+your `.md` default alone. The update to this version is still done by the version you have, so it may reset that default
+one last time, and a notice then helps you choose Markdown Midget again. Ctrl+H opens Replace, and Find and Replace start
+with the text you selected. A prerelease, so these changes get everyday use before 1.0.0; it includes everything in 1.0.0-rc1.
+
 ### Added
 
-- **Find and Replace now start with your selected text**: select a word or phrase on one line and press Ctrl+F or Ctrl+H, and *Find what* holds it, in either view. In the formatted view it's the text you see, without Markdown. A selection over more than one line, or longer than 500 characters, leaves *Find what* as it was. Replace All now changes the whole document when the selection is on one line; only a selection over more than one line limits it.
+- **Find and Replace now start with your selected text**: select a word or phrase on one line and press Ctrl+F or Ctrl+H, and *Find what* holds it, in either view. In the formatted view it's the text as the page shows it, without Markdown, so a `<br>` counts as a line break and a footnote reference as its label. A selection over more than one line, or longer than 500 characters, leaves *Find what* as it was. Replace All now changes the whole document when the selection is on one line, as it does with no selection; only a selection over more than one line limits it. Before, any selection limited it.
 - **Ctrl+H now opens Replace**, as in other editors: the Find and Replace dialog opens in either view with the cursor in *Replace with*, or in *Find what* when that's empty. In a read-only document, such as Help, Replace stays greyed out and the cursor goes to *Find what*.
 - **Edit ▸ Replace…** now sits under **Find…**, and does what Ctrl+H does.
-- **Markdown Midget now helps you set it as the .md default**: **File ▸ Windows Integration ▸ Make Markdown Midget the default…**, and a button of the same name in the Register dialog, open Windows Settings where you choose it; from Windows 11 22H2, on Markdown Midget's own page. Before, you had to find that page yourself.
-- **After an update, Markdown Midget now tells you if Windows doesn't open .md files with it**: the installed copy says so once and offers **Make it the default…**, **Not now** and **Don't show this again**. It only looks, and never changes a default itself. Before, you found out when a `.md` file opened in another app.
+- **Markdown Midget now helps you set it as the .md default**: once it's registered, **File ▸ Windows Integration ▸ Make Markdown Midget the default…**, and a button of the same name in the Register dialog, open Windows Settings where you choose it; from Windows 11 22H2, on Markdown Midget's own page. Until then, the menu item says to register first and the button is greyed out. Before, you had to find that page yourself.
+- **After an update, Markdown Midget now tells you if Windows doesn't open .md files with it**: after each update, the installed copy checks what opens `.md` files. If it's another app, it says "Windows no longer opens .md files with Markdown Midget." when they opened with Markdown Midget the last time it ran, or "Windows doesn't open .md files with Markdown Midget." when there's no record of that, as after an update from 1.0.0-rc1 or earlier. If they already opened in another app the last time it ran, it says nothing. The notice shows once and offers **Make it the default…**, **Not now** and **Don't show this again**; after **Not now** it comes back only if Markdown Midget becomes the default again and a later update finds it isn't. It only looks, and never changes a default itself. Before, you found out when a `.md` file opened in another app.
 
 ### Changed
 
@@ -24,7 +31,7 @@ testing before the stable release of the same number.
 
 ### Fixed
 
-- **Updating Markdown Midget now keeps your file associations**: if Markdown Midget opens your `.md` files, an update or registering again leaves that choice alone, and a copy you chose by hand now opens the installed one. Before, either could switch `.md` files back to another app. The update to this version is still done by the version you have, so check once afterwards; Help, *If .md files stopped opening in Markdown Midget after an update*, shows how to choose it again.
+- **Updating Markdown Midget now keeps your file associations**: if Markdown Midget opens your `.md` files, an update or registering again leaves that choice alone. If you chose a downloaded copy of Markdown Midget by hand, registering or updating now points that choice at the installed copy. Before, either could switch `.md` files back to another app. The update to this version is still done by the version you have, so it may switch them one last time; the notice after the update then offers to make Markdown Midget the default again, and Help, *If .md files stopped opening in Markdown Midget after an update*, shows how.
 - **Replace is now greyed out when no document is open**: at "No document open", the Find and Replace dialog greys *Replace* and *Replace All* as it does in a read-only document, and they come back when you open one. Before, you could press them.
 
 ## [1.0.0-rc1] - 2026-09-15
@@ -1307,7 +1314,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.0-rc1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.0-rc2...HEAD
+[1.0.0-rc2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc2
 [1.0.0-rc1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc1
 [1.0.0-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-beta1
 [0.10.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v0.10.0
