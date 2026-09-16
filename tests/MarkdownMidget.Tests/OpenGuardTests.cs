@@ -810,6 +810,18 @@ public class OpenGuardTests : IDisposable
         Assert.Null(MainWindow.DocumentArgument(Array.Empty<string>()));
     }
 
+    [Fact]   // A stray file named like a flag where the app starts (Downloads, for a Move relaunch) is not the document; its full path is.
+    public void DocumentArgumentSkipsBareFlagNamesButNotTheirFullPaths()
+    {
+        string[] flags = ["--make-default", "--finish-move", "--recover", "--new", "--source", "--readonly", "-r", "--help-window"];
+        try
+        {
+            foreach (var flag in flags) File.WriteAllText(flag, "");   // where a bare token resolves: the current folder
+            foreach (var flag in flags) { Assert.Null(MainWindow.DocumentArgument([flag])); Assert.Equal(Path.GetFullPath(flag), MainWindow.DocumentArgument([Path.GetFullPath(flag)])); }
+        }
+        finally { foreach (var flag in flags) File.Delete(flag); }
+    }
+
     [Theory]
     [InlineData(true, true)]
     [InlineData(true, false)]

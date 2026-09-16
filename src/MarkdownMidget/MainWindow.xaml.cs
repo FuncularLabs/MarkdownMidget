@@ -226,7 +226,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// The document path on a command line: the first argument that names an
-    /// existing file and is not the VALUE of --recover or --finish-move. The
+    /// existing file and is not a bare flag or the VALUE of --recover or --finish-move. The
     /// latter's value is the downloaded exe, which exists and must not be opened as
     /// a document. Mirrors the loop in the constructor, which consumes those values
     /// the same way for its own purposes.
@@ -237,6 +237,7 @@ public partial class MainWindow : Window
         {
             var arg = args[i];
             if (arg is "--recover" or "--finish-move") { if (i + 1 < args.Length) i++; continue; }
+            if (arg is "--readonly" or "-r" or "/readonly" or "--source" or "/source" or "--help-window" or "--new" or "--make-default") continue;   // the loop's flags, not a same-named file
             if (File.Exists(arg)) return arg;
         }
         return null;
