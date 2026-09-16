@@ -492,9 +492,9 @@ it's clear what each option does. Register offers (all on by default):
   it later.
 - **Add to the Start menu** — a `Markdown Midget.lnk` in your Start-menu Programs.
 - **Add a Desktop shortcut** — a shortcut on your desktop.
-- **Make it my default for .md files** (off by default) — opens the Default Apps
-  page filtered to `.md`; click "Markdown Midget" there to finish (Windows
-  requires this last click).
+- **Make it my default for .md files** (off by default) — then opens the Settings page
+  **Make Markdown Midget the default…** opens, where you choose Markdown Midget for
+  `.md` to finish (Windows requires this last step).
 
 **File ▸ Windows Integration ▸ Unregister as .md editor** offers to undo each of
 those (with diagrams), all optional:

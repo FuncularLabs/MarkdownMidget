@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -591,26 +590,6 @@ internal static class RegistrationService
                 catch { await Task.Delay(250); }
             }
         });
-    }
-
-    // ===== Windows default-apps deep link =====
-
-    /// <summary>
-    /// Open Windows Settings on the Default Apps page filtered to .md. Win10/11
-    /// won't let us set the default programmatically (they guard UserChoice
-    /// with a hash), so this is the honest path — user confirms with one click.
-    /// </summary>
-    public static void OpenDefaultAppsSettings()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo("ms-settings:defaultapps?registeredAppOrFileExtension=.md")
-            { UseShellExecute = true });
-        }
-        catch
-        {
-            try { Process.Start(new ProcessStartInfo("ms-settings:defaultapps") { UseShellExecute = true }); } catch { }
-        }
     }
 
     // ===== Notify Explorer that associations changed =====

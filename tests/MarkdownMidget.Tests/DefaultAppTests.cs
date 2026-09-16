@@ -74,11 +74,23 @@ public class DefaultAppTests
     public void Make_default_launches_only_when_registered_and_says_so_when_it_cannot()
     {
         List<string> launched = [], told = [];
-        DefaultApp.OpenSettings(true, launched.Add, told.Add);
-        DefaultApp.OpenSettings(false, launched.Add, told.Add);
-        DefaultApp.OpenSettings(true, _ => throw new Win32Exception(1155, "No application is associated with the specified file for this operation"), told.Add);
-        Assert.Equal([DefaultApp.SettingsUri(Environment.OSVersion.Version.Build)], launched);
+        DefaultApp.OpenSettings(true, 22621, launched.Add, told.Add);
+        DefaultApp.OpenSettings(false, 22621, launched.Add, told.Add);
+        DefaultApp.OpenSettings(true, 22621, _ => throw new Win32Exception(1155, "No application is associated with the specified file for this operation"), told.Add);
+        Assert.Equal([DefaultApp.SettingsUri(22621)], launched);
         Assert.Equal([DefaultApp.ButtonTip(registered: false), DefaultApp.LaunchFailed], told);
+    }
+
+    [Theory]   // Register, with Make it my default ticked, calls OpenSettings once registered, as the button does; the wiring is INST-03's
+    [InlineData(22621, "Markdown Midget's page")]
+    [InlineData(19045, "Default apps")]   // Windows 10 22H2: no page for one app
+    public void Register_with_make_default_launches_the_buttons_page_for_the_build_and_says_which_page(int build, string page)
+    {
+        List<string> launched = [], told = [];
+        DefaultApp.OpenSettings(true, build, launched.Add, told.Add);
+        Assert.Equal([DefaultApp.SettingsUri(build)], launched);
+        Assert.Empty(told);
+        Assert.Contains(page, DefaultApp.RegisterNote(build));
     }
 
     [Fact]

@@ -11,18 +11,23 @@ namespace MarkdownMidget;
 internal static class DefaultApp
 {
     internal const string LaunchFailed = "Couldn't open Windows Settings. Open Settings ▸ Apps ▸ Default apps and choose Markdown Midget for .md files there.";
+    private const string DefaultApps = "ms-settings:defaultapps";
     internal static string SettingsUri(int windowsBuild) => windowsBuild >= 22621
-        ? "ms-settings:defaultapps?registeredAppUser=" + Uri.EscapeDataString(RegistrationService.DisplayName) : "ms-settings:defaultapps";
+        ? DefaultApps + "?registeredAppUser=" + Uri.EscapeDataString(RegistrationService.DisplayName) : DefaultApps;
+    /// <summary>Register's last line with Make it my default ticked, before it calls <see cref="OpenSettings(Window)"/>: names the page <see cref="SettingsUri"/> opens.</summary>
+    internal static string RegisterNote(int windowsBuild) => SettingsUri(windowsBuild) != DefaultApps
+        ? "Settings will open on Markdown Midget's page: click .md, choose Markdown Midget, then Set default (Windows requires this last step)."
+        : "Settings will open on Default apps: set .md to Markdown Midget there (Windows requires this last step).";
     internal static string ButtonTip(bool registered) => registered ? "Opens Windows Settings, where you choose Markdown Midget for .md files."
         : "Register Markdown Midget first: File ▸ Windows Integration ▸ Register as .md editor…";
-    internal static void OpenSettings(Window owner) => OpenSettings(RegistrationService.IsRegistered(), uri => Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true })?.Dispose(),
-        text => MessageBox.Show(owner, text, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information));
+    internal static void OpenSettings(Window owner) => OpenSettings(RegistrationService.IsRegistered(), Environment.OSVersion.Version.Build,
+        uri => Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true })?.Dispose(), text => MessageBox.Show(owner, text, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information));
 
-    /// <summary>Every Make default entry point: launches <see cref="SettingsUri"/> if registered; if not, or if the launch fails, says why.</summary>
-    internal static void OpenSettings(bool registered, Action<string> launch, Action<string> tell)
+    /// <summary>Every Make default entry point, Register's included: launches <see cref="SettingsUri"/> if registered; if not, or if the launch fails, says why.</summary>
+    internal static void OpenSettings(bool registered, int windowsBuild, Action<string> launch, Action<string> tell)
     {
         if (!registered) { tell(ButtonTip(false)); return; }
-        try { launch(SettingsUri(Environment.OSVersion.Version.Build)); } catch { tell(LaunchFailed); }
+        try { launch(SettingsUri(windowsBuild)); } catch { tell(LaunchFailed); }
     }
 
     /// <summary>After an update of the installed copy, unless suppressed: .md opened with us at the last run, or nothing was recorded (rc1 didn't), and doesn't now.</summary>

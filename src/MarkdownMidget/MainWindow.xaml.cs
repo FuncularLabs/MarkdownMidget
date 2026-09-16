@@ -3314,11 +3314,10 @@ public partial class MainWindow : Window
             if (dlg.AddDesktop) lines.Add("Desktop shortcut: added");
             lines.Add("");
             lines.Add("Earlier Markdown Midget entries in \"Open with\" now open this version, so a default you chose keeps working. Unregister removes them.");
-            if (dlg.SetAsDefault)
-                lines.Add("\nSettings will open on the .md page — click \"Markdown Midget\" there to finish making it the default (Windows requires this last click).");
+            if (dlg.SetAsDefault) lines.Add("\n" + DefaultApp.RegisterNote(Environment.OSVersion.Version.Build));
 
             MessageBox.Show(this, string.Join("\n", lines), "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
-            if (dlg.SetAsDefault) RegistrationService.OpenDefaultAppsSettings();
+            if (dlg.SetAsDefault) DefaultApp.OpenSettings(this);   // registered now, so this opens the page the note names, as Make default does
         }
         catch (Exception ex)
         {

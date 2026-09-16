@@ -9,6 +9,10 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Registering with "Make it my default for .md files" now opens Settings on Markdown Midget's page**, the same page as the **Make Markdown Midget the default…** button (Default apps before Windows 11 22H2), and the message before it says so. Before, Settings opened on the general Default apps page, not the `.md` page the dialog promised.
+
 ## [1.0.0-rc2] - 2026-09-16
 
 The second 1.0 release candidate: 1.0.0-rc1 plus the changes below. Updating or registering Markdown Midget now leaves

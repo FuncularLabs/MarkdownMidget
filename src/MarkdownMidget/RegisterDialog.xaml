@@ -101,7 +101,7 @@
         <StackPanel Margin="0,0,0,16">
             <CheckBox x:Name="SetDefaultCheck" IsChecked="False" Content="Make it my de_fault for .md files" FontWeight="SemiBold" />
             <TextBlock Style="{StaticResource Caption}"
-                       Text="Windows requires you to confirm defaults, so Settings will open on the .md page — click Markdown Midget there to finish." />
+                       Text="Windows requires you to confirm defaults, so Settings opens where you choose Markdown Midget for .md files to finish." />
             <Button x:Name="MakeDefaultBtn" Content="Ma_ke Markdown Midget the default…" HorizontalAlignment="Left" Margin="26,8,0,0" Padding="10,2" Click="MakeDefault_Click" ToolTipService.ShowOnDisabled="True" />
         </StackPanel>
 
