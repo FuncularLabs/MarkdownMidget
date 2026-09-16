@@ -956,4 +956,20 @@ describe('FindWhatFromTheSelection', () => {
     findNext(true);                                                     // Find's own selection of "code": a pattern must not become it
     assert.equal(findSelectionText(ed.view(), 501), '');
   });
+
+  test('a break counts as the page shows it: a <br> is a new line, a soft wrap is a space', () => {
+    load('cat one<br>two cat\n\ncat elsewhere');
+    let { from, to } = blockRange('cat onetwo cat');
+    ed.selectText(from, to);
+    assert.equal(findSelectionText(ed.view(), 501), 'cat one\ntwo cat');     // two lines: no seed, and a Replace All scope
+    scan('cat');
+    assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 2);
+    load('cat quick\nbrown cat\n\ncat elsewhere');
+    ({ from, to } = blockRange('cat quick\nbrown cat'));
+    ed.selectText(from, to);
+    assert.equal(findSelectionText(ed.view(), 501), 'cat quick brown cat');  // one line: seeded, and no scope
+    assert.equal(scan('cat quick brown cat').total, 1);                     // the index sees the same space
+    scan('cat');
+    assert.equal(findReplaceAll(ed.view(), 'dog', true).replaced, 3);
+  });
 });

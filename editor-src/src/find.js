@@ -312,7 +312,14 @@ function afterChange(view, tr) {
 }
 
 // Only a selection over a line break limits Replace All; one on a single line is what fills Find what (FindEngine.IsReplaceScope).
-const spansLines = (view, sel) => /[\r\n]/.test(view.state.doc.textBetween(sel.from, sel.to, '\n'));
+const spansLines = (view, sel) => /[\r\n]/.test(shownText(view, sel));
+
+// The selected text as the page shows it, breaks included: a soft wrap (an inline hardbreak) shows, and is
+// indexed, as a space; a hard break or an inline <br> (an html atom) starts a new line; blocks are lines.
+const shownLeaf = (n) => n.type.name === 'hardbreak' ? (n.attrs.isInline ? ' ' : '\n')
+  : n.type.name === 'html' ? (/<br\b/i.test(n.attrs.value) ? '\n' : '')
+  : n.type.spec.leafText?.(n) ?? '';
+const shownText = (view, sel) => view.state.doc.textBetween(sel.from, sel.to, '\n', shownLeaf);
 
 // The Replace All scope. Selected text over a line break is the scope — unless it is Find's own
 // selection of the current match, in which case the selection captured when the
@@ -351,12 +358,12 @@ export function findCaptureScope(view) {
   return { from: sel.from, to: sel.to };
 }
 
-/// The selected text as shown (no markdown; '\n' between blocks and at a hard break), at most `limit` characters, for
+/// The selected text as shown (no markdown; breaks as shownLeaf has them), at most `limit` characters, for
 /// FindEngine.SeedQuery. Nothing for a node or Find's own current match: re-seeding would turn a pattern into its match.
 export function findSelectionText(view, limit) {
   const sel = view?.state.selection;
   if (!sel || sel.node || isCurrentMatch(view, sel)) return '';
-  return view.state.doc.textBetween(sel.from, sel.to, '\n').slice(0, limit);
+  return shownText(view, sel).slice(0, limit);
 }
 
 /// The map from a .NET group NUMBER to the JavaScript one, built from a pattern
