@@ -769,11 +769,14 @@ changes under a running window, so the item doesn't appear there.
 
 ### If .md files stopped opening in Markdown Midget after an update
 
-Updating could switch `.md` files back to another app. After an update, if `.md`
-files don't open with Markdown Midget, the installed copy says so once: click
+After an update, the installed copy tells you once if `.md` files don't open with
+Markdown Midget. It says "Windows no longer opens .md files with Markdown Midget." when
+they opened with Markdown Midget the last time it ran, or "Windows doesn't open .md files
+with Markdown Midget." when there's no record of that, as after an update from 1.0.0-rc1 or
+earlier. If they opened in another app the last time it ran, there's no notice. Click
 **Make it the default…**, then choose **Markdown Midget** for `.md` in the Windows Settings page that opens (on
 Windows 10, under **Choose default apps by file type**). **Not now** closes it; it
-comes back only if Markdown Midget becomes the default and later loses it again.
+comes back only if Markdown Midget becomes the default again and a later update finds it isn't.
 **Don't show this again** turns it off. The same page
 opens from **File ▸ Windows Integration ▸ Make Markdown Midget the default…**, or the
 button of that name in **Register as .md editor…**, once Markdown Midget is registered.
