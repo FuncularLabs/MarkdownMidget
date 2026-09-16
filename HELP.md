@@ -477,9 +477,9 @@ and the status bar shows a live **word and character count**.
 
 **File ▸ Windows Integration ▸ Register as .md editor…** adds Markdown Midget to
 the Windows **"Open with"** list for `.md` files, per-user, with no installer or
-admin prompt. A stable ProgID (`MarkdownMidget.Document`) is used so re-running
-the wizard just points the existing entry at the current version — you'll never
-see duplicate "Markdown Midget" entries in the Open With menu.
+admin prompt. Registering again points earlier Markdown Midget entries at this
+version, including a copy you chose with **Choose an app on your PC**, so a default
+you chose keeps working. Only **Unregister** removes them.
 
 Registering always installs a stable copy to
 `%LocalAppData%\Programs\MarkdownMidget\` (so the Open With entry keeps working

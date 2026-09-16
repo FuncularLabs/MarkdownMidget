@@ -706,11 +706,20 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 #### INST-01 Updating over an existing install keeps the .md default
 - **Change:** Fixed: "Updating Markdown Midget now keeps your file associations" · **Documents:** a copy of `br-forms.md` · **Settings:** this build installed and registered; another app that opens `.md` files installed, such as Markdown Monster or Visual Studio Code
-1. Right-click the copy ▸ **Open with** ▸ **Choose another app** ▸ **Markdown Midget** ▸ **Always**.
+1. Right-click the copy ▸ **Open with** ▸ **Choose another app** ▸ **Choose an app on your PC**, pick `%LocalAppData%\Programs\MarkdownMidget\MarkdownMidget.exe`, then **Always**.
 2. Run **File ▸ Windows Integration ▸ Register as .md editor…** again. Then, if **Help ▸ About Markdown Midget** offers an update, click **Update**; if not, write N/A for this part in the note.
 3. After each step, double-click the copy and look at Windows **Settings ▸ Apps ▸ Default apps** for `.md`.
 - **Expected:** The copy opens in Markdown Midget each time, Settings still names Markdown Midget for `.md`, and Windows shows no notice that an app default was reset.
+- **Control:** on rc1 (build 328), step 1 then Register resets `.md` to the other app. If that doesn't happen, this test can't fail; say so in the note.
 - **Type:** Human. Only a person can set a Windows default app, and no test may touch the real registry. An update is carried out by the version already installed, so it proves the fix only from a build that has it.
+
+#### INST-02 Register with Move keeps a downloaded copy you chose working
+- **Change:** Fixed: "Updating Markdown Midget now keeps your file associations" · **Documents:** a copy of `br-forms.md` · **Settings:** this build's exe in Downloads; another app that opens `.md` files installed
+1. Right-click the copy ▸ **Open with** ▸ **Choose another app** ▸ **Choose an app on your PC**, pick the exe in Downloads, then **Always**.
+2. From that exe, run **File ▸ Windows Integration ▸ Register as .md editor…** with **Move the downloaded file into the app folder** ticked.
+3. Close every Markdown Midget window and double-click the copy.
+- **Expected:** The download is gone from Downloads, and the copy opens in the installed Markdown Midget with no error and no app chooser.
+- **Type:** Human. Windows decides what a default chosen that way runs, and no test may touch the real registry.
 
 ## 4. Run log
 
@@ -1265,6 +1274,7 @@ Human results only, from Paul on 2026-09-15. No automated run on this interim RC
 | VIEW-03 | | | |
 | TIP-01 | | | |
 | INST-01 | | | |
+| INST-02 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

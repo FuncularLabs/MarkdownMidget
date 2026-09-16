@@ -72,13 +72,16 @@ internal static class RegistrationService
     // ===== Register / Unregister =====
 
     /// <summary>The HKEY_CURRENT_USER calls registration makes, so tests can pass a fake. Get is null
-    /// when missing; Set writes a string as REG_SZ, a byte[] as REG_NONE; deletes are best-effort.</summary>
+    /// when missing; Set writes a string as REG_SZ, a byte[] as REG_NONE; deletes are best-effort; the
+    /// name lists are empty when the key is missing.</summary>
     internal interface IRegistryValues
     {
         object? Get(string key, string name);
         void Set(string key, string name, object value);
         void DeleteTree(string key);
         void DeleteValue(string key, string name);
+        IEnumerable<string> SubKeyNames(string key);
+        IEnumerable<string> ValueNames(string key);
     }
 
     private sealed class CurrentUserRegistry : IRegistryValues
@@ -99,13 +102,16 @@ internal static class RegistrationService
         {
             try { using var k = Registry.CurrentUser.OpenSubKey(key, writable: true); k?.DeleteValue(name, false); } catch { }
         }
+        public IEnumerable<string> SubKeyNames(string key) { using var k = Registry.CurrentUser.OpenSubKey(key); return k?.GetSubKeyNames() ?? []; }
+        public IEnumerable<string> ValueNames(string key) { using var k = Registry.CurrentUser.OpenSubKey(key); return k?.GetValueNames() ?? []; }
     }
 
     /// <summary>
     /// Register <paramref name="exePath"/> as an editor for .md. Installed updates and repeat
     /// Registers run this again, so it writes only missing or different values, in place, and
     /// deletes nothing: deleting what a user's default (UserChoice) points at makes Windows reset
-    /// it to another app. The stray cleanup that did so now runs only in <see cref="Unregister()"/>.
+    /// it to another app. The stray cleanup that did so now runs only in <see cref="Unregister()"/>;
+    /// Register points those entries at <paramref name="exePath"/> instead.
     /// </summary>
     public static void Register(string exePath) => Register(exePath, CurrentUserRegistry.Instance, NotifyShellAssocChanged);
 
@@ -169,7 +175,39 @@ internal static class RegistrationService
         Put(CapabilitiesKeyPath + @"\FileAssociations", ".mdenc", SecureProgId);
         Put(@"Software\RegisteredApplications", DisplayName, CapabilitiesKeyPath);
 
+        // Entries an older copy left running a MarkdownMidget*.exe elsewhere: the Applications\<file> key
+        // "Choose an app on your PC" writes, or a ProgID an Open with list names. A default may name one,
+        // so point it here, in place: deleting it resets that default, and leaving it breaks once Move
+        // deletes the download it runs. Best-effort, entry by entry, as the cleanup it replaces was.
+        try
+        {
+            var strays = reg.SubKeyNames(classes + "Applications").Select(n => @"Applications\" + n).ToList();
+            foreach (var ext in new[] { ".md", ".markdown", ".mdenc" })
+                strays.AddRange(reg.ValueNames(classes + ext + @"\OpenWithProgids").Concat(reg.ValueNames(
+                    @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" + ext + @"\OpenWithProgids")));
+            foreach (var stray in strays.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if (!RunsMarkdownMidgetExe(reg.Get(classes + stray + @"\shell\open\command", string.Empty) as string)) continue;
+                    Put(classes + stray + @"\shell\open\command", string.Empty, command);
+                    if (reg.Get(classes + stray + @"\DefaultIcon", string.Empty) is not null) Put(classes + stray + @"\DefaultIcon", string.Empty, icon);
+                }
+                catch { /* the next entry */ }
+            }
+        }
+        catch { /* the registration above is complete */ }
+
         if (changed) notifyShell();
+    }
+
+    /// <summary>Whether <paramref name="command"/> runs a file named MarkdownMidget*.exe: judged by the file
+    /// name of its quoted path, or of its first word if unquoted, so a folder or an argument naming us doesn't count.</summary>
+    private static bool RunsMarkdownMidgetExe(string? command)
+    {
+        var c = command?.TrimStart() ?? string.Empty;
+        var exe = c.StartsWith('"') ? c[1..].Split('"')[0] : c.Split(' ')[0];
+        return System.IO.Enumeration.FileSystemName.MatchesSimpleExpression("MarkdownMidget*.exe", Path.GetFileName(exe));
     }
 
     /// <summary>Remove all registration and dedupe strays. Safe to call twice. Explicit uninstall only.</summary>

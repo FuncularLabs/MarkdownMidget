@@ -3311,7 +3311,7 @@ public partial class MainWindow : Window
             if (dlg.AddStartMenu) lines.Add("Start menu: added");
             if (dlg.AddDesktop) lines.Add("Desktop shortcut: added");
             lines.Add("");
-            lines.Add("If Explorer's \"Open with\" menu still shows an old entry, sign out and back in — it caches aggressively.");
+            lines.Add("Earlier Markdown Midget entries in \"Open with\" now open this version, so a default you chose keeps working. Unregister removes them.");
             if (dlg.SetAsDefault)
                 lines.Add("\nSettings will open on the .md page — click \"Markdown Midget\" there to finish making it the default (Windows requires this last click).");
 

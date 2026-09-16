@@ -38,7 +38,8 @@
         <TextBlock TextWrapping="Wrap" Margin="0,0,0,4">
             Add Markdown Midget to the Windows <Bold>"Open with"</Bold> list for
             <Bold>.md</Bold> files, and choose how it's installed. Earlier Markdown
-            Midget references are cleaned up so only this version remains.
+            Midget entries are pointed at this version, so a default you chose keeps
+            working; Unregister removes them.
         </TextBlock>
         <TextBlock x:Name="ExePathText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
                    Foreground="#FF666666" Margin="0,0,0,14" />
