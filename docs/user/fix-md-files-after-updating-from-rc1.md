@@ -12,8 +12,8 @@ change it for you. It takes you to the right place in Windows Settings instead.
 
 ## The fastest way: use the notice
 
-After the update, Markdown Midget shows a notice that Windows doesn't open, or no
-longer opens, `.md` files with Markdown Midget.
+After the update, Markdown Midget usually shows a notice that Windows doesn't open,
+or no longer opens, `.md` files with Markdown Midget.
 
 ![A notice like this appears after the update. It may say "doesn't open" or "no longer opens".](images/rc1-fix-01-notice.png)
 
@@ -35,9 +35,9 @@ The Settings wording may differ slightly by Windows version.
 If Markdown Midget opens with unsaved work, a recovered document or the Help window,
 the notice waits. It appears the next time Markdown Midget opens without them.
 
-## If you closed the notice
+## If you closed the notice or didn't see it
 
-The notice appears only once. To get to the same Settings page later:
+The notice appears only once. To get to the same Settings page from Markdown Midget:
 
 1. In Markdown Midget, open **File ▸ Windows Integration ▸ Make Markdown Midget the default…**.
 2. Follow steps 2 to 4 in the previous section.
@@ -52,8 +52,11 @@ Markdown Midget says so when you click **Make it the default…**. To register i
 1. Open **File ▸ Windows Integration ▸ Register as .md editor…**.
 2. Set **Add to the Start menu** and **Add a Desktop shortcut** the way you want them.
 3. Tick **Make it my default for .md files**, then click **Register**.
-4. Click **OK** on the message that confirms it. Settings then opens on the `.md`
-   page. Choose **Markdown Midget** there to finish.
+4. Click **OK** on the message that confirms it. Settings opens. If it shows
+   Markdown Midget's page, follow steps 2 to 4 in
+   [The fastest way: use the notice](#the-fastest-way-use-the-notice). If it shows the
+   main **Default apps** page, see
+   [If Settings opens on the main Default apps page](#if-settings-opens-on-the-main-default-apps-page).
 
 If you leave **Make it my default for .md files** unticked, open
 **File ▸ Windows Integration ▸ Make Markdown Midget the default…** after registering
@@ -75,7 +78,7 @@ can't open Settings at all, it tells you, and you can open
 - **Windows 10:** Click **Choose default apps by file type**. Scroll to **.md**, click
   the app next to it, and select **Markdown Midget**.
 
-![The Default apps page with .md typed under "Set a default for a file type or link type"](images/rc1-fix-02-settings-app-page.png)
+![The Default apps page with .md typed under "Set a default for a file type or link type"](images/rc1-fix-02-default-apps-search.png)
 
 The wording may differ slightly by Windows version.
 
@@ -92,6 +95,6 @@ The wording may differ slightly by Windows version.
 No. From 1.0.0-rc2 on, updating Markdown Midget or registering it again keeps the app
 you chose for `.md` files. This one time, the update to rc2 was done by rc1.
 
-If `.md` files ever stop opening in Markdown Midget again, the first start after the
-next update tells you, with the same **Make it the default…** button. If you ticked
+If an update ever switches `.md` files away from Markdown Midget again, the first start
+after that update tells you, with the same **Make it the default…** button. If you ticked
 **Don't show this again**, the notice stays off.
