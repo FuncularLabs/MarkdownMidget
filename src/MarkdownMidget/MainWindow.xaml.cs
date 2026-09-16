@@ -213,6 +213,7 @@ public partial class MainWindow : Window
         // App.OnStartup asks the same question before this window exists (the
         // already-open check) and the two answers must not drift.
         _pendingOpenPath = DocumentArgument(args);
+        _makeDefaultAfterMove = MakeDefaultAfterMove(args);
 
         if (_isHelpWindow) MenuViewHelp.IsEnabled = MenuWhatsNew.IsEnabled = false; // no help-of-help
         else UpdateWhatsNewBadge();   // a help/changelog viewer doesn't get its own badge
@@ -240,6 +241,17 @@ public partial class MainWindow : Window
         }
         return null;
     }
+
+    /// <summary>What Register with Move starts the installed copy with: the download to delete, --make-default when Make it my
+    /// default was ticked (<see cref="MakeDefaultAfterMove"/>), then the open document, which <see cref="DocumentArgument"/> finds.</summary>
+    internal static List<string> FinishMoveArguments(string download, bool makeDefault, string? currentPath)
+    {
+        var args = new List<string> { "--finish-move", download };
+        if (makeDefault) args.Add("--make-default");
+        if (currentPath is not null) args.Add(currentPath);
+        return args;
+    }
+    internal static bool MakeDefaultAfterMove(string[] args) => args.Contains("--finish-move") && args.Contains("--make-default");
 
     /// <summary>
     /// What a relaunch that reopens this document (Apply update, the About dialog's
@@ -2158,8 +2170,12 @@ public partial class MainWindow : Window
         try { await LandAsync(); }
         finally { if (!_landed) { _landed = true; _inPlaceOpens--; } }
         OfferDefaultAfterUpdate();   // after the editor, the document and any recovery
+        var makeDefault = _makeDefaultAfterMove && !_yieldingToOtherWindow;   // not over a window that is closing
+        _makeDefaultAfterMove = false;   // once, before the message pumps, even if the editor reports ready again
+        DefaultApp.AfterMove(this, makeDefault);
     }
     private bool _landed;
+    private bool _makeDefaultAfterMove;   // --finish-move --make-default: Register with Move handed off before opening Settings
 
     // ===== Already-open guard (issue #1) =====
 
@@ -3300,9 +3316,7 @@ public partial class MainWindow : Window
             if (willMove)
             {
                 var psi = new ProcessStartInfo(exeToRegister) { UseShellExecute = true };
-                psi.ArgumentList.Add("--finish-move");
-                psi.ArgumentList.Add(download);
-                if (_currentPath is not null) psi.ArgumentList.Add(_currentPath);
+                foreach (var arg in FinishMoveArguments(download, dlg.SetAsDefault, _currentPath)) psi.ArgumentList.Add(arg);
                 StartHandingOffDocument(() => Process.Start(psi));
                 _dirty = false; // handled above; don't let Closing re-prompt
                 Application.Current.Shutdown();

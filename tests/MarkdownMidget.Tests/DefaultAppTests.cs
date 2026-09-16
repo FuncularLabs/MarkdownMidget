@@ -93,6 +93,18 @@ public class DefaultAppTests
         Assert.Contains(page, DefaultApp.RegisterNote(build));
     }
 
+    [Theory]   // Register with Move hands off before its own message and Settings; the installed copy does both once its window has landed
+    [InlineData(true, 22621)]
+    [InlineData(true, 19045)]
+    [InlineData(false, 22621)]   // unticked: the move finishes as before, saying and opening nothing
+    public void The_copy_a_Move_install_starts_says_Registers_note_then_opens_Settings_only_when_make_default_was_ticked(bool makeDefault, int build)
+    {
+        List<string> seen = [];
+        DefaultApp.AfterMove(makeDefault, true, build, seen.Add, seen.Add);
+        string[] expected = makeDefault ? ["Registered Markdown Midget as an editor for .md files.\n\n" + DefaultApp.RegisterNote(build), DefaultApp.SettingsUri(build)] : [];
+        Assert.Equal(expected, seen);
+    }
+
     [Fact]
     public void The_button_tooltip_says_to_register_first_while_the_button_is_greyed_out()
     {

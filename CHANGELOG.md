@@ -11,7 +11,7 @@ testing before the stable release of the same number.
 
 ### Fixed
 
-- **Registering with "Make it my default for .md files" now opens Settings on Markdown Midget's page**, the same page as the **Make Markdown Midget the default…** button (Default apps before Windows 11 22H2), and the message before it says so. Before, Settings opened on the general Default apps page, not the `.md` page the dialog promised.
+- **Registering with "Make it my default for .md files" now opens Settings on Markdown Midget's page**, the same page as the **Make Markdown Midget the default…** button (Default apps before Windows 11 22H2), and the message before it says so. That includes registering from a download with **Move the downloaded file into the app folder**: once the installed copy starts, it gives the message and opens Settings. Before, Settings opened on the general Default apps page, not the `.md` page the dialog promised, and with Move nothing opened.
 
 ## [1.0.0-rc2] - 2026-09-16
 

@@ -810,6 +810,24 @@ public class OpenGuardTests : IDisposable
         Assert.Null(MainWindow.DocumentArgument(Array.Empty<string>()));
     }
 
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void MoveRelaunchCarriesMakeDefaultAndTheDocument(bool makeDefault, bool withDocument)
+    {
+        // Register with Move starts the installed copy with these; its startup reads them back.
+        var exe = Doc("MarkdownMidget.exe");
+        var doc = Doc("notes.md");
+        File.WriteAllText(exe, "");
+        File.WriteAllText(doc, "");
+        var args = MainWindow.FinishMoveArguments(exe, makeDefault, withDocument ? doc : null).ToArray();
+        Assert.Equal(new[] { "--finish-move", exe }, args[..2]);
+        Assert.Equal(makeDefault, MainWindow.MakeDefaultAfterMove(args));
+        Assert.Equal(withDocument ? doc : null, MainWindow.DocumentArgument(args));
+        Assert.False(MainWindow.MakeDefaultAfterMove(new[] { "--make-default", doc }));   // only a Move install's relaunch carries it
+    }
+
     [Fact]
     public void DefaultDirectoryIsUnderLocalAppData()
     {

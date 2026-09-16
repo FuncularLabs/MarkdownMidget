@@ -20,8 +20,19 @@ internal static class DefaultApp
         : "Settings will open on Default apps: set .md to Markdown Midget there (Windows requires this last step).";
     internal static string ButtonTip(bool registered) => registered ? "Opens Windows Settings, where you choose Markdown Midget for .md files."
         : "Register Markdown Midget first: File ▸ Windows Integration ▸ Register as .md editor…";
-    internal static void OpenSettings(Window owner) => OpenSettings(RegistrationService.IsRegistered(), Environment.OSVersion.Version.Build,
-        uri => Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true })?.Dispose(), text => MessageBox.Show(owner, text, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information));
+    internal static void OpenSettings(Window owner) => OpenSettings(RegistrationService.IsRegistered(), Environment.OSVersion.Version.Build, Launch, Tell(owner));
+    internal static void AfterMove(Window owner, bool makeDefault)   // IsRegistered is read only when there is something to do
+        => AfterMove(makeDefault, makeDefault && RegistrationService.IsRegistered(), Environment.OSVersion.Version.Build, Launch, Tell(owner));
+    private static void Launch(string uri) => Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true })?.Dispose();
+    private static Action<string> Tell(Window owner) => text => MessageBox.Show(owner, text, "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+    /// <summary>The installed copy a Move install started (MainWindow.MakeDefaultAfterMove), once its window has landed: Register handed
+    /// off before its message and Settings, so with Make it my default ticked this says the note, then opens Settings as Register does.</summary>
+    internal static void AfterMove(bool makeDefault, bool registered, int windowsBuild, Action<string> launch, Action<string> tell)
+    {
+        if (!makeDefault) return;
+        tell("Registered Markdown Midget as an editor for .md files.\n\n" + RegisterNote(windowsBuild));
+        OpenSettings(registered, windowsBuild, launch, tell);
+    }
 
     /// <summary>Every Make default entry point, Register's included: launches <see cref="SettingsUri"/> if registered; if not, or if the launch fails, says why.</summary>
     internal static void OpenSettings(bool registered, int windowsBuild, Action<string> launch, Action<string> tell)
