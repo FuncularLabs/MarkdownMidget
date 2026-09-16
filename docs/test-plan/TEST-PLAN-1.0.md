@@ -1064,6 +1064,97 @@ Automated items only, run by Claude on 2026-09-15 in `C:\code\MarkdownMidget\.cl
 | SRC-07 | | | |
 | SRC-08 | | | |
 
+### Build 350 (1.0.0-rc1+build.350) — 2026-09-15
+
+Human results only, from Paul on 2026-09-15. No automated run on this interim RC2 build; the full automated run comes on the rc2 candidate build.
+
+| ID | Result | By | Note |
+|---|---|---|---|
+| LIN-01 | | | |
+| LIN-02 | | | |
+| LIN-03 | | | |
+| LIN-04 | | | |
+| LIN-05 | | | |
+| LIN-06 | | | |
+| VIEW-01 | | | |
+| VIEW-02 | | | |
+| ANC-01 | | | |
+| ANC-02 | | | |
+| ANC-03 | | | |
+| ANC-04 | | | |
+| LNK-01 | | | |
+| LNK-02 | | | |
+| LNK-03 | | | |
+| LNK-04 | | | |
+| LNK-05 | | | |
+| LNK-06 | | | |
+| LNK-07 | | | |
+| WEB-01 | | | |
+| WEB-02 | | | |
+| WEB-03 | | | |
+| WEB-04 | | | |
+| WEB-05 | | | |
+| WEB-06 | | | |
+| MENU-01 | | | |
+| SPL-01 | | | |
+| PERF-01 | | | |
+| PERF-02 | | | |
+| SWT-01 | | | |
+| SWT-02 | | | |
+| SWT-03 | | | |
+| SWT-04 | | | |
+| SWT-05 | | | |
+| SWT-06 | | | |
+| SWT-07 | | | |
+| FM-01 | | | |
+| FM-02 | | | |
+| FM-03 | | | |
+| FM-04 | | | |
+| FM-05 | | | |
+| TBL-01 | | | |
+| TBL-02 | | | |
+| TBL-03 | | | |
+| TBL-04 | | | |
+| TBL-05 | | | |
+| TBL-06 | | | |
+| TBL-07 | | | |
+| BR-01 | | | |
+| BR-02 | | | |
+| BR-03 | | | |
+| LST-01 | | | |
+| LST-02 | | | |
+| LST-03 | | | |
+| OPN-01 | | | |
+| OPN-02 | | | |
+| OPN-03 | | | |
+| OPN-04 | | | |
+| OPN-05 | | | |
+| OPN-06 | | | |
+| OPN-07 | | | |
+| OPN-08 | | | |
+| OPN-09 | | | |
+| BIG-01 | | | |
+| BIG-02 | | | |
+| BIG-03 | | | |
+| BIG-04 | | | |
+| BIG-05 | | | |
+| BIG-06 | | | |
+| BIG-07 | | | |
+| BIG-08 | | | |
+| SRC-01 | | | |
+| SRC-02 | | | |
+| SRC-03 | | | |
+| SRC-04 | | | |
+| SRC-05 | | | |
+| SRC-06 | | | |
+| SRC-07 | | | |
+| SRC-08 | | | |
+| FND-01 | | | |
+| FND-02 | | | |
+| FND-03 | | Paul (2026-09-15) | Step 4 PASS: with no document open, Ctrl+F, Ctrl+H and Edit ▸ Replace… each grey Replace and Replace All with "No document is open." and Enter runs Find Next. With the dialog open, opening a document and turning read-only off enables them. Ctrl+W greys them again. Steps 1–3 not reported. |
+| VIEW-03 | | | |
+| TIP-01 | | | |
+
 ### Build ___ (1.0.0-…+build.N) — date
 
 | ID | Result | By | Note |
