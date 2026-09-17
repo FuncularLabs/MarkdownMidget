@@ -192,6 +192,31 @@ public class SourceFormattingMarksTests
         Assert.Equal(marks, hits);                     // each mark sits on its own tab or space
     }
 
+    [Theory]   // review round 3: right-to-left rows, and a dot on a row's first column
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EveryDotSitsWhereAvalonEditPutsItsSpaceInRightToLeftTextToo(bool wrap)
+    {
+        string[] lines = ["שלום  עולם  ", "مرحبا  بالعالم  ", "    ", string.Concat(Enumerable.Repeat("שלום  ", 40)) + "סוף", "hello  world  "];
+        var (dots, expected) = On(ed =>
+        {
+            ed.WordWrap = wrap;
+            ed.ShowMarks = true;
+            var dots = Of(ed, '·');   // the long Hebrew line is wider than the view when it doesn't wrap
+            var state = SpaceMarks.State.Start;
+            var expected = new List<Point>();
+            for (var n = 0; n < lines.Length; n++)
+            {
+                (var marks, state) = SpaceMarks.Step(lines[n], state);
+                expected.AddRange(marks.Select(i => PositionOf(ed, ed.Document.GetLineByNumber(n + 1).Offset + i)));
+            }
+            return (dots, expected);
+        }, string.Join("\n", lines));
+
+        Assert.Equal(4 + 4 + 4 + 80 + 4, expected.Count);
+        Assert.Equal(expected, dots);
+    }
+
     [Fact]   // review finding 3: MRK-02 step 2 against the editor, one undo step per keystroke
     public void TypedBackticksAndEnterUndoOneKeystrokeAtATime()
     {

@@ -84,6 +84,7 @@ internal sealed class FormattingMarks : IBackgroundRenderer
         {
             var start = line.FirstDocumentLine.Offset;
             int[]? spaces = null;
+            string? lineText = null;
             // One pass down the wrapped rows, keeping each row's top and first column as it goes:
             // AvalonEdit's per-row lookups walk every row of the line, which on a pasted picture's
             // thousands of rows would cost rows² on every repaint. Rows above the view are stepped
@@ -99,10 +100,17 @@ internal sealed class FormattingMarks : IBackgroundRenderer
                 first += row.Length;
                 if (rowTop - scroll.Y > textView.ActualHeight) break;
                 if (top - scroll.Y < 0) continue;
-                // A long row is cut to the columns under the view's left and right edges, with one to spare.
-                int left = Math.Max(rowFirst, line.GetVisualColumn(row, scroll.X, false) - 1),
-                    right = Math.Min(first, line.GetVisualColumn(row, scroll.X + textView.ActualWidth, false) + 1);
-                int from = start + line.GetRelativeOffset(left), to = start + line.GetRelativeOffset(right);
+                int from = start + line.GetRelativeOffset(rowFirst), to = start + line.GetRelativeOffset(first);
+                lineText ??= doc.GetText(line.FirstDocumentLine);
+                // A row wider than the view, all left to right, is cut to the columns under the view's left and
+                // right edges, with one to spare. Not a right-to-left row: hit-testing an edge there answers the
+                // run's logical end, which would cut its own spaces out (or cross the range over).
+                if (row.WidthIncludingTrailingWhitespace > textView.ActualWidth
+                    && !RightToLeft(lineText.AsSpan(from - start, Math.Min(to - start, lineText.Length) - (from - start))))
+                {
+                    from = start + line.GetRelativeOffset(Math.Max(rowFirst, line.GetVisualColumn(row, scroll.X, false) - 1));
+                    to = start + line.GetRelativeOffset(Math.Min(first, line.GetVisualColumn(row, scroll.X + textView.ActualWidth, false) + 1));
+                }
                 var textTop = rowTop + row.Baseline - textView.DefaultBaseline - scroll.Y;   // VisualYPosition.TextTop, for this row
                 Point At(int offset)
                 {
@@ -111,7 +119,7 @@ internal sealed class FormattingMarks : IBackgroundRenderer
                 }
                 for (var tab = doc.IndexOf('\t', from, to - from); tab >= 0; tab = doc.IndexOf('\t', tab + 1, to - tab - 1))
                     marks.Add(('→', At(tab)));
-                spaces ??= SpaceMarks.Step(doc.GetText(line.FirstDocumentLine), StartOf(doc, line.FirstDocumentLine.LineNumber)).Marks;
+                spaces ??= SpaceMarks.Step(lineText, StartOf(doc, line.FirstDocumentLine.LineNumber)).Marks;
                 // Marks come in offset order, so the row's first is found by halving, not by reading them all.
                 var index = Array.BinarySearch(spaces, from - start);
                 for (index = index < 0 ? ~index : index; index < spaces.Length && start + spaces[index] < to; index++)
@@ -124,6 +132,12 @@ internal sealed class FormattingMarks : IBackgroundRenderer
         }
         return marks;
     }
+
+    /// <summary>Whether <paramref name="text"/> holds right-to-left letters (Hebrew, Arabic, Syriac,
+    /// Thaana, N'Ko and their presentation forms) or a right-to-left mark, embedding, override or isolate.</summary>
+    private static bool RightToLeft(ReadOnlySpan<char> text) =>
+        text.ContainsAnyInRange('֐', 'ࣿ') || text.ContainsAnyInRange('יִ', '﷿')
+        || text.ContainsAnyInRange('ﹰ', '﻿') || text.IndexOfAny("‏‫‮⁧") >= 0;
 
     public void Draw(TextView textView, DrawingContext drawingContext)
     {
