@@ -245,6 +245,21 @@ public class SourceFormattingMarksTests
             $"mark {mark} is not {(light ? "lighter" : "dimmer")} than the text");
     }
 
+    [Theory]   // review finding 6: the read-back as ApplySourceColors hands it over
+    [InlineData(",\"mark\":{\"r\":98,\"g\":114,\"b\":164}", "#6272A4")]   // Dracula's --mdm-mark, as the formatted view shows it
+    [InlineData("", "#7B7C81")]                                            // an older bundle: the text faded toward the page
+    [InlineData(",\"mark\":null", "#7B7C81")]
+    public void TheThemesOwnMarkColourWinsOverTheMix(string mark, string expected)
+    {
+        var json = "{\"background\":{\"r\":40,\"g\":42,\"b\":54},\"foreground\":{\"r\":248,\"g\":248,\"b\":242},\"source\":{"
+            + "\"heading\":{\"r\":189,\"g\":147,\"b\":249},\"link\":{\"r\":139,\"g\":233,\"b\":253},\"accent\":{\"r\":80,\"g\":250,\"b\":123},"
+            + "\"quote\":{\"r\":98,\"g\":114,\"b\":164}" + mark + "}}";
+        var brush = FormattingMarks.ForReadBack(json);
+        Assert.Equal((Color)ColorConverter.ConvertFromString(expected), brush.Color);
+        Assert.True(brush.IsFrozen);
+        Assert.Equal(Color.FromRgb(0xC4, 0xC8, 0xD0), FormattingMarks.ForReadBack("null").Color);   // no read-back at all
+    }
+
     [Theory]   // AC3
     [InlineData(null)]
     [InlineData("null")]                  // the script threw

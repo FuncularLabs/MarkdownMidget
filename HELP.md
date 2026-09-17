@@ -119,7 +119,8 @@ editing the markdown source directly.
 
 ## Formatting marks (¶)
 
-The **¶** toolbar toggle shows Word-style marks in light gray, in both views. In the
+The **¶** toolbar toggle shows Word-style marks in both views, in the theme's faint mark
+colour (light gray by default). In the
 formatted view: **¶** at paragraph and heading ends, **↵** at manual line breaks, and
 **→** for tabs. In the Markdown source view: **¶** at the end of each line, **→** for
 tabs, and **·** for the spaces that are hard to see but change what Markdown does:

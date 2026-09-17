@@ -60,6 +60,19 @@ public class SourcePaletteTests
         Assert.Null(p!.Strong);
     }
 
+    [Theory]   // review finding 6: the theme's --mdm-mark, sent beside bold
+    [InlineData(",\"mark\":{\"r\":98,\"g\":114,\"b\":164}", true)]
+    [InlineData("", false)]                 // a bundle from before the mark colour was sent
+    [InlineData(",\"mark\":null", false)]   // the page could not resolve it
+    public void TheMarkColourIsKeptWhenThePageSendsOne(string mark, bool sent)
+    {
+        var json = Good.Replace("\"b\":100}}}", "\"b\":100}" + mark + "}}");
+        Assert.Contains("\"b\":100}" + mark + "}}", json);   // the anchor matched
+
+        Assert.Equal(sent ? Color.FromRgb(98, 114, 164) : (Color?)null, SourcePalette.Parse(json)!.Mark);
+        Assert.Null(SourcePalette.Parse(Good.Replace("\"b\":100}}}", "\"b\":100},\"mark\":{\"r\":-1,\"g\":0,\"b\":0}}}")));
+    }
+
     [Fact]
     public void AMalformedBoldColourRefusesThePalette()
     {

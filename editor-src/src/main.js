@@ -353,7 +353,9 @@ function probeTheme(doc, win) {
     // Bold. Default's --mdm-strong is currentColor, which resolves against this
     // probe's own `color` — so an unset one reads back as the body text, which is
     // what bold was before the variable existed.
-    'text-emphasis-color:var(--mdm-strong)';
+    'text-emphasis-color:var(--mdm-strong);' +
+    // The formatting marks, which the source view draws its own ¶ → · in (FormattingMarks).
+    'accent-color:var(--mdm-mark)';
   host.appendChild(probe);
 
   let result = { background: null, foreground: null, mermaid: '', source: null };
@@ -380,8 +382,12 @@ function probeTheme(doc, win) {
     // would read back as bold in the page's own background colour.
     const strongRaw = cs.getPropertyValue('text-emphasis-color');
     const strong = strongRaw ? flattenColor(strongRaw, bgCss) : null;
+    // The marks' colour is optional the same way. An unresolved one leaves accent-color at
+    // its initial `auto`, which is no colour (the host then mixes its own), not black.
+    const markRaw = cs.getPropertyValue('accent-color');
+    const mark = markRaw && markRaw !== 'auto' ? flattenColor(markRaw, bgCss) : null;
     const source = (heading && link && accent && quote)
-      ? { heading, link, accent, quote, strong }
+      ? { heading, link, accent, quote, strong, mark }
       : null;
 
     result = {

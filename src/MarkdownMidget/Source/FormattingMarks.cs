@@ -119,22 +119,27 @@ internal sealed class FormattingMarks : IBackgroundRenderer
         foreach (var (glyph, at) in marks) drawingContext.DrawText(glyph switch { '¶' => pilcrow, '→' => arrow, _ => dot }, at);
     }
 
-    /// <summary>How far the marks sit from the page toward the text: fainter than the line
-    /// numbers (the text at half strength), and at least 1.5:1 on every built-in theme, the
-    /// floor the formatted view's <c>--mdm-mark</c> is held to.</summary>
+    /// <summary>How far the marks sit from the page toward the text when the theme's own
+    /// mark colour isn't sent: fainter than the line numbers (the text at half strength),
+    /// and at least 1.5:1 on every built-in theme, the floor <c>--mdm-mark</c> is held to.</summary>
     private const double Strength = 0.4;
 
+    /// <summary>The marks' colour for the theme read-back JSON that ApplySourceColors
+    /// receives: <see cref="BrushFor"/> of its colours and the <c>--mdm-mark</c> it sends.</summary>
+    internal static SolidColorBrush ForReadBack(string? json) =>
+        BrushFor(Themes.ThemeReadBack.Parse(json), SourcePalette.Parse(json)?.Mark);
+
     /// <summary>
-    /// The marks' colour for a theme read-back: its text faded toward its page, so light
-    /// grey on a light theme and a dim text colour on a dark one. A failed read-back (null)
-    /// gets the default theme's <c>--mdm-mark</c> grey, for the original pane the source
-    /// view then falls back to.
+    /// The marks' colour: the theme's own <c>--mdm-mark</c> when the page sent it, the same
+    /// colour the formatted view's marks use; otherwise (a bundle from before it was sent)
+    /// its text faded toward its page, so light grey on a light theme and a dim text colour
+    /// on a dark one. A failed read-back (null) gets the default theme's <c>--mdm-mark</c>
+    /// grey, for the original pane the source view then falls back to.
     /// </summary>
-    internal static SolidColorBrush BrushFor((Color Background, Color Foreground)? read)
+    internal static SolidColorBrush BrushFor((Color Background, Color Foreground)? read, Color? mark = null)
     {
-        var colour = read is { } r
-            ? Color.FromRgb(Mix(r.Background.R, r.Foreground.R), Mix(r.Background.G, r.Foreground.G), Mix(r.Background.B, r.Foreground.B))
-            : Color.FromRgb(0xC4, 0xC8, 0xD0);
+        var colour = read is not { } r ? Color.FromRgb(0xC4, 0xC8, 0xD0)
+            : mark ?? Color.FromRgb(Mix(r.Background.R, r.Foreground.R), Mix(r.Background.G, r.Foreground.G), Mix(r.Background.B, r.Foreground.B));
         var brush = new SolidColorBrush(colour);
         brush.Freeze();
         return brush;
