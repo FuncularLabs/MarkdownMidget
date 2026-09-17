@@ -45,10 +45,12 @@ internal static class AppearanceModes
     {
         try
         {
-            using var stream = new FileStream(settingsPath, FileMode.Open, FileAccess.Read,
-                                              FileShare.ReadWrite | FileShare.Delete);
-            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            using var json = JsonDocument.Parse(reader.ReadToEnd());   // byte-order marks as File.ReadAllText
+            string text;
+            using (var stream = new FileStream(settingsPath, FileMode.Open, FileAccess.Read,
+                                               FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+                text = reader.ReadToEnd();   // byte-order marks as File.ReadAllText; closed before parsing
+            using var json = JsonDocument.Parse(text);
             var root = json.RootElement;
             return root.ValueKind == JsonValueKind.Object
                    && root.TryGetProperty(SettingName, out var value) && value.ValueKind == JsonValueKind.String

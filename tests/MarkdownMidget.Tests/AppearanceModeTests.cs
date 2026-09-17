@@ -175,6 +175,66 @@ public sealed class AppearanceModeTests : IDisposable
         Assert.Equal(3, waits);
     }
 
+    // ===== the settings watcher: a real FileSystemWatcher on this test's temp folder =====
+
+    private static readonly TimeSpan EventWait = TimeSpan.FromSeconds(10);
+
+    /// <summary>What WriteSettings does: a temporary file, moved over settings.json.</summary>
+    private static void Save(string path, string mode)
+    {
+        var tmp = $"{path}.{Environment.ProcessId}.tmp";
+        File.WriteAllText(tmp, "{\"AppearanceMode\":\"" + mode + "\"}");
+        MainWindow.ReplaceFile(tmp, path, () => System.Threading.Thread.Sleep(25));
+    }
+
+    [Fact]
+    public void TheSettingsWatcherSeesEveryWayTheFileChanges()
+    {
+        // Measured: each step raises only the event named, so each pins one handler.
+        var path = Path.Combine(_dir, "settings.json");
+        var raised = new System.Threading.ManualResetEventSlim();   // not disposed: a late event may still set it
+        using var watcher = WindowsAppearance.WatchSettings(path, raised.Set);
+        Assert.NotNull(watcher);
+
+        void Expect(string step, Action change)
+        {
+            System.Threading.Thread.Sleep(250);   // a late event from the step before
+            raised.Reset();
+            change();
+            Assert.True(raised.Wait(EventWait), step);
+        }
+
+        Expect("the first save: Renamed", () => Save(path, "Dark"));
+        Expect("a later save: Deleted, then Renamed", () => Save(path, "Light"));
+        Expect("written in place: Changed", () => File.WriteAllText(path, "{}"));
+        Expect("deleted: Deleted", () => File.Delete(path));
+        Expect("created empty: Created", () => File.Create(path).Dispose());
+    }
+
+    [Fact]
+    public void AWatchedSaveIsFollowedAndNothingIsReadAfterDispose()
+    {
+        var path = Path.Combine(_dir, "settings.json");
+        var reads = 0;
+        var settled = new System.Threading.AutoResetEvent(false);   // not disposed, as above
+        var appearance = new WindowsAppearance(() => 1, () => false,
+            refresh => { refresh(); settled.Set(); },
+            () => { System.Threading.Interlocked.Increment(ref reads); return AppearanceModes.ReadSetting(path); });
+        appearance.FollowSettingsFile(path);
+
+        Save(path, "Dark");
+        Assert.True(System.Threading.SpinWait.SpinUntil(() => appearance.Mode == AppearanceMode.Dark, EventWait));
+        Assert.True(appearance.IsDark);
+
+        appearance.Dispose();
+        System.Threading.Thread.Sleep(250);
+        settled.Reset();
+        var readsBefore = reads;
+        Save(path, "Light");
+        Assert.False(settled.WaitOne(TimeSpan.FromSeconds(1)));
+        Assert.Equal((readsBefore, AppearanceMode.Dark), (reads, appearance.Mode));
+    }
+
     [Theory]
     [InlineData("System", false, "For Windows light mode")]
     [InlineData("System", true, "For Windows dark mode")]

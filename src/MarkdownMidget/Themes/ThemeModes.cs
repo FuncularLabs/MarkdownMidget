@@ -24,7 +24,7 @@ internal interface IThemeSettings
     string? SourceThemeDark { get; set; }
 }
 
-/// <summary>One theme key for Windows light mode and one for dark mode.</summary>
+/// <summary>One theme key for light mode and one for dark mode.</summary>
 internal readonly record struct ThemePair(string Light, string Dark)
 {
     public string For(bool dark) => dark ? Dark : Light;
@@ -32,7 +32,7 @@ internal readonly record struct ThemePair(string Light, string Dark)
 }
 
 /// <summary>
-/// A theme per Windows mode. The document remembers one theme for light mode and one
+/// A theme per mode, light and dark. The document remembers one theme for light mode and one
 /// for dark, and so does the source view's own theme while "Same Theme for Both Views"
 /// is off. "The mode" is the effective one: Windows', unless View ▸ Mode says Light or Dark
 /// (<see cref="WindowsAppearance"/>). View ▸ Theme sets the slot for the mode in force when
@@ -85,7 +85,7 @@ internal sealed class ThemeModes
     public bool IsDark => _windowsIsDark();
     public string DocumentKey => Document.For(IsDark);
 
-    /// <summary>What a launch or a Windows mode switch applies: the document's theme for
+    /// <summary>What a launch or a mode switch applies: the document's theme for
     /// the mode, and the source view's own when unlinked (null: it follows the document).</summary>
     public (string Document, string? Source) Remembered()
     {

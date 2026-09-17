@@ -48,9 +48,12 @@ internal sealed class WindowsAppearance : IDisposable
         _highContrast = highContrast;
         _settle = settle ?? (refresh => refresh());
         _savedMode = savedMode ?? (() => null);
-        Mode = _savedMode() ?? AppearanceMode.System;
+        _lastSaved = _savedMode();
+        Mode = _lastSaved ?? AppearanceMode.System;
         IsDark = Read();
     }
+
+    private AppearanceMode? _lastSaved;   // the last mode read from settings.json; null before a read succeeds
 
     /// <summary>True when the effective mode is dark: View ▸ Mode is Dark, or System with
     /// Windows' apps in dark mode; and high contrast is off.</summary>
@@ -84,17 +87,23 @@ internal sealed class WindowsAppearance : IDisposable
         // one: the re-read is cheap, and Refresh raises only on an actual flip.
         SystemEvents.UserPreferenceChanged += appearance.OnSystemPreferenceChanged;
         appearance._subscribed = true;
-        appearance._settingsWatcher = WatchSettings(settingsPath, appearance.OnPreferenceChanged);
+        appearance.FollowSettingsFile(settingsPath);
         return appearance;
     }
+
+    /// <summary>Re-read after every change to <paramref name="settingsPath"/>, until Dispose.</summary>
+    internal void FollowSettingsFile(string settingsPath) =>
+        _settingsWatcher = WatchSettings(settingsPath, OnPreferenceChanged);
 
     /// <summary>
     /// A View ▸ Mode pick in another window arrives as a write to settings.json, which every
     /// window watches. Any write, or the file going, is treated like a Windows notification:
     /// the same settled re-read, which raises only on a flip and never writes. A watcher
     /// that can't start leaves this window following Windows and its own picks only.
+    /// Measured: a save over no file raises Renamed only; over a file, Deleted then Renamed;
+    /// a write in place, Changed; a delete, Deleted; an empty file created, Created.
     /// </summary>
-    private static FileSystemWatcher? WatchSettings(string settingsPath, Action changed)
+    internal static FileSystemWatcher? WatchSettings(string settingsPath, Action changed)
     {
         try
         {
@@ -104,7 +113,6 @@ internal sealed class WindowsAppearance : IDisposable
             {
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
             };
-            // A save replaces the file from a temporary one: a rename to settings.json.
             watcher.Changed += (_, _) => changed();
             watcher.Created += (_, _) => changed();
             watcher.Deleted += (_, _) => changed();
@@ -131,17 +139,21 @@ internal sealed class WindowsAppearance : IDisposable
     }
 
     /// <summary>Read Windows' mode and View ▸ Mode again, and raise <see cref="Changed"/> if
-    /// the effective mode flipped.</summary>
+    /// the effective mode flipped. The saved mode is taken only when it differs from the one
+    /// read last: a pick elsewhere. A pick here whose save didn't land then survives other
+    /// windows' saves and Windows' broadcasts, until a pick elsewhere replaces it.</summary>
     internal void Refresh()
     {
-        if (_savedMode() is { } mode) Mode = mode;
+        if (_savedMode() is { } saved && saved != _lastSaved) (Mode, _lastSaved) = (saved, saved);
         Update();
     }
 
-    /// <summary>View ▸ Mode picked in this window: applies at once. The caller saves it; this
-    /// window's watcher then reads the same pick back, which changes nothing.</summary>
+    /// <summary>View ▸ Mode picked in this window: applies at once. The caller saves it first,
+    /// and settings.json is read now, so a save that didn't land leaves the value on disk as
+    /// the one read last (see <see cref="Refresh"/>).</summary>
     internal void SetMode(AppearanceMode mode)
     {
+        if (_savedMode() is { } saved) _lastSaved = saved;
         Mode = mode;
         Update();
     }

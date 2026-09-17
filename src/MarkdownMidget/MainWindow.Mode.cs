@@ -21,9 +21,10 @@ public partial class MainWindow
         var mode = AppearanceModes.Parse(tag);
         // Saved first, then applied here. Every other window's settings watcher reads the
         // pick back and follows it, and writes nothing; so does this window's, finding it
-        // already applied.
-        SavePersistentField(RememberMode(mode));
+        // already applied. A save that fails leaves the pick on this window only, and says so.
+        var saved = SavePersistentField(RememberMode(mode));
         _appearance.SetMode(mode);
+        if (!saved) FlashStatus("Couldn't save the mode — it applies to this window until it closes.");
         SyncModeMenu();
         RefocusEditor();
     }

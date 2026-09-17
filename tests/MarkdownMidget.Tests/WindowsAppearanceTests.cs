@@ -126,6 +126,39 @@ public class WindowsAppearanceTests
     }
 
     [Fact]
+    public void AnUnsavedPickSurvivesOtherSavesAndAPickElsewhereStillWins()
+    {
+        // This window picks Dark, and the save doesn't land: settings.json still says Light.
+        AppearanceMode? saved = AppearanceMode.Light;
+        object? apps = 1;
+        using var appearance = new WindowsAppearance(() => apps, () => false, savedMode: () => saved);
+        appearance.SetMode(AppearanceMode.Dark);
+
+        appearance.Refresh();                          // another window saved something else
+        apps = 0;
+        appearance.Refresh();                          // Windows broadcast
+        Assert.Equal((AppearanceMode.Dark, true), (appearance.Mode, appearance.IsDark));
+
+        saved = AppearanceMode.System;                 // another window picked System
+        apps = 1;
+        appearance.Refresh();
+        Assert.Equal((AppearanceMode.System, false), (appearance.Mode, appearance.IsDark));
+    }
+
+    [Fact]
+    public void AnUnsavedPickSurvivesWhenSettingsWereUnreadableAtLaunch()
+    {
+        // The window started read-only: settings.json couldn't be read, so the pick isn't saved.
+        AppearanceMode? saved = null;
+        using var appearance = new WindowsAppearance(() => 1, () => false, savedMode: () => saved);
+        saved = AppearanceMode.Light;                  // readable again by the time of the pick
+        appearance.SetMode(AppearanceMode.Dark);
+
+        appearance.Refresh();                          // another window saved something else
+        Assert.Equal((AppearanceMode.Dark, true), (appearance.Mode, appearance.IsDark));
+    }
+
+    [Fact]
     public void ThePickInThisWindowAppliesAtOnceAndRaisesOnlyOnAFlip()
     {
         using var appearance = new WindowsAppearance(() => 1, () => false, savedMode: () => AppearanceMode.System);

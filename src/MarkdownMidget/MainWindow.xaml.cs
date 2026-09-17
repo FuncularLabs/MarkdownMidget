@@ -4147,7 +4147,7 @@ public partial class MainWindow : Window
         public bool UseBuiltInPicker { get; set; }       // skip the native dialog entirely
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
-        // One per Windows mode since 1.0.0-rc3 (ThemeLight/ThemeDark, null = never
+        // One per mode, light and dark, since 1.0.0-rc3 (ThemeLight/ThemeDark, null = never
         // written); Theme is the last one picked, kept for older builds and migration.
         public string Theme { get; set; } = "";
         public string? ThemeLight { get; set; }
@@ -4246,7 +4246,7 @@ public partial class MainWindow : Window
             _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
-            _loadedThemeSettings = s;   // resolved per Windows mode in InitializeThemes, which can read the theme files
+            _loadedThemeSettings = s;   // resolved per mode in InitializeThemes, which can read the theme files
             _lineNumbers = s.LineNumbers;
             _sourceLineNumbers = s.SourceLineNumbers ?? _lineNumbers;
             _linkLineNumbers = s.LinkLineNumbers;
@@ -4420,17 +4420,19 @@ public partial class MainWindow : Window
     /// CurrentSettings(), means a caller that only wants to change one thing can't
     /// accidentally also republish a stale copy of everything else.
     /// </summary>
-    private void SavePersistentField(Action<AppSettings> apply)
+    /// <returns>Whether the field was written; the callers that don't say so are best-effort.</returns>
+    private bool SavePersistentField(Action<AppSettings> apply)
     {
-        if (_settingsUnknown) return;
+        if (_settingsUnknown) return false;
         try
         {
-            if (!TryReadSettings(out var existing)) return;
+            if (!TryReadSettings(out var existing)) return false;
             var s = existing ?? CurrentSettings();
             apply(s);
             WriteSettings(s);
+            return true;
         }
-        catch { /* best-effort */ }
+        catch { return false; }
     }
 
     /// <summary>This session's preferences, without any window geometry — the two

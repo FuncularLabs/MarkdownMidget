@@ -449,7 +449,7 @@ injected.
   Worth stating in HELP.md, because it will otherwise read as a bug the first time
   someone prints from Dracula.
 
-**Out of scope here; the chrome follows Windows' mode instead:** the document theme does
+**Out of scope here; the chrome follows the light or dark mode instead:** the document theme does
 not colour the WPF menu bar, toolbar, status bar or dialogs. This originally read as a
 settled "not themed". It was revisited on 2026-09-16 (ROADMAP, "Now — the 1.0.0-rc3
 set"): the chrome keeps today's look in light mode and gets a dark palette and a dark

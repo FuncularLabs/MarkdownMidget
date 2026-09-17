@@ -31,7 +31,7 @@ public partial class MainWindow
     /// the theme slots follow it; View ▸ Mode sets it (MainWindow.Mode.cs).</summary>
     private WindowsAppearance? _appearance;
 
-    /// <summary>The remembered themes, one per Windows mode for the document and for
+    /// <summary>The remembered themes, one per mode (light, dark) for the document and for
     /// the source view's own, and "Same Theme for Both Views". Only a pick or a link
     /// toggle changes those settings (<see cref="ThemeModes"/>).</summary>
     private ThemeModes? _themes;
