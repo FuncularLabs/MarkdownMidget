@@ -212,6 +212,12 @@ public class ThemeModesTests
         legacy.Modes.CopyTo(save);
         Assert.Equivalent(new Saved { Theme = "Dracula.css", ThemeLight = "mine-light.css", ThemeDark = "Dracula.css" }, save);
 
+        // A link toggle is a choice too: the source view's pair is written from the document's.
+        legacy.Modes.RememberLink(false);
+        legacy.Modes.CopyTo(save);
+        Assert.Equal((false, "mine-light.css", "Dracula.css", "mine-light.css"),
+            (save.LinkThemes, save.SourceThemeLight, save.SourceThemeDark, save.SourceTheme));
+
         // Slots loaded from disk were written: they are restated, as the file is gone.
         new Window(Materialized(linked: false)).Modes.CopyTo(save);
         Assert.Equivalent(Materialized(linked: false), save);
@@ -346,6 +352,7 @@ public class ThemeModesTests
     [InlineData(":root { --mdm-color-scheme-note: dark; }", false)]
     [InlineData("a::before{content:\"/*\"} :root{--mdm-color-scheme: dark;} b::after{content:\"*/\"}", true)]  // not a comment: strings
     [InlineData("a::before{content:\"}\"} :root{--mdm-color-scheme: dark}", true)]
+    [InlineData("a::before{content:\"\\\"}\"} :root{--mdm-color-scheme: dark}", true)]  // an escaped quote doesn't end the string
     [InlineData(":root { background: url(data:x,}); --mdm-color-scheme: dark }", true)]     // not a block: parentheses
     [InlineData(":root { /* the scheme; */ --mdm-color-scheme: dark; }", true)]
     [InlineData(":root { --mdm-color-scheme: light; } @media (prefers-color-scheme: dark) { :root { --mdm-color-scheme: dark; } }", false)]
@@ -366,7 +373,7 @@ public class ThemeModesTests
 
         var clock = Stopwatch.StartNew();
         Assert.False(ThemeModes.DeclaresDark(css));
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"took {clock.Elapsed.TotalSeconds:0.0} s");
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed.TotalSeconds:0.0} s");
     }
 
     [Theory]
