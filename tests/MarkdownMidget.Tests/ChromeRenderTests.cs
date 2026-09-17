@@ -88,14 +88,16 @@ public class ChromeRenderTests
                 },
             },
         }),
-        new("toolbar with overflow and grip", true, () => new ToolBar
+        new("toolbar with overflow", true, () => new ToolBarTray
         {
-            Width = 90,
-            Items = { new Button { Content = "One" }, new Button { Content = "Two" }, new Button { Content = "Three" }, new Button { Content = "Four" } },
+            IsLocked = true, Width = 90,
+            ToolBars = { new ToolBar { Items = { new Button { Content = "One" }, new Button { Content = "Two" }, new Button { Content = "Three" }, new Button { Content = "Four" } } } },
         }),
-        new("toolbar combo box", false, () => new ToolBar
+        // Toolbars sit in a locked tray, as the app's one tray is: the dark toolbar has no grip.
+        new("toolbar combo box", false, () => new ToolBarTray
         {
-            Items = { new ComboBox { Width = 140, Items = { "Paragraph", "Heading 1" }, SelectedIndex = 0 } },
+            IsLocked = true,
+            ToolBars = { new ToolBar { Items = { new ComboBox { Width = 140, Items = { "Paragraph", "Heading 1" }, SelectedIndex = 0 } } } },
         }),
         new("status bar", true, () => new StatusBar
         {
@@ -345,6 +347,13 @@ public class ChromeRenderTests
                 var border = Assert.IsType<Border>(owner.Template.FindName(part, owner));
                 Assert.True(Token(key) == ((SolidColorBrush)border.Background).Color, $"{owner.GetType().Name} {part} is not {key}");
             }
+
+            // The file list's rows: Aero2's GridView style would colour them navy.
+            var view = new GridView();
+            view.Columns.Add(new GridViewColumn { Header = "Name", Width = 120 });
+            var files = new ListView { View = view, Items = { "notes.md" } };
+            Draw(Host(files, Dark));
+            Assert.Equal(Token("Chrome.Text"), ((SolidColorBrush)files.Foreground).Color);
         });
     }
 

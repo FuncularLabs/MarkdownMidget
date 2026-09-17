@@ -29,12 +29,10 @@ internal static class ChromeWindows
     internal static void Register()
     {
         if (Interlocked.Exchange(ref _registered, 1) == 1) return;
-        // SizeChanged comes with the first layout, before the window is visible (measured);
-        // Loaded is the backstop for a window that somehow skipped it.
+        // SizeChanged comes with the first layout, after the handle exists and before the
+        // window is visible (measured, for manual and size-to-content windows alike).
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.SizeChangedEvent,
             new SizeChangedEventHandler((sender, _) => Sync(sender)), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
-            new RoutedEventHandler((sender, _) => Sync(sender)), handledEventsToo: true);
     }
 
     /// <summary>Record the mode and bring every open window's title bar to it.</summary>
@@ -51,16 +49,9 @@ internal static class ChromeWindows
         foreach (var window in open)
         {
             if (window.Dispatcher.HasShutdownStarted) continue;
-            if (window.Dispatcher.CheckAccess()) SyncOpen(window);
-            else window.Dispatcher.BeginInvoke(new Action(() => SyncOpen(window)));
+            if (window.Dispatcher.CheckAccess()) Sync(window);
+            else window.Dispatcher.BeginInvoke(new Action(() => Sync(window)));
         }
-    }
-
-    // A seen window with no handle has been closed: leave it alone rather than wait for a
-    // handle it will never get again.
-    private static void SyncOpen(Window window)
-    {
-        if (new System.Windows.Interop.WindowInteropHelper(window).Handle != IntPtr.Zero) Sync(window);
     }
 
     private static void Sync(object sender)

@@ -20,36 +20,19 @@ public static class DarkTitleBar
     /// <summary>Sends one attribute and returns the HRESULT. Replaced by tests.</summary>
     internal static Func<IntPtr, int, int, int> SetAttribute = SetAttributeNative;
 
-    /// <summary>The mode waiting for a window that had no handle when it was asked.</summary>
-    private static readonly DependencyProperty PendingProperty =
-        DependencyProperty.RegisterAttached("Pending", typeof(object), typeof(DarkTitleBar), new PropertyMetadata(null));
-
     /// <summary>
     /// Dark or light title bar for <paramref name="window"/>. True when the request went to
-    /// the window's handle; false when the window has none yet, in which case it goes on
-    /// SourceInitialized, with the mode of the latest call.
+    /// the window's handle; false, and nothing sent, when the window has no handle (not yet
+    /// created, or closed). ChromeWindows only asks once the handle exists, and retries on the
+    /// window's next layout otherwise.
     /// </summary>
     public static bool Apply(Window window, bool dark)
     {
         ArgumentNullException.ThrowIfNull(window);
         var handle = new WindowInteropHelper(window).Handle;
-        if (handle == IntPtr.Zero)
-        {
-            if (window.GetValue(PendingProperty) is null) window.SourceInitialized += OnSourceInitialized;
-            window.SetValue(PendingProperty, dark);
-            return false;
-        }
+        if (handle == IntPtr.Zero) return false;
         Send(handle, dark);
         return true;
-    }
-
-    private static void OnSourceInitialized(object? sender, EventArgs e)
-    {
-        if (sender is not Window window) return;
-        window.SourceInitialized -= OnSourceInitialized;
-        var pending = window.GetValue(PendingProperty);
-        window.ClearValue(PendingProperty);
-        if (pending is bool dark) Apply(window, dark);
     }
 
     private static void Send(IntPtr handle, bool dark)

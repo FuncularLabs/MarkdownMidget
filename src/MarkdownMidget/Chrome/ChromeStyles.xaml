@@ -287,7 +287,7 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <!-- Horizontal only: the one toolbar tray is docked across the top. -->
+    <!-- Horizontal and locked only, as the one toolbar tray is (MainWindow.xaml): no grip. -->
     <Style TargetType="{x:Type ToolBar}">
         <Setter Property="Background" Value="{DynamicResource Chrome.ToolBar.Background}" />
         <Setter Property="Template">
@@ -314,37 +314,6 @@
                         <Border x:Name="MainPanelBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" Margin="0,0,11,0" CornerRadius="3">
                             <DockPanel KeyboardNavigation.TabIndex="1" KeyboardNavigation.TabNavigation="Local">
-                                <Thumb x:Name="ToolBarThumb" Margin="-3,-1,0,0" Padding="6,5,1,6" Width="10">
-                                    <Thumb.Style>
-                                        <Style TargetType="{x:Type Thumb}">
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="{x:Type Thumb}">
-                                                        <Border Background="Transparent" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                                                            <Rectangle>
-                                                                <Rectangle.Fill>
-                                                                    <DrawingBrush TileMode="Tile" Viewbox="0,0,4,4" Viewport="0,0,4,4" ViewportUnits="Absolute" ViewboxUnits="Absolute">
-                                                                        <DrawingBrush.Drawing>
-                                                                            <DrawingGroup>
-                                                                                <GeometryDrawing Brush="{DynamicResource Chrome.Etched.Highlight}" Geometry="M1,1L1,3 3,3 3,1z" />
-                                                                                <GeometryDrawing Brush="{DynamicResource Chrome.Text.Disabled}" Geometry="M0,0L0,2 2,2 2,0z" />
-                                                                            </DrawingGroup>
-                                                                        </DrawingBrush.Drawing>
-                                                                    </DrawingBrush>
-                                                                </Rectangle.Fill>
-                                                            </Rectangle>
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter Property="Cursor" Value="SizeAll" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </Thumb.Style>
-                                </Thumb>
                                 <ContentPresenter x:Name="ToolBarHeader" ContentSource="Header" HorizontalAlignment="Center" Margin="4,0" VerticalAlignment="Center"
                                                   SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                                 <ToolBarPanel x:Name="PART_ToolBarPanel" IsItemsHost="True" Margin="0,1,2,2" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
@@ -352,14 +321,8 @@
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsOverflowOpen" Value="True">
-                            <Setter TargetName="ToolBarThumb" Property="IsEnabled" Value="False" />
-                        </Trigger>
                         <Trigger Property="Header" Value="{x:Null}">
                             <Setter TargetName="ToolBarHeader" Property="Visibility" Value="Collapsed" />
-                        </Trigger>
-                        <Trigger Property="ToolBarTray.IsLocked" Value="True">
-                            <Setter TargetName="ToolBarThumb" Property="Visibility" Value="Collapsed" />
                         </Trigger>
                         <Trigger SourceName="OverflowPopup" Property="HasDropShadow" Value="True">
                             <Setter TargetName="Shdw" Property="Margin" Value="0,0,5,5" />
@@ -911,6 +874,7 @@
     </Style>
     <Style TargetType="{x:Type ListView}">
         <Setter Property="BorderBrush" Value="{DynamicResource Chrome.List.Border}" />
+        <!-- Needed: Aero2's GridView style colours the rows #FF042271 (navy), unreadable on dark. -->
         <Setter Property="Foreground" Value="{DynamicResource Chrome.Text}" />
     </Style>
     <Style TargetType="{x:Type ListViewItem}">

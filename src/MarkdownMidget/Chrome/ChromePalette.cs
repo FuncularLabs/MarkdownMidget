@@ -51,9 +51,8 @@ internal sealed class ChromeDarkMode : ResourceDictionary
 /// Light is exactly today's app: only <see cref="ChromeLightPalette"/> is merged, which holds
 /// the colours the windows' XAML used to spell out and no colour-bearing style (its two styles
 /// set sizes only: menu separators' spacing and the file picker's glyph buttons; see
-/// ChromeLight.xaml). No template replaces Aero2's. Dark
-/// merges <see cref="ChromeDarkMode"/>. High contrast always takes the light path, so the
-/// system's colours stay in charge there.
+/// ChromeLight.xaml). No template replaces Aero2's. Dark merges <see cref="ChromeDarkMode"/>.
+/// High contrast always takes the light path, so the system's colours stay in charge there.
 /// </summary>
 public static class ChromePalette
 {
@@ -85,9 +84,10 @@ public static class ChromePalette
     /// THE HOOK for the Windows appearance service: call it once at startup with the effective
     /// mode, before the first window opens, and again from its Changed event. Safe from any
     /// thread (it moves itself to the application's; when calls cross threads, the last one
-    /// made wins) and cheap to repeat: applying the mode already in force changes nothing. Every open window follows through DynamicResource,
-    /// and every window's title bar follows through <see cref="ChromeWindows"/>. With high
-    /// contrast on, dark is ignored and the light path is taken.
+    /// made wins) and cheap to repeat: applying the mode already in force changes nothing.
+    /// Every open window follows through DynamicResource, and every window's title bar follows
+    /// through <see cref="ChromeWindows"/>. With high contrast on, dark is ignored and the
+    /// light path is taken.
     /// </summary>
     public static void Apply(bool dark) =>
         Apply(dark, Application.Current?.Dispatcher, () => Application.Current?.Resources, () => SystemParameters.HighContrast);
@@ -117,10 +117,10 @@ public static class ChromePalette
     }
 
     /// <summary>
-    /// Put exactly one chrome dictionary into <paramref name="resources"/>' merged
-    /// dictionaries, where the previous one was (other merged dictionaries keep their
-    /// places), and report whether dark was applied. Returns without touching anything when
-    /// the wanted one is already the only one there.
+    /// Put the wanted chrome dictionary into <paramref name="resources"/>' merged dictionaries
+    /// in place of the chrome dictionary there (App.xaml starts with one; only this changes
+    /// it), or add it, and report whether dark was applied. Returns without touching anything
+    /// when the wanted kind is already there.
     /// </summary>
     internal static bool Apply(ResourceDictionary? resources, bool dark, bool highContrast)
     {
@@ -128,22 +128,14 @@ public static class ChromePalette
         if (resources is null) return effective;
 
         var merged = resources.MergedDictionaries;
-        var ours = merged.Where(d => d is ChromeLightPalette or ChromeDarkMode).ToList();
-        if (ours.Count == 1 && (effective ? ours[0] is ChromeDarkMode : ours[0] is ChromeLightPalette))
-            return effective;
+        var current = merged.FirstOrDefault(d => d is ChromeLightPalette or ChromeDarkMode);
+        if (effective ? current is ChromeDarkMode : current is ChromeLightPalette) return effective;
 
         // A fresh dictionary each switch: switches are rare, and a dictionary is never shared
         // between two resource owners or two threads.
         ResourceDictionary wanted = effective ? new ChromeDarkMode() : new ChromeLightPalette();
-        if (ours.Count == 0)
-        {
-            merged.Add(wanted);
-            return effective;
-        }
-        // Replace in place: one change, so one resource invalidation per open window.
-        merged[merged.IndexOf(ours[0])] = wanted;
-        foreach (var stale in ours.Skip(1))
-            merged.Remove(stale);
+        if (current is null) merged.Add(wanted);
+        else merged[merged.IndexOf(current)] = wanted;   // one change: one resource invalidation per open window
         return effective;
     }
 }

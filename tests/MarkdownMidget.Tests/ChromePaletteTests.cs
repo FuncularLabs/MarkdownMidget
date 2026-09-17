@@ -225,25 +225,6 @@ public class ChromePaletteTests
     }
 
     [Fact]
-    public void StrayChromeDictionariesCollapseToTheOneWanted()
-    {
-        // A resource set that somehow holds several (two starts, a hand edit) ends with one.
-        RunSta(() =>
-        {
-            var resources = new ResourceDictionary();
-            resources.MergedDictionaries.Add(new ChromeLightPalette());
-            resources.MergedDictionaries.Add(new ChromeDarkMode());
-            resources.MergedDictionaries.Add(new ChromeLightPalette());
-            ChromePalette.Apply(resources, dark: true, highContrast: false);
-            Assert.IsType<ChromeDarkMode>(Assert.Single(resources.MergedDictionaries));
-
-            resources.MergedDictionaries.Add(new ChromeLightPalette());
-            ChromePalette.Apply(resources, dark: false, highContrast: false);
-            Assert.IsType<ChromeLightPalette>(Assert.Single(resources.MergedDictionaries));
-        });
-    }
-
-    [Fact]
     public void HighContrastTakesTheLightPathEvenWhenDarkIsAsked()
     {
         RunSta(() =>

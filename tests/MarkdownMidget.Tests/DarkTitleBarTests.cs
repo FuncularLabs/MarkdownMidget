@@ -11,7 +11,7 @@ namespace MarkdownMidget.Tests;
 
 /// <summary>
 /// The dark title bar request, with DWM replaced by a recorder so nothing about the machine
-/// matters: a window without a handle gets it when the handle arrives, attribute 19 is the
+/// matters: a window without a handle is left alone, attribute 19 is the
 /// fallback for older Windows 10, a DWM that refuses or is missing is not an error, and every
 /// window (through the class handler) is set before it is shown and follows a switch.
 /// The last test shows two plain windows, off screen and not activated, hence the WpfSta collection.
@@ -33,7 +33,7 @@ public class DarkTitleBarTests
     }
 
     [Fact]
-    public void AWindowWithoutAHandleIsSetWhenItsHandleIsCreatedWithTheLatestMode()
+    public void AWindowWithoutAHandleIsLeftAloneAndOneWithAHandleIsSet()
     {
         var calls = new List<(IntPtr, int, int)>();
         WithDwm((h, attribute, value) => { calls.Add((h, attribute, value)); return 0; }, () =>
@@ -41,16 +41,11 @@ public class DarkTitleBarTests
             var window = new Window();
             try
             {
-                Assert.False(DarkTitleBar.Apply(window, dark: false));
                 Assert.False(DarkTitleBar.Apply(window, dark: true));
                 Assert.Empty(calls);
-
-                var handle = new WindowInteropHelper(window).EnsureHandle();   // raises SourceInitialized; nothing is shown
+                var handle = new WindowInteropHelper(window).EnsureHandle();   // nothing is shown
+                Assert.True(DarkTitleBar.Apply(window, dark: true));
                 Assert.Equal([(handle, DarkTitleBar.UseImmersiveDarkMode, 1)], calls);
-
-                Assert.True(DarkTitleBar.Apply(window, dark: false));
-                Assert.Equal((handle, DarkTitleBar.UseImmersiveDarkMode, 0), calls[^1]);
-                Assert.Equal(2, calls.Count);
             }
             finally { window.Close(); }
         });
