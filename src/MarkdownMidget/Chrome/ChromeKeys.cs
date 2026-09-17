@@ -29,4 +29,6 @@ public static class ChromeKeys
     public const string ChipRemovedText = "Chrome.Chip.RemovedText";
     public const string IconNumberedList = "Chrome.Icon.NumberedList";
     public const string IconSpellCheck = "Chrome.Icon.SpellCheck";
+    /// <summary>A style, not a brush: the built-in file picker's glyph buttons.</summary>
+    public const string PickerNavButton = "Chrome.Picker.NavButton";
 }

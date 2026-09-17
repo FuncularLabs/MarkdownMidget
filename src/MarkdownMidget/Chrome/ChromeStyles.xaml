@@ -384,43 +384,41 @@
     </Style>
 
     <!-- ===== Dialog controls ===== -->
+    <!-- Keyed, so the file picker's glyph buttons (Chrome.Picker.NavButton) share it. -->
+    <ControlTemplate x:Key="Chrome.ButtonTemplate" TargetType="{x:Type ButtonBase}">
+        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+            <ContentPresenter x:Name="contentPresenter" Focusable="False" RecognizesAccessKey="True" Margin="{TemplateBinding Padding}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="Button.IsDefaulted" Value="True">
+                <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Hover.Background}" />
+                <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Hover.Border}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Pressed.Background}" />
+                <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Pressed.Border}" />
+            </Trigger>
+            <Trigger Property="ToggleButton.IsChecked" Value="True">
+                <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Checked.Background}" />
+                <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Checked.Border}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Disabled.Background}" />
+                <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Disabled.Border}" />
+                <Setter TargetName="contentPresenter" Property="TextElement.Foreground" Value="{DynamicResource Chrome.Button.Disabled.Text}" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
     <Style TargetType="{x:Type Button}">
         <Setter Property="Background" Value="{DynamicResource Chrome.Button.Background}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Chrome.Button.Border}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type ButtonBase}">
-                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
-                        <ContentPresenter x:Name="contentPresenter" Focusable="False" RecognizesAccessKey="True" Margin="{TemplateBinding Padding}"
-                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="Button.IsDefaulted" Value="True">
-                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Hover.Background}" />
-                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Hover.Border}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Pressed.Background}" />
-                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Pressed.Border}" />
-                        </Trigger>
-                        <Trigger Property="ToggleButton.IsChecked" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Checked.Background}" />
-                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Checked.Border}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="border" Property="Background" Value="{DynamicResource Chrome.Button.Disabled.Background}" />
-                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource Chrome.Button.Disabled.Border}" />
-                            <Setter TargetName="contentPresenter" Property="TextElement.Foreground" Value="{DynamicResource Chrome.Button.Disabled.Text}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="Template" Value="{StaticResource Chrome.ButtonTemplate}" />
     </Style>
 
     <Style TargetType="{x:Type TextBox}">

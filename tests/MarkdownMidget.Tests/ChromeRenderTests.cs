@@ -382,4 +382,47 @@ public class ChromeRenderTests
             return max;
         }
     }
+
+    [Aero2Fact]
+    public void ThePickerNavButtonsFollowASwitchMadeWhileTheyAreOpen()
+    {
+        ChromePaletteTests.RunSta(() =>
+        {
+            // The picker's nav button style as it was before the chrome work: sizes and the fade only.
+            var before = new Style(typeof(ButtonBase));
+            foreach (var (property, value) in new (DependencyProperty, object)[]
+                     {
+                         (Control.FontFamilyProperty, new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets")), (Control.FontSizeProperty, 14.0),
+                         (FrameworkElement.WidthProperty, 28.0), (FrameworkElement.HeightProperty, 26.0),
+                         (Control.PaddingProperty, new Thickness(0)), (FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0)),
+                     })
+                before.Setters.Add(new Setter(property, value));
+            before.Triggers.Add(new Trigger { Property = UIElement.IsEnabledProperty, Value = false, Setters = { new Setter(UIElement.OpacityProperty, 0.35) } });
+            // One enabled button and one disabled (Back with no history).
+            FrameworkElement Pair(Action<Button> style)
+            {
+                var (enabled, disabled) = (new Button { Content = "" }, new Button { Content = "", IsEnabled = false });
+                style(enabled);
+                style(disabled);
+                return new StackPanel { Orientation = Orientation.Horizontal, Children = { enabled, disabled } };
+            }
+            var expected = Draw(Host(Pair(b => b.Style = before), Aero2));
+
+            ResourceDictionary? resources = null;
+            var buttons = new List<Button>();
+            var root = Host(Pair(b => { b.SetResourceReference(FrameworkElement.StyleProperty, ChromeKeys.PickerNavButton); buttons.Add(b); }),
+                            r => { resources = r; Light(r); });
+            Assert.Null(Difference(expected, Draw(root)));   // light: as the picker drew before
+
+            Dark(resources!);   // Windows switches while the picker is open
+            Draw(root);
+            var face = ((SolidColorBrush)new ChromeDarkPalette()["Chrome.Button.Background"]).Color;
+            foreach (var b in buttons)
+                Assert.Equal(face, Assert.IsType<SolidColorBrush>(b.Background).Color);
+            Assert.Equal((1.0, 0.35), (buttons[0].Opacity, buttons[1].Opacity));
+
+            Light(resources!);
+            Assert.Null(Difference(expected, Draw(root)));
+        });
+    }
 }

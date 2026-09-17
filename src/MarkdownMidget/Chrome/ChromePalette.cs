@@ -49,8 +49,9 @@ internal sealed class ChromeDarkMode : ResourceDictionary
 /// The window chrome's light and dark palettes, and the one switch between them.
 ///
 /// Light is exactly today's app: only <see cref="ChromeLightPalette"/> is merged, which holds
-/// the colours the windows' XAML used to spell out and no colour-bearing style (its one style
-/// keeps menu separators' spacing; see ChromeLight.xaml). No template replaces Aero2's. Dark
+/// the colours the windows' XAML used to spell out and no colour-bearing style (its two styles
+/// set sizes only: menu separators' spacing and the file picker's glyph buttons; see
+/// ChromeLight.xaml). No template replaces Aero2's. Dark
 /// merges <see cref="ChromeDarkMode"/>. High contrast always takes the light path, so the
 /// system's colours stay in charge there.
 /// </summary>

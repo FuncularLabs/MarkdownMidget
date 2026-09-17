@@ -44,6 +44,24 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Chrome.Menu.Separator}" />
     </Style>
 
+    <!-- The file picker's glyph buttons: see ChromeLight.xaml; here on the dark button. -->
+    <Style x:Key="Chrome.Picker.NavButton" TargetType="{x:Type ButtonBase}">
+        <Setter Property="Background" Value="{DynamicResource Chrome.Button.Background}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Chrome.Button.Border}" />
+        <Setter Property="Template" Value="{DynamicResource Chrome.ButtonTemplate}" />
+        <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,3,0" />
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.35" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Toolbar, status bar, tooltip -->
     <SolidColorBrush x:Key="Chrome.ToolBar.Background" Color="#FF2B2B2B" />
     <SolidColorBrush x:Key="Chrome.ToolBar.Separator" Color="#FF4A4A4A" />

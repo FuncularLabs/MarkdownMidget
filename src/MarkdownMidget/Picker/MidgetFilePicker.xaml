@@ -1,26 +1,12 @@
 <Window x:Class="MarkdownMidget.Picker.MidgetFilePicker"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="clr-namespace:MarkdownMidget.Chrome"
         Title="Open" Height="520" Width="820" MinHeight="360" MinWidth="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Icon="/Assets/midget-256.png">
-    <Window.Resources>
-        <!-- Based on the Button style in force when the picker opens: Aero2's, or the dark
-             chrome's (Chrome/ChromeStyles.xaml). An explicit style would otherwise hide the latter. -->
-        <Style x:Key="NavGlyph" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="Width" Value="28" />
-            <Setter Property="Height" Value="26" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,3,0" />
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.35" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
+    <!-- The glyph buttons' style is in the chrome palettes (Chrome.Picker.NavButton), taken by
+         DynamicResource, so an open picker follows a light/dark switch. -->
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -30,13 +16,13 @@
 
         <!-- Navigation + address bar -->
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <Button x:Name="BackButton" Style="{StaticResource NavGlyph}" Content="&#xE72B;"
+            <Button x:Name="BackButton" Style="{DynamicResource {x:Static chrome:ChromeKeys.PickerNavButton}}" Content="&#xE72B;"
                     ToolTip="Back (Alt+Left)" Click="Back_Click" DockPanel.Dock="Left" />
-            <Button x:Name="ForwardButton" Style="{StaticResource NavGlyph}" Content="&#xE72A;"
+            <Button x:Name="ForwardButton" Style="{DynamicResource {x:Static chrome:ChromeKeys.PickerNavButton}}" Content="&#xE72A;"
                     ToolTip="Forward (Alt+Right)" Click="Forward_Click" DockPanel.Dock="Left" />
-            <Button x:Name="UpButton" Style="{StaticResource NavGlyph}" Content="&#xE74A;"
+            <Button x:Name="UpButton" Style="{DynamicResource {x:Static chrome:ChromeKeys.PickerNavButton}}" Content="&#xE74A;"
                     ToolTip="Up one folder (Alt+Up)" Click="Up_Click" DockPanel.Dock="Left" />
-            <Button Style="{StaticResource NavGlyph}" Content="&#xE72C;" Margin="0,0,6,0"
+            <Button Style="{DynamicResource {x:Static chrome:ChromeKeys.PickerNavButton}}" Content="&#xE72C;" Margin="0,0,6,0"
                     ToolTip="Refresh (F5)" Click="Refresh_Click" DockPanel.Dock="Right" />
             <TextBox x:Name="AddressBox" VerticalContentAlignment="Center" Padding="4,2"
                      KeyDown="AddressBox_KeyDown" ToolTip="Type or paste a folder path, then press Enter" />
