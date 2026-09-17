@@ -465,19 +465,33 @@ const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 const themeVariables = (themeCss) => new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
 /** Whether a declaration's rule lists exactly this selector. */
 const names = (d, selector) => d.where.split(' > ').at(-1).split(', ').includes(selector);
-/** A rule that colours a heading or a link as such, in any selector shape. */
-const headingOrLink = (d) => d.prop === 'color' && /(^|[\s>+~])(a|h[1-6])(?![\w-])/.test(d.where.split(' > ').at(-1));
+/** The element each selector in a declaration's rule styles: its last compound, such as
+ *  `a:hover` for `.mdm-prosemirror blockquote a:hover`. */
+const subjects = (d) => d.where.split(' > ').at(-1).split(', ').map((s) => s.split(/[\s>+~]+/).at(-1));
+const HEADING_OR_LINK = /^(a|h[1-6])(?![\w-])/;
+/** A colour on a heading or a link itself, whatever its ancestors. */
+const headingOrLink = (d) => d.prop === 'color' && subjects(d).some((s) => HEADING_OR_LINK.test(s));
+/** A selector for the root element alone. */
+const isRoot = (selector) => /^(:root|html)([.#:[][^\s>+~]*)?$/.test(selector);
 
 /** The print declarations that reach paper with this theme installed over Default. */
 function paperDeclarations(themeCss) {
   const vars = themeVariables(themeCss);
-  return declarations(read('styles', 'print.css'), vars).filter((d) =>
-    d.where.split(' > ').filter((part) => part.startsWith('@')).every((at) => {
+  return declarations(read('styles', 'print.css'), vars).flatMap((d) => {
+    const parts = d.where.split(' > ');
+    const applies = parts.filter((part) => part.startsWith('@')).every((at) => {
       if (at === '@media print' || at === '@page') return true;
       const query = at.match(/^@container style\((--[\w-]+):\s*([^()]*?)\s*\)$/);
       assert.ok(query, `print.css has a condition this test can't evaluate: ${at}`);
       return vars.get(query[1]) === query[2];
-    }));
+    });
+    if (!applies) return [];
+    if (!parts.some((part) => part.startsWith('@container'))) return [d];
+    // A style query asks the element's parent, and the root element has none, so
+    // Chromium never matches it there: a root selector inside one styles nothing.
+    const kept = parts.at(-1).split(', ').filter((s) => !isRoot(s));
+    return kept.length ? [{ ...d, where: [...parts.slice(0, -1), kept.join(', ')].join(' > ') }] : [];
+  });
 }
 
 /** Print's own value for this selector's property, or undefined when print leaves it alone. */
@@ -582,19 +596,22 @@ test('paper pins a dark theme\'s heading and link variables, not their colours',
   }
 
   // Pinning variables is enough only while every rule of ours that colours a heading or
-  // a link reads one that paper pins on that element.
+  // a link, with any ancestors (a link in a quote, say), reads one that paper pins on
+  // every such element. Print's own rules are the checks above; screen-only rules
+  // never reach paper.
   const pinned = (selector) => new Set(paperDeclarations(readTheme('Dracula.css'))
     .filter((d) => d.prop.startsWith('--') && names(d, selector)).map((d) => d.prop));
-  const rules = declarations(editorCss).filter((d) => !d.where.startsWith('@') && d.prop === 'color');
-  for (const [el, pinnedOn] of [...HEADINGS.map((h) => [h, h]), ['a', 'a'], ['a:hover', 'a']]) {
-    const colouring = rules.filter((d) => names(d, `.mdm-prosemirror ${el}`));
-    assert.ok(colouring.length > 0, `no screen rule colours ${el}`);
-    for (const d of colouring) {
+  const seen = new Set();
+  for (const d of declarations(editorCss).filter((d) => !/^@media (print|screen)\b/.test(d.where) && headingOrLink(d))) {
+    for (const subject of subjects(d).filter((s) => HEADING_OR_LINK.test(s))) {
+      seen.add(subject);
+      const pinnedOn = `.mdm-prosemirror ${subject.match(HEADING_OR_LINK)[1]}`;
       const variable = d.value.match(/^var\((--[\w-]+)\)$/)?.[1];
-      assert.ok(variable && pinned(`.mdm-prosemirror ${pinnedOn}`).has(variable),
-        `${d.where} { color: ${d.value} } is not a variable paper pins on ${pinnedOn}`);
+      assert.ok(variable && pinned(pinnedOn).has(variable),
+        `${d.where} { color: ${d.value} } colours ${subject} with something paper doesn't pin on ${pinnedOn}`);
     }
   }
+  for (const el of [...HEADINGS, 'a', 'a:hover']) assert.ok(seen.has(el), `no screen rule colours ${el}`);
 });
 
 test('Default and every light built-in print headings and links in their own colours, as before', () => {

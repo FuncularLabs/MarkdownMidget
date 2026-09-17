@@ -44,7 +44,9 @@
 
   /* Paper is light, so its colour scheme is too. A dark theme's scheme paints the page
      margins dark (#121212 in Edge) when the print dialog's "Background graphics" is
-     ticked. Default and every light theme already resolve to `light`. */
+     ticked. Default and every light theme already resolve to `light`. Keep this out of
+     the dark-only block below: a style query asks an element's parent, the root
+     element has none, so there the query never matches and the margins stay dark. */
   :root {
     color-scheme: light !important;
   }
