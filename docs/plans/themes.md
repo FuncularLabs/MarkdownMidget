@@ -449,13 +449,14 @@ injected.
   Worth stating in HELP.md, because it will otherwise read as a bug the first time
   someone prints from Dracula.
 
-**Out of scope, decided:** the WPF menu bar, toolbar and status bar are not themed.
-They are native Windows chrome, they look correct in the OS theme, and doing them
-well is separate work with its own dark-title-bar problems. This is a settled
-decision rather than a deferral — if it is ever revisited it should be because the
-menu bar is being restyled for some other reason, not because a dark theme made it
-look inconsistent. The source view is the exception and *is* themed (§4), because it
-is the document, not chrome.
+**Out of scope here; the chrome follows Windows' mode instead:** the document theme does
+not colour the WPF menu bar, toolbar, status bar or dialogs. This originally read as a
+settled "not themed". It was revisited on 2026-09-16 (ROADMAP, "Now — the 1.0.0-rc3
+set"): the chrome keeps today's look in light mode and gets a dark palette and a dark
+title bar when Windows is in dark mode. That is still separate from this plan: the
+chrome follows the Windows mode, never the chosen document theme (`Chrome\ChromePalette.cs`).
+The source view is the exception and *is* themed (§4), because it is the document, not
+chrome.
 
 ---
 
