@@ -22,8 +22,8 @@
             <Setter Property="IsTabStop" Value="False" />
             <!-- Greyed out, a button still shows its tooltip, which says when it is available. -->
             <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-            <!-- Under the button, below a larger-than-standard pointer (ToolbarToolTip). -->
-            <Setter Property="ToolTipService.Placement" Value="Bottom" />
+            <!-- Unchanged for a standard pointer; under the button, below an enlarged one (ToolbarToolTip). -->
+            <Setter Property="ToolTipService.Placement" Value="{x:Static local:ToolbarToolTip.Placement}" />
             <Setter Property="ToolTipService.VerticalOffset" Value="{x:Static local:ToolbarToolTip.VerticalOffset}" />
             <Style.Triggers>
                 <!-- WPF's default disabled look for glyph text barely dims; a user
@@ -43,7 +43,7 @@
             <Setter Property="Focusable" Value="False" />
             <Setter Property="IsTabStop" Value="False" />
             <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-            <Setter Property="ToolTipService.Placement" Value="Bottom" />
+            <Setter Property="ToolTipService.Placement" Value="{x:Static local:ToolbarToolTip.Placement}" />
             <Setter Property="ToolTipService.VerticalOffset" Value="{x:Static local:ToolbarToolTip.VerticalOffset}" />
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
@@ -289,7 +289,7 @@
                         <TextBlock Text="Style:" VerticalAlignment="Center" Margin="4,0,4,0" />
                         <ComboBox x:Name="StyleCombo" Width="162" IsTabStop="False"
                                   ToolTip="Block style (Ctrl+Shift+H) — editable documents only" ToolTipService.ShowOnDisabled="True"
-                                  ToolTipService.Placement="Bottom" ToolTipService.VerticalOffset="{x:Static local:ToolbarToolTip.VerticalOffset}"
+                                  ToolTipService.Placement="{x:Static local:ToolbarToolTip.Placement}" ToolTipService.VerticalOffset="{x:Static local:ToolbarToolTip.VerticalOffset}"
                                   SelectionChanged="StyleCombo_Changed">
                             <ComboBoxItem Content="Paragraph" Tag="paragraph" IsSelected="True" />
                             <ComboBoxItem Content="H1 &#8212; Heading 1" Tag="h1" />
