@@ -135,9 +135,9 @@ tabs, and **·** for the spaces that are hard to see but change what Markdown do
 
 Other spaces aren't marked, such as ordinary indentation (in a blockquote, counted from
 after the `>`), the spaces after a list marker or a `>`, and the padding in a table row
-that starts with `|`. In a code block, front matter at the top of the file, and an HTML
-comment, only spaces at the end of a line are marked, because spacing there is usually on
-purpose. A code block inside a list item or blockquote ends where the item or quote does.
+that starts with `|`. In a code block, front matter (from a `---` on the first line to the
+next `---`), and an HTML comment, only spaces at the end of a line are marked, because
+spacing there is usually on purpose. A code block inside a list item or blockquote ends where the item or quote does.
 The marks are only shown: they aren't copied, found, printed or saved.
 
 ## Find

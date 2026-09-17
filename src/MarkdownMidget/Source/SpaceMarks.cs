@@ -59,7 +59,7 @@ internal static class SpaceMarks
                 var closes = before.Fence switch
                 {
                     '<' => line.Contains("-->", StringComparison.Ordinal),
-                    '-' => line.AsSpan(0, end) is "---" or "...",
+                    '-' => line.AsSpan(0, end) is "---",   // not "...": the formatted view's front-matter parser closes only on ---
                     _ => quote == before.Quote && col < before.FenceColumn + 4 && text.Length >= before.FenceLength
                          && !text.ContainsAnyExcept(before.Fence),
                 };

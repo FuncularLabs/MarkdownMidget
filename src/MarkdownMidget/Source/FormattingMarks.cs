@@ -64,6 +64,9 @@ internal sealed class FormattingMarks : IBackgroundRenderer
     /// the cost of a visual-position lookup.</summary>
     internal int Placed { get; private set; }
 
+    /// <summary>How many wrapped rows the last <see cref="Positions"/> stepped through.</summary>
+    internal int RowsVisited { get; private set; }
+
     /// <summary>
     /// Each visible mark and where it goes in view coordinates (the glyph's top-left): →
     /// where a tab starts, · on the spaces <see cref="SpaceMarks"/> picks, ¶ right after the
@@ -73,35 +76,51 @@ internal sealed class FormattingMarks : IBackgroundRenderer
     /// </summary>
     internal IReadOnlyList<(char Glyph, Point At)> Positions(TextView textView)
     {
-        Placed = 0;
+        Placed = RowsVisited = 0;
         var marks = new List<(char, Point)>();
         if (!_enabled || !textView.VisualLinesValid || textView.Document is not { } doc) return marks;
         var scroll = textView.ScrollOffset;
         foreach (var line in textView.VisualLines)
         {
             var start = line.FirstDocumentLine.Offset;
-            Point At(int offset) { Placed++; return line.GetVisualPosition(line.GetVisualColumn(offset - start), VisualYPosition.TextTop) - scroll; }
             int[]? spaces = null;
+            // One pass down the wrapped rows, keeping each row's top and first column as it goes:
+            // AvalonEdit's per-row lookups walk every row of the line, which on a pasted picture's
+            // thousands of rows would cost rows² on every repaint. Rows above the view are stepped
+            // over; the first row below it ends the walk.
+            double top = line.VisualTop;   // in the document; the scroll comes off last, as AvalonEdit's own positions do
+            var first = 0;
             foreach (var row in line.TextLines)
             {
-                // Only the part of a row in view: a wrapped row above or below it is skipped, and a
-                // long row is cut to the columns under its left and right edges, with one to spare.
-                var top = line.GetTextLineVisualYPosition(row, VisualYPosition.LineTop) - scroll.Y;
-                if (top + row.Height < 0 || top > textView.ActualHeight) continue;
-                var first = line.GetTextLineVisualStartColumn(row);
-                int left = Math.Max(first, line.GetVisualColumn(row, scroll.X, false) - 1),
-                    right = Math.Min(first + row.Length, line.GetVisualColumn(row, scroll.X + textView.ActualWidth, false) + 1);
+                RowsVisited++;
+                double rowTop = top;
+                int rowFirst = first;
+                top += row.Height;
+                first += row.Length;
+                if (rowTop - scroll.Y > textView.ActualHeight) break;
+                if (top - scroll.Y < 0) continue;
+                // A long row is cut to the columns under the view's left and right edges, with one to spare.
+                int left = Math.Max(rowFirst, line.GetVisualColumn(row, scroll.X, false) - 1),
+                    right = Math.Min(first, line.GetVisualColumn(row, scroll.X + textView.ActualWidth, false) + 1);
                 int from = start + line.GetRelativeOffset(left), to = start + line.GetRelativeOffset(right);
+                var textTop = rowTop + row.Baseline - textView.DefaultBaseline - scroll.Y;   // VisualYPosition.TextTop, for this row
+                Point At(int offset)
+                {
+                    Placed++;
+                    return new Point(line.GetTextLineVisualXPosition(row, line.GetVisualColumn(offset - start)) - scroll.X, textTop);
+                }
                 for (var tab = doc.IndexOf('\t', from, to - from); tab >= 0; tab = doc.IndexOf('\t', tab + 1, to - tab - 1))
                     marks.Add(('→', At(tab)));
                 spaces ??= SpaceMarks.Step(doc.GetText(line.FirstDocumentLine), StartOf(doc, line.FirstDocumentLine.LineNumber)).Marks;
-                foreach (var space in spaces)
-                    if (start + space >= from && start + space < to) marks.Add(('·', At(start + space)));
+                // Marks come in offset order, so the row's first is found by halving, not by reading them all.
+                var index = Array.BinarySearch(spaces, from - start);
+                for (index = index < 0 ? ~index : index; index < spaces.Length && start + spaces[index] < to; index++)
+                    marks.Add(('·', At(start + spaces[index])));
             }
             if (line.LastDocumentLine.DelimiterLength == 0) continue;
-            var last = line.TextLines[^1];
-            marks.Add(('¶', new Point(line.GetTextLineVisualXPosition(last, line.VisualLength),
-                line.GetTextLineVisualYPosition(last, VisualYPosition.TextTop)) - scroll));
+            var last = line.TextLines[^1];   // its top is the line's bottom less its own height
+            marks.Add(('¶', new Point(line.GetTextLineVisualXPosition(last, line.VisualLength) - scroll.X,
+                line.VisualTop + (line.Height - last.Height) + last.Baseline - textView.DefaultBaseline - scroll.Y)));
         }
         return marks;
     }

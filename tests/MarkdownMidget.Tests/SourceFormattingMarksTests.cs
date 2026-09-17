@@ -105,20 +105,22 @@ public class SourceFormattingMarksTests
     }
 
     [Fact]   // AC1
-    public void EachTabGetsAnArrowWhereItStartsOnAWrappedRowToo()
+    public void EachTabAndLineEndIsMarkedOnTheWrappedRowItIsOn()
     {
-        var text = "\tlead\n" + string.Concat(Enumerable.Repeat("word ", 30)) + "x\ty\t";
-        var (marks, tabs, secondRowTop) = On(ed =>
+        var text = "\tlead\n" + string.Concat(Enumerable.Repeat("word ", 30)) + "x\ty\t\nlast";
+        var (marks, tabs, secondRowTop, pilcrow, lineEnd) = On(ed =>
         {
             ed.WordWrap = true;
             ed.ShowMarks = true;
             var starts = Enumerable.Range(0, text.Length).Where(i => text[i] == '\t').ToArray();
-            return (Of(ed, '→'), starts.Select(i => PositionOf(ed, i)).ToArray(), PositionOf(ed, text.IndexOf("word", StringComparison.Ordinal)).Y);
+            return (Of(ed, '→'), starts.Select(i => PositionOf(ed, i)).ToArray(), PositionOf(ed, text.IndexOf("word", StringComparison.Ordinal)).Y,
+                Of(ed, '¶')[1], PositionOf(ed, ed.Document.GetLineByNumber(2).EndOffset));
         }, text);
 
         Assert.Equal(3, tabs.Length);
         Assert.Equal(tabs, marks);
         Assert.True(marks[1].Y > secondRowTop, "the wrapped line's tabs are marked on the row they are on, not its first");
+        Assert.Equal(lineEnd, pilcrow);   // and its ¶ on its last row
     }
 
     [Fact]   // spaces: the SpaceMarks rules, on screen, following edits above them
@@ -161,6 +163,33 @@ public class SourceFormattingMarksTests
         Assert.Equal(inView, scrolled);   // nothing placed off to either side
         Assert.True(allInView, "every mark returned is in the view");
         Assert.InRange(wrapped, 1, 1000);   // wrapped rows below the view are not placed either
+    }
+
+    [Fact]   // review round 2, N1: a pasted picture's 600 KB line walks its rows only down to the view's bottom
+    public void AWrappedPictureSizedLineWalksOnlyTheRowsDownToTheViewsBottom()
+    {
+        var text = "![p](data:image/png;base64," + string.Concat(Enumerable.Repeat("iVBORw0KGgoAAAA\tNSUhEU  ", 25_000)) + ")\nafter";
+        var (rows, atTop, inMiddle, marks, hits) = On(ed =>
+        {
+            ed.WordWrap = true;
+            ed.ShowMarks = true;
+            var view = Settle(ed);
+            ed.Marks.Positions(view);
+            var top = ed.Marks.RowsVisited;
+            var line = view.VisualLines[0];
+            ed.ScrollToVerticalOffset(line.Height / 2);
+            view = Settle(ed);
+            var placed = ed.Marks.Positions(view).Where(m => m.Glyph != '¶').ToArray();
+            var onTheirCharacters = placed.Count(m => view.GetPosition(new Point(m.At.X + 1, m.At.Y + 2) + view.ScrollOffset) is { } p
+                && ed.Document.GetCharAt(ed.Document.GetOffset(p.Location)) == (m.Glyph == '→' ? '\t' : ' '));
+            return (line.TextLines.Count, top, ed.Marks.RowsVisited, placed.Length, onTheirCharacters);
+        }, text);
+
+        Assert.True(rows > 4000, $"only {rows} rows");
+        Assert.InRange(atTop, 1, 40);                  // a 400-pixel view's rows, and the first below it
+        Assert.InRange(inMiddle, rows / 2, rows / 2 + 40);   // the rows above, walked once, then the view's
+        Assert.True(marks > 0, "marks in view");
+        Assert.Equal(marks, hits);                     // each mark sits on its own tab or space
     }
 
     [Fact]   // review finding 3: MRK-02 step 2 against the editor, one undo step per keystroke

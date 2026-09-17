@@ -98,7 +98,7 @@ public class SpaceMarksTests
     [InlineData("<!-- note  \nx  y\n-->\na  b", "9,10|||1,2")]  
     [InlineData("- ```\n  a  b\n  ```\nc  d", "|||1,2")]                // a fence straight after a list marker
     [InlineData("---\ntitle:  x\n---\na  b", "|||1,2")]                 // front matter
-    [InlineData("---\nk:  v\n...\na  b", "|||1,2")]
+    [InlineData("---\nk:  v\n...\nx:  y\n---\na  b", "|||||1,2")]     // only --- closes it, as in the formatted view's parser
     [InlineData("\n---\nk:  v", "||2,3")]                                // only on the first line
     [InlineData("Title\n=====\n    a  b", "||")]                         // code may follow a setext heading
     public void FencesCommentsAndFrontMatterMarkOnlyTrailingSpaces(string document, string expected) =>
