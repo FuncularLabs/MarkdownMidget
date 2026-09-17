@@ -5,7 +5,9 @@
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Icon="/Assets/midget-256.png">
     <Window.Resources>
-        <Style x:Key="NavGlyph" TargetType="{x:Type ButtonBase}">
+        <!-- Based on the Button style in force when the picker opens: Aero2's, or the dark
+             chrome's (Chrome/ChromeStyles.xaml). An explicit style would otherwise hide the latter. -->
+        <Style x:Key="NavGlyph" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Width" Value="28" />

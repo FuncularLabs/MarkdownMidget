@@ -1,14 +1,15 @@
 <Window x:Class="MarkdownMidget.RegisterDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="clr-namespace:MarkdownMidget.Chrome"
         Title="Register as .md editor" SizeToContent="Height" Width="560"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ShowInTaskbar="False" Icon="/Assets/midget-256.png">
     <Window.Resources>
         <!-- A small rounded "chip" used to build the minimalist diagrams. -->
         <Style x:Key="Chip" TargetType="Border">
-            <Setter Property="Background" Value="#FFF3F4F6" />
-            <Setter Property="BorderBrush" Value="#FFCFD4DB" />
+            <Setter Property="Background" Value="{DynamicResource {x:Static chrome:ChromeKeys.ChipBackground}}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static chrome:ChromeKeys.ChipBorder}}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="8,5" />
@@ -17,18 +18,18 @@
         <Style x:Key="ChipLabel" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="#FF3A3F46" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static chrome:ChromeKeys.ChipText}}" />
         </Style>
         <Style x:Key="Arrow" TargetType="TextBlock">
             <Setter Property="Text" Value="&#x2192;" />
             <Setter Property="FontSize" Value="20" />
-            <Setter Property="Foreground" Value="#FF8A9099" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static chrome:ChromeKeys.ChipArrowText}}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="8,0" />
         </Style>
         <Style x:Key="Caption" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11" />
-            <Setter Property="Foreground" Value="#FF5B6168" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static chrome:ChromeKeys.ChipCaptionText}}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="26,2,0,0" />
         </Style>
@@ -42,7 +43,7 @@
             working; Unregister removes them.
         </TextBlock>
         <TextBlock x:Name="ExePathText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
-                   Foreground="#FF666666" Margin="0,0,0,14" />
+                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.DialogCodeText}}" Margin="0,0,0,14" />
 
         <!-- Move vs copy -->
         <StackPanel x:Name="MovePanel" Margin="0,0,0,14">
@@ -52,7 +53,7 @@
                     <StackPanel>
                         <Image Source="/Assets/midget-64.png" Width="22" Height="22" HorizontalAlignment="Center" />
                         <TextBlock Style="{StaticResource ChipLabel}" Text="Downloads" />
-                        <TextBlock Style="{StaticResource ChipLabel}" Text="(removed)" Foreground="#FFB23A3A" />
+                        <TextBlock Style="{StaticResource ChipLabel}" Text="(removed)" Foreground="{DynamicResource {x:Static chrome:ChromeKeys.ChipRemovedText}}" />
                     </StackPanel>
                 </Border>
                 <TextBlock Style="{StaticResource Arrow}" />

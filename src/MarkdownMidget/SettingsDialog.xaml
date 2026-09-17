@@ -1,12 +1,13 @@
 <Window x:Class="MarkdownMidget.SettingsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="clr-namespace:MarkdownMidget.Chrome"
         Title="Settings"
         SizeToContent="WidthAndHeight" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
         <Style TargetType="TextBlock" x:Key="Caption">
-            <Setter Property="Foreground" Value="#FF5B6570" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static chrome:ChromeKeys.TextSecondary}}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="24,2,0,0" />
         </Style>
@@ -66,7 +67,7 @@
         <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0"
                    Text="One-way copy from CUSTOM.DIC into Markdown Midget's own dictionary. Word's file is only read — never changed." />
         <TextBlock x:Name="ImportResult" Style="{StaticResource Caption}" Margin="0,4,0,0"
-                   Foreground="#FF3B6EA5" Visibility="Collapsed" />
+                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" Visibility="Collapsed" />
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
             <Button Content="Cancel" IsCancel="True" Padding="16,3" Margin="0,0,8,0" />

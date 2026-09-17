@@ -77,7 +77,7 @@ public partial class SettingsDialog : Window
         {
             // Say what's wrong in place rather than throwing up a second dialog.
             RecentHint.Text = $"Enter a number between {MinRecent} and {MaxRecentLimit}.";
-            RecentHint.Foreground = System.Windows.Media.Brushes.Firebrick;
+            RecentHint.SetResourceReference(TextBlock.ForegroundProperty, Chrome.ChromeKeys.DialogInvalidText);
             RecentLimitBox.Focus();
             RecentLimitBox.SelectAll();
             return;
