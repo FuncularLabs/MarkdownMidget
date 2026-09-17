@@ -4750,6 +4750,7 @@ public partial class MainWindow : Window
     private void ToggleMarks_Click(object sender, RoutedEventArgs e)
     {
         _showMarks = MarksToggle.IsChecked == true;
+        SourceBox.ShowMarks = _showMarks;   // one toggle for both views; the source editor keeps it through view switches and documents
         if (_editorReady)
             _ = RunEditorAsync($"window.MDM.showMarks({(_showMarks ? "true" : "false")})");
         RefocusEditor();

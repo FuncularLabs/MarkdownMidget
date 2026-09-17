@@ -119,8 +119,10 @@ editing the markdown source directly.
 
 ## Formatting marks (¶)
 
-The **¶** toolbar toggle shows Word-style marks in light gray: **¶** at paragraph
-and heading ends, **↵** at manual line breaks, and **→** for tabs.
+The **¶** toolbar toggle shows Word-style marks in light gray, in both views. In the
+formatted view: **¶** at paragraph and heading ends, **↵** at manual line breaks, and
+**→** for tabs. In the Markdown source view: **¶** at the end of each line and **→** for
+tabs. The marks are only shown: they aren't copied, found, printed or saved.
 
 ## Find
 

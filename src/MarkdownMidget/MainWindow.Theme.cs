@@ -343,6 +343,7 @@ public partial class MainWindow
             SourceBox.Foreground = fg;
             SourceBox.CaretBrush = caret;
             SourceBox.LineNumbersForeground = Brushes.Gray;   // AvalonEdit's own, readable on the original pane
+            SourceBox.MarksBrush = Source.FormattingMarks.BrushFor(null);   // the ¶ and → marks: the default theme's mark grey
             FlashStatus("The theme was applied, but the markdown source view couldn't follow it.");
             return;
         }
@@ -353,6 +354,7 @@ public partial class MainWindow
         // a dark theme — the pane looks right and typing looks broken.
         SourceBox.CaretBrush = new SolidColorBrush(read.Foreground);
         SourceBox.LineNumbersForeground = new SolidColorBrush(read.Foreground) { Opacity = 0.5 };   // the gutter: the text, dimmed
+        SourceBox.MarksBrush = Source.FormattingMarks.BrushFor(read);   // the ¶ and → marks: the text, fainter still
 
         ApplySourceSyntax(json);
     }

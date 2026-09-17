@@ -68,6 +68,9 @@ public class SourceEditor : TextEditor
         // and takes AvalonEdit's path untouched.
         CommandManager.AddPreviewCanExecuteHandler(this, OnPreviewCanPaste);
         CommandManager.AddPreviewExecutedHandler(this, OnPreviewPaste);
+
+        Marks = new FormattingMarks(TextArea.TextView);
+        AddBackgroundRenderer(Marks);
     }
 
     /// <summary>
@@ -248,6 +251,32 @@ public class SourceEditor : TextEditor
     {
         get => TextArea.Caret.CaretBrush;
         set => TextArea.Caret.CaretBrush = value;
+    }
+
+    // ===== formatting marks (the ¶ toggle) =====
+
+    /// <summary>The ¶ and → marks; drawn only while <see cref="ShowMarks"/> is on.</summary>
+    internal FormattingMarks Marks { get; }
+
+    /// <summary>
+    /// The ¶ toolbar toggle, in this view: ¶ at each line ending and → at each tab
+    /// (<see cref="Marks"/>); spaces are not marked, as in the formatted view. This setter
+    /// is the one place the source view's marks are switched on and off. They are only
+    /// painted, so the text and everything read from it is unchanged, and the editor lives
+    /// as long as its window, so the setting holds through view switches and every document.
+    /// </summary>
+    public bool ShowMarks
+    {
+        get => Marks.Enabled;
+        set => Marks.Enabled = value;
+    }
+
+    /// <summary>The marks' colour: AvalonEdit's <see cref="TextView.NonPrintableCharacterBrush"/>,
+    /// which <see cref="Marks"/> draws with (and AvalonEdit's own marks would use).</summary>
+    public Brush MarksBrush
+    {
+        get => TextArea.TextView.NonPrintableCharacterBrush;
+        set => TextArea.TextView.NonPrintableCharacterBrush = value;
     }
 
     // ===== line / offset mapping (0-based, TextBox semantics) =====

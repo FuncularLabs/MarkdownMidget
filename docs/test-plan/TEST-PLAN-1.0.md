@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [MRK](#mrk--formatting-marks) formatting marks · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -265,6 +265,19 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 - **Expected:** In steps 2 and 3, with Background graphics unticked or ticked, the page and its margins are white, body text is black, every heading (the one in the quote too) is near-black, and the paragraph, quote and cell links are dark blue and underlined. The table's header row keeps its theme's look (Default's grey for Print Dark), and its link is in the header's text colour and readable. The PDF looks like the unticked preview. In step 4 everything prints as it did before this build: headings and links in the theme's colours, which the preview may darken where they are very light while Background graphics is unticked. Ticked, Solarized Light's page is cream and Print Light's pale headings and link are hard to read, as before. After each preview closes, the page on screen is unchanged.
 - **Type:** Both. Automated: `theme-parity.test.mjs` "every built-in is sorted into dark or light by what it declares", "a dark built-in prints every heading and its links dark enough for paper, with Background graphics on or off", "paper pins a dark theme's heading and link variables, not their colours", "Default and every light built-in print headings and links in their own colours, as before", "a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't evaluate the style query that tells print a theme is dark, nor the print dialog's Background graphics option, so only the real print preview shows WebView2 applying them.
+
+### MRK — Formatting marks
+
+#### MRK-01 Formatting marks show in the Markdown source view too
+- **Change:** Added: "Formatting marks (¶) now show in the Markdown source view too" · **Documents:** `br-forms.md`, `front-matter-bom-crlf.md`, the Help window · **Settings:** formatted view, a light theme
+1. Close every Markdown Midget window. Open `br-forms.md`, click **¶** on the toolbar and press Ctrl+E. Press Ctrl+End, then type `a`, a space, Tab, `b`, Enter and `c`.
+2. Click **¶** off, then on again. Press Ctrl+E twice, to the formatted view and back.
+3. Click just after the tab you typed and note Ln and Col in the status bar; click **¶** off, note them again, and click **¶** on. Select the two lines you typed, press Ctrl+C and paste into Notepad. Press Ctrl+F, choose **Extended**, find `\t` and close the dialog. Press Ctrl+G and go to the last line. Press Ctrl+P, look at the preview and cancel.
+4. Switch **View ▸ Theme** to a dark theme, then back to the light one.
+5. Press Ctrl+S and open the saved file in Notepad. Press Ctrl+W, then open `front-matter-bom-crlf.md` in the same window (a window with no document opens the file in place), and press Ctrl+E if it opens in the formatted view.
+6. Press F1. In Help, press Ctrl+E, then click **¶**. Close Help (an open Help window is reused, not reopened).
+- **Expected:** In step 1 every line but the last (`c`) ends in a faint **¶** and the tab shows **→**, so your first line reads `a →b¶`. Spaces show no mark, and no `\n`, `\r`, `·` or `»` appears anywhere. In step 2 the marks go and come back with the button and stay on through both switches, and the formatted view shows its own marks. In step 3 Ln and Col are the same with **¶** on and off, Notepad gets the text without marks, Find says "Match 1 of 1", Go to Line lands on `c`, and the preview has no marks. In step 4 the marks turn a dim text colour on the dark theme and light gray again on the light one. In step 5 the saved file has no marks, and `front-matter-bom-crlf.md`, whose lines end in CRLF, shows one **¶** per line, with **¶** still on. In step 6 Help shows no marks until **¶** is clicked in its own window, then shows them although it's read-only.
+- **Type:** Both. Automated: `SourceFormattingMarksTests.TurningMarksOnShowsLineEndsAndTabsButNoSpacesAndOffHidesThemAll`, `EachLineEndingGetsOnePilcrowAfterItsTextWhateverTheNewline`, `EachTabGetsAnArrowWhereItStartsOnAWrappedRowToo`, `LinesScrolledOutOfViewAreNotMarked`, `MarksStayOnThroughANewDocumentAHiddenPaneAndReadOnly`, `TheMarkColourIsTheThemeTextFadedTowardItsPage`, `AFailedThemeReadBackGivesTheDefaultThemesMarkGrey`, `TheMarksBrushIsTheTextViewsNonPrintableCharacterBrush`, `MarksLeaveTheTextSavedBytesFindMatchesCopiedTextCaretColumnAndLinesUnchanged`. Human: the toolbar button, view switches, theme changes, the clipboard, print and Help, which need the app.
 
 ### ANC — Heading links
 
@@ -1553,6 +1566,7 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | TIP-02 | | | |
 | THM-01 | | | |
 | PRN-01 | | | |
+| MRK-01 | | | |
 | INST-01 | | | |
 | INST-02 | | | |
 | INST-03 | | | |
