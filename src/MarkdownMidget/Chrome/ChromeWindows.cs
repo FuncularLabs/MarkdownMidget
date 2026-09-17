@@ -25,8 +25,6 @@ internal static class ChromeWindows
     private static readonly DependencyProperty TrackedProperty =
         DependencyProperty.RegisterAttached("Tracked", typeof(bool), typeof(ChromeWindows), new PropertyMetadata(false));
 
-    internal static bool IsDark => _dark;
-
     /// <summary>Once per process; later calls do nothing.</summary>
     internal static void Register()
     {

@@ -14,7 +14,7 @@ namespace MarkdownMidget.Tests;
 /// matters: a window without a handle gets it when the handle arrives, attribute 19 is the
 /// fallback for older Windows 10, a DWM that refuses or is missing is not an error, and every
 /// window (through the class handler) is set before it is shown and follows a switch.
-/// One shown window, off screen and not activated, hence the WpfSta collection.
+/// The last test shows two plain windows, off screen and not activated, hence the WpfSta collection.
 /// </summary>
 [Collection("WpfSta")]
 public class DarkTitleBarTests
