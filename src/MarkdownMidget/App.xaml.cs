@@ -49,6 +49,10 @@ public partial class App : Application
             return;
         }
 
+        // Title bars follow the chrome palette in every window from here on; the palette
+        // itself starts light (App.xaml) until ChromePalette.Apply says otherwise.
+        Chrome.ChromeWindows.Register();
+
         // UI-thread exceptions. The important, non-obvious case: a native file
         // dialog (Open, Save As, the dictionary import) runs a NESTED message
         // pump, so an exception sitting in any queued dispatcher operation — a

@@ -51,6 +51,10 @@
     <Resource Include="Assets\midget-256.png" />
     <Resource Include="Assets\numbered-list-64.png" />
     <Resource Include="Assets\spellcheck-64.png" />
+    <!-- The same two toolbar pictures with the near-black ink made light, for the dark
+         chrome palette (Chrome\ChromeDark.xaml); colours other than the ink are unchanged. -->
+    <Resource Include="Assets\numbered-list-64-dark.png" />
+    <Resource Include="Assets\spellcheck-64-dark.png" />
   </ItemGroup>
 
   <!-- The Milkdown editor bundle (built by editor-src) is embedded in the assembly

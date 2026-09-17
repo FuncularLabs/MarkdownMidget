@@ -1,8 +1,15 @@
 ﻿<Application x:Class="MarkdownMidget.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:MarkdownMidget">
+             xmlns:local="clr-namespace:MarkdownMidget"
+             xmlns:chrome="clr-namespace:MarkdownMidget.Chrome">
     <Application.Resources>
-         
+        <!-- The light chrome palette, present from the start because the windows draw with its
+             brushes. ChromePalette.Apply swaps it for the dark one and back. -->
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <chrome:ChromeLightPalette />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

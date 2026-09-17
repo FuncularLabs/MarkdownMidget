@@ -1,0 +1,134 @@
+<!-- The chrome palette for dark mode: the same keys as ChromeLight.xaml (see its header for
+     the groups), in a neutral dark grey family that sits beside dark document themes
+     (Dracula, GitHub Dark Dimmed, slate) without going to black. Surfaces step up in
+     lightness: window #202020, bars #2B2B2B, popups #303030. Every text brush clears 4.5:1
+     on the surface it is drawn on and every disabled one 3:1; ChromePaletteTests computes
+     the pairs from these brushes. -->
+<ResourceDictionary x:Class="MarkdownMidget.Chrome.ChromeDarkPalette"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- System -->
+    <SolidColorBrush x:Key="Chrome.Window.Background" Color="#FF202020" />
+    <SolidColorBrush x:Key="Chrome.Window.Frame" Color="#FF505050" />
+    <SolidColorBrush x:Key="Chrome.Text" Color="#FFE6E6E6" />
+    <SolidColorBrush x:Key="Chrome.Text.Disabled" Color="#FF8C8C8C" />
+    <SolidColorBrush x:Key="Chrome.Control.Background" Color="#FF2B2B2B" />
+    <SolidColorBrush x:Key="Chrome.Control.Dark" Color="#FF5A5A5A" />
+    <SolidColorBrush x:Key="Chrome.Control.DarkDark" Color="#FF6E6E6E" />
+    <SolidColorBrush x:Key="Chrome.Selection.Background" Color="#FF2F66AD" />
+    <SolidColorBrush x:Key="Chrome.Selection.Text" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Chrome.Selection.Inactive.Background" Color="#FF3D3D3D" />
+    <SolidColorBrush x:Key="Chrome.Link" Color="#FF6CB4FF" />
+
+    <!-- Menu, context menu -->
+    <SolidColorBrush x:Key="Chrome.Menu.Background" Color="#FF2B2B2B" />
+    <SolidColorBrush x:Key="Chrome.Menu.Text" Color="#FFE6E6E6" />
+    <SolidColorBrush x:Key="Chrome.Menu.Text.Disabled" Color="#FF8C8C8C" />
+    <SolidColorBrush x:Key="Chrome.Menu.Popup.Background" Color="#FF303030" />
+    <SolidColorBrush x:Key="Chrome.Menu.Popup.Border" Color="#FF505050" />
+    <SolidColorBrush x:Key="Chrome.Menu.Separator" Color="#FF484848" />
+    <SolidColorBrush x:Key="Chrome.Menu.Highlight.Background" Color="#FF34495E" />
+    <SolidColorBrush x:Key="Chrome.Menu.Highlight.Border" Color="#FF4F7FAF" />
+    <SolidColorBrush x:Key="Chrome.Menu.DisabledHighlight.Background" Color="#0AFFFFFF" />
+    <SolidColorBrush x:Key="Chrome.Menu.DisabledHighlight.Border" Color="#21FFFFFF" />
+    <SolidColorBrush x:Key="Chrome.ContextMenu.Background" Color="#FF303030" />
+    <SolidColorBrush x:Key="Chrome.ContextMenu.Border" Color="#FF505050" />
+    <SolidColorBrush x:Key="Chrome.ContextMenu.Gutter" Color="#FF303030" />
+    <SolidColorBrush x:Key="Chrome.ContextMenu.GutterLine" Color="#FF484848" />
+    <SolidColorBrush x:Key="Chrome.Etched.Highlight" Color="#00FFFFFF" />
+
+    <!-- Menu separators: see ChromeLight.xaml; here with the dark line colour too. -->
+    <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="{x:Type Separator}">
+        <Setter Property="Margin" Value="0,2,0,2" />
+        <Setter Property="Background" Value="{DynamicResource Chrome.Menu.Separator}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Chrome.Menu.Separator}" />
+    </Style>
+
+    <!-- Toolbar, status bar, tooltip -->
+    <SolidColorBrush x:Key="Chrome.ToolBar.Background" Color="#FF2B2B2B" />
+    <SolidColorBrush x:Key="Chrome.ToolBar.Separator" Color="#FF4A4A4A" />
+    <SolidColorBrush x:Key="Chrome.StatusBar.Background" Color="#FF2B2B2B" />
+    <SolidColorBrush x:Key="Chrome.ToolTip.Background" Color="#FF303030" />
+    <SolidColorBrush x:Key="Chrome.ToolTip.Border" Color="#FF5A5A5A" />
+    <SolidColorBrush x:Key="Chrome.ToolTip.Text" Color="#FFE6E6E6" />
+
+    <!-- Buttons -->
+    <SolidColorBrush x:Key="Chrome.Button.Background" Color="#FF3A3A3A" />
+    <SolidColorBrush x:Key="Chrome.Button.Border" Color="#FF5C5C5C" />
+    <SolidColorBrush x:Key="Chrome.Button.Hover.Background" Color="#FF464646" />
+    <SolidColorBrush x:Key="Chrome.Button.Hover.Border" Color="#FF4F8BC9" />
+    <SolidColorBrush x:Key="Chrome.Button.Pressed.Background" Color="#FF2E4F72" />
+    <SolidColorBrush x:Key="Chrome.Button.Pressed.Border" Color="#FF6AA2DC" />
+    <SolidColorBrush x:Key="Chrome.Button.Checked.Background" Color="#FF2E4F72" />
+    <SolidColorBrush x:Key="Chrome.Button.Checked.Border" Color="#FF4F8BC9" />
+    <SolidColorBrush x:Key="Chrome.Button.Disabled.Background" Color="#FF2A2A2A" />
+    <SolidColorBrush x:Key="Chrome.Button.Disabled.Border" Color="#FF404040" />
+    <SolidColorBrush x:Key="Chrome.Button.Disabled.Text" Color="#FF8C8C8C" />
+
+    <!-- Fields, lists, check marks, group box, progress -->
+    <SolidColorBrush x:Key="Chrome.Field.Border" Color="#FF6A6A6A" />
+    <SolidColorBrush x:Key="Chrome.List.Border" Color="#FF5A5A5A" />
+    <SolidColorBrush x:Key="Chrome.Check.Background" Color="#FF1C1C1C" />
+    <SolidColorBrush x:Key="Chrome.Check.Border" Color="#FF9A9A9A" />
+    <SolidColorBrush x:Key="Chrome.Check.Glyph" Color="#FFE6E6E6" />
+    <SolidColorBrush x:Key="Chrome.Check.Hover.Background" Color="#FF2A3A4A" />
+    <SolidColorBrush x:Key="Chrome.Check.Hover.Border" Color="#FF5593FF" />
+    <SolidColorBrush x:Key="Chrome.Check.Pressed.Background" Color="#FF22364D" />
+    <SolidColorBrush x:Key="Chrome.Check.Pressed.Border" Color="#FF3C77DD" />
+    <SolidColorBrush x:Key="Chrome.Check.Disabled.Background" Color="#FF2A2A2A" />
+    <SolidColorBrush x:Key="Chrome.Check.Disabled.Border" Color="#FF4A4A4A" />
+    <SolidColorBrush x:Key="Chrome.Check.Disabled.Glyph" Color="#FF7A7A7A" />
+    <SolidColorBrush x:Key="Chrome.GroupBox.Border" Color="#FF4A4A4A" />
+    <SolidColorBrush x:Key="Chrome.Progress.Background" Color="#FF3A3A3A" />
+    <SolidColorBrush x:Key="Chrome.Progress.Border" Color="#FF505050" />
+    <SolidColorBrush x:Key="Chrome.Progress.Foreground" Color="#FF06B025" />
+
+    <!-- Scroll bars -->
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Background" Color="#FF262626" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Button.Hover" Color="#FF3A3A3A" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Button.Pressed" Color="#FF8C8C8C" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Glyph" Color="#FF9A9A9A" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Glyph.Hover" Color="#FFE6E6E6" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Glyph.Pressed" Color="#FF202020" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Glyph.Disabled" Color="#FF707070" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Thumb" Color="#FF5A5A5A" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Thumb.Hover" Color="#FF7A7A7A" />
+    <SolidColorBrush x:Key="Chrome.ScrollBar.Thumb.Dragging" Color="#FF9A9A9A" />
+
+    <!-- Combo box -->
+    <SolidColorBrush x:Key="Chrome.ComboBox.Background" Color="#FF333333" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Border" Color="#FF6A6A6A" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Hover.Background" Color="#FF3D4550" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Hover.Border" Color="#FF5A8FC8" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Pressed.Background" Color="#FF2E4F72" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Pressed.Border" Color="#FF6AA2DC" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Disabled.Background" Color="#FF2A2A2A" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Disabled.Border" Color="#FF404040" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Arrow" Color="#FFB0B0B0" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Arrow.Active" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Chrome.ComboBox.Arrow.Disabled" Color="#FF787878" />
+
+    <!-- Windows -->
+    <SolidColorBrush x:Key="Chrome.Text.Accent" Color="#FF7FB6F0" />
+    <SolidColorBrush x:Key="Chrome.Text.Secondary" Color="#FFB0B6BD" />
+    <SolidColorBrush x:Key="Chrome.Busy.Veil" Color="#A0000000" />
+    <SolidColorBrush x:Key="Chrome.Splash.Background" Color="#FF34373B" />
+    <SolidColorBrush x:Key="Chrome.Find.Status.Background" Color="#FF2B2B2B" />
+    <SolidColorBrush x:Key="Chrome.Find.Status.Border" Color="#FF4A4A4A" />
+    <SolidColorBrush x:Key="Chrome.Dialog.PathText" Color="#FFC8C8C8" />
+    <SolidColorBrush x:Key="Chrome.Dialog.MutedText" Color="#FFC0C0C0" />
+    <SolidColorBrush x:Key="Chrome.Dialog.CodeText" Color="#FFB8B8B8" />
+    <SolidColorBrush x:Key="Chrome.Dialog.HintText" Color="#FFA8A8A8" />
+    <SolidColorBrush x:Key="Chrome.Dialog.FaintText" Color="#FFA0A0A0" />
+    <SolidColorBrush x:Key="Chrome.Dialog.WarningText" Color="#FFF0A060" />
+    <SolidColorBrush x:Key="Chrome.Dialog.ErrorText" Color="#FFFF7B86" />
+    <SolidColorBrush x:Key="Chrome.Dialog.InvalidText" Color="#FFFF8080" />
+    <SolidColorBrush x:Key="Chrome.Chip.Background" Color="#FF2B2B2B" />
+    <SolidColorBrush x:Key="Chrome.Chip.Border" Color="#FF4F545A" />
+    <SolidColorBrush x:Key="Chrome.Chip.Text" Color="#FFDADDE1" />
+    <SolidColorBrush x:Key="Chrome.Chip.ArrowText" Color="#FF9AA0A8" />
+    <SolidColorBrush x:Key="Chrome.Chip.CaptionText" Color="#FFAEB4BA" />
+    <SolidColorBrush x:Key="Chrome.Chip.RemovedText" Color="#FFFF8A8A" />
+    <BitmapImage x:Key="Chrome.Icon.NumberedList" UriSource="pack://application:,,,/MarkdownMidget;component/Assets/numbered-list-64-dark.png" />
+    <BitmapImage x:Key="Chrome.Icon.SpellCheck" UriSource="pack://application:,,,/MarkdownMidget;component/Assets/spellcheck-64-dark.png" />
+</ResourceDictionary>
