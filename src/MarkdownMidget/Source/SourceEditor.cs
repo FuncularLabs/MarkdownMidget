@@ -42,10 +42,15 @@ public class SourceEditor : TextEditor
         Options.EnableEmailHyperlinks = false;
         Options.CutCopyWholeLine = false;          // TextBox copies the selection, nothing more
 
+        // Before the Document.Changed subscription below, whose handler tells it about edits.
+        Marks = new FormattingMarks(TextArea.TextView);
+        AddBackgroundRenderer(Marks);
+
         // Document.Changed carries real offsets (Offset / InsertionLength /
         // RemovalLength), which is exactly what the squiggle tracker needs and what
         // WPF's TextChangedEventArgs.Changes used to supply. Raised as TextEdited so
-        // the host can keep shifting squiggle ranges through edits.
+        // the host can keep shifting squiggle ranges through edits; the formatting
+        // marks hear of it too, to re-read the lines from the edit down.
         //
         // Subscribed once, to the document that exists now. AvalonEdit's Text setter
         // mutates this document in place rather than replacing it, and the app never
@@ -68,9 +73,6 @@ public class SourceEditor : TextEditor
         // and takes AvalonEdit's path untouched.
         CommandManager.AddPreviewCanExecuteHandler(this, OnPreviewCanPaste);
         CommandManager.AddPreviewExecutedHandler(this, OnPreviewPaste);
-
-        Marks = new FormattingMarks(TextArea.TextView);
-        AddBackgroundRenderer(Marks);
     }
 
     /// <summary>
@@ -80,8 +82,11 @@ public class SourceEditor : TextEditor
     /// </summary>
     public event Action<int, int, int>? TextEdited;
 
-    private void OnDocumentChanged(object? sender, DocumentChangeEventArgs e) =>
+    private void OnDocumentChanged(object? sender, DocumentChangeEventArgs e)
+    {
+        Marks.TextChanged(Document.GetLineByOffset(e.Offset).LineNumber);   // the space marks' context, from the edited line on
         TextEdited?.Invoke(e.Offset, e.InsertionLength, e.RemovalLength);
+    }
 
     // ===== pasting a picture =====
 
@@ -255,12 +260,12 @@ public class SourceEditor : TextEditor
 
     // ===== formatting marks (the ¶ toggle) =====
 
-    /// <summary>The ¶ and → marks; drawn only while <see cref="ShowMarks"/> is on.</summary>
+    /// <summary>The ¶, → and · marks; drawn only while <see cref="ShowMarks"/> is on.</summary>
     internal FormattingMarks Marks { get; }
 
     /// <summary>
-    /// The ¶ toolbar toggle, in this view: ¶ at each line ending and → at each tab
-    /// (<see cref="Marks"/>); spaces are not marked, as in the formatted view. This setter
+    /// The ¶ toolbar toggle, in this view: ¶ at each line ending, → at each tab and · on
+    /// the spaces <see cref="SpaceMarks"/> picks (<see cref="Marks"/>). This setter
     /// is the one place the source view's marks are switched on and off. They are only
     /// painted, so the text and everything read from it is unchanged, and the editor lives
     /// as long as its window, so the setting holds through view switches and every document.

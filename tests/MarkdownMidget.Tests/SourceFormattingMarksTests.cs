@@ -67,24 +67,24 @@ public class SourceFormattingMarksTests
         ed.Marks.Positions(Settle(ed)).Where(m => m.Glyph == glyph).Select(m => m.At).ToArray();
 
     [Fact]   // AC1
-    public void TurningMarksOnShowsLineEndsAndTabsButNoSpacesAndOffHidesThemAll()
+    public void TurningMarksOnDrawsOurMarksNotAvalonEditsAndOffHidesThemAll()
     {
         var states = On(ed =>
         {
             object Read()
             {
-                var o = ed.TextArea.Options;   // AvalonEdit's own marks stay off: its line end draws "\n", its tab », its space ·
-                return (o.ShowSpaces, o.ShowTabs, o.ShowEndOfLine, ed.ShowMarks, Of(ed, '¶').Length, Of(ed, '→').Length, GlyphsDrawn(ed));
+                var o = ed.TextArea.Options;   // AvalonEdit's own marks stay off: its line end draws "\n", its tab », its space · on every space
+                return (o.ShowSpaces, o.ShowTabs, o.ShowEndOfLine, ed.ShowMarks, Of(ed, '¶').Length, Of(ed, '→').Length, Of(ed, '·').Length, GlyphsDrawn(ed));
             }
             var before = Read();
             ed.ShowMarks = true;
             var on = Read();
             ed.ShowMarks = false;
             return (before, on, Read());
-        }, "a b\tc\nsecond line\n");
+        }, "a b\tc  \nsecond line\n");
 
-        Assert.Equal((false, false, false, false, 0, 0, 0), states.before);
-        Assert.Equal((false, false, false, true, 2, 1, 3), states.on);
+        Assert.Equal((false, false, false, false, 0, 0, 0, 0), states.before);
+        Assert.Equal((false, false, false, true, 2, 1, 2, 5), states.on);
         Assert.Equal(states.before, states.Item3);
     }
 
@@ -119,6 +119,25 @@ public class SourceFormattingMarksTests
         Assert.Equal(3, tabs.Length);
         Assert.Equal(tabs, marks);
         Assert.True(marks[1].Y > secondRowTop, "the wrapped line's tabs are marked on the row they are on, not its first");
+    }
+
+    [Fact]   // spaces: the SpaceMarks rules, on screen, following edits above them
+    public void SpacesAreDottedWhereTheRulesSayAndFollowAnEditAbove()
+    {
+        const string text = "a  b\n```\nc  d\n```\n";
+        var (before, dotsBefore, after, dotsAfter) = On(ed =>
+        {
+            ed.ShowMarks = true;
+            var dots = Of(ed, '·');   // laid out first, then asked where the spaces are
+            var first = (new[] { 1, 2 }.Select(i => PositionOf(ed, i)).ToArray(), dots);
+            ed.Document.Insert(0, "```\n");   // "a  b" is now code, and "c  d" is not
+            dots = Of(ed, '·');
+            var c = ed.Text.IndexOf("c  d", StringComparison.Ordinal);
+            return (first.Item1, first.dots, new[] { c + 1, c + 2 }.Select(i => PositionOf(ed, i)).ToArray(), dots);
+        }, text);
+
+        Assert.Equal(before, dotsBefore);
+        Assert.Equal(after, dotsAfter);
     }
 
     [Fact]   // AC1
@@ -204,9 +223,9 @@ public class SourceFormattingMarksTests
     }
 
     [Fact]   // AC4
-    public void MarksLeaveTheTextSavedBytesFindMatchesCopiedTextCaretColumnAndLinesUnchanged()
+    public void MarksLeaveTheTextSavedBytesFindMatchesCopiedTextWordMovesCaretColumnAndLinesUnchanged()
     {
-        const string text = "# Title\n\nTwo spaces make a break  \nnext\tline with a tab\n\n- item\n";
+        const string text = "# Title\n\nTwo  spaces make a break  \nnext\tline with a tab\n   \n- item\n";
         var (off, on) = On(ed =>
         {
             string Snapshot()
@@ -214,12 +233,15 @@ public class SourceFormattingMarksTests
                 Settle(ed);
                 ed.SelectAll();
                 var copied = ed.TextArea.Selection.GetText();   // what Copy puts on the clipboard
+                ed.CaretIndex = 0;
+                var words = string.Join(",", Enumerable.Range(0, 12).Select(_ => { System.Windows.Documents.EditingCommands.MoveRightByWord.Execute(null, ed.TextArea); return ed.CaretIndex; }));   // Ctrl+Right
+                Assert.True(words.Split(',').Distinct().Count() >= 8, "the word moves moved: " + words);
                 ed.CaretIndex = text.IndexOf("line", StringComparison.Ordinal);   // just after the tab
                 var tabs = FindEngine.Build("\\t", FindEngine.Mode.Extended, matchCase: false, wholeWord: false)!;
                 var spaces = FindEngine.Build(" ", FindEngine.Mode.Normal, matchCase: false, wholeWord: false)!;
                 return string.Join("|", ed.Text, Convert.ToHexString(DocumentText.Encode(ed.Text, LineEnding.CrLf, bom: false)),
                     string.Join(",", tabs.Matches(ed.Text).Select(m => m.Index)), string.Join(",", spaces.Matches(ed.Text).Select(m => m.Index)),
-                    copied, ed.CaretLineColumn(), ed.LineCount, ed.GetLineText(2), ed.GetCharacterIndexFromLineIndex(3));
+                    copied, words, ed.CaretLineColumn(), ed.LineCount, ed.GetLineText(2), ed.GetCharacterIndexFromLineIndex(3));
             }
             var before = Snapshot();
             ed.ShowMarks = true;

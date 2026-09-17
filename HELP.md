@@ -121,8 +121,21 @@ editing the markdown source directly.
 
 The **¶** toolbar toggle shows Word-style marks in light gray, in both views. In the
 formatted view: **¶** at paragraph and heading ends, **↵** at manual line breaks, and
-**→** for tabs. In the Markdown source view: **¶** at the end of each line and **→** for
-tabs. The marks are only shown: they aren't copied, found, printed or saved.
+**→** for tabs. In the Markdown source view: **¶** at the end of each line, **→** for
+tabs, and **·** for the spaces that are hard to see but change what Markdown does:
+
+- spaces at the end of a line, since two or more there make a line break;
+- two or more spaces in a row inside a line;
+- every space on a line with nothing else on it;
+- the indentation of a line that looks wrongly indented: it mixes tabs and spaces, or it
+  is indented past a list item's marker but not as far as the item's text, so it lines
+  up with neither. Under `1. ` a nested list needs three spaces; with two it starts a
+  separate list.
+
+Other spaces aren't marked, such as ordinary indentation, the spaces after a list marker
+and the padding in a table row that starts with `|`. In a code block, only spaces at the end of a line are marked,
+because spacing inside code is usually on purpose. The marks are only shown: they aren't
+copied, found, printed or saved.
 
 ## Find
 

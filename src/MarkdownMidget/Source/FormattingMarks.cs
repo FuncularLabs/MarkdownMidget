@@ -3,20 +3,22 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
+using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
 
 namespace MarkdownMidget.Source;
 
 /// <summary>
 /// The source view's formatting marks while the ¶ toolbar toggle is on: ¶ at each line
-/// ending and → at each tab, the formatted view's glyphs. AvalonEdit's own marks are not
-/// used: its end-of-line mark spells the ending out ("\n" for the LF text held in memory)
-/// and its tab mark is ».
+/// ending and → at each tab, the formatted view's glyphs, and · on the spaces
+/// <see cref="SpaceMarks"/> picks. AvalonEdit's own marks are not used: its end-of-line
+/// mark spells the ending out ("\n" for the LF text held in memory), its tab mark is », and
+/// it marks every space or none.
 ///
 /// A background renderer, like <see cref="SquiggleRenderer"/>: it only paints, so the
-/// caret, selection, wrapping, the status bar's column, Find, copy, print and save never
-/// see a mark. Drawn in the selection layer, which repaints on every scroll and edit, so a
-/// selected mark sits under the selection tint.
+/// caret, word-by-word moves, selection, wrapping, the status bar's column, Find, copy,
+/// print and save never see a mark. Drawn in the selection layer, which repaints on every
+/// scroll and edit, so a selected mark sits under the selection tint.
 /// </summary>
 internal sealed class FormattingMarks : IBackgroundRenderer
 {
@@ -38,11 +40,31 @@ internal sealed class FormattingMarks : IBackgroundRenderer
 
     public KnownLayer Layer => KnownLayer.Selection;
 
+    /// <summary>The <see cref="SpaceMarks"/> state each line starts in, for the lines read so
+    /// far: [n - 1] is line n's. Filled on demand down to the lines on screen, and cut back
+    /// by <see cref="TextChanged"/>, so an edit re-reads only from its own line.</summary>
+    private readonly List<SpaceMarks.State> _lineStarts = [SpaceMarks.State.Start];
+
+    /// <summary>The document changed at line <paramref name="lineNumber"/>: the states of the
+    /// lines after it may be wrong now. Called for every change, marks on or off.</summary>
+    internal void TextChanged(int lineNumber)
+    {
+        if (_lineStarts.Count > lineNumber) _lineStarts.RemoveRange(lineNumber, _lineStarts.Count - lineNumber);
+    }
+
+    private SpaceMarks.State StartOf(TextDocument doc, int lineNumber)
+    {
+        for (var n = _lineStarts.Count; n < lineNumber; n++)
+            _lineStarts.Add(SpaceMarks.Step(doc.GetText(doc.GetLineByNumber(n)), _lineStarts[n - 1]).Next);
+        return _lineStarts[lineNumber - 1];
+    }
+
     /// <summary>
     /// Each visible mark and where it goes in view coordinates (the glyph's top-left): →
-    /// where a tab starts, ¶ right after the text of each line that ends in a line break,
-    /// on its last wrapped row (the document's last line has none). Empty when off or
-    /// before layout. Exposed so placement is testable without a DrawingContext.
+    /// where a tab starts, · on the spaces <see cref="SpaceMarks"/> picks, ¶ right after the
+    /// text of each line that ends in a line break, on its last wrapped row (the document's
+    /// last line has none). Empty when off or before layout. Exposed so placement is
+    /// testable without a DrawingContext.
     /// </summary>
     internal IReadOnlyList<(char Glyph, Point At)> Positions(TextView textView)
     {
@@ -53,8 +75,12 @@ internal sealed class FormattingMarks : IBackgroundRenderer
         {
             var start = line.FirstDocumentLine.Offset;
             var end = line.LastDocumentLine.EndOffset;
+            Point At(int offset) => line.GetVisualPosition(line.GetVisualColumn(offset - start), VisualYPosition.TextTop) - scroll;
             for (var tab = doc.IndexOf('\t', start, end - start); tab >= 0; tab = doc.IndexOf('\t', tab + 1, end - tab - 1))
-                marks.Add(('→', line.GetVisualPosition(line.GetVisualColumn(tab - start), VisualYPosition.TextTop) - scroll));
+                marks.Add(('→', At(tab)));
+            var first = line.FirstDocumentLine;
+            foreach (var space in SpaceMarks.Step(doc.GetText(first), StartOf(doc, first.LineNumber)).Marks)
+                marks.Add(('·', At(start + space)));
             if (line.LastDocumentLine.DelimiterLength == 0) continue;
             var row = line.TextLines[^1];
             marks.Add(('¶', new Point(line.GetTextLineVisualXPosition(row, line.VisualLength),
@@ -72,8 +98,8 @@ internal sealed class FormattingMarks : IBackgroundRenderer
         var dpi = VisualTreeHelper.GetDpi(textView).PixelsPerDip;
         FormattedText Glyph(string s) => new(s, CultureInfo.InvariantCulture, textView.FlowDirection, typeface,
             TextElement.GetFontSize(textView), textView.NonPrintableCharacterBrush, dpi);
-        FormattedText pilcrow = Glyph("¶"), arrow = Glyph("→");
-        foreach (var (glyph, at) in marks) drawingContext.DrawText(glyph == '¶' ? pilcrow : arrow, at);
+        FormattedText pilcrow = Glyph("¶"), arrow = Glyph("→"), dot = Glyph("·");
+        foreach (var (glyph, at) in marks) drawingContext.DrawText(glyph switch { '¶' => pilcrow, '→' => arrow, _ => dot }, at);
     }
 
     /// <summary>How far the marks sit from the page toward the text: fainter than the line
