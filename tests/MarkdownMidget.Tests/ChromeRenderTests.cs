@@ -354,6 +354,12 @@ public class ChromeRenderTests
             var files = new ListView { View = view, Items = { "notes.md" } };
             Draw(Host(files, Dark));
             Assert.Equal(Token("Chrome.Text"), ((SolidColorBrush)files.Foreground).Color);
+
+            // A dialog button: the dark template, not Aero2's light blue hover and pressed fills.
+            var button = new Button { Content = "OK" };
+            var buttonHost = Host(button, Dark);
+            Draw(buttonHost);
+            Assert.Same(buttonHost.FindResource("Chrome.ButtonTemplate"), button.Template);
         });
     }
 
@@ -426,8 +432,12 @@ public class ChromeRenderTests
             Dark(resources!);   // Windows switches while the picker is open
             Draw(root);
             var face = ((SolidColorBrush)new ChromeDarkPalette()["Chrome.Button.Background"]).Color;
+            var template = root.FindResource("Chrome.ButtonTemplate");   // the dark button template, so hover and pressed are dark too
             foreach (var b in buttons)
+            {
                 Assert.Equal(face, Assert.IsType<SolidColorBrush>(b.Background).Color);
+                Assert.Same(template, b.Template);
+            }
             Assert.Equal((1.0, 0.35), (buttons[0].Opacity, buttons[1].Opacity));
 
             Light(resources!);
