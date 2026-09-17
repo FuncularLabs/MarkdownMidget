@@ -494,7 +494,7 @@ public partial class MainWindow : Window
                 // A theme that has gone missing between launches says so and falls
                 // back WITHOUT forgetting the choice — reverting silently is the thing
                 // that reads as the app losing a setting.
-                _ = ApplyStartupThemesAsync();
+                _ = ApplyRememberedThemesAsync();
                 RequestSpellCheckSoon();
                 UpdatePageWidthChecks();
                 _ = ApplyLandingStateAsync();
@@ -4132,7 +4132,7 @@ public partial class MainWindow : Window
 
     // ===== Settings (persisted) =====
 
-    private sealed class AppSettings
+    private sealed class AppSettings : Themes.IThemeSettings
     {
         public string PageWidth { get; set; } = "portrait";
         public Dictionary<string, PrintPrefs> PrintPrefs { get; set; } = new();
@@ -4147,10 +4147,16 @@ public partial class MainWindow : Window
         public bool UseBuiltInPicker { get; set; }       // skip the native dialog entirely
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
+        // One per Windows mode since 1.0.0-rc3 (ThemeLight/ThemeDark, null = never
+        // written); Theme is the last one picked, kept for older builds and migration.
         public string Theme { get; set; } = "";
+        public string? ThemeLight { get; set; }
+        public string? ThemeDark { get; set; }
         // The source view's own theme when the two views are unlinked — same list, same
-        // filename rule. Ignored while linked; relinking resets it to the document theme.
+        // filename rule, same per-mode slots. Ignored while linked; relinking resets it to the document theme.
         public string? SourceTheme { get; set; }
+        public string? SourceThemeLight { get; set; }
+        public string? SourceThemeDark { get; set; }
         // View ▸ Theme ▸ "Same Theme for Both Views". Default on.
         public bool LinkThemes { get; set; } = true;
         public bool LineNumbers { get; set; }              // View ▸ Line Numbers (#10): the formatted view's, both views' while linked
@@ -4237,9 +4243,7 @@ public partial class MainWindow : Window
             _recentLimit = Math.Clamp(s.RecentLimit, SettingsDialog.MinRecent, SettingsDialog.MaxRecentLimit);
             _startWithBlankDocument = s.StartWithBlankDocument;
             _backupEnabled = s.KeepBackup;
-            _themeKey = s.Theme ?? Themes.ThemeStore.DefaultKey;
-            _linkThemes = s.LinkThemes;
-            _sourceThemeKey = s.SourceTheme ?? _themeKey;
+            _loadedThemeSettings = s;   // resolved per Windows mode in InitializeThemes, which can read the theme files
             _lineNumbers = s.LineNumbers;
             _sourceLineNumbers = s.SourceLineNumbers ?? _lineNumbers;
             _linkLineNumbers = s.LinkLineNumbers;
@@ -4336,9 +4340,9 @@ public partial class MainWindow : Window
     /// instance's launch-time copy of it here would revert a position another
     /// instance saved in the meantime.
     ///
-    /// Theme and LastSeenChangelogVersion are carried through from disk the same
+    /// The theme fields and LastSeenChangelogVersion are carried through from disk the same
     /// way, and for the same reason: they are each written by their OWN dedicated
-    /// caller (<see cref="Themes.ThemeStore"/>'s consumer via SetThemeKey, and
+    /// caller (<see cref="Themes.ThemeModes"/>, for a View ▸ Theme pick, and
     /// MarkChangelogSeen) via <see cref="SavePersistentField"/>, not by this generic
     /// path. Multiple windows share this one file; a window that toggled word wrap
     /// an hour ago is not carrying today's theme choice or today's "seen" version in
@@ -4364,6 +4368,11 @@ public partial class MainWindow : Window
             s.Theme = existing?.Theme ?? s.Theme;
             s.SourceTheme = existing?.SourceTheme ?? s.SourceTheme;
             s.LinkThemes = existing?.LinkThemes ?? s.LinkThemes;
+            // Null on disk means never written, so it stays null: taking this window's
+            // migrated values instead would fix a migration nobody chose.
+            if (existing is not null)
+                (s.ThemeLight, s.ThemeDark, s.SourceThemeLight, s.SourceThemeDark) =
+                    (existing.ThemeLight, existing.ThemeDark, existing.SourceThemeLight, existing.SourceThemeDark);
             s.LineNumbers = existing?.LineNumbers ?? s.LineNumbers;
             s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
             s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
@@ -4417,6 +4426,10 @@ public partial class MainWindow : Window
         Theme = _themeKey,
         SourceTheme = _sourceThemeKey,
         LinkThemes = _linkThemes,
+        ThemeLight = _themes?.Document.Light,
+        ThemeDark = _themes?.Document.Dark,
+        SourceThemeLight = _themes?.Source.Light,
+        SourceThemeDark = _themes?.Source.Dark,
         LineNumbers = _lineNumbers,
         SourceLineNumbers = _sourceLineNumbers,
         LinkLineNumbers = _linkLineNumbers,
@@ -5468,7 +5481,7 @@ public partial class MainWindow : Window
     private void MarkChangelogSeen()
     {
         _lastSeenChangelogVersion = AppVersion;
-        // SavePersistentField, not SaveSettings — the same reason SetThemeKey uses
+        // SavePersistentField, not SaveSettings — the same reason a theme pick uses
         // it: an unrelated toggle later in a DIFFERENT window, still holding this
         // window's PRE-open value in memory, must not republish it and bring the
         // badge back for a changelog the user genuinely already read.

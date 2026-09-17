@@ -349,6 +349,17 @@ Switching is instant, applies to the source view as well as the formatted one, a
 is remembered between sessions. Diagrams follow along; the menu bar, toolbar and
 status bar do not — those are Windows' own furniture and stay in the system theme.
 
+**One theme for light mode, one for dark mode.** The document follows the app mode
+you choose in Windows (Settings ▸ Personalization ▸ Colors ▸ *Choose your mode*).
+Markdown Midget remembers a theme for each mode, and View ▸ Theme sets the one for
+the mode Windows is in now — the top of the menu says which, *For Windows light
+mode* or *For Windows dark mode*. When Windows switches mode, the document switches
+to that mode's theme straight away, with nothing to restart. Until you pick one,
+light mode uses Midget Solarized and dark mode uses Obsidiminutive. A theme you
+picked in an earlier version stays yours for the mode it suits: a light theme for
+light mode, a dark theme for dark mode. With a Windows contrast theme on, the light
+mode theme is used.
+
 The **Markdown source view** (Ctrl+E) is syntax-highlighted, and its colours follow
 the theme too: headings, links, emphasis, code, quotes and list markers take the
 same palette the formatted view uses, on the same page background. Where a theme's
@@ -359,7 +370,8 @@ text colour, so the source view is never less legible than the theme's own prose
 Views** is on by default. Turn it off and View ▸ Theme changes only the view you're
 in — pick a dark theme while in the source view and the formatted document keeps its
 own. The menu ticks the theme of whichever view is showing. Both choices are
-remembered; turning it back on snaps the source view to the document's theme.
+remembered, for each Windows mode; turning it back on snaps the source view to the
+document's theme.
 
 **Printing keeps paper light** — the page prints white with dark text whatever you
 pick, because a dark page on paper is unreadable and empties a toner cartridge.

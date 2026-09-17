@@ -26,32 +26,36 @@ public partial class MainWindow
 {
     private ThemeStore? _themeStore;
 
-    /// <summary>The theme the user chose, which is what settings.json holds.</summary>
-    private string _themeKey = ThemeStore.DefaultKey;
+    /// <summary>Windows' light or dark app mode, and when it changes. Created with the
+    /// window and disposed when it closes; the window chrome can follow it too.</summary>
+    private WindowsAppearance? _appearance;
+
+    /// <summary>The remembered themes, one per Windows mode for the document and for
+    /// the source view's own, and "Same Theme for Both Views". The only writer of those
+    /// settings, and only for a pick or a link toggle (<see cref="ThemeModes"/>).</summary>
+    private ThemeModes? _themes;
+
+    /// <summary>Settings as LoadSettings read them, held until InitializeThemes can read
+    /// the theme files a migration needs.</summary>
+    private IThemeSettings? _loadedThemeSettings;
+
+    // For CurrentSettings, which restates this window's preferences.
+    private string _themeKey => _themes?.DocumentKey ?? ThemeStore.DefaultKey;
+    private string _sourceThemeKey => _themes is { } t ? t.Source.For(t.IsDark) : _themeKey;
+    private bool _linkThemes => _themes?.Linked ?? true;
 
     /// <summary>
     /// The theme actually on screen, which is what the menu ticks.
     ///
-    /// Separate from <see cref="_themeKey"/> because the two genuinely differ when a
+    /// Separate from the remembered theme because the two genuinely differ when a
     /// chosen theme isn't there this launch, and collapsing them costs the user their
-    /// preference — see <see cref="ApplyThemeAsync"/>.
+    /// preference — see <see cref="ApplyDocumentThemeAsync"/>.
     /// </summary>
     private string _appliedKey = ThemeStore.DefaultKey;
 
     /// <summary>What the source view was before a theme touched it, so Default puts
     /// it back exactly rather than to something that looks about right.</summary>
     private (Brush Background, Brush Foreground, Brush? Caret)? _sourceOriginal;
-
-    /// <summary>View ▸ Theme ▸ "Same Theme for Both Views". On (the default) the
-    /// source view follows the document theme; off, it keeps its own, chosen from the
-    /// same list, and View ▸ Theme changes only the view the user is in.</summary>
-    private bool _linkThemes = true;
-
-    /// <summary>The source view's own theme, meaningful only when unlinked. Persisted
-    /// separately so it survives a restart while unlinked. Relinking snaps it to the
-    /// document theme — deliberately simple, and what HELP says; a later unlink starts
-    /// again from whatever the document is showing.</summary>
-    private string _sourceThemeKey = ThemeStore.DefaultKey;
 
     /// <summary>What the source view is actually showing — what the menu ticks when
     /// the source view is active and unlinked. See <see cref="_appliedKey"/> for why
@@ -67,8 +71,35 @@ public partial class MainWindow
         // thing to keep in step with CI's tag-derived InformationalVersion.
         _themeStore.Refresh(AppVersion);
 
+        var appearance = _appearance = WindowsAppearance.Start(Dispatcher);
+        _themes = new ThemeModes(_loadedThemeSettings ?? new AppSettings(), IsDarkTheme,
+            () => appearance.IsDark, change => SavePersistentField(s => change(s)));
+        _loadedThemeSettings = null;
+        appearance.Changed += Appearance_Changed;
+        Closed += (_, _) => appearance.Dispose();
+
         if (fellBack)
             FlashStatus("Themes are being kept in your profile — this folder isn't writable.");
+    }
+
+    /// <summary>Whether a theme declares itself dark, to migrate a theme saved before
+    /// there was one per mode; null when its file can't be read this launch.</summary>
+    private bool? IsDarkTheme(string key) =>
+        _themeStore is { } store && store.Find(key) is { } theme && store.Read(theme, out _) is { } css
+            ? ThemeModes.DeclaresDark(css)
+            : null;
+
+    /// <summary>
+    /// Windows switched between light and dark mode: show that mode's remembered themes.
+    /// A switch is not a choice, so nothing is written — only a pick from View ▸ Theme
+    /// is. Settings are read again first, so a theme another window picked for this mode
+    /// since this one launched is the one shown.
+    /// </summary>
+    private async void Appearance_Changed(object? sender, EventArgs e)
+    {
+        if (_themes is null) return;
+        if (!_settingsUnknown && TryReadSettings(out var saved) && saved is not null) _themes.Reload(saved);
+        await ApplyRememberedThemesAsync();
     }
 
     // ===== the menu =====
@@ -84,7 +115,15 @@ public partial class MainWindow
     private void BuildThemeMenu()
     {
         ThemeMenu.Items.Clear();
-        if (_themeStore is null) return;
+        if (_themeStore is null || _themes is null) return;
+
+        // Which mode's theme a pick sets. High contrast counts as light.
+        ThemeMenu.Items.Add(new MenuItem
+        {
+            Header = _themes.IsDark ? "For Windows dark mode" : "For Windows light mode",
+            IsEnabled = false,
+        });
+        ThemeMenu.Items.Add(new Separator());
 
         var wasCustom = false;
         var first = true;
@@ -145,10 +184,23 @@ public partial class MainWindow
         ThemeMenu.Items.Add(open);
     }
 
+    /// <summary>
+    /// View ▸ Theme: apply <paramref name="sender"/>'s theme to the view(s) the pick is
+    /// for — linked, both; unlinked, only the view the user is in
+    /// (<see cref="Source.ThemeLinking"/>) — and remember it for the mode Windows is in
+    /// at the click, if it applied. The mode is taken before the await: Windows can
+    /// switch while the theme goes on, and the pick still belongs to the mode the menu
+    /// named.
+    /// </summary>
     private async void ThemeItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: string key }) return;
-        await ApplyThemeAsync(key);
+        if (sender is not MenuItem { Tag: string key } || _themes is null) return;
+        var (dark, sourceMode) = (_themes.IsDark, _sourceMode);
+        var (toDocument, toSource) = Source.ThemeLinking.TargetsFor(_themes.Linked, sourceMode);
+        var applied = toDocument
+            ? await ApplyDocumentThemeAsync(key, alsoSource: toSource)
+            : await ApplySourceThemeAsync(key);
+        if (applied is not null) _themes.RememberPick(dark, sourceMode, applied);
         RefocusEditor();
     }
 
@@ -169,18 +221,8 @@ public partial class MainWindow
     // ===== applying =====
 
     /// <summary>
-    /// View ▸ Theme: apply <paramref name="key"/> to the view(s) the selection is for.
-    /// Linked, both; unlinked, only the view the user is in (<see cref="Source.ThemeLinking"/>).
-    /// </summary>
-    private async Task ApplyThemeAsync(string? key)
-    {
-        var (toDocument, toSource) = Source.ThemeLinking.TargetsFor(_linkThemes, _sourceMode);
-        if (toDocument) await ApplyDocumentThemeAsync(key, alsoSource: toSource);
-        else if (toSource) await ApplySourceThemeAsync(key);
-    }
-
-    /// <summary>
-    /// Install a theme on the document by name, and remember it if it worked. With
+    /// Install a theme on the document by name. Returns the key that applied, for the
+    /// caller that is a pick to remember; null when it didn't. With
     /// <paramref name="alsoSource"/> the source view follows the same read-back (the
     /// linked case); without it the source view is left exactly as it is.
     ///
@@ -196,9 +238,9 @@ public partial class MainWindow
     /// Both say so. Silence would leave someone looking at a palette they didn't pick
     /// with no idea why, which is the complaint this whole path exists to avoid.
     /// </summary>
-    private async Task ApplyDocumentThemeAsync(string? key, bool alsoSource)
+    private async Task<string?> ApplyDocumentThemeAsync(string? key, bool alsoSource)
     {
-        if (_themeStore is null) return;
+        if (_themeStore is null) return null;
 
         var theme = _themeStore.Find(key);
         if (theme is null)
@@ -222,7 +264,7 @@ public partial class MainWindow
             _appliedKey = ThemeStore.DefaultKey;
             if (alsoSource) _sourceAppliedKey = ThemeStore.DefaultKey;
             BuildThemeMenu();
-            return;
+            return null;
         }
 
         var css = _themeStore.Read(theme, out var failure);
@@ -233,27 +275,14 @@ public partial class MainWindow
             // screen — the update and backup paths refuse the same way.
             FlashStatus($"Can't use {theme.Name}: {failure}");
             BuildThemeMenu();
-            return;
+            return null;
         }
 
         await InstallThemeAsync(css, alsoSource);
+        _appliedKey = theme.Key;
         if (alsoSource) _sourceAppliedKey = theme.Key;
-        SetThemeKey(theme.Key);
-    }
-
-    /// <summary>Record a theme that actually applied. The only writer of the
-    /// persisted preference — via SavePersistentField, not SaveSettings, so an
-    /// unrelated toggle in a DIFFERENT open window can't later republish that
-    /// window's stale in-memory theme over the choice made here.</summary>
-    private void SetThemeKey(string key)
-    {
-        _appliedKey = key;
-        if (!string.Equals(_themeKey, key, StringComparison.OrdinalIgnoreCase))
-        {
-            _themeKey = key;
-            SavePersistentField(s => s.Theme = key);
-        }
         BuildThemeMenu();
+        return theme.Key;
     }
 
     /// <summary>
@@ -268,8 +297,8 @@ public partial class MainWindow
     {
         // Nothing to install into yet, and nothing to report either: the menu is live
         // from the moment the window opens but the editor takes a moment, so an early
-        // click lands here. Persisting the choice anyway is correct rather than
-        // sloppy — the 'ready' handler applies _themeKey the instant there is a page,
+        // click lands here. Remembering the choice anyway is correct rather than
+        // sloppy — the 'ready' handler applies the remembered theme the instant there is a page,
         // so the theme is simply already on when the editor appears. Do not "fix"
         // this into an error message without moving that apply.
         if (!_editorReady || Web.CoreWebView2 is null) return;
@@ -356,11 +385,11 @@ public partial class MainWindow
     /// the bundle's layers but not the page's theme, and probes it with the same code
     /// the document read-back uses. Same fallbacks as the document: a missing file
     /// falls back to Default and keeps the preference; an unreadable one changes
-    /// nothing.
+    /// nothing. Returns the key that applied, or null.
     /// </summary>
-    private async Task ApplySourceThemeAsync(string? key)
+    private async Task<string?> ApplySourceThemeAsync(string? key)
     {
-        if (_themeStore is null) return;
+        if (_themeStore is null) return null;
 
         var theme = _themeStore.Find(key);
         if (theme is null)
@@ -370,7 +399,7 @@ public partial class MainWindow
             await ResolveSourceThemeAsync(string.Empty);
             _sourceAppliedKey = ThemeStore.DefaultKey;
             BuildThemeMenu();
-            return;
+            return null;
         }
 
         var css = _themeStore.Read(theme, out var failure);
@@ -378,11 +407,13 @@ public partial class MainWindow
         {
             FlashStatus($"Can't use {theme.Name}: {failure}");
             BuildThemeMenu();
-            return;
+            return null;
         }
 
         await ResolveSourceThemeAsync(css);
-        SetSourceThemeKey(theme.Key);
+        _sourceAppliedKey = theme.Key;
+        BuildThemeMenu();
+        return theme.Key;
     }
 
     private async Task ResolveSourceThemeAsync(string css)
@@ -401,48 +432,35 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Record a source theme that actually applied — the only writer of the
-    /// persisted SourceTheme, via SavePersistentField for the same reason SetThemeKey
-    /// uses it.</summary>
-    private void SetSourceThemeKey(string key)
-    {
-        _sourceAppliedKey = key;
-        if (!string.Equals(_sourceThemeKey, key, StringComparison.OrdinalIgnoreCase))
-        {
-            _sourceThemeKey = key;
-            SavePersistentField(s => s.SourceTheme = key);
-        }
-        BuildThemeMenu();
-    }
-
     private async void LinkThemes_Click(object sender, RoutedEventArgs e)
     {
-        _linkThemes = !_linkThemes;
-        SavePersistentField(s => s.LinkThemes = _linkThemes);
-        if (_linkThemes)
+        if (_themes is null) return;
+        // Persists the setting, and starts the source view's own themes, in both modes,
+        // from the document's (ThemeModes.RememberLink).
+        _themes.RememberLink(!_themes.Linked);
+        if (_themes.Linked)
         {
             // Relinking: the source view snaps to the document theme. Re-installing the
             // document's REMEMBERED theme (not what happens to be on screen) is what
             // re-derives the source colours, and it keeps the preference intact when
             // the remembered file is missing this launch.
-            await ApplyDocumentThemeAsync(_themeKey, alsoSource: true);
-            SetSourceThemeKey(_appliedKey);
+            await ApplyDocumentThemeAsync(_themes.DocumentKey, alsoSource: true);
         }
-        else
-        {
-            // Unlinking changes nothing on screen. From here View ▸ Theme is per-view,
-            // and the source view starts from what it is already showing.
-            SetSourceThemeKey(_appliedKey);
-        }
+        // Unlinking changes nothing on screen. From here View ▸ Theme is per-view, and
+        // the source view starts from what the document is showing.
+        _sourceAppliedKey = _appliedKey;
+        BuildThemeMenu();
         RefocusEditor();
     }
 
-    /// <summary>At editor-ready: the document theme, then the source view's own theme
-    /// when the two are unlinked. Linked, the document read-back already dressed the
-    /// source view.</summary>
-    private async Task ApplyStartupThemesAsync()
+    /// <summary>At editor-ready, and when Windows switches mode: the document's theme
+    /// for the mode, then the source view's own when the two are unlinked. Linked, the
+    /// document read-back already dressed the source view. Applies only; never writes.</summary>
+    private async Task ApplyRememberedThemesAsync()
     {
-        await ApplyDocumentThemeAsync(_themeKey, alsoSource: _linkThemes);
-        if (!_linkThemes) await ApplySourceThemeAsync(_sourceThemeKey);
+        if (_themes is null) return;
+        var (document, source) = _themes.Remembered();
+        await ApplyDocumentThemeAsync(document, alsoSource: source is null);
+        if (source is not null) await ApplySourceThemeAsync(source);
     }
 }
