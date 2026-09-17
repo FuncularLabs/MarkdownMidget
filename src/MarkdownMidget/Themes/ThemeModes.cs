@@ -34,9 +34,10 @@ internal readonly record struct ThemePair(string Light, string Dark)
 /// <summary>
 /// A theme per Windows mode. The document remembers one theme for light mode and one
 /// for dark, and so does the source view's own theme while "Same Theme for Both Views"
-/// is off. View ▸ Theme sets the slot for the mode Windows was in when it was picked; a
-/// switch of Windows mode shows the other slot and writes nothing, because it is not a
-/// choice.
+/// is off. "The mode" is the effective one: Windows', unless View ▸ Mode says Light or Dark
+/// (<see cref="WindowsAppearance"/>). View ▸ Theme sets the slot for the mode in force when
+/// it was picked; a switch of mode, by Windows or View ▸ Mode, shows the other slot and
+/// writes nothing, because it is not a theme choice.
 ///
 /// Only <see cref="RememberPick"/> and <see cref="RememberLink"/> change them, both
 /// through the window's merge-on-write persister; a save of other settings restates them
@@ -60,7 +61,8 @@ internal sealed class ThemeModes
     /// <param name="saved">Settings as loaded.</param>
     /// <param name="isDarkTheme">Whether a theme file declares itself dark; null when it
     /// can't be read this launch. Used only to migrate a saved single theme.</param>
-    /// <param name="windowsIsDark">Windows' effective app mode, now.</param>
+    /// <param name="windowsIsDark">The effective mode now: Windows', or View ▸ Mode's
+    /// (<see cref="WindowsAppearance.IsDark"/>).</param>
     /// <param name="persist">Applies a change to the settings on disk (read, change, write).</param>
     public ThemeModes(IThemeSettings saved, Func<string, bool?> isDarkTheme, Func<bool> windowsIsDark,
                       Action<Action<IThemeSettings>> persist)
@@ -103,7 +105,7 @@ internal sealed class ThemeModes
     }
 
     /// <summary>
-    /// A theme picked from View ▸ Theme, which applied, for the mode Windows was in when
+    /// A theme picked from View ▸ Theme, which applied, for the mode that was in force when
     /// it was clicked. Linked, or in the formatted view, it is the document's; unlinked in
     /// the source view, the source view's own (<see cref="ThemeLinking"/>). Writes that
     /// view's slot for that mode, and both slots of the pair: the other one as it is on

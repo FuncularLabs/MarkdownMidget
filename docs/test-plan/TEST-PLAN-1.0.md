@@ -212,14 +212,14 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 ### THM — Light and dark mode themes
 
 #### THM-01 The document theme follows Windows light and dark mode
-- **Change:** Added: "The document theme now follows Windows light and dark mode" · **Documents:** `br-forms.md`, `tables.md` · **Settings:** Windows Settings ▸ Personalization ▸ Colors ▸ Choose your mode; formatted view; settings.json backed up in step 1 and restored in step 5
-1. Close every Markdown Midget window. In PowerShell, back up your settings, then set them up the way an earlier version left them, with one saved theme, Dracula:
+- **Change:** Added: "The document theme now follows Windows light and dark mode" · **Documents:** `br-forms.md`, `tables.md` · **Settings:** Windows Settings ▸ Personalization ▸ Colors ▸ Choose your mode; View ▸ Mode on System (step 1's lines set it); formatted view; settings.json backed up in step 1 and restored in step 5
+1. Close every Markdown Midget window. In PowerShell, back up your settings, then set them up the way an earlier version left them, with one saved theme, Dracula, and View ▸ Mode on System:
 
    ```powershell
    $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
    if (-not (Test-Path "$p.thm-backup")) { Copy-Item $p "$p.thm-backup" }
    $s = Get-Content $p -Raw -Encoding utf8 | ConvertFrom-Json
-   'ThemeLight','ThemeDark','SourceThemeLight','SourceThemeDark' | ForEach-Object { $s.PSObject.Properties.Remove($_) }
+   'ThemeLight','ThemeDark','SourceThemeLight','SourceThemeDark','AppearanceMode' | ForEach-Object { $s.PSObject.Properties.Remove($_) }
    $s.Theme = 'Dracula.css'; $s.LinkThemes = $true
    $s | ConvertTo-Json -Depth 5 | Set-Content $p -Encoding utf8
    ```
@@ -236,6 +236,58 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 - **Expected:** In step 1, with Dracula saved, light shows Midget Solarized and dark shows Dracula; with `''` (Default) saved, light shows Midget Solarized and dark shows Obsidiminutive. The greyed top line of View ▸ Theme names the current mode. Every switch recolours every open window within about a second, with no restart. In step 2 dark shows Dracula and light One Light. In step 3 the `tables.md` window shows GitHub Dark Dimmed after the switches, and after reopening dark shows GitHub Dark Dimmed and light One Light: turning spell check off and on didn't undo the pick. In step 4 the source view shows One Light in light and Solarized Light in dark, and the formatted view One Light in light and GitHub Dark Dimmed in dark; turning the setting back on gives the source view GitHub Dark Dimmed. In step 5, with the contrast theme on, the top line reads *For Windows light mode* and **One Light** is ticked (the contrast theme may override the page colours); with it off, the line reads *For Windows dark mode*, and GitHub Dark Dimmed is ticked and showing.
 - **Type:** Both. Automated: `ThemeModesTests.TheSlotForTheModeWindowsIsInIsAppliedAndTicked`, `ThemeModesTests.APickWritesOnlyTheSlotForTheModeItWasMadeIn`, `ThemeModesTests.ASavedThemeMigratesToTheModeItMatches`, `ThemeModesTests.SwitchingWindowsModeAppliesTheOtherSlotAndWritesNothing`, `ThemeModesTests.AModeSwitchShowsWhatAnotherWindowPickedForThatMode`, `ThemeModesTests.AnotherSettingsSaveKeepsThemeFieldsAsTheyAreOnDisk`, `ThemeModesTests.TurningLinkingOnOrOffStartsTheSourceViewFromTheDocumentInBothModes`, `WindowsAppearanceTests.AppsUseLightThemeDecidesDarkMode`, `WindowsAppearanceTests.HighContrastCountsAsLight`, `WindowsAppearanceTests.ChangedIsRaisedOncePerFlipOfTheEffectiveMode`. Human: the Windows mode switch, the menu and the windows' colours, which need the app.
+
+#### THM-02 The window chrome follows the mode
+- **Change:** Added: "The menus, toolbar, status bar, dialogs and title bar now follow Windows light and dark mode" · **Documents:** `br-forms.md`, `tables.md` · **Settings:** Windows Settings ▸ Personalization ▸ Colors ▸ Choose your mode; View ▸ Mode on System; the built-in file picker, which is off by default and turned on in step 4; settings.json backed up in step 1 and restored in step 6
+1. Close every Markdown Midget window. Back up your settings and set View ▸ Mode to System (the `if` line keeps the first backup if one is already there):
+
+   ```powershell
+   $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
+   if (-not (Test-Path "$p.thm-backup")) { Copy-Item $p "$p.thm-backup" }
+   $s = Get-Content $p -Raw -Encoding utf8 | ConvertFrom-Json
+   $s.PSObject.Properties.Remove('AppearanceMode')
+   $s | ConvertTo-Json -Depth 5 | Set-Content $p -Encoding utf8
+   ```
+
+   Set Windows to **Light**, start Markdown Midget and check that View ▸ Mode ticks **System**. Set Windows to **Dark**, maximise the window and close it. Start Markdown Midget again and watch its window appear. Restore it down, move and resize it, close it, start Markdown Midget again and watch. In that window open `br-forms.md` with File ▸ Open….
+2. In Dark, look at: every top-level menu; the submenus File ▸ Open Recent, File ▸ Windows Integration, Style ▸ Code Block, View ▸ Line Numbers, View ▸ Document Width, View ▸ Mode and View ▸ Theme; a greyed item (the top line of View ▸ Theme); the Style dropdown; the dropdowns of the code-block chevron and **Document width** toolbar buttons; the tooltips on **Bold** and on the greyed **Word wrap** button; the status bar; the right-click menu on text. Narrow the window until the toolbar shows its overflow arrow, open it, then widen the window again. Use **File ▸ Open…** to open `tables.md`, which opens in a second window, and right-click in a table there.
+3. In the `br-forms.md` window, open each dialog, look at it and close it: Edit ▸ Find… (Ctrl+F), Edit ▸ Replace… (Ctrl+H), Edit ▸ Go to Line… (Ctrl+G), Edit ▸ Settings… (close with Cancel), Insert ▸ Link… (Ctrl+K), Insert ▸ Table… and Help ▸ About Markdown Midget. Then press F1 for Help, go back to the `br-forms.md` window and press Ctrl+F, and leave both open. Set Windows to **Light**, then **Dark**, and look at every open window each time. Close Help and Find.
+4. Open **Edit ▸ Settings…**, turn on **Always use the built-in file picker** and click OK. Open **File ▸ Open…** and look at the Back and Forward buttons (greyed), the Up button (pointed at), the folder tree, the address bar and the file list, with a row selected. With the picker still open, set Windows to **Light**, look again, set it back to **Dark**, and cancel the picker.
+5. Turn on a contrast theme (Settings ▸ Accessibility ▸ Contrast themes) and look at both windows, a menu and a dialog. Turn it off. Set Windows to **Light** and do the same.
+6. Close every Markdown Midget window and put your settings back. If you stop THM-02 before this step, close every window and run this line when you stop:
+
+   ```powershell
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.thm-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   ```
+
+- **Expected:** In light mode everything looks as it did in rc2. In dark mode every menu, submenu, dropdown, right-click menu, tooltip, dialog, the toolbar and its overflow, the status bar, the Help window and the built-in picker are dark with light text; greyed items are dimmer but readable; every title bar is dark. In step 1 each window is dark from its first frame, maximised or at its saved place and size, with no light flash of the title bar or menus. In steps 3 and 4 each switch recolours every open window, title bars and the open picker included, within about a second. In step 5, with a contrast theme on, every window uses the contrast theme's colours in both modes, and turning it off gives back the mode's own look. Not failures: Windows' own message boxes and its Open and Save dialogs stay light, and a toolbar button you point at shows a pale blue highlight.
+- **Type:** Both. Automated: `WindowsAppearanceTests.TheChromeGetsTheEffectiveModeAtStartAndOnEveryChange`, `WindowsAppearanceTests.HighContrastWinsOverDark`, `AppearanceModeTests.TheEffectiveModeForEveryChoiceWindowsModeAndContrast`, `ChromePaletteTests.HighContrastTakesTheLightPathEvenWhenDarkIsAsked`, `ChromePaletteHookTests.TheLastCallWinsWhenAnEarlierOneWasQueuedFromAnotherThread`, `ChromeRenderTests.DarkModeLeavesNoControlLight`, `ChromeRenderTests.DarkModeReachesThePopupsThatAreNotDrawnUntilOpened`, `ChromeRenderTests.ThePickerNavButtonsFollowASwitchMadeWhileTheyAreOpen`, `DarkTitleBarTests.EveryWindowIsSetBeforeItIsShownAndFollowsASwitchWhileOpen`. Human: how each real window looks, the first frame of a starting window, and Windows' own switch and contrast themes, which need the app.
+
+#### THM-03 View ▸ Mode overrides Windows in every window
+- **Change:** Added: "View ▸ Mode now lets you choose Light, Dark or System" · **Documents:** `br-forms.md`, `tables.md` · **Settings:** Windows Settings ▸ Personalization ▸ Colors ▸ Choose your mode; formatted view; settings.json backed up in step 1 and restored in step 6
+1. Close every Markdown Midget window. Back up your settings and set View ▸ Mode to System:
+
+   ```powershell
+   $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
+   if (-not (Test-Path "$p.thm-backup")) { Copy-Item $p "$p.thm-backup" }
+   $s = Get-Content $p -Raw -Encoding utf8 | ConvertFrom-Json
+   $s.PSObject.Properties.Remove('AppearanceMode')
+   $s | ConvertTo-Json -Depth 5 | Set-Content $p -Encoding utf8
+   ```
+
+   Set Windows to **Light**. Open `br-forms.md`, then use **File ▸ Open…** to open `tables.md`, which opens in a second window. In the `br-forms.md` window open View ▸ Mode, and View ▸ Theme.
+2. In the `br-forms.md` window pick **View ▸ Mode ▸ Dark**. Look at both windows, then in the `tables.md` window open View ▸ Mode and View ▸ Theme. In the `tables.md` window pick **System**, then **Dark** again, looking at both windows after each pick.
+3. In the `tables.md` window pick **Dracula** from View ▸ Theme. Set Windows to **Dark**, then **Light**.
+4. Turn on a contrast theme (Settings ▸ Accessibility ▸ Contrast themes), look at both windows and open View ▸ Theme in one. Turn the contrast theme off.
+5. Close both windows. Start Markdown Midget, watch its window appear, and open `br-forms.md` from File ▸ Open Recent. Open View ▸ Mode, then pick **System**, and open View ▸ Theme. Set Windows to **Dark** and open View ▸ Theme again. Pick **View ▸ Mode ▸ Light**, then **System**.
+6. Close every Markdown Midget window and put your settings back. If you stop THM-03 before this step, close every window and run this line when you stop:
+
+   ```powershell
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.thm-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   ```
+
+- **Expected:** In step 1 View ▸ Mode ticks **System**, both windows are light, and View ▸ Theme's top line reads *For Windows light mode*. In step 2, within about a second of each pick, both windows switch together, menus, title bars and document theme: dark after Dark, light after System. The `tables.md` window ticks the mode picked in the other window, and its View ▸ Theme top line reads *For dark mode*. In step 3 Dracula shows in the `tables.md` window, and the Windows switches change nothing in either window. In step 4 both windows use the contrast theme's colours and the top line reads *For light mode*; with it off both are dark again. In step 5 the window opens dark, with no light flash, **Dark** is ticked, and `br-forms.md` shows Dracula; after System it is light and reads *For Windows light mode*; after Windows goes dark it shows Dracula and reads *For Windows dark mode*; Light makes it light with Windows still dark, and System makes it dark again.
+- **Type:** Both. Automated: `AppearanceModeTests.TheEffectiveModeForEveryChoiceWindowsModeAndContrast`, `AppearanceModeTests.MissingOrUnknownValuesMeanSystem`, `AppearanceModeTests.APickWritesOnlyAppearanceMode`, `AppearanceModeTests.AnotherWindowsSaveKeepsTheModeAsItIsOnDisk`, `AppearanceModeTests.ASettingsFileIsReadForItsMode`, `AppearanceModeTests.TheModeAWindowWritesIsTheModeTheOthersRead`, `AppearanceModeTests.NoSettingsFileMeansSystem`, `AppearanceModeTests.AnUnreadableFileIsNoAnswerAndIsLeftExactlyAsItIs`, `AppearanceModeTests.ASaveWaitsOutAWindowReadingTheSettingsFile`, `AppearanceModeTests.AReplaceThatKeepsFailingGivesUpAfterAFewTries`, `AppearanceModeTests.TheThemeCaptionNamesWindowsOnlyUnderSystem`, `WindowsAppearanceTests.AModeReadFromSettingsRaisesChangedOnlyWhenTheEffectiveModeFlips`, `WindowsAppearanceTests.ThePickInThisWindowAppliesAtOnceAndRaisesOnlyOnAFlip`, `ThemeModesTests.APickUnderAModeOverrideWritesThatModesSlot`, `ThemeModesTests.SwitchingTheModeOverrideAppliesTheOtherSlotAndWritesNothing`. Human: the menu clicks, the settings watcher between real windows and Windows' own switch, which need the app.
 
 ### PRN — Printing with a theme
 
@@ -1575,6 +1627,8 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | TIP-01 | | | |
 | TIP-02 | | | |
 | THM-01 | | | |
+| THM-02 | | | |
+| THM-03 | | | |
 | PRN-01 | | | |
 | MRK-01 | | | |
 | MRK-02 | | | |

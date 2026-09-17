@@ -348,6 +348,29 @@ is remembered between sessions.
 The **zoom** percentage is shown at the bottom-right of the status bar — zoom with
 **Ctrl + mouse wheel**, and click the indicator to reset to 100%.
 
+## Light and dark mode
+
+Markdown Midget follows the app mode you choose in Windows (Settings ▸ Personalization
+▸ Colors ▸ *Choose your mode*). In dark mode the menus, toolbar, status bar, dialogs,
+title bar and built-in file picker turn dark, and the document shows the theme you
+picked for dark mode (see [Themes](#themes)). When Windows switches mode, every open
+window follows straight away.
+
+**View ▸ Mode** lets you override Windows:
+
+| Mode | |
+|---|---|
+| **Light** | Always light, whatever mode Windows is in |
+| **Dark** | Always dark, whatever mode Windows is in |
+| **System** | Follows Windows. This is the default |
+
+The choice is saved, and every open window follows it within about a second. With a
+Windows contrast theme on, Markdown Midget uses its light look in every mode, so the
+contrast theme's colours stay in charge. Windows' own message boxes and its Open and
+Save dialogs stay light, and a toolbar button you point at keeps its pale blue
+highlight in dark mode. Version 1.0.0-rc2 and earlier don't know this setting: once
+one of them saves your settings, Mode is back on System.
+
 ## Themes
 
 **View ▸ Theme** recolours the editing surface. Eight ship with the app:
@@ -364,14 +387,17 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 | **Solarized Light** | Light, warm, low-glare |
 
 Switching is instant, applies to the source view as well as the formatted one, and
-is remembered between sessions. Diagrams follow along; the menu bar, toolbar and
-status bar do not — those are Windows' own furniture and stay in the system theme.
+is remembered between sessions. Diagrams follow along. The menus, toolbar, status bar
+and dialogs don't take the theme's colours: they follow
+[light or dark mode](#light-and-dark-mode).
 
 **One theme for light mode, one for dark mode.** The document follows the app mode
-you choose in Windows (Settings ▸ Personalization ▸ Colors ▸ *Choose your mode*).
+you choose in Windows (Settings ▸ Personalization ▸ Colors ▸ *Choose your mode*), or
+the one you set in View ▸ Mode.
 Markdown Midget remembers a theme for each mode, and View ▸ Theme sets the one for
-the mode Windows is in now — the top of the menu says which, *For Windows light
-mode* or *For Windows dark mode*. When Windows switches mode, the document switches
+the mode you're in now — the top of the menu says which: *For Windows light mode* or
+*For Windows dark mode* with View ▸ Mode on System, *For light mode* or *For dark
+mode* with it on Light or Dark. When the mode switches, the document switches
 to that mode's theme straight away, with nothing to restart. Until you pick one,
 light mode uses Midget Solarized and dark mode uses Obsidiminutive. With a Windows
 contrast theme on, the light mode theme is used.
@@ -392,7 +418,7 @@ text colour, so the source view is never less legible than the theme's own prose
 Views** is on by default. Turn it off and View ▸ Theme changes only the view you're
 in — pick a dark theme while in the source view and the formatted document keeps its
 own. The menu ticks the theme of whichever view is showing. Both choices are
-remembered, for each Windows mode; turning it back on snaps the source view to the
+remembered, for each mode; turning it back on snaps the source view to the
 document's theme.
 
 **Printing keeps paper light** — the page prints white with dark text whatever you

@@ -90,6 +90,9 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
   - A theme saved by an earlier build carries over to the mode it matches; a saved
     Default counts as never chosen.
   - The switch should happen while the app is running, as soon as Windows changes mode.
+  - **View ▸ Mode ▸ Light | Dark | System** overrides Windows for both the chrome and
+    the theme slot; System is the default, and the choice is saved. High contrast still
+    wins, and every open window follows a change within about a second.
 
   Raised by an rc2 tester on X (2026-09-16) who works at night with Windows set to
   Dark: a dark theme darkened the document but not the header or footer. The same

@@ -4132,7 +4132,7 @@ public partial class MainWindow : Window
 
     // ===== Settings (persisted) =====
 
-    private sealed class AppSettings : Themes.IThemeSettings
+    internal sealed class AppSettings : Themes.IThemeSettings
     {
         public string PageWidth { get; set; } = "portrait";
         public Dictionary<string, PrintPrefs> PrintPrefs { get; set; } = new();
@@ -4159,6 +4159,9 @@ public partial class MainWindow : Window
         public string? SourceThemeDark { get; set; }
         // View ▸ Theme ▸ "Same Theme for Both Views". Default on.
         public bool LinkThemes { get; set; } = true;
+        // View ▸ Mode: "System", "Light" or "Dark"; null until picked, and missing or unknown is
+        // System (AppearanceModes.Parse). Only a pick writes it, so SaveSettings carries it from disk.
+        public string? AppearanceMode { get; set; }
         public bool LineNumbers { get; set; }              // View ▸ Line Numbers (#10): the formatted view's, both views' while linked
         public bool? SourceLineNumbers { get; set; }       // the source view's own; null = LineNumbers
         public bool LinkLineNumbers { get; set; } = true;  // "Same Setting for Both Views"
@@ -4193,7 +4196,7 @@ public partial class MainWindow : Window
     private readonly LargeDocument _large = new();   // a large document's own line numbers and spell check, over the saved ones
     private bool SpellOn => _large.SpellCheck(_spellCheck);
 
-    private sealed class PrintPrefs
+    internal sealed class PrintPrefs
     {
         public bool ShowHeaderFooter { get; set; } = true;
         public bool ColorCodeBlocks { get; set; } = true;
@@ -4329,9 +4332,26 @@ public partial class MainWindow : Window
         try
         {
             File.WriteAllText(tmp, JsonSerializer.Serialize(s));
-            File.Move(tmp, SettingsStorePath, overwrite: true);
+            ReplaceFile(tmp, SettingsStorePath, () => System.Threading.Thread.Sleep(25));
         }
         finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* leave it */ } }
+    }
+
+    /// <summary>Move <paramref name="source"/> over <paramref name="target"/>, trying up to four
+    /// times. Any open handle on the target, even a reader's that shares delete, makes the
+    /// replace fail with access denied; and every window reads settings.json 250 ms after each
+    /// save, to follow a View ▸ Mode pick (WindowsAppearance). Still failing, it throws.</summary>
+    internal static void ReplaceFile(string source, string target, Action wait)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(source, target, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (attempt < 4 && ex is UnauthorizedAccessException or IOException) { wait(); }
+        }
     }
 
     /// <summary>
@@ -4340,10 +4360,10 @@ public partial class MainWindow : Window
     /// instance's launch-time copy of it here would revert a position another
     /// instance saved in the meantime.
     ///
-    /// The theme fields and LastSeenChangelogVersion are carried through from disk the same
-    /// way, and for the same reason: they are each written by their OWN dedicated
-    /// caller (<see cref="Themes.ThemeModes"/>, for a View ▸ Theme pick, and
-    /// MarkChangelogSeen) via <see cref="SavePersistentField"/>, not by this generic
+    /// The theme fields, View ▸ Mode and LastSeenChangelogVersion are carried through from
+    /// disk the same way (<see cref="CarryFromDisk"/>), and for the same reason: they are each
+    /// written by their OWN dedicated caller (<see cref="Themes.ThemeModes"/>, for a View ▸
+    /// Theme pick, Mode_Click and MarkChangelogSeen) via <see cref="SavePersistentField"/>, not by this generic
     /// path. Multiple windows share this one file; a window that toggled word wrap
     /// an hour ago is not carrying today's theme choice or today's "seen" version in
     /// its in-memory fields, and a generic save from THAT toggle must not overwrite
@@ -4359,21 +4379,33 @@ public partial class MainWindow : Window
             // lose the user's window position.
             if (!TryReadSettings(out var existing)) return;
             var s = CurrentSettings();
-            // Geometry is carried through from disk, not from this instance's fields.
-            s.WindowLeft = existing?.WindowLeft;
-            s.WindowTop = existing?.WindowTop;
-            s.WindowWidth = existing?.WindowWidth;
-            s.WindowHeight = existing?.WindowHeight;
-            s.WindowMaximized = existing?.WindowMaximized ?? false;
-            if (existing is not null) Themes.ThemeModes.CarryFromDisk(existing, s);   // nulls included
-            s.LineNumbers = existing?.LineNumbers ?? s.LineNumbers;
-            s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
-            s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
-            s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
-            (s.MdOpensWithUs, s.LastRunVersion, s.DefaultNoticeOff) = (existing?.MdOpensWithUs, existing?.LastRunVersion, existing?.DefaultNoticeOff == true);
+            CarryFromDisk(existing, s);
             WriteSettings(s);
         }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>For <see cref="SaveSettings"/>: the fields other writers own, taken from the
+    /// settings on disk (<paramref name="existing"/>, null when there is no file) into
+    /// <paramref name="s"/>, this window's preferences.</summary>
+    internal static void CarryFromDisk(AppSettings? existing, AppSettings s)
+    {
+        // Geometry is carried through from disk, not from this instance's fields.
+        s.WindowLeft = existing?.WindowLeft;
+        s.WindowTop = existing?.WindowTop;
+        s.WindowWidth = existing?.WindowWidth;
+        s.WindowHeight = existing?.WindowHeight;
+        s.WindowMaximized = existing?.WindowMaximized ?? false;
+        if (existing is not null)
+        {
+            Themes.ThemeModes.CarryFromDisk(existing, s);   // nulls included
+            s.AppearanceMode = existing.AppearanceMode;     // null too: never picked
+        }
+        s.LineNumbers = existing?.LineNumbers ?? s.LineNumbers;
+        s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
+        s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
+        s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
+        (s.MdOpensWithUs, s.LastRunVersion, s.DefaultNoticeOff) = (existing?.MdOpensWithUs, existing?.LastRunVersion, existing?.DefaultNoticeOff == true);
     }
 
     /// <summary>

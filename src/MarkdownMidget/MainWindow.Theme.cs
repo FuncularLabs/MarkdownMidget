@@ -26,9 +26,9 @@ public partial class MainWindow
 {
     private ThemeStore? _themeStore;
 
-    /// <summary>Windows' light or dark app mode, and when it changes. Created with the
-    /// window and disposed when it closes. Only the theme code uses it so far, through a
-    /// local; the field is here for the window chrome to follow the same mode.</summary>
+    /// <summary>The effective light or dark mode (Windows', or View ▸ Mode's), and when it
+    /// changes. Created with the window and disposed when it closes. The window chrome and
+    /// the theme slots follow it; View ▸ Mode sets it (MainWindow.Mode.cs).</summary>
     private WindowsAppearance? _appearance;
 
     /// <summary>The remembered themes, one per Windows mode for the document and for
@@ -67,7 +67,10 @@ public partial class MainWindow
         // thing to keep in step with CI's tag-derived InformationalVersion.
         _themeStore.Refresh(AppVersion);
 
-        var appearance = _appearance = WindowsAppearance.Start(Dispatcher);
+        var appearance = _appearance = WindowsAppearance.Start(Dispatcher, SettingsStorePath);
+        // The chrome first, and now: the constructor runs before the window is shown, so a
+        // dark start has no light flash. On a change it goes before the themes below.
+        appearance.Follow(Chrome.ChromePalette.Apply);
         _themes = new ThemeModes(_loadedThemeSettings ?? new AppSettings(), IsDarkTheme,
             () => appearance.IsDark, change => SavePersistentField(s => change(s)));
         _loadedThemeSettings = null;
@@ -86,8 +89,9 @@ public partial class MainWindow
             : null;
 
     /// <summary>
-    /// Windows switched between light and dark mode: show that mode's remembered themes.
-    /// A switch is not a choice, so no setting is written — only a pick from View ▸ Theme
+    /// The effective mode flipped — Windows switched, or View ▸ Mode was picked here or in
+    /// another window: show that mode's remembered themes.
+    /// A switch is not a theme choice, so no setting is written — only a pick from View ▸ Theme
     /// writes one. Settings are read again first, so a theme another window picked for
     /// this mode since this one launched is the one shown; that read is TryReadSettings,
     /// which moves a corrupt settings.json aside, as every other read does.
@@ -106,7 +110,9 @@ public partial class MainWindow
     // On View's own opening, not Theme's: see MenuAccessKeys.IsOwnSubmenuOpening.
     private void ViewMenu_Opened(object sender, RoutedEventArgs e)
     {
-        if (MenuAccessKeys.IsOwnSubmenuOpening(sender, e.OriginalSource)) BuildThemeMenu();
+        if (!MenuAccessKeys.IsOwnSubmenuOpening(sender, e.OriginalSource)) return;
+        SyncModeMenu();
+        BuildThemeMenu();
     }
 
     private void BuildThemeMenu()
@@ -117,7 +123,7 @@ public partial class MainWindow
         // Which mode's theme a pick sets. High contrast counts as light.
         ThemeMenu.Items.Add(new MenuItem
         {
-            Header = _themes.IsDark ? "For Windows dark mode" : "For Windows light mode",
+            Header = AppearanceModes.ThemeCaption(_appearance?.Mode ?? AppearanceMode.System, _themes.IsDark),
             IsEnabled = false,
         });
         ThemeMenu.Items.Add(new Separator());
@@ -184,9 +190,9 @@ public partial class MainWindow
     /// <summary>
     /// View ▸ Theme: apply <paramref name="sender"/>'s theme to the view(s) the pick is
     /// for — linked, both; unlinked, only the view the user is in
-    /// (<see cref="Source.ThemeLinking"/>) — and remember it for the mode Windows is in
-    /// at the click, if it applied. The mode is taken before the await: Windows can
-    /// switch while the theme goes on, and the pick still belongs to the mode the menu
+    /// (<see cref="Source.ThemeLinking"/>) — and remember it for the effective mode at the
+    /// click (Windows', or View ▸ Mode's), if it applied. The mode is taken before the await:
+    /// it can switch while the theme goes on, and the pick still belongs to the mode the menu
     /// named.
     /// </summary>
     private async void ThemeItem_Click(object sender, RoutedEventArgs e)
@@ -452,7 +458,7 @@ public partial class MainWindow
         RefocusEditor();
     }
 
-    /// <summary>At editor-ready, and when Windows switches mode: the document's theme
+    /// <summary>At editor-ready, and when the mode switches: the document's theme
     /// for the mode, then the source view's own when the two are unlinked. Linked, the
     /// document read-back already dressed the source view. Applies only; writes no
     /// setting. (The mode-switch caller reads settings first: see Appearance_Changed.)</summary>

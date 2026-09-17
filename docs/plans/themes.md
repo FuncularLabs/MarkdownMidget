@@ -454,7 +454,8 @@ not colour the WPF menu bar, toolbar, status bar or dialogs. This originally rea
 settled "not themed". It was revisited on 2026-09-16 (ROADMAP, "Now — the 1.0.0-rc3
 set"): the chrome keeps today's look in light mode and gets a dark palette and a dark
 title bar when Windows is in dark mode. That is still separate from this plan: the
-chrome follows the Windows mode, never the chosen document theme (`Chrome\ChromePalette.cs`).
+chrome follows the light or dark mode (Windows', or View ▸ Mode's), never the chosen document
+theme (`Chrome\ChromePalette.cs`, applied from `WindowsAppearance`).
 The source view is the exception and *is* themed (§4), because it is the document, not
 chrome.
 

@@ -90,6 +90,86 @@ public class WindowsAppearanceTests
         Assert.Equal(1, raised);          // and, unchanged, raises nothing
     }
 
+    // ===== View ▸ Mode =====
+
+    [Fact]
+    public void AModeReadFromSettingsRaisesChangedOnlyWhenTheEffectiveModeFlips()
+    {
+        object? apps = 1;                  // Windows light
+        AppearanceMode? saved = null;      // unreadable at launch: System
+        var scheduled = new List<Action>();
+        using var appearance = new WindowsAppearance(() => apps, () => false, scheduled.Add, () => saved);
+        var raised = 0;
+        appearance.Changed += (_, _) => raised++;
+        void Notified() { appearance.OnPreferenceChanged(); scheduled[^1](); }   // settings.json or Windows changed
+
+        saved = AppearanceMode.Light;      // another window picked Light: light already
+        Notified();
+        Assert.Equal((AppearanceMode.Light, false, 0), (appearance.Mode, appearance.IsDark, raised));
+
+        saved = AppearanceMode.Dark;
+        Notified();
+        Assert.Equal((AppearanceMode.Dark, true, 1), (appearance.Mode, appearance.IsDark, raised));
+
+        saved = null;                      // a read that failed keeps the last answer
+        apps = 0;                          // and Windows going dark under Dark changes nothing
+        Notified();
+        Assert.Equal((AppearanceMode.Dark, true, 1), (appearance.Mode, appearance.IsDark, raised));
+
+        saved = AppearanceMode.System;     // back to System with Windows dark: still dark
+        Notified();
+        Assert.Equal((AppearanceMode.System, true, 1), (appearance.Mode, appearance.IsDark, raised));
+
+        saved = AppearanceMode.Light;
+        Notified();
+        Assert.Equal((AppearanceMode.Light, false, 2), (appearance.Mode, appearance.IsDark, raised));
+    }
+
+    [Fact]
+    public void ThePickInThisWindowAppliesAtOnceAndRaisesOnlyOnAFlip()
+    {
+        using var appearance = new WindowsAppearance(() => 1, () => false, savedMode: () => AppearanceMode.System);
+        var raised = 0;
+        appearance.Changed += (_, _) => raised++;
+
+        appearance.SetMode(AppearanceMode.Light);
+        Assert.Equal((AppearanceMode.Light, false, 0), (appearance.Mode, appearance.IsDark, raised));
+        appearance.SetMode(AppearanceMode.Dark);
+        Assert.Equal((AppearanceMode.Dark, true, 1), (appearance.Mode, appearance.IsDark, raised));
+    }
+
+    [Fact]
+    public void HighContrastWinsOverDark()
+    {
+        var highContrast = true;
+        using var appearance = new WindowsAppearance(() => 1, () => highContrast, savedMode: () => AppearanceMode.Dark);
+        Assert.Equal((AppearanceMode.Dark, false), (appearance.Mode, appearance.IsDark));
+        highContrast = false;
+        appearance.Refresh();
+        Assert.True(appearance.IsDark);
+    }
+
+    [Fact]
+    public void TheChromeGetsTheEffectiveModeAtStartAndOnEveryChange()
+    {
+        // MainWindow passes ChromePalette.Apply, before the window is first shown.
+        var highContrast = false;
+        AppearanceMode? saved = AppearanceMode.Dark;
+        using var appearance = new WindowsAppearance(() => 1, () => highContrast, savedMode: () => saved);
+        var applied = new List<bool>();
+
+        appearance.Follow(applied.Add);
+        Assert.Equal(new[] { true }, applied);        // Dark over Windows light
+
+        highContrast = true;
+        appearance.Refresh();
+        highContrast = false;
+        saved = AppearanceMode.System;
+        appearance.Refresh();                         // System with Windows light: no flip, no call
+        appearance.SetMode(AppearanceMode.Dark);
+        Assert.Equal(new[] { true, false, true }, applied);
+    }
+
     [Fact]
     public void AClosedWindowsAppearanceRaisesNothing()
     {

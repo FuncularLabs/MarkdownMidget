@@ -302,6 +302,42 @@ public class ThemeModesTests
         Assert.Equal(0, window.Writes);
     }
 
+    // ===== View ▸ Mode =====
+
+    [Fact]
+    public void APickUnderAModeOverrideWritesThatModesSlot()
+    {
+        // Windows light, View ▸ Mode Dark: the pick is dark mode's theme.
+        var disk = Materialized();
+        using var appearance = new WindowsAppearance(() => 1, () => false, savedMode: () => AppearanceMode.Dark);
+        var modes = new ThemeModes(disk.Copy(), Kind, () => appearance.IsDark, apply => apply(disk));
+
+        modes.RememberPick(modes.IsDark, sourceMode: false, "Dracula.css");   // what ThemeItem_Click passes
+
+        Assert.Equal(("a.css", "Dracula.css"), (disk.ThemeLight, disk.ThemeDark));
+    }
+
+    [Fact]
+    public void SwitchingTheModeOverrideAppliesTheOtherSlotAndWritesNothing()
+    {
+        var disk = Materialized(linked: false);
+        var before = disk.Copy();
+        var writes = 0;
+        using var appearance = new WindowsAppearance(() => 1, () => false);   // Windows light, System
+        var modes = new ThemeModes(disk.Copy(), Kind, () => appearance.IsDark, apply => { writes++; apply(disk); });
+        var shown = new List<(string, string?)>();
+        appearance.Changed += (_, _) => { modes.Reload(disk.Copy()); shown.Add(modes.Remembered()); };   // Appearance_Changed
+
+        appearance.SetMode(AppearanceMode.Dark);
+        appearance.SetMode(AppearanceMode.System);  // Windows light: back to light
+        appearance.SetMode(AppearanceMode.Light);   // light already: nothing to apply
+        appearance.SetMode(AppearanceMode.Dark);
+        appearance.SetMode(AppearanceMode.System);
+        Assert.Equal(new (string, string?)[] { ("b.css", "d.css"), ("a.css", "c.css"), ("b.css", "d.css"), ("a.css", "c.css") }, shown);
+        Assert.Equal(0, writes);
+        Assert.Equivalent(before, disk);
+    }
+
     // ===== Same Theme for Both Views =====
 
     [Theory]

@@ -249,6 +249,15 @@
                             <MenuItem x:Name="PageWidthFull" Header="_Full Width" IsCheckable="True"
                                       Tag="full" Click="PageWidth_Click" />
                         </MenuItem>
+                        <MenuItem Header="_Mode"
+                                  ToolTip="Light or dark menus, toolbar, dialogs and title bar, with the theme you picked for that mode.">
+                            <MenuItem x:Name="ModeLight" Header="_Light" IsCheckable="True" Tag="Light" Click="Mode_Click"
+                                      ToolTip="Always light, whatever mode Windows is in." />
+                            <MenuItem x:Name="ModeDark" Header="_Dark" IsCheckable="True" Tag="Dark" Click="Mode_Click"
+                                      ToolTip="Always dark, whatever mode Windows is in. A Windows contrast theme still wins." />
+                            <MenuItem x:Name="ModeSystem" Header="_System" IsCheckable="True" IsChecked="True" Tag="System" Click="Mode_Click"
+                                      ToolTip="Follow the mode chosen in Windows Settings ▸ Personalization ▸ Colors." />
+                        </MenuItem>
                         <MenuItem x:Name="ThemeMenu" Header="_Theme"
                                   ToolTip="Recolour the editing surface. Printing is unaffected — paper stays light." />
                         <Separator />
