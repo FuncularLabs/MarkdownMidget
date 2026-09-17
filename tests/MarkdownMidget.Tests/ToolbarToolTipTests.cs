@@ -11,7 +11,7 @@ namespace MarkdownMidget.Tests;
 /// <summary>
 /// Where a toolbar tooltip opens (<see cref="ToolbarToolTip"/>), from the pointer size Windows keeps in CursorBaseSize.
 /// Every read here is a fake: the tests use ToolbarToolTip.Mapping, and never ToolbarToolTip's own fields, whose static
-/// constructor reads the registry. That the toolbar's tooltips use these values is checked by hand: it needs the window.
+/// constructor reads the registry. That the toolbar's tooltips use these values is checked by hand, in TEST-PLAN-1.0.md TIP-02: it needs the window.
 /// </summary>
 public class ToolbarToolTipTests
 {

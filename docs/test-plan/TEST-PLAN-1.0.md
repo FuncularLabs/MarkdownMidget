@@ -198,8 +198,16 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 #### TIP-01 A greyed-out toolbar button shows a tooltip that says when it's available
 - **Change:** Changed: "Toolbar buttons now explain themselves when greyed out" · **Documents:** `br-forms.md` · **Settings:** formatted view
 1. Hover over every toolbar button and the Style box: in the formatted view, in the source view (Ctrl+E), with no document open (Ctrl+W), and in Help (F1).
-- **Expected:** Each one shows its tooltip, greyed out or not, with its shortcut where it had one. A greyed-out one says when it's available: **Word wrap (source view only)**, "editable documents only" on Save and the formatting controls, and Undo and Redo say when there is something to undo or redo. The tooltips look as before.
+- **Expected:** Each one shows its tooltip, greyed out or not, with its shortcut where it had one. A greyed-out one says when it's available: **Word wrap (source view only)**, "editable documents only" on Save and the formatting controls, and Undo and Redo say when there is something to undo or redo. With a standard-size pointer, the tooltips open where they did before; with an enlarged pointer, see TIP-02.
 - **Type:** Human. WPF tooltips on disabled controls have no test.
+
+#### TIP-02 Toolbar tooltips open below an enlarged mouse pointer
+- **Change:** Fixed: "Toolbar tooltips now open below an enlarged mouse pointer" · **Documents:** `br-forms.md`, the Help window · **Settings:** formatted view; Windows Settings ▸ Accessibility ▸ Mouse pointer and touch ▸ Size
+1. Set the pointer **Size** to 1 (standard) and open a new window. Hover over **Bold**, the **Style** box, the formatted/source view pair, the code-block chevron, and a greyed-out button in Help (F1), resting the pointer near the top edge and then near the bottom edge of each.
+2. Set **Size** to 3 and look at the window that is already open, then open a new window and repeat step 1 in it.
+3. Set **Size** back to 1 and open a new window.
+- **Expected:** In step 1 every tooltip opens just below the pointer, exactly as in rc2. In step 2 the window that was already open still places them as in step 1; in the new window each tooltip opens under its control, clear of the whole pointer, wherever the pointer rests on the control. In step 3 tooltips open below the pointer again, as in step 1.
+- **Type:** Both. Automated: `ToolbarToolTipTests` (the pointer size to placement and offset mapping, and that toolbar controls and their tooltips have those values unset by default). Human: where the tooltips open in the window, which needs the app.
 
 ### ANC — Heading links
 
@@ -1485,6 +1493,7 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | FND-05 | | | |
 | VIEW-03 | | | |
 | TIP-01 | | | |
+| TIP-02 | | | |
 | INST-01 | | | |
 | INST-02 | | | |
 | INST-03 | | | |
