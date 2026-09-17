@@ -67,6 +67,10 @@ internal sealed class FormattingMarks : IBackgroundRenderer
     /// <summary>How many wrapped rows the last <see cref="Positions"/> stepped through.</summary>
     internal int RowsVisited { get; private set; }
 
+    /// <summary>The column under an x on a row, AvalonEdit's hit-test; a seam so a test can hand the
+    /// horizontal cut the reversed or out-of-row answers a right-to-left layout could give.</summary>
+    internal Func<VisualLine, System.Windows.Media.TextFormatting.TextLine, double, int> ColumnAt { get; set; } = (line, row, x) => line.GetVisualColumn(row, x, false);
+
     /// <summary>
     /// Each visible mark and where it goes in view coordinates (the glyph's top-left): →
     /// where a tab starts, · on the spaces <see cref="SpaceMarks"/> picks, ¶ right after the
@@ -108,8 +112,10 @@ internal sealed class FormattingMarks : IBackgroundRenderer
                 if (row.WidthIncludingTrailingWhitespace > textView.ActualWidth
                     && !RightToLeft(lineText.AsSpan(from - start, Math.Min(to - start, lineText.Length) - (from - start))))
                 {
-                    from = start + line.GetRelativeOffset(Math.Max(rowFirst, line.GetVisualColumn(row, scroll.X, false) - 1));
-                    to = start + line.GetRelativeOffset(Math.Min(first, line.GetVisualColumn(row, scroll.X + textView.ActualWidth, false) + 1));
+                    // Trusted only as two columns of this row, in order: a throw here would repeat on every repaint.
+                    int left = ColumnAt(line, row, scroll.X), right = ColumnAt(line, row, scroll.X + textView.ActualWidth);
+                    if (rowFirst <= left && left <= right && right <= first)
+                        (from, to) = (start + line.GetRelativeOffset(Math.Max(rowFirst, left - 1)), start + line.GetRelativeOffset(Math.Min(first, right + 1)));
                 }
                 var textTop = rowTop + row.Baseline - textView.DefaultBaseline - scroll.Y;   // VisualYPosition.TextTop, for this row
                 Point At(int offset)

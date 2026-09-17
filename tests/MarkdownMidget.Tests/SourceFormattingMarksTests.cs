@@ -217,6 +217,24 @@ public class SourceFormattingMarksTests
         Assert.Equal(expected, dots);
     }
 
+    [Fact]   // follow-up: a cut from reversed or out-of-row hit-test columns falls back to the whole row, never throws
+    public void AReversedOrOutOfRowHitTestReadsTheWholeRow()
+    {
+        var text = string.Concat(Enumerable.Repeat("hello  ", 60)) + "end";   // wider than the view, left to right, unwrapped
+        var (reversed, outside, whole) = On(ed =>
+        {
+            ed.ShowMarks = true;
+            ed.Marks.ColumnAt = (_, _, x) => x == 0 ? 400 : 3;   // the left edge's column after the right edge's
+            var reversed = Of(ed, '·');
+            ed.Marks.ColumnAt = (_, _, x) => x == 0 ? -7 : 100_000;
+            return (reversed, Of(ed, '·'), SpaceMarks.Step(text, SpaceMarks.State.Start).Marks.Select(i => PositionOf(ed, i)).ToArray());
+        }, text);
+
+        Assert.Equal(120, whole.Length);
+        Assert.Equal(whole, reversed);
+        Assert.Equal(whole, outside);
+    }
+
     [Fact]   // review finding 3: MRK-02 step 2 against the editor, one undo step per keystroke
     public void TypedBackticksAndEnterUndoOneKeystrokeAtATime()
     {
