@@ -370,12 +370,13 @@ the last of the usability gaps raised in the 0.6.x review.
 
 ### Nits
 
-- **Toolbar tooltips should clear an enlarged mouse pointer.** WPF opens a tooltip just
-  below the pointer and assumes a standard pointer size, so with a larger pointer
-  (Windows accessibility settings) the pointer can sit over the tooltip's text. Windows
-  always draws the pointer on top, so the tooltip has to move instead. Proposed fix:
-  anchor toolbar tooltips under their button, and push them further down only when the
-  pointer is larger than standard. Low priority: few users set pointers that large.
+- ~~**Toolbar tooltips should clear an enlarged mouse pointer.**~~ **Done 2026-09-16
+  (1.0.0-rc3)**: every toolbar tooltip, the Style box's included, opens under its
+  button, and when the pointer is larger than standard, moved down by the pointer's
+  whole size (`ToolbarToolTip`, from `HKCU\Control Panel\Cursors\CursorBaseSize`, read
+  as each window builds its toolbar). Was: WPF opened a tooltip just below the pointer and
+  assumed a standard pointer size, so a larger pointer (Windows accessibility settings)
+  sat over the tooltip's text, and Windows always draws the pointer on top.
 
 ---
 

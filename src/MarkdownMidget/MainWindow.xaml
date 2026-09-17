@@ -22,6 +22,9 @@
             <Setter Property="IsTabStop" Value="False" />
             <!-- Greyed out, a button still shows its tooltip, which says when it is available. -->
             <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <!-- Under the button, below a larger-than-standard pointer (ToolbarToolTip). -->
+            <Setter Property="ToolTipService.Placement" Value="Bottom" />
+            <Setter Property="ToolTipService.VerticalOffset" Value="{x:Static local:ToolbarToolTip.VerticalOffset}" />
             <Style.Triggers>
                 <!-- WPF's default disabled look for glyph text barely dims; a user
                      reading the toolbar could not tell Undo from Redo (dogfooding,
@@ -40,6 +43,8 @@
             <Setter Property="Focusable" Value="False" />
             <Setter Property="IsTabStop" Value="False" />
             <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="ToolTipService.Placement" Value="Bottom" />
+            <Setter Property="ToolTipService.VerticalOffset" Value="{x:Static local:ToolbarToolTip.VerticalOffset}" />
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.35" />
@@ -284,6 +289,7 @@
                         <TextBlock Text="Style:" VerticalAlignment="Center" Margin="4,0,4,0" />
                         <ComboBox x:Name="StyleCombo" Width="162" IsTabStop="False"
                                   ToolTip="Block style (Ctrl+Shift+H) — editable documents only" ToolTipService.ShowOnDisabled="True"
+                                  ToolTipService.Placement="Bottom" ToolTipService.VerticalOffset="{x:Static local:ToolbarToolTip.VerticalOffset}"
                                   SelectionChanged="StyleCombo_Changed">
                             <ComboBoxItem Content="Paragraph" Tag="paragraph" IsSelected="True" />
                             <ComboBoxItem Content="H1 &#8212; Heading 1" Tag="h1" />
