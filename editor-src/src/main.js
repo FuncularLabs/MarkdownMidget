@@ -349,7 +349,11 @@ function probeTheme(doc, win) {
     'position:absolute;left:-9999px;top:0;width:0;height:0;pointer-events:none;' +
     'background:var(--mdm-page-bg);color:var(--mdm-text);border-color:var(--mdm-app-bg);' +
     'outline-color:var(--mdm-heading);text-decoration-color:var(--mdm-link);' +
-    'column-rule-color:var(--mdm-quote-bar);caret-color:var(--mdm-quote-text)';
+    'column-rule-color:var(--mdm-quote-bar);caret-color:var(--mdm-quote-text);' +
+    // Bold. Default's --mdm-strong is currentColor, which resolves against this
+    // probe's own `color` — so an unset one reads back as the body text, which is
+    // what bold was before the variable existed.
+    'text-emphasis-color:var(--mdm-strong)';
   host.appendChild(probe);
 
   let result = { background: null, foreground: null, mermaid: '', source: null };
@@ -371,8 +375,13 @@ function probeTheme(doc, win) {
     const link = flattenColor(cs.textDecorationColor, bgCss);
     const accent = flattenColor(cs.columnRuleColor, bgCss);
     const quote = flattenColor(cs.caretColor, bgCss);
+    // Bold is optional on the host (null keeps it body text), so it doesn't gate
+    // `source`. Guarded on the raw value: flattenColor('') returns its base, which
+    // would read back as bold in the page's own background colour.
+    const strongRaw = cs.getPropertyValue('text-emphasis-color');
+    const strong = strongRaw ? flattenColor(strongRaw, bgCss) : null;
     const source = (heading && link && accent && quote)
-      ? { heading, link, accent, quote }
+      ? { heading, link, accent, quote, strong }
       : null;
 
     result = {

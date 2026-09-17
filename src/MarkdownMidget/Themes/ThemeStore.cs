@@ -59,7 +59,7 @@ internal sealed class ThemeStore
     /// <summary>
     /// A ceiling on a user-supplied file that is read, held in memory, marshalled
     /// across the JS bridge as a string literal and installed as the text of a
-    /// &lt;style&gt; element. The six shipped palettes are a few KB; anything near
+    /// &lt;style&gt; element. The shipped palettes are a few KB each; anything near
     /// this is a mistake or a wedge.
     /// </summary>
     public const int MaxBytes = 256 * 1024;

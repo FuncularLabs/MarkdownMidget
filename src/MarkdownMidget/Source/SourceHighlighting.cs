@@ -53,9 +53,10 @@ public sealed class SourceHighlighting
     ///
     /// The role→colour mapping is where "capture the vibe of the WYSIWYG theme"
     /// lives: headings and structural markers take the heading colour, links the link
-    /// colour, quotes the quote colour, code the accent, and emphasis/strong stay the
-    /// body text colour (their weight and slant carry them). Each accent passes
-    /// through the legibility floor so nothing lands under 4.5:1 on the page.
+    /// colour, quotes the quote colour, code the accent, strong the theme's bold colour
+    /// (<c>--mdm-strong</c>, which is body text unless the theme sets one), and emphasis
+    /// stays body text (its slant carries it). Each accent passes through the
+    /// legibility floor so nothing lands under 4.5:1 on the page.
     /// </summary>
     public void SetPalette(SourceEditor editor, SourcePalette palette)
     {
@@ -70,7 +71,7 @@ public sealed class SourceHighlighting
         Set("Link", link);
         Set("BlockQuote", quote);
         Set("InlineCode", accent);   // inline code and fenced-code lines
-        Set("Strong", palette.Text);
+        Set("Strong", palette.Strong is { } strong ? palette.Legible(strong) : palette.Text);
         Set("Emphasis", palette.Text);
 
         // Force a re-highlight: the DocumentHighlighter caches brushes per line, so a

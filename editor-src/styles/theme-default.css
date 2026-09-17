@@ -31,6 +31,13 @@
   --mdm-page-shadow: rgba(0, 0, 0, 0.18);
   --mdm-text: #1a1a1a;
 
+  /* Bold. Optional: `currentColor` means no colour of its own, so bold stays the
+     colour of the text around it - how every theme looked before this existed.
+     Name a colour and bold body text, quotes and table cells take it; bold inside
+     a heading or a link keeps that element's colour, as the source view does. Not
+     on paper (print.css). The source view's bold follows it too. */
+  --mdm-strong: currentColor;
+
   /* Headings — steelblue, then three separately-tuned greys for h4/h5/h6. */
   --mdm-heading: #4682b4;
   --mdm-h4: #555555;

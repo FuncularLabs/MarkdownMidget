@@ -57,6 +57,22 @@ body {
   color: var(--mdm-link-hover);
 }
 
+.mdm-prosemirror strong {
+  color: var(--mdm-strong);
+}
+
+/* A heading or a link already says what it is in colour, and the source view's
+   heading and link spans take the ** inside them - so bold there keeps its colour. */
+.mdm-prosemirror h1 strong,
+.mdm-prosemirror h2 strong,
+.mdm-prosemirror h3 strong,
+.mdm-prosemirror h4 strong,
+.mdm-prosemirror h5 strong,
+.mdm-prosemirror h6 strong,
+.mdm-prosemirror a strong {
+  color: inherit;
+}
+
 .mdm-prosemirror blockquote {
   background: var(--mdm-quote-bg);
   border-left: 6px solid var(--mdm-quote-bar);

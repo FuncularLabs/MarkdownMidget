@@ -9,6 +9,10 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Added
+
+- **New dark theme: Obsidiminutive**, after the Obsidian style in Notepad++: a slate page with pale grey text, orange headings, violet italic links and green inline code. Bold text is a soft yellow you can read, where Obsidian's own dark navy bold almost disappears, and every text colour meets WCAG AA contrast (4.5:1). Pick it from **View ▸ Theme**. Your own themes can colour bold too: set `--mdm-strong` (see `sample.css`). Bold keeps the colour of the text around it in every other theme and in any theme that doesn't set it, and printed bold stays the colour of the printed text.
+
 ### Fixed
 
 - **Registering with "Make it my default for .md files" now opens Settings on Markdown Midget's page**, the same page as the **Make Markdown Midget the default…** button (Default apps before Windows 11 22H2), and the message before it says so. That includes registering from a download with **Move the downloaded file into the app folder**: once the installed copy starts, it gives the message and opens Settings. Before, Settings opened on the general Default apps page, not the `.md` page the dialog promised, and with Move nothing opened.

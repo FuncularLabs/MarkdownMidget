@@ -30,7 +30,7 @@ public class SourcePaletteContrastTests
     public static IEnumerable<object[]> BuiltInThemes()
     {
         foreach (var name in new[] { "Dracula", "GitHub-Dark-Dimmed", "GitHub-Light",
-                                     "Midget-Solarized", "One-Light", "Solarized-Light" })
+                                     "Midget-Solarized", "Obsidiminutive", "One-Light", "Solarized-Light" })
             yield return new object[] { name };
     }
 
@@ -57,13 +57,47 @@ public class SourcePaletteContrastTests
     private static SourcePalette PaletteFor(string themeName)
     {
         var css = ReadThemeCss(themeName);
+        // The page resolves an unset --mdm-strong to the body text colour (Default's
+        // currentColor, read on a probe whose colour is --mdm-text), so that is what
+        // the read-back carries for a theme that doesn't set one.
+        var text = Var(css, "text");
         return new SourcePalette(
             Background: Var(css, "page-bg"),
-            Text: Var(css, "text"),
+            Text: text,
             Heading: Var(css, "heading"),
             Link: Var(css, "link"),
             Accent: Var(css, "quote-bar"),
-            Quote: Var(css, "quote-text"));
+            Quote: Var(css, "quote-text"),
+            Strong: Regex.IsMatch(css, @"--mdm-strong:\s*#") ? Var(css, "strong") : text);
+    }
+
+    [Fact]
+    public void TheSourceViewPaintsBoldInTheThemesBoldColour()
+    {
+        // Obsidiminutive sets --mdm-strong; the Strong span follows the read-back.
+        var p = PaletteFor("Obsidiminutive");
+        Assert.NotEqual(p.Text, p.Strong);
+        Assert.Contains(("Strong", p.Strong!.Value), ApplyAndReadBack(p));
+    }
+
+    [Theory]
+    [InlineData("Dracula", true)]
+    [InlineData("Solarized-Light", true)]   // body text under 4.5:1: the floor must not move bold off it
+    [InlineData("GitHub-Light", false)]     // a bundle that sends no bold colour at all
+    public void WithNoBoldColourTheSourceViewKeepsBoldInBodyText(string themeName, bool readBackSendsText)
+    {
+        var p = PaletteFor(themeName);
+        if (!readBackSendsText) p = p with { Strong = null };
+        Assert.Contains(("Strong", p.Text), ApplyAndReadBack(p));
+    }
+
+    [Fact]
+    public void AnIllegibleBoldColourFloorsToBodyText()
+    {
+        // Same floor as every other role: a bold colour under 4.5:1 is not painted.
+        var p = PaletteFor("Obsidiminutive") with { Strong = Color.FromRgb(0x40, 0x4e, 0x51) };
+        Assert.True(SourcePalette.ContrastRatio(p.Strong!.Value, p.Background) < 4.5);
+        Assert.Contains(("Strong", p.Text), ApplyAndReadBack(p));
     }
 
     [Theory]

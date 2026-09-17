@@ -1,0 +1,122 @@
+/* =====================================================================
+ *  Obsidiminutive — dark: Obsidian, made small enough for a Midget.
+ *
+ *  After the Obsidian style that ships with Notepad++,
+ *  https://notepad-plus-plus.org — colours read off the app, not copied
+ *  from its theme file. Colours only.
+ *
+ *  Obsidian's slate page, pale grey text and orange headings, kept. Where
+ *  one of its colours is too faint to read as text it is lifted just far
+ *  enough to clear WCAG AA (4.5:1), and every text pair here does:
+ *
+ *    body text     #e0e2e4               10.21:1
+ *    headings      #ec7600                4.52:1   (Obsidian's orange, as is)
+ *    links         #a082bd -> #b49ad0     4.06 -> 5.35:1  (4.78 in a quote)
+ *    bold          dark navy -> #ebc859   illegible -> 8.17:1
+ *    code comments #66747b -> #8a9ba2     3.06 -> 5.13:1 on the code block
+ *
+ *  Bold is the one real departure. Obsidian draws it in a dark indigo that
+ *  all but disappears on this page. Here it is Obsidian's own yellow
+ *  (#ffcd22) with the saturation cut from 100% to 78%: a clear hue away from
+ *  the grey text and the orange headings, and at 8.17:1 a little quieter
+ *  than the text itself, so a bold-heavy page doesn't glare. Obsidian's pale
+ *  khaki (#e8e2b7) was the other candidate; at 10.10:1 it is the body text's
+ *  own lightness, so bold would differ only by a faint warm tint.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* Obsidian, as Notepad++ draws markdown: page #293134, text #e0e2e4,
+     headings #ec7600, links #a082bd, inline code and numbers #93c763,
+     rules #66747b, gutter #3f4b4e, current line #2f393c, selection #404e51;
+     accents yellow #ffcd22, steel blue #678cb1, khaki #e8e2b7. */
+
+  --mdm-color-scheme: dark;
+  --mdm-app-bg: #1e2426;
+  --mdm-page-bg: #293134;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.5);
+  --mdm-text: #e0e2e4;
+  --mdm-strong: #ebc859;
+
+  /* Every level orange, as in Obsidian; size tells them apart. */
+  --mdm-heading: #ec7600;
+  --mdm-h4: #ec7600;
+  --mdm-h5: #ec7600;
+  --mdm-h6: #ec7600;
+
+  --mdm-link: #b49ad0;
+  --mdm-link-hover: #c8b4dd;
+
+  /* The quote sits on Obsidian's current-line band. */
+  --mdm-quote-bg: #2f393c;
+  --mdm-quote-bar: #678cb1;
+  --mdm-quote-text: #d3d8da;
+
+  --mdm-code-bg: #323d40;
+  --mdm-pre-bg: #22292b;
+  --mdm-pre-fg: #e0e2e4;
+
+  --mdm-hr: #66747b;
+
+  /* The header row is Obsidian's gutter slate. */
+  --mdm-table-border: #3f4b4e;
+  --mdm-cell-border: #3a4548;
+  --mdm-td-bg: #293134;
+  --mdm-th-bg: #3f4b4e;
+  --mdm-th-text: #e0e2e4;
+  --mdm-row-alt-bg: #2d3639;
+  /* On paper. The header keeps its screen look (its pair is contrast-tested,
+     and one dark row per table is not a toner problem); the stripe must be
+     LIGHT because printed body text is pinned black - see print.css. */
+  --mdm-print-th-bg: #3f4b4e;
+  --mdm-print-th-text: #e0e2e4;
+  --mdm-print-row-alt-bg: #f0f2f3;
+
+  --mdm-mermaid-theme: dark;
+
+  /* Chrome. Obsidian has no red to borrow; this one is warm enough to read as
+     a squiggle against the slate, at 4.84:1. */
+  --mdm-squiggle: #ff6e61;
+  --mdm-mark: #66747b;
+  --mdm-cell-selected: rgba(103, 140, 177, 0.28);
+  --mdm-resize-handle: #678cb1;
+
+  --mdm-mermaid-bg: #293134;
+  --mdm-mermaid-border: #3f4b4e;
+  --mdm-mermaid-error-bg: #3a2e30;
+  --mdm-mermaid-error-border: #ff6e61;
+  --mdm-mermaid-error-text: #ff9a8f;
+  --mdm-mermaid-empty: #8a9ba2;
+
+  /* Syntax, on the darker code block. */
+  --mdm-token-comment: #8a9ba2;
+  --mdm-token-punctuation: #e8e2b7;
+  --mdm-token-property: #8cafd2;
+  --mdm-token-number: #93c763;
+  --mdm-token-string: #ec7600;
+  --mdm-token-operator: #e8e2b7;
+  --mdm-token-keyword: #ffcd22;
+  --mdm-token-function: #b49ad0;
+  --mdm-token-regex: #e3a04f;
+}
+
+/* Inline code in Obsidian's green. There is no variable for inline code's colour
+ * (the editor takes it from its Nord base, #5e81ac, which is 2.78:1 here), so it
+ * is a rule, reading the number green: 5.64:1 on --mdm-code-bg. The second rule
+ * keeps fenced code out of it - this layer outranks the one that already says so. */
+.mdm-prosemirror code {
+  color: var(--mdm-token-number);
+}
+
+.mdm-prosemirror pre code {
+  color: inherit;
+}
+
+/* Links in italic, as Obsidian draws them. Screen only, like Midget Solarized's
+ * text size, so paper stays the same whichever theme is picked. */
+@media screen {
+  .mdm-prosemirror a {
+    font-style: italic;
+  }
+}

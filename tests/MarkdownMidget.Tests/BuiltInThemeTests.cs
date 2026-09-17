@@ -57,6 +57,7 @@ public class BuiltInThemeTests
             "themes/GitHub-Dark-Dimmed.css",
             "themes/GitHub-Light.css",
             "themes/Midget-Solarized.css",
+            "themes/Obsidiminutive.css",
             "themes/One-Light.css",
             "themes/Solarized-Light.css",
         }, shipped);
@@ -67,8 +68,8 @@ public class BuiltInThemeTests
     {
         // Help says the number twice — once for the themes folder, once for the
         // Known limits bullet about edits to it being overwritten — and the number
-        // is easy to get wrong, because the MENU offers seven themes and the folder
-        // holds six FILES: Default has no file, it is the palette every other theme
+        // is easy to get wrong, because the MENU offers one more theme than the folder
+        // holds FILES: Default has no file, it is the palette every other theme
         // replaces. Both sentences are read here so neither can drift alone, and the
         // truth comes from the embedded resources rather than a constant, so adding
         // or removing a palette fails this until Help is told.
@@ -89,7 +90,7 @@ public class BuiltInThemeTests
             Assert.True(claim.Equals(word[shipped], StringComparison.OrdinalIgnoreCase)
                         || claim == shipped.ToString(CultureInfo.InvariantCulture),
                 $"HELP.md says \"{claim} built-in theme files\"; {shipped} .css files ship " +
-                "under themes/ (Default is the seventh THEME and has no file)");
+                "under themes/ (Default is one more THEME and has no file)");
     }
 
     private static string Help()
@@ -106,7 +107,7 @@ public class BuiltInThemeTests
         // derived from them and nothing else — `github-light.css` would appear as
         // "Github Light", which is not what the theme is called.
         => Assert.Equal(
-            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized", "One Light", "Solarized Light" },
+            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized", "Obsidiminutive", "One Light", "Solarized Light" },
             App.GetManifestResourceNames()
                 .Where(n => n.StartsWith("themes/", StringComparison.Ordinal))
                 .OrderBy(n => n, StringComparer.Ordinal)
@@ -129,8 +130,136 @@ public class BuiltInThemeTests
         // forgets --mdm-td-bg gets white table cells and looks like a rendering bug
         // rather than a missing line.
         var mine = Variables(Read(resource));
-        var missing = DefaultVars.Keys.Where(k => !mine.ContainsKey(k)).OrderBy(k => k).ToArray();
+        var missing = DefaultVars.Keys
+            .Where(k => !mine.ContainsKey(k) && !OptionalVariables.Contains(k))
+            .OrderBy(k => k).ToArray();
         Assert.Equal(Array.Empty<string>(), missing);
+    }
+
+    /// <summary>
+    /// Variables whose Default value means "nothing of its own", so leaving them unset
+    /// is a choice rather than a light value leaking into a dark page. Default's
+    /// <c>--mdm-strong</c> is <c>currentColor</c>: bold stays the colour of the text
+    /// around it, which is how every theme looked before the variable existed.
+    /// </summary>
+    private static readonly HashSet<string> OptionalVariables = new(StringComparer.Ordinal) { "--mdm-strong" };
+
+    [Fact]
+    public void OptionalVariablesReallyAreNoColourOfTheirOwnInDefault()
+    {
+        // The exemption above is only safe while Default's value adds no colour. Give
+        // --mdm-strong a real colour in theme-default.css and every theme that leaves
+        // it unset would inherit a light-page value - the failure the exemption skips.
+        foreach (var name in OptionalVariables)
+            Assert.Equal("currentcolor", DefaultVars[name].ToLowerInvariant());
+    }
+
+    // ===== Obsidiminutive, and bold with a colour of its own =====
+
+    private const string Obsidiminutive = "themes/Obsidiminutive.css";
+
+    /// <summary>The six palettes that shipped before --mdm-strong existed.</summary>
+    public static TheoryData<string> PalettesThatPredateStrong => new()
+    {
+        "themes/Dracula.css", "themes/GitHub-Dark-Dimmed.css", "themes/GitHub-Light.css",
+        "themes/Midget-Solarized.css", "themes/One-Light.css", "themes/Solarized-Light.css",
+    };
+
+    [Fact]
+    public void ObsidiminutiveShipsAsADarkThemeWithNothingLeftToTheLightDefault()
+    {
+        // Listed, usable and built-in, through the same store the menu reads - in a
+        // temp folder, never the real profile.
+        var root = Path.Combine(Path.GetTempPath(), "mm-obsidiminutive-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new ThemeStore(root);
+            Assert.True(store.Refresh("1.0.0", App));
+            var listed = store.List().SingleOrDefault(t => t.Key == "Obsidiminutive.css");
+            Assert.NotNull(listed);
+            Assert.Equal("Obsidiminutive", listed!.Name);
+            Assert.True(listed.IsUsable, listed.Unusable);
+            Assert.False(listed.IsCustom);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* temp */ }
+        }
+
+        var css = Read(Obsidiminutive);
+        Assert.Null(CssValidator.Validate(css));
+
+        var mine = Variables(css);
+        Assert.Equal("dark", mine["--mdm-color-scheme"]);
+
+        // Everything the other dark built-ins set, plus the bold colour this theme
+        // exists to fix - so nothing here falls through to Default's light values.
+        var expected = Variables(Read("themes/Dracula.css")).Keys
+            .Concat(Variables(Read("themes/GitHub-Dark-Dimmed.css")).Keys)
+            .Append("--mdm-strong")
+            .Distinct().OrderBy(k => k, StringComparer.Ordinal);
+        Assert.Equal(Array.Empty<string>(), expected.Where(k => !mine.ContainsKey(k)).ToArray());
+    }
+
+    [Theory]
+    [MemberData(nameof(PalettesThatPredateStrong))]
+    public void ThePalettesThatPredateStrongLeaveBoldAsItWas(string resource)
+        // Unset means Default's currentColor, which is bold in the colour of the text
+        // around it - exactly what these themes rendered before. Setting it in one of
+        // them is a visual change for everyone using it, and belongs in its own commit.
+        => Assert.False(Variables(Read(resource)).ContainsKey("--mdm-strong"),
+            $"{resource} sets --mdm-strong; its users would see bold change colour");
+
+    [Fact]
+    public void ObsidiminutiveClearsAAOnEveryTextPairItDefines()
+    {
+        // WCAG AA for normal text, 4.5:1, on every pair a reader actually meets - not
+        // just body text on the page, which is all the older palettes are held to.
+        // Inline code's colour is this theme's own rule (it reads --mdm-token-number;
+        // editor-src/test/theme-parity.test.mjs pins that), so its pair is named here.
+        var vars = Variables(Read(Obsidiminutive));
+        var pairs = new (string Fg, string Bg)[]
+        {
+            ("--mdm-text", "--mdm-page-bg"),
+            ("--mdm-heading", "--mdm-page-bg"),
+            ("--mdm-h4", "--mdm-page-bg"),
+            ("--mdm-h5", "--mdm-page-bg"),
+            ("--mdm-h6", "--mdm-page-bg"),
+            ("--mdm-link", "--mdm-page-bg"),
+            ("--mdm-link-hover", "--mdm-page-bg"),
+            ("--mdm-strong", "--mdm-page-bg"),
+            ("--mdm-quote-text", "--mdm-quote-bg"),
+            ("--mdm-strong", "--mdm-quote-bg"),
+            ("--mdm-link", "--mdm-quote-bg"),
+            ("--mdm-token-number", "--mdm-code-bg"),
+            ("--mdm-pre-fg", "--mdm-pre-bg"),
+            ("--mdm-th-text", "--mdm-th-bg"),
+            ("--mdm-strong", "--mdm-th-bg"),
+            ("--mdm-text", "--mdm-td-bg"),
+            ("--mdm-strong", "--mdm-td-bg"),
+            ("--mdm-link", "--mdm-td-bg"),
+            ("--mdm-text", "--mdm-row-alt-bg"),
+            ("--mdm-strong", "--mdm-row-alt-bg"),
+            ("--mdm-link", "--mdm-row-alt-bg"),
+            ("--mdm-mermaid-empty", "--mdm-mermaid-bg"),
+            ("--mdm-mermaid-error-text", "--mdm-mermaid-error-bg"),
+            ("--mdm-token-comment", "--mdm-pre-bg"),
+            ("--mdm-token-punctuation", "--mdm-pre-bg"),
+            ("--mdm-token-property", "--mdm-pre-bg"),
+            ("--mdm-token-number", "--mdm-pre-bg"),
+            ("--mdm-token-string", "--mdm-pre-bg"),
+            ("--mdm-token-operator", "--mdm-pre-bg"),
+            ("--mdm-token-keyword", "--mdm-pre-bg"),
+            ("--mdm-token-function", "--mdm-pre-bg"),
+            ("--mdm-token-regex", "--mdm-pre-bg"),
+        };
+
+        var failures = pairs
+            .Select(p => (p.Fg, p.Bg, Ratio: Contrast(Rgb(vars[p.Fg]), Rgb(vars[p.Bg]))))
+            .Where(p => p.Ratio < 4.5)
+            .Select(p => $"{p.Fg} ({vars[p.Fg]}) on {p.Bg} ({vars[p.Bg]}) is {p.Ratio:0.00}:1")
+            .ToArray();
+        Assert.Equal(Array.Empty<string>(), failures);
     }
 
     [Theory]
@@ -275,9 +404,9 @@ public class BuiltInThemeTests
         AssertContrast(vars, "--mdm-squiggle", 3.0, "theme-default.css");
         AssertContrast(vars, "--mdm-resize-handle", 3.0, "theme-default.css");
         AssertContrast(vars, "--mdm-mark", 1.5, "theme-default.css");
-        // The print-table pair too — the theories above cover only the six embedded
-        // resources, and Default is the seventh theme. Without this line the
-        // "enforced for all seven" claim was enforced for six.
+        // The print-table pair too — the theories above cover only the embedded
+        // resources, and Default is a theme with no resource. Without this line the
+        // "enforced for every theme" claim skipped one.
         Assert.True(Contrast(Rgb(vars["--mdm-print-th-text"]), Rgb(vars["--mdm-print-th-bg"])) >= 3.0);
         Assert.True(Contrast(Rgb(vars["--mdm-print-row-alt-bg"]), (0, 0, 0)) >= 12.0);
     }

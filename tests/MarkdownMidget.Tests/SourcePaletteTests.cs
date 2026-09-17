@@ -33,6 +33,43 @@ public class SourcePaletteTests
         Assert.Equal(Color.FromRgb(80, 90, 100), p.Quote);
     }
 
+    [Fact]
+    public void ABoldColourInTheReadBackIsKept()
+    {
+        // The page sends `strong` beside the other roles: --mdm-strong resolved on the
+        // probe, which is the body text colour when a theme leaves it unset.
+        var json = Good.Replace("\"quote\":{\"r\":80,\"g\":90,\"b\":100}",
+            "\"quote\":{\"r\":80,\"g\":90,\"b\":100},\"strong\":{\"r\":235,\"g\":200,\"b\":89}");
+        Assert.NotEqual(Good, json);   // the anchor matched
+
+        Assert.Equal(Color.FromRgb(235, 200, 89), SourcePalette.Parse(json)!.Strong);
+    }
+
+    [Theory]
+    // Absent: a bundle from before the bold colour existed.
+    [InlineData("")]
+    // Null: the page could not resolve it.
+    [InlineData(",\"strong\":null")]
+    public void NoBoldColourMeansNoneRatherThanNoPalette(string strong)
+    {
+        var json = Good.Replace("\"b\":100}}}", "\"b\":100}" + strong + "}}");
+        Assert.Contains("\"b\":100}" + strong + "}}", json);   // the anchor matched
+
+        var p = SourcePalette.Parse(json);
+        Assert.NotNull(p);
+        Assert.Null(p!.Strong);
+    }
+
+    [Fact]
+    public void AMalformedBoldColourRefusesThePalette()
+    {
+        // Present but wrong is not the same as absent: same fail-closed rule as every
+        // other role, so a half-read palette is never applied.
+        var json = Good.Replace("\"b\":100}}}", "\"b\":100},\"strong\":{\"r\":999,\"g\":0,\"b\":0}}}");
+        Assert.NotEqual(Good, json);
+        Assert.Null(SourcePalette.Parse(json));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

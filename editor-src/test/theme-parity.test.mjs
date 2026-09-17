@@ -12,7 +12,7 @@
 // it to equal the list recorded before the refactor, exactly.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { declarations, rootVariables } from './css-declarations.mjs';
@@ -278,6 +278,7 @@ test('each site reads its own variable, not a twin that matches today', () => {
     ['.token.keyword', 'color', '--mdm-token-keyword'],
     ['.token.function', 'color', '--mdm-token-function'],
     ['.token.regex', 'color', '--mdm-token-regex'],
+    ['.mdm-prosemirror strong {', 'color', '--mdm-strong'],
   ];
 
   for (const [marker, prop, expected] of wiring) {
@@ -362,4 +363,77 @@ test('a dark theme can flip the colour scheme', () => {
   // Fallback included: a theme file that fails to load leaves the seam with nothing
   // behind it, and `color-scheme` with no value is not the same as `light`.
   assert.match(editorCss, /color-scheme:\s*var\(\s*--mdm-color-scheme\s*,\s*light\s*\)/);
+});
+
+// ===== bold's own colour (--mdm-strong) =====
+//
+// jsdom can't cascade @layer or resolve var(), so these resolve declarations the way
+// the parity tests above do: Default's variables with a theme's laid over them.
+
+const builtinDir = join(here, '..', '..', 'src', 'MarkdownMidget', 'Themes', 'builtin');
+const readTheme = (file) => readFileSync(join(builtinDir, file), 'utf8');
+const PREDATE_STRONG = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'GitHub-Light.css',
+  'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
+
+/** What `.mdm-prosemirror strong { color }` resolves to with this theme installed. */
+function strongColour(themeCss) {
+  const vars = new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
+  vars.set('--mdm-page-width', '850px');
+  const hits = declarations(editorCss, vars)
+    .filter((d) => d.where === '.mdm-prosemirror strong' && d.prop === 'color');
+  assert.equal(hits.length, 1, 'expected exactly one screen rule colouring strong');
+  return hits[0].value;
+}
+
+test('bold takes --mdm-strong when a theme sets one', () => {
+  const theme = readTheme('Obsidiminutive.css');
+  const strong = rootVariables(theme).get('--mdm-strong');
+  assert.match(strong ?? '', /^#[0-9a-f]{6}$/, 'Obsidiminutive sets a hex --mdm-strong');
+  assert.equal(strongColour(theme), strong);
+});
+
+test('a theme that leaves --mdm-strong unset keeps bold the colour of the text around it', () => {
+  // Every built-in is either one that predates the variable or the one that sets it,
+  // so a new palette has to decide rather than slip past this.
+  assert.deepEqual(readdirSync(builtinDir).filter((f) => f.endsWith('.css')).sort(),
+    [...PREDATE_STRONG, 'Obsidiminutive.css'].sort());
+
+  // currentColor on `color` is the inherited colour: bold in a paragraph is the body
+  // text, exactly as before the variable existed. Default ('' = no theme) included.
+  for (const file of ['', ...PREDATE_STRONG]) {
+    const css = file ? readTheme(file) : '';
+    assert.equal(rootVariables(css).has('--mdm-strong'), false, `${file} sets --mdm-strong`);
+    assert.equal(strongColour(css).toLowerCase(), 'currentcolor', `${file || 'Default'}: bold gained a colour`);
+  }
+});
+
+test('bold inside a heading or a link keeps that element\'s colour', () => {
+  // As the source view does, where the heading and link spans consume the ** inside
+  // them. More specific than the strong rule, in the same layer.
+  const ours = declarations(read('styles', 'base.css'));
+  const inside = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a']
+    .map((el) => `.mdm-prosemirror ${el} strong`).sort().join(', ');
+  const hits = ours.filter((d) => d.where === inside && d.prop === 'color');
+  assert.equal(hits.length, 1, `no single rule for ${inside}`);
+  assert.equal(hits[0].value, 'inherit');
+});
+
+test('paper ignores the bold colour', () => {
+  // Pale bold on a dark screen is invisible on white paper. inherit, not #000, so
+  // bold keeps what printing gives the text around it (#333 in a quote, say).
+  const hits = declarations(read('styles', 'print.css'))
+    .filter((d) => d.where === '@media print > .mdm-prosemirror strong' && d.prop === 'color');
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].value, 'inherit');
+  assert.equal(hits[0].important, true);
+});
+
+test('Obsidiminutive colours inline code, and not fenced code, with its number green', () => {
+  // Inline code's colour comes from the vendor (Nord's #5e81ac), which is 2.78:1 on this
+  // theme's code background. The theme's own rule replaces it; BuiltInThemeTests
+  // holds --mdm-token-number on --mdm-code-bg to 4.5:1 on the strength of this pin.
+  const decls = declarations(readTheme('Obsidiminutive.css'));
+  const colour = (where) => decls.filter((d) => d.where === where && d.prop === 'color').map((d) => d.value);
+  assert.deepEqual(colour('.mdm-prosemirror code'), ['var(--mdm-token-number)']);
+  assert.deepEqual(colour('.mdm-prosemirror pre code'), ['inherit']);
 });

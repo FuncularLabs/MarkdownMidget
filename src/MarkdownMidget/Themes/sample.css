@@ -47,6 +47,12 @@
   --mdm-page-shadow: rgba(0, 0, 0, 0.18);
   --mdm-text: #1a1a1a;
 
+  /* Bold. `currentColor` means no colour of its own: bold stays the colour of
+     the text around it. Name a colour to make bold stand out - in paragraphs,
+     quotes, tables and the source view; bold inside a heading or a link keeps
+     that colour, and printed bold stays the colour of the printed text. */
+  --mdm-strong: currentColor;
+
   /* ---- headings and links ------------------------------------------ */
 
   --mdm-heading: #4682b4;       /* h1–h3 */

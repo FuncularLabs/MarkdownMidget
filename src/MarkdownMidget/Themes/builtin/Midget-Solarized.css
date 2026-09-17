@@ -132,7 +132,7 @@
  * the theme", and the 0.7.0-beta1 changelog says "entirely" — a promise that was
  * true when every theme was colours and that an unscoped size rule would quietly
  * break, since print.css pins the palette with !important but never pins prose
- * size. `@media screen` keeps paper identical across all seven themes and keeps
+ * size. `@media screen` keeps paper identical across every theme and keeps
  * the released claim honest. */
 @media screen {
   .mdm-prosemirror > p,

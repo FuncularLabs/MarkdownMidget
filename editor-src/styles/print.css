@@ -53,6 +53,12 @@
     color: #000 !important;
   }
 
+  /* A theme's bold colour is chosen for its screen page; pale bold on white paper
+     disappears. inherit, not #000, so bold prints as the text around it does. */
+  .mdm-prosemirror strong {
+    color: inherit !important;
+  }
+
   .mdm-mark {
     display: none !important;
   }

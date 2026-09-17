@@ -15,6 +15,11 @@ namespace MarkdownMidget.Source;
 /// a theme may write <c>oklch()</c> or <c>color-mix()</c> that WPF cannot parse. A
 /// shape that is not exactly right yields null rather than a half-palette — the same
 /// fail-closed posture as <see cref="Themes.ThemeReadBack"/>.
+///
+/// <see cref="Strong"/> is bold's colour (<c>--mdm-strong</c>). The page resolves an
+/// unset one to the body text colour, so it is normally present; null means the
+/// read-back carried none (<c>null</c>, or a bundle older than the role), and bold
+/// then stays body text.
 /// </summary>
 public sealed record SourcePalette(
     Color Background,
@@ -22,7 +27,8 @@ public sealed record SourcePalette(
     Color Heading,
     Color Link,
     Color Accent,
-    Color Quote)
+    Color Quote,
+    Color? Strong = null)
 {
     /// <summary>Parse the <c>source</c> block of the theme read-back, plus the shared
     /// background/foreground. Null for anything that is not exactly the expected
@@ -48,8 +54,17 @@ public sealed record SourcePalette(
                 || accent is null || quote is null)
                 return null;
 
+            // Optional, but not lenient: absent or null is "no bold colour", while a
+            // value that is there and malformed refuses the palette like any other role.
+            Color? strong = null;
+            if (src.TryGetProperty("strong", out var s) && s.ValueKind != JsonValueKind.Null)
+            {
+                strong = ReadColor(src, "strong");
+                if (strong is null) return null;
+            }
+
             return new SourcePalette(bg.Value, text.Value, heading.Value, link.Value,
-                accent.Value, quote.Value);
+                accent.Value, quote.Value, strong);
         }
         catch (JsonException) { return null; }
     }

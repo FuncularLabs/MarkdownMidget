@@ -414,6 +414,18 @@
   "important": false
  },
  {
+  "where": ".mdm-prosemirror strong",
+  "prop": "color",
+  "value": "currentColor",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror a strong, .mdm-prosemirror h1 strong, .mdm-prosemirror h2 strong, .mdm-prosemirror h3 strong, .mdm-prosemirror h4 strong, .mdm-prosemirror h5 strong, .mdm-prosemirror h6 strong",
+  "prop": "color",
+  "value": "inherit",
+  "important": false
+ },
+ {
   "where": ".mdm-prosemirror blockquote",
   "prop": "background",
   "value": "#f2f7fb",
@@ -1054,6 +1066,12 @@
   "prop": "color",
   "value": "#000000",
   "important": false
+ },
+ {
+  "where": "@media print > .mdm-prosemirror strong",
+  "prop": "color",
+  "value": "inherit",
+  "important": true
  },
  {
   "where": "@media print > .mdm-mark",

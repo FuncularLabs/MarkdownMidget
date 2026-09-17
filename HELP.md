@@ -332,7 +332,7 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 
 ## Themes
 
-**View ▸ Theme** recolours the editing surface. Seven ship with the app:
+**View ▸ Theme** recolours the editing surface. Eight ship with the app:
 
 | Theme | |
 |---|---|
@@ -341,6 +341,7 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
 | **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
+| **Obsidiminutive** | Dark — after Notepad++'s Obsidian, with bold you can read |
 | **One Light** | Light, cool and crisp |
 | **Solarized Light** | Light, warm, low-glare |
 
@@ -374,7 +375,7 @@ new name appears in the menu without restarting the app.
 
 Two folders, and the difference matters:
 
-- **`themes\`** holds the six built-in theme files — the seventh theme, Default, is
+- **`themes\`** holds the seven built-in theme files — the eighth theme, Default, is
   the app's own palette and has no file. They are rewritten from the app whenever
   you update, so that a fix to one reaches you — which also means **edits to them
   are lost**.
@@ -885,7 +886,7 @@ into and what to do instead.
 - **Mermaid ships inside the editor bundle whether a document uses it or not.**
   Diagrams work with nothing to install; the cost is download size, and there is
   no way to leave it out.
-- **Edits to the six built-in theme files are lost when you update.** They are
+- **Edits to the seven built-in theme files are lost when you update.** They are
   rewritten from the app so that a fix reaches you. Keep your own colours in
   `themes\custom\`, where nothing is ever overwritten — see [Writing your
   own](#writing-your-own).
