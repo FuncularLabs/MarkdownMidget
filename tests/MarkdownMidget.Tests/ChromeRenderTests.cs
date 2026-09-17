@@ -148,6 +148,15 @@ public class ChromeRenderTests
                 new TreeViewItem { Header = "This PC", IsExpanded = true, Items = { new TreeViewItem { Header = "Documents", IsSelected = true }, new TreeViewItem { Header = "Music", Items = { "x" } } } },
             },
         }),
+        // The source view: AvalonEdit's own ScrollViewer, so its scroll bars and corner are WPF's.
+        // The text area's colours belong to the document theme; a dark one is set here.
+        new("source view scroll bars", true, () => new Source.SourceEditor
+        {
+            Width = 220, Height = 90, FontSize = 12,
+            Background = new SolidColorBrush(Color.FromRgb(0x22, 0x27, 0x2E)), Foreground = Brushes.Gainsboro,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Visible, VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
+            Text = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line {i} of a document long enough to scroll sideways")),
+        }),
         new("list view", false, () =>
         {
             var view = new GridView();

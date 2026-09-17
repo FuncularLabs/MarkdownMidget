@@ -2,8 +2,8 @@
      the groups), in a neutral dark grey family that sits beside dark document themes
      (Dracula, GitHub Dark Dimmed, slate) without going to black. Surfaces step up in
      lightness: window #202020, bars #2B2B2B, popups #303030. Every text brush clears 4.5:1
-     on the surface it is drawn on and every disabled one 3:1; ChromePaletteTests computes
-     the pairs from these brushes. -->
+     on the surface it is drawn on, and disabled text and glyphs (check marks, arrows) 3:1;
+     ChromePaletteTests computes the pairs from these brushes. -->
 <ResourceDictionary x:Class="MarkdownMidget.Chrome.ChromeDarkPalette"
                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
