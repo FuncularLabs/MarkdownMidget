@@ -27,22 +27,18 @@ public partial class MainWindow
     private ThemeStore? _themeStore;
 
     /// <summary>Windows' light or dark app mode, and when it changes. Created with the
-    /// window and disposed when it closes; the window chrome can follow it too.</summary>
+    /// window and disposed when it closes. Only the theme code uses it so far, through a
+    /// local; the field is here for the window chrome to follow the same mode.</summary>
     private WindowsAppearance? _appearance;
 
     /// <summary>The remembered themes, one per Windows mode for the document and for
-    /// the source view's own, and "Same Theme for Both Views". The only writer of those
-    /// settings, and only for a pick or a link toggle (<see cref="ThemeModes"/>).</summary>
+    /// the source view's own, and "Same Theme for Both Views". Only a pick or a link
+    /// toggle changes those settings (<see cref="ThemeModes"/>).</summary>
     private ThemeModes? _themes;
 
     /// <summary>Settings as LoadSettings read them, held until InitializeThemes can read
     /// the theme files a migration needs.</summary>
     private IThemeSettings? _loadedThemeSettings;
-
-    // For CurrentSettings, which restates this window's preferences.
-    private string _themeKey => _themes?.DocumentKey ?? ThemeStore.DefaultKey;
-    private string _sourceThemeKey => _themes is { } t ? t.Source.For(t.IsDark) : _themeKey;
-    private bool _linkThemes => _themes?.Linked ?? true;
 
     /// <summary>
     /// The theme actually on screen, which is what the menu ticks.
@@ -91,9 +87,10 @@ public partial class MainWindow
 
     /// <summary>
     /// Windows switched between light and dark mode: show that mode's remembered themes.
-    /// A switch is not a choice, so nothing is written — only a pick from View ▸ Theme
-    /// is. Settings are read again first, so a theme another window picked for this mode
-    /// since this one launched is the one shown.
+    /// A switch is not a choice, so no setting is written — only a pick from View ▸ Theme
+    /// writes one. Settings are read again first, so a theme another window picked for
+    /// this mode since this one launched is the one shown; that read is TryReadSettings,
+    /// which moves a corrupt settings.json aside, as every other read does.
     /// </summary>
     private async void Appearance_Changed(object? sender, EventArgs e)
     {
@@ -146,7 +143,7 @@ public partial class MainWindow
                 // is missing this launch the two differ, and ticking the preference
                 // would claim a palette the user is not looking at.
                 IsChecked = string.Equals(theme.Key,
-                    Source.ThemeLinking.TickedKey(_linkThemes, _sourceMode, _appliedKey, _sourceAppliedKey),
+                    Source.ThemeLinking.TickedKey(_themes.Linked, _sourceMode, _appliedKey, _sourceAppliedKey),
                     StringComparison.OrdinalIgnoreCase),
                 IsEnabled = theme.IsUsable,
             };
@@ -166,7 +163,7 @@ public partial class MainWindow
         {
             Header = "_Same Theme for Both Views",
             IsCheckable = true,
-            IsChecked = _linkThemes,
+            IsChecked = _themes.Linked,
             ToolTip = "On: one theme for the formatted and source views. Off: View ▸ Theme " +
                       "changes only the view you're in, so the markdown source view can " +
                       "have its own theme — a dark one under a light document, say.",
@@ -455,7 +452,8 @@ public partial class MainWindow
 
     /// <summary>At editor-ready, and when Windows switches mode: the document's theme
     /// for the mode, then the source view's own when the two are unlinked. Linked, the
-    /// document read-back already dressed the source view. Applies only; never writes.</summary>
+    /// document read-back already dressed the source view. Applies only; writes no
+    /// setting. (The mode-switch caller reads settings first: see Appearance_Changed.)</summary>
     private async Task ApplyRememberedThemesAsync()
     {
         if (_themes is null) return;

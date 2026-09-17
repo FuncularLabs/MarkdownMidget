@@ -19,7 +19,7 @@ internal sealed class WindowsAppearance : IDisposable
 {
     private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
-    /// <summary>How long a burst of change broadcasts is given to finish.</summary>
+    /// <summary>How long after the first notification the mode is read again.</summary>
     private static readonly TimeSpan SettleTime = TimeSpan.FromMilliseconds(250);
 
     private readonly Func<object?> _appsUseLightTheme;
@@ -32,8 +32,9 @@ internal sealed class WindowsAppearance : IDisposable
     /// <param name="appsUseLightTheme">The Personalize AppsUseLightTheme value, null when
     /// missing. A seam, so tests never read the registry.</param>
     /// <param name="highContrast">Whether high contrast is on.</param>
-    /// <param name="settle">Runs the re-read later, on the window's thread, once the
-    /// burst of broadcasts for one change is over.</param>
+    /// <param name="settle">Runs the re-read later, on the window's thread — live, 250 ms
+    /// after the first notification. Notifications until it runs share it; one after it
+    /// has run schedules another.</param>
     internal WindowsAppearance(Func<object?> appsUseLightTheme, Func<bool> highContrast, Action<Action>? settle = null)
     {
         _appsUseLightTheme = appsUseLightTheme;
@@ -73,9 +74,8 @@ internal sealed class WindowsAppearance : IDisposable
 
     private void OnSystemPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e) => OnPreferenceChanged();
 
-    /// <summary>A Windows preference changed, maybe the mode: re-read once things settle.
-    /// Notifications while a re-read is already scheduled are part of the same burst.
-    /// May be called from any thread.</summary>
+    /// <summary>A Windows preference changed, maybe the mode: schedule a re-read, unless
+    /// one is already scheduled and not yet run. May be called from any thread.</summary>
     internal void OnPreferenceChanged()
     {
         if (_disposed || Interlocked.Exchange(ref _pending, 1) == 1) return;

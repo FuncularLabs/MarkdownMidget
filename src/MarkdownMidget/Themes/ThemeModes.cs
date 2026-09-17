@@ -1,6 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Text;
 using MarkdownMidget.Source;
 
 namespace MarkdownMidget.Themes;
@@ -37,8 +38,9 @@ internal readonly record struct ThemePair(string Light, string Dark)
 /// switch of Windows mode shows the other slot and writes nothing, because it is not a
 /// choice.
 ///
-/// The only writers are <see cref="RememberPick"/> and <see cref="RememberLink"/>, both
-/// through the window's merge-on-write persister. Settings with no slots yet (saved by
+/// Only <see cref="RememberPick"/> and <see cref="RememberLink"/> change them, both
+/// through the window's merge-on-write persister; a save of other settings restates them
+/// through <see cref="CarryFromDisk"/> or <see cref="CopyTo"/>. Settings with no slots yet (saved by
 /// an earlier build) are migrated in memory on every launch, and the first pick writes
 /// both slots, so the migrated slot for the other mode is not lost.
 /// </summary>
@@ -70,6 +72,11 @@ internal sealed class ThemeModes
         Reload(saved);
     }
 
+    // What settings.json holds besides the pairs: the pre-rc3 fields, and whether each
+    // pair has been written — as loaded, or since written by this window.
+    private string? _theme, _sourceTheme;
+    private bool _documentWritten, _sourceWritten;
+
     public ThemePair Document { get; private set; }
     public ThemePair Source { get; private set; }
     public bool Linked { get; private set; }
@@ -90,6 +97,9 @@ internal sealed class ThemeModes
     {
         Document = DocumentPair(saved);
         Source = SourcePair(saved);
+        (_theme, _sourceTheme) = (saved.Theme, saved.SourceTheme);
+        _documentWritten = saved.ThemeLight is not null || saved.ThemeDark is not null;
+        _sourceWritten = saved.SourceThemeLight is not null || saved.SourceThemeDark is not null;
     }
 
     /// <summary>
@@ -104,6 +114,7 @@ internal sealed class ThemeModes
         if (ThemeLinking.TargetsFor(Linked, sourceMode).Document)
         {
             Document = Document.With(dark, key);
+            (_theme, _documentWritten) = (key, true);
             _persist(s =>
             {
                 var pair = DocumentPair(s).With(dark, key);
@@ -113,6 +124,7 @@ internal sealed class ThemeModes
         else
         {
             Source = Source.With(dark, key);
+            (_sourceTheme, _sourceWritten) = (key, true);
             _persist(s =>
             {
                 var pair = SourcePair(s).With(dark, key);
@@ -123,17 +135,42 @@ internal sealed class ThemeModes
 
     /// <summary>"Same Theme for Both Views" turned on or off. Either way the source view's
     /// own themes start from the document's, in both modes: relinked, it shows the
-    /// document's; unlinked, nothing changes on screen.</summary>
+    /// document's; unlinked, nothing changes on screen. Saved from the document's themes
+    /// as they are on disk, which may hold another window's newer picks.</summary>
     public void RememberLink(bool linked)
     {
+        var dark = IsDark;
         Linked = linked;
         Source = Document;
-        var (pair, current) = (Document, Document.For(IsDark));
+        (_sourceTheme, _sourceWritten) = (Document.For(dark), true);
         _persist(s =>
         {
+            var pair = DocumentPair(s);
             s.LinkThemes = linked;
-            (s.SourceThemeLight, s.SourceThemeDark, s.SourceTheme) = (pair.Light, pair.Dark, current);
+            (s.SourceThemeLight, s.SourceThemeDark, s.SourceTheme) = (pair.Light, pair.Dark, pair.For(dark));
         });
+    }
+
+    /// <summary>This window's theme settings as settings.json holds them, for a save that
+    /// restates the window's preferences: a pair never written stays null, so a first run
+    /// doesn't make today's defaults a choice.</summary>
+    public void CopyTo(IThemeSettings target)
+    {
+        (target.Theme, target.SourceTheme, target.LinkThemes) = (_theme ?? ThemeStore.DefaultKey, _sourceTheme, Linked);
+        target.ThemeLight = _documentWritten ? Document.Light : null;
+        target.ThemeDark = _documentWritten ? Document.Dark : null;
+        target.SourceThemeLight = _sourceWritten ? Source.Light : null;
+        target.SourceThemeDark = _sourceWritten ? Source.Dark : null;
+    }
+
+    /// <summary>For a save of other settings over a file that exists: every theme field as
+    /// it is on disk, nulls included. Only a pick or a link toggle writes them; a window
+    /// that toggled word wrap holds older ones, or migrated ones nobody chose.</summary>
+    public static void CarryFromDisk(IThemeSettings disk, IThemeSettings target)
+    {
+        (target.Theme, target.SourceTheme, target.LinkThemes) = (disk.Theme, disk.SourceTheme, disk.LinkThemes);
+        (target.ThemeLight, target.ThemeDark) = (disk.ThemeLight, disk.ThemeDark);
+        (target.SourceThemeLight, target.SourceThemeDark) = (disk.SourceThemeLight, disk.SourceThemeDark);
     }
 
     private ThemePair DocumentPair(IThemeSettings s) => Migrate(s.ThemeLight, s.ThemeDark, s.Theme);
@@ -159,22 +196,67 @@ internal sealed class ThemeModes
         return _isDarkTheme(legacy) == true ? new(LightDefault, legacy) : new(legacy, DarkDefault);
     }
 
-    private static readonly Regex Comment = new(@"/\*.*?\*/", RegexOptions.Singleline | RegexOptions.CultureInvariant);
-
-    // Custom property names are case-sensitive; the keyword is not.
-    private static readonly Regex Scheme = new(@"--mdm-color-scheme\s*:\s*([^;}]*)", RegexOptions.CultureInvariant);
-
     /// <summary>
     /// Whether a theme's CSS declares <c>--mdm-color-scheme: dark</c> — the value the page
-    /// hands to <c>color-scheme</c>, so the one the browser itself goes by. The last
-    /// declaration wins; none means light, as base.css falls back. "light dark" is not
-    /// a dark theme.
+    /// hands to <c>color-scheme</c>, so the one the browser itself goes by. Only
+    /// declarations outside at-rules count, so an <c>@media (prefers-color-scheme: dark)</c>
+    /// override doesn't make a light theme dark; the last of them wins; none means light,
+    /// as base.css falls back. "light dark" is not a dark theme.
+    ///
+    /// One pass that skips comments, quoted strings and parentheses the way CssValidator
+    /// scans: a comment stripper that didn't know strings rescanned the rest of the file
+    /// from every "/*" inside one.
     /// </summary>
     public static bool DeclaresDark(string? css)
     {
+        const string name = "--mdm-color-scheme";   // custom property names are case-sensitive
         if (string.IsNullOrEmpty(css)) return false;
-        if (Scheme.Matches(Comment.Replace(css, " ")).LastOrDefault() is not { } declared) return false;
-        var words = declared.Groups[1].Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        string? declared = null;
+        var blocks = new Stack<bool>();              // each open block: inside an at-rule?
+        var statement = new StringBuilder();
+        var paren = 0;
+        for (var i = 0; i < css.Length; i++)
+        {
+            var c = css[i];
+            if (c == '/' && i + 1 < css.Length && css[i + 1] == '*')
+            {
+                var end = css.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                if (end < 0) break;
+                i = end + 1;
+                continue;
+            }
+            if (c is '"' or '\'')
+            {
+                var j = i + 1;   // to the closing quote, over escapes; a newline ends a bad string
+                while (j < css.Length && css[j] != c && css[j] is not ('\n' or '\r' or '\f'))
+                    j += css[j] == '\\' ? 2 : 1;
+                statement.Append(c);
+                i = j;
+                continue;
+            }
+            if (paren > 0 || c is not (';' or '{' or '}'))
+            {
+                if (c == '(') paren++;
+                else if (c == ')' && paren > 0) paren--;
+                statement.Append(c);
+                continue;
+            }
+
+            var text = statement.ToString().Trim();
+            statement.Clear();
+            var inAtRule = blocks.Count > 0 && blocks.Peek();
+            if (c == '{')
+            {
+                blocks.Push(inAtRule || text.StartsWith('@'));
+                continue;
+            }
+            if (blocks.Count > 0 && !inAtRule && text.StartsWith(name, StringComparison.Ordinal)
+                && text[name.Length..].TrimStart() is { Length: > 0 } rest && rest[0] == ':')
+                declared = rest[1..];
+            if (c == '}' && blocks.Count > 0) blocks.Pop();
+        }
+
+        var words = (declared ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         return words.Contains("dark", StringComparer.OrdinalIgnoreCase)
             && !words.Contains("light", StringComparer.OrdinalIgnoreCase);
     }

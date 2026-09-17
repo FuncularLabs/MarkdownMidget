@@ -4365,14 +4365,7 @@ public partial class MainWindow : Window
             s.WindowWidth = existing?.WindowWidth;
             s.WindowHeight = existing?.WindowHeight;
             s.WindowMaximized = existing?.WindowMaximized ?? false;
-            s.Theme = existing?.Theme ?? s.Theme;
-            s.SourceTheme = existing?.SourceTheme ?? s.SourceTheme;
-            s.LinkThemes = existing?.LinkThemes ?? s.LinkThemes;
-            // Null on disk means never written, so it stays null: taking this window's
-            // migrated values instead would fix a migration nobody chose.
-            if (existing is not null)
-                (s.ThemeLight, s.ThemeDark, s.SourceThemeLight, s.SourceThemeDark) =
-                    (existing.ThemeLight, existing.ThemeDark, existing.SourceThemeLight, existing.SourceThemeDark);
+            if (existing is not null) Themes.ThemeModes.CarryFromDisk(existing, s);   // nulls included
             s.LineNumbers = existing?.LineNumbers ?? s.LineNumbers;
             s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
             s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
@@ -4410,7 +4403,7 @@ public partial class MainWindow : Window
 
     /// <summary>This session's preferences, without any window geometry — the two
     /// are persisted on different schedules and by different writers.</summary>
-    private AppSettings CurrentSettings() => new()
+    private AppSettings CurrentSettings() => WithThemes(new()
     {
         PageWidth = _pageWidth,
         PrintPrefs = _printPrefs,
@@ -4423,18 +4416,18 @@ public partial class MainWindow : Window
         RecentLimit = _recentLimit,
         StartWithBlankDocument = _startWithBlankDocument,
         KeepBackup = _backupEnabled,
-        Theme = _themeKey,
-        SourceTheme = _sourceThemeKey,
-        LinkThemes = _linkThemes,
-        ThemeLight = _themes?.Document.Light,
-        ThemeDark = _themes?.Document.Dark,
-        SourceThemeLight = _themes?.Source.Light,
-        SourceThemeDark = _themes?.Source.Dark,
         LineNumbers = _lineNumbers,
         SourceLineNumbers = _sourceLineNumbers,
         LinkLineNumbers = _linkLineNumbers,
         LastSeenChangelogVersion = _lastSeenChangelogVersion,
-    };
+    });
+
+    /// <summary>The theme fields as settings.json holds them; a theme pair never written stays null.</summary>
+    private AppSettings WithThemes(AppSettings s)
+    {
+        _themes?.CopyTo(s);
+        return s;
+    }
 
     // ===== Document width =====
 

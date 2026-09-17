@@ -336,7 +336,7 @@ The **zoom** percentage is shown at the bottom-right of the status bar — zoom 
 
 | Theme | |
 |---|---|
-| **Default** | The look Markdown Midget has always had |
+| **Default** | Markdown Midget's original look |
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
@@ -355,10 +355,14 @@ Markdown Midget remembers a theme for each mode, and View ▸ Theme sets the one
 the mode Windows is in now — the top of the menu says which, *For Windows light
 mode* or *For Windows dark mode*. When Windows switches mode, the document switches
 to that mode's theme straight away, with nothing to restart. Until you pick one,
-light mode uses Midget Solarized and dark mode uses Obsidiminutive. A theme you
-picked in an earlier version stays yours for the mode it suits: a light theme for
-light mode, a dark theme for dark mode. With a Windows contrast theme on, the light
-mode theme is used.
+light mode uses Midget Solarized and dark mode uses Obsidiminutive. With a Windows
+contrast theme on, the light mode theme is used.
+
+**Coming from an earlier version,** the theme you used stays for the mode it suits,
+and the other mode starts on its default. If you used Default, light mode now starts
+on Midget Solarized: pick Default from View ▸ Theme to have it back. A dark theme you
+used in light mode moves to dark mode: pick it again in light mode if you want it
+there.
 
 The **Markdown source view** (Ctrl+E) is syntax-highlighted, and its colours follow
 the theme too: headings, links, emphasis, code, quotes and list markers take the

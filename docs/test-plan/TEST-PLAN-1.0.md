@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -208,6 +208,18 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 3. Close every Markdown Midget window, set **Size** back to 1, open `br-forms.md` and hover over **Bold**.
 - **Expected:** In step 1 every tooltip opens just below the pointer, exactly as in rc2. In step 2 the window that was already open still places the **Bold** tooltip as in step 1; after reopening, each tooltip opens under its control, clear of the whole pointer, wherever the pointer rests on the control. In step 3 the tooltip opens below the pointer again, as in step 1.
 - **Type:** Both. Automated: `ToolbarToolTipTests.AStandardPointerKeepsWpfsPlacementUnderThePointer`, `ToolbarToolTipTests.AnEnlargedPointerMovesTheTooltipUnderTheButtonByItsWholeSize`, `ToolbarToolTipTests.AMissingInvalidOrSmallSizeKeepsWpfsPlacement`, `ToolbarToolTipTests.AReadThatThrowsKeepsWpfsPlacement`, `ToolbarToolTipTests.TheStandardValuesAreWhatToolbarControlsAndTheirTooltipsHaveUnset`. Human: where the tooltips open in the window, which needs the app.
+
+### THM — Light and dark mode themes
+
+#### THM-01 The document theme follows Windows light and dark mode
+- **Change:** Added: "The document theme now follows Windows light and dark mode" · **Documents:** `br-forms.md`, `tables.md` · **Settings:** Windows Settings ▸ Personalization ▸ Colors ▸ Choose your mode; formatted view
+1. Before installing (the first launch of a build with this change reads the theme rc2 saved), note which theme View ▸ Theme ticks in rc2 and whether it is light or dark. Install the build, set Windows to **Light**, open `br-forms.md` and open View ▸ Theme. Set Windows to **Dark** and open View ▸ Theme again.
+2. In Dark, pick **Dracula**. Set Windows to Light and pick **One Light**. Set Windows to Dark, then Light.
+3. Set Windows to Dark. In the `br-forms.md` window use **File ▸ Open…** to open `tables.md`, which opens in a second window. Pick **GitHub Dark Dimmed** in the `br-forms.md` window. In the `tables.md` window, turn **View ▸ Spell Check** off and on again. Set Windows to Light, then Dark, and look at the `tables.md` window. Close both windows, open `br-forms.md`, then set Windows to Light.
+4. Set Windows to Dark. Turn off **View ▸ Theme ▸ Same Theme for Both Views**, press Ctrl+E and pick **Solarized Light**. Set Windows to Light, then Dark, and press Ctrl+E after each. Turn **Same Theme for Both Views** back on.
+5. Turn on a contrast theme (Settings ▸ Accessibility ▸ Contrast themes), open View ▸ Theme, then turn the contrast theme off.
+- **Expected:** In step 1 the rc2 theme shows in the mode it suits and the other mode shows its default: Midget Solarized in light, Obsidiminutive in dark (rc2's Default counts as no choice). The greyed top line of View ▸ Theme names the current mode. Every switch recolours every open window within about a second, with no restart. In step 2 dark shows Dracula and light One Light. In step 3 the `tables.md` window shows GitHub Dark Dimmed after the switches, and after reopening dark shows GitHub Dark Dimmed and light One Light: turning spell check off and on didn't undo the pick. In step 4 the source view shows Solarized Light in dark and One Light in light, while the formatted view keeps GitHub Dark Dimmed in dark; turning the setting back on gives the source view the document's theme. In step 5 the top line reads *For Windows light mode* and the document shows One Light.
+- **Type:** Both. Automated: `ThemeModesTests.TheSlotForTheModeWindowsIsInIsAppliedAndTicked`, `ThemeModesTests.APickWritesOnlyTheSlotForTheModeItWasMadeIn`, `ThemeModesTests.ASavedThemeMigratesToTheModeItMatches`, `ThemeModesTests.SwitchingWindowsModeAppliesTheOtherSlotAndWritesNothing`, `ThemeModesTests.AModeSwitchShowsWhatAnotherWindowPickedForThatMode`, `ThemeModesTests.AnotherSettingsSaveKeepsThemeFieldsAsTheyAreOnDisk`, `ThemeModesTests.TurningLinkingOnOrOffStartsTheSourceViewFromTheDocumentInBothModes`, `WindowsAppearanceTests.AppsUseLightThemeDecidesDarkMode`, `WindowsAppearanceTests.HighContrastCountsAsLight`, `WindowsAppearanceTests.ChangedIsRaisedOncePerFlipOfTheEffectiveMode`. Human: the Windows mode switch, the menu and the windows' colours, which need the app.
 
 ### ANC — Heading links
 
@@ -336,7 +348,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Change:** Fixed: "Right on File ▸ Open Recent or View ▸ Theme opens it at its first entry" · **Documents:** any · **Settings:** at least two recent files
 1. Press Alt+F, move down to **Open Recent** and press Right, then Left.
 2. Press Alt+V, move to **Theme** and press Right, then Left.
-- **Expected:** Right opens the submenu with its first entry highlighted. Left closes it and leaves you on the parent item. Neither key jumps to the next top-level menu.
+- **Expected:** Right opens the submenu with the first item you can choose highlighted (in View ▸ Theme, **Default**, under the greyed *For Windows … mode* line). Left closes it and leaves you on the parent item. Neither key jumps to the next top-level menu.
 - **Type:** Both. Automated: `MenuAccessKeysTests.OnlyAMenusOwnOpeningIsItsOwn` and `MenuAccessKeysTests.ANestedSubmenuOpeningReachesTheParentButIsNotItsOwn`. Human: WPF keyboard navigation.
 
 ### SPL — Spell check on large documents
@@ -1494,6 +1506,7 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | VIEW-03 | | | |
 | TIP-01 | | | |
 | TIP-02 | | | |
+| THM-01 | | | |
 | INST-01 | | | |
 | INST-02 | | | |
 | INST-03 | | | |

@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using MarkdownMidget.Source;
 using MarkdownMidget.Themes;
 using Xunit;
@@ -143,18 +145,76 @@ public class ThemeModesTests
         Assert.Equal(new ThemePair("mine-light.css", "Dracula.css"), relaunched.Modes.Document);
     }
 
-    [Fact]
-    public void APickMergesOntoWhatIsOnDiskNotOntoThisWindowsCopy()
+    [Theory]
+    [InlineData(false)]   // the document's themes
+    [InlineData(true)]    // unlinked, in the source view: its own
+    public void APickMergesOntoWhatIsOnDiskNotOntoThisWindowsCopy(bool sourceView)
     {
         // Another window picked a light theme after this one launched. This window's
         // dark pick must not put its stale light theme back.
-        var window = new Window(Materialized(), dark: true);
-        window.Disk.ThemeLight = "other-window.css";
+        var window = new Window(Materialized(linked: !sourceView), dark: true);
+        if (sourceView) window.Disk.SourceThemeLight = "other-window.css";
+        else window.Disk.ThemeLight = "other-window.css";
 
-        window.Modes.RememberPick(dark: true, sourceMode: false, "new.css");
+        window.Modes.RememberPick(dark: true, sourceMode: sourceView, "new.css");
 
-        Assert.Equal("other-window.css", window.Disk.ThemeLight);
-        Assert.Equal("new.css", window.Disk.ThemeDark);
+        Assert.Equal(("other-window.css", "new.css"), sourceView
+            ? (window.Disk.SourceThemeLight, window.Disk.SourceThemeDark)
+            : (window.Disk.ThemeLight, window.Disk.ThemeDark));
+    }
+
+    [Fact]
+    public void AFirstSourceViewPickKeepsItsOtherModesMigratedTheme()
+    {
+        var window = new Window(new Saved { Theme = "One-Light.css", SourceTheme = "mine-light.css", LinkThemes = false }, dark: true);
+
+        window.Modes.RememberPick(dark: true, sourceMode: true, "Dracula.css");
+
+        Assert.Equal(("mine-light.css", "Dracula.css", "Dracula.css"),
+            (window.Disk.SourceThemeLight, window.Disk.SourceThemeDark, window.Disk.SourceTheme));
+        Assert.Equal(((string?)null, (string?)null, "One-Light.css"), (window.Disk.ThemeLight, window.Disk.ThemeDark, window.Disk.Theme));
+        Assert.Equal(new ThemePair("mine-light.css", "Dracula.css"), new Window(window.Disk).Modes.Source);
+    }
+
+    // ===== saves of other settings =====
+
+    [Fact]
+    public void AnotherSettingsSaveKeepsThemeFieldsAsTheyAreOnDisk()
+    {
+        // Window B holds every slot in memory. On disk, window A's pick left no light slot
+        // and no source theme. B toggles word wrap: its save restates B's preferences, then
+        // takes every theme field from disk — nulls too, which mean "never written".
+        var window = new Window(Materialized(linked: false));
+        var disk = new Saved { Theme = "GitHub-Dark-Dimmed.css", ThemeDark = "GitHub-Dark-Dimmed.css" };
+        var save = new Saved();
+
+        window.Modes.CopyTo(save);
+        ThemeModes.CarryFromDisk(disk, save);
+
+        Assert.Equivalent(disk, save);
+    }
+
+    [Fact]
+    public void ASaveWithNoFileLeavesNeverChosenSlotsEmpty()
+    {
+        // First run: writing the resolved defaults would make today's defaults a choice.
+        var save = new Saved { Theme = "junk.css", ThemeLight = "junk.css" };
+        new Window(new Saved()).Modes.CopyTo(save);
+        Assert.Equivalent(new Saved(), save);
+
+        // An earlier build's single theme stays as it was, still to be migrated.
+        var legacy = new Window(new Saved { Theme = "mine-light.css" });
+        legacy.Modes.CopyTo(save);
+        Assert.Equivalent(new Saved { Theme = "mine-light.css" }, save);
+
+        // A pick is a choice: its pair is written; the source view's still isn't.
+        legacy.Modes.RememberPick(dark: true, sourceMode: false, "Dracula.css");
+        legacy.Modes.CopyTo(save);
+        Assert.Equivalent(new Saved { Theme = "Dracula.css", ThemeLight = "mine-light.css", ThemeDark = "Dracula.css" }, save);
+
+        // Slots loaded from disk were written: they are restated, as the file is gone.
+        new Window(Materialized(linked: false)).Modes.CopyTo(save);
+        Assert.Equivalent(Materialized(linked: false), save);
     }
 
     // ===== migration =====
@@ -259,6 +319,19 @@ public class ThemeModesTests
         Assert.Null(window.Modes.Remembered().Source);
     }
 
+    [Fact]
+    public void UnlinkingTakesTheDocumentsThemesFromDiskNotFromThisWindow()
+    {
+        // This window launched on a.css/b.css; another window has since picked both.
+        var window = new Window(Materialized(linked: true));
+        (window.Disk.ThemeLight, window.Disk.ThemeDark) = ("Dracula.css", "other.css");
+
+        window.Modes.RememberLink(false);
+
+        Assert.Equal(("Dracula.css", "other.css", "Dracula.css"),
+            (window.Disk.SourceThemeLight, window.Disk.SourceThemeDark, window.Disk.SourceTheme));
+    }
+
     // ===== reading a theme's mode =====
 
     [Theory]
@@ -271,10 +344,30 @@ public class ThemeModesTests
     [InlineData(":root { --mdm-color-scheme: DARK !important; }", true)]
     [InlineData(":root { --mdm-color-scheme: light dark; }", false)]
     [InlineData(":root { --mdm-color-scheme-note: dark; }", false)]
+    [InlineData("a::before{content:\"/*\"} :root{--mdm-color-scheme: dark;} b::after{content:\"*/\"}", true)]  // not a comment: strings
+    [InlineData("a::before{content:\"}\"} :root{--mdm-color-scheme: dark}", true)]
+    [InlineData(":root { background: url(data:x,}); --mdm-color-scheme: dark }", true)]     // not a block: parentheses
+    [InlineData(":root { /* the scheme; */ --mdm-color-scheme: dark; }", true)]
+    [InlineData(":root { --mdm-color-scheme: light; } @media (prefers-color-scheme: dark) { :root { --mdm-color-scheme: dark; } }", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void AThemesModeIsTheColorSchemeItDeclares(string? css, bool dark)
         => Assert.Equal(dark, ThemeModes.DeclaresDark(css));
+
+    [Fact]
+    public void ReadingAThemesModeIsOnePassEvenOverAFullSizeTheme()
+    {
+        // A theme the validator accepts, at the size cap, with "/*" in every string. A
+        // comment stripper that doesn't know strings rescans the rest of the file from
+        // each one: 15.9 s measured, on the UI thread, at launch and on a mode switch.
+        const string rule = "a{content:\"/*\"}\n";
+        var css = string.Concat(Enumerable.Repeat(rule, ThemeStore.MaxBytes / rule.Length));
+        Assert.Null(CssValidator.Validate(css));
+
+        var clock = Stopwatch.StartNew();
+        Assert.False(ThemeModes.DeclaresDark(css));
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), $"took {clock.Elapsed.TotalSeconds:0.0} s");
+    }
 
     [Theory]
     [InlineData("themes/Dracula.css", true)]
