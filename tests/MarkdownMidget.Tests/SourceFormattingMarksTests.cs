@@ -140,6 +140,51 @@ public class SourceFormattingMarksTests
         Assert.Equal(after, dotsAfter);
     }
 
+    [Fact]   // review finding 4: a long line places only the marks in view
+    public void OnlyTheMarksInViewArePlacedOnAVeryLongLine()
+    {
+        var text = string.Concat(Enumerable.Repeat("a\t  ", 2000)) + "end";   // 2,000 tabs and 4,000 dotted spaces on one line
+        var (scrolled, inView, allInView, wrapped) = On(ed =>
+        {
+            ed.ShowMarks = true;
+            Settle(ed);
+            ed.ScrollToHorizontalOffset(20000);
+            var view = Settle(ed);
+            var marks = ed.Marks.Positions(view);
+            var placed = (ed.Marks.Placed, marks.Count, marks.All(m => m.At.X > -40 && m.At.X < view.ActualWidth));
+            ed.WordWrap = true;
+            ed.Marks.Positions(Settle(ed));
+            return (placed.Placed, placed.Count, placed.Item3, ed.Marks.Placed);
+        }, text);
+
+        Assert.InRange(inView, 1, 100);
+        Assert.Equal(inView, scrolled);   // nothing placed off to either side
+        Assert.True(allInView, "every mark returned is in the view");
+        Assert.InRange(wrapped, 1, 1000);   // wrapped rows below the view are not placed either
+    }
+
+    [Fact]   // review finding 3: MRK-02 step 2 against the editor, one undo step per keystroke
+    public void TypedBackticksAndEnterUndoOneKeystrokeAtATime()
+    {
+        const string text = "a  b\n- item\nc  d\n";
+        var (atStart, typed, afterOne, afterFour, restored) = On(ed =>
+        {
+            ed.ShowMarks = true;
+            var start = Of(ed, '·').Length;
+            ed.CaretIndex = text.IndexOf("- item", StringComparison.Ordinal);
+            foreach (var key in new[] { "`", "`", "`", "\n" }) ed.TextArea.PerformTextInput(key);
+            var dots = Of(ed, '·').Length;
+            ed.Undo();
+            var one = Of(ed, '·').Length;
+            ed.Undo(); ed.Undo(); ed.Undo();
+            return (start, dots, one, Of(ed, '·').Length, ed.Text == text);
+        }, text);
+
+        Assert.Equal((4, 2), (atStart, typed));   // the fence makes "c  d" code
+        Assert.Equal(typed, afterOne);            // one Ctrl+Z takes back only the Enter: "```- item" still opens a fence
+        Assert.Equal((atStart, true), (afterFour, restored));
+    }
+
     [Fact]   // AC1
     public void LinesScrolledOutOfViewAreNotMarked()
     {

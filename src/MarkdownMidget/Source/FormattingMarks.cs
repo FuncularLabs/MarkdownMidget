@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
@@ -59,6 +60,10 @@ internal sealed class FormattingMarks : IBackgroundRenderer
         return _lineStarts[lineNumber - 1];
     }
 
+    /// <summary>How many tab and space marks the last <see cref="Positions"/> placed, each
+    /// the cost of a visual-position lookup.</summary>
+    internal int Placed { get; private set; }
+
     /// <summary>
     /// Each visible mark and where it goes in view coordinates (the glyph's top-left): →
     /// where a tab starts, · on the spaces <see cref="SpaceMarks"/> picks, ¶ right after the
@@ -68,23 +73,35 @@ internal sealed class FormattingMarks : IBackgroundRenderer
     /// </summary>
     internal IReadOnlyList<(char Glyph, Point At)> Positions(TextView textView)
     {
+        Placed = 0;
         var marks = new List<(char, Point)>();
         if (!_enabled || !textView.VisualLinesValid || textView.Document is not { } doc) return marks;
         var scroll = textView.ScrollOffset;
         foreach (var line in textView.VisualLines)
         {
             var start = line.FirstDocumentLine.Offset;
-            var end = line.LastDocumentLine.EndOffset;
-            Point At(int offset) => line.GetVisualPosition(line.GetVisualColumn(offset - start), VisualYPosition.TextTop) - scroll;
-            for (var tab = doc.IndexOf('\t', start, end - start); tab >= 0; tab = doc.IndexOf('\t', tab + 1, end - tab - 1))
-                marks.Add(('→', At(tab)));
-            var first = line.FirstDocumentLine;
-            foreach (var space in SpaceMarks.Step(doc.GetText(first), StartOf(doc, first.LineNumber)).Marks)
-                marks.Add(('·', At(start + space)));
+            Point At(int offset) { Placed++; return line.GetVisualPosition(line.GetVisualColumn(offset - start), VisualYPosition.TextTop) - scroll; }
+            int[]? spaces = null;
+            foreach (var row in line.TextLines)
+            {
+                // Only the part of a row in view: a wrapped row above or below it is skipped, and a
+                // long row is cut to the columns under its left and right edges, with one to spare.
+                var top = line.GetTextLineVisualYPosition(row, VisualYPosition.LineTop) - scroll.Y;
+                if (top + row.Height < 0 || top > textView.ActualHeight) continue;
+                var first = line.GetTextLineVisualStartColumn(row);
+                int left = Math.Max(first, line.GetVisualColumn(row, scroll.X, false) - 1),
+                    right = Math.Min(first + row.Length, line.GetVisualColumn(row, scroll.X + textView.ActualWidth, false) + 1);
+                int from = start + line.GetRelativeOffset(left), to = start + line.GetRelativeOffset(right);
+                for (var tab = doc.IndexOf('\t', from, to - from); tab >= 0; tab = doc.IndexOf('\t', tab + 1, to - tab - 1))
+                    marks.Add(('→', At(tab)));
+                spaces ??= SpaceMarks.Step(doc.GetText(line.FirstDocumentLine), StartOf(doc, line.FirstDocumentLine.LineNumber)).Marks;
+                foreach (var space in spaces)
+                    if (start + space >= from && start + space < to) marks.Add(('·', At(start + space)));
+            }
             if (line.LastDocumentLine.DelimiterLength == 0) continue;
-            var row = line.TextLines[^1];
-            marks.Add(('¶', new Point(line.GetTextLineVisualXPosition(row, line.VisualLength),
-                line.GetTextLineVisualYPosition(row, VisualYPosition.TextTop)) - scroll));
+            var last = line.TextLines[^1];
+            marks.Add(('¶', new Point(line.GetTextLineVisualXPosition(last, line.VisualLength),
+                line.GetTextLineVisualYPosition(last, VisualYPosition.TextTop)) - scroll));
         }
         return marks;
     }
