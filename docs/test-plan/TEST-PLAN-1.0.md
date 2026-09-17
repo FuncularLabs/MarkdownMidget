@@ -217,21 +217,21 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
    ```powershell
    $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
-   Copy-Item $p "$p.thm-backup"
+   if (-not (Test-Path "$p.thm-backup")) { Copy-Item $p "$p.thm-backup" }
    $s = Get-Content $p -Raw -Encoding utf8 | ConvertFrom-Json
    'ThemeLight','ThemeDark','SourceThemeLight','SourceThemeDark' | ForEach-Object { $s.PSObject.Properties.Remove($_) }
    $s.Theme = 'Dracula.css'; $s.LinkThemes = $true
    $s | ConvertTo-Json -Depth 5 | Set-Content $p -Encoding utf8
    ```
 
-   Set Windows to **Light**, open `br-forms.md` and open View ▸ Theme. Set Windows to **Dark** and open View ▸ Theme again. Close the window, run the lines again **without** the `Copy-Item` line (it would overwrite your backup) and with `''` in place of `'Dracula.css'`, and repeat.
+   Set Windows to **Light**, open `br-forms.md` and open View ▸ Theme. Set Windows to **Dark** and open View ▸ Theme again. Close the window, run the lines again with `''` in place of `'Dracula.css'` (the backup line keeps your first backup), and repeat.
 2. In Dark, pick **Dracula**. Set Windows to Light and pick **One Light**. Set Windows to Dark, then Light.
 3. Set Windows to Dark. In the `br-forms.md` window use **File ▸ Open…** to open `tables.md`, which opens in a second window. Pick **GitHub Dark Dimmed** in the `br-forms.md` window. In the `tables.md` window, turn **View ▸ Spell Check** off and on again. Set Windows to Light, then Dark, and look at the `tables.md` window. Close both windows, open `br-forms.md`, then set Windows to Light.
 4. Set Windows to Dark. Turn off **View ▸ Theme ▸ Same Theme for Both Views**, press Ctrl+E and pick **Solarized Light**. Set Windows to Light, then Dark; after each switch, look at the source view, press Ctrl+E and look at the formatted view, then press Ctrl+E again. Turn **Same Theme for Both Views** back on, then press Ctrl+E.
-5. Turn on a contrast theme (Settings ▸ Accessibility ▸ Contrast themes) and open View ▸ Theme. Turn the contrast theme off and open View ▸ Theme again. Close every Markdown Midget window and put your settings back:
+5. Turn on a contrast theme (Settings ▸ Accessibility ▸ Contrast themes) and open View ▸ Theme. Turn the contrast theme off and open View ▸ Theme again. Close every Markdown Midget window and put your settings back. If you stop THM-01 before this step, close every window and run this line when you stop:
 
    ```powershell
-   Copy-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.thm-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.thm-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
    ```
 
 - **Expected:** In step 1, with Dracula saved, light shows Midget Solarized and dark shows Dracula; with `''` (Default) saved, light shows Midget Solarized and dark shows Obsidiminutive. The greyed top line of View ▸ Theme names the current mode. Every switch recolours every open window within about a second, with no restart. In step 2 dark shows Dracula and light One Light. In step 3 the `tables.md` window shows GitHub Dark Dimmed after the switches, and after reopening dark shows GitHub Dark Dimmed and light One Light: turning spell check off and on didn't undo the pick. In step 4 the source view shows One Light in light and Solarized Light in dark, and the formatted view One Light in light and GitHub Dark Dimmed in dark; turning the setting back on gives the source view GitHub Dark Dimmed. In step 5, with the contrast theme on, the top line reads *For Windows light mode* and **One Light** is ticked (the contrast theme may override the page colours); with it off, the line reads *For Windows dark mode*, and GitHub Dark Dimmed is ticked and showing.
