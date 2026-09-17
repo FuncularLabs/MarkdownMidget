@@ -27,6 +27,20 @@ namespace MarkdownMidget.Tests;
 /// </summary>
 public class ChromeRenderTests
 {
+    /// <summary>
+    /// Skipped, with the reason shown, unless WPF is drawing with Aero2: every comparison here
+    /// is against Aero2's own pixels and sizes. Windows reports "Aero" for the standard theme;
+    /// high contrast ("AeroLite") and the classic look (visual styles off) load other themes.
+    /// </summary>
+    internal sealed class Aero2FactAttribute : FactAttribute
+    {
+        public Aero2FactAttribute()
+        {
+            if (!string.Equals(SystemParameters.UxThemeName, "Aero", StringComparison.OrdinalIgnoreCase))
+                Skip = $"Needs the standard Windows theme, which WPF draws with Aero2; this session's theme is \"{SystemParameters.UxThemeName}\".";
+        }
+    }
+
     private sealed record Shot(int Width, int Height, byte[] Pixels);
 
     private sealed record Sample(string Name, bool Faithful, Func<FrameworkElement> Make);
@@ -236,8 +250,6 @@ public class ChromeRenderTests
 
     private static void ForEachSample(Func<Sample, bool> include, Action<Sample, List<string>> check)
     {
-        // The comparisons are against this machine's Aero2; high contrast swaps the theme.
-        if (SystemParameters.HighContrast) return;
         ChromePaletteTests.RunSta(() =>
         {
             var failures = new List<string>();
@@ -252,7 +264,7 @@ public class ChromeRenderTests
         });
     }
 
-    [Fact]
+    [Aero2Fact]
     public void TheLightPaletteLeavesEveryControlDrawnExactlyAsAero2()
     {
         ForEachSample(_ => true, (sample, failures) =>
@@ -261,7 +273,7 @@ public class ChromeRenderTests
         });
     }
 
-    [Fact]
+    [Aero2Fact]
     public void TheDarkTemplatesWithTheLightPaletteDrawAero2PixelForPixel()
     {
         ForEachSample(s => s.Faithful, (sample, failures) =>
@@ -270,7 +282,7 @@ public class ChromeRenderTests
         });
     }
 
-    [Fact]
+    [Aero2Fact]
     public void SwitchingToDarkAndBackRestoresAero2OnTheSameControls()
     {
         ForEachSample(_ => true, (sample, failures) =>
@@ -285,7 +297,7 @@ public class ChromeRenderTests
         });
     }
 
-    [Fact]
+    [Aero2Fact]
     public void DarkModeLeavesNoControlLight()
     {
         ForEachSample(_ => true, (sample, failures) =>
@@ -308,10 +320,9 @@ public class ChromeRenderTests
         static double Linear(double s) => s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
     }
 
-    [Fact]
+    [Aero2Fact]
     public void DarkModeReachesThePopupsThatAreNotDrawnUntilOpened()
     {
-        if (SystemParameters.HighContrast) return;
         ChromePaletteTests.RunSta(() =>
         {
             var palette = new ChromeDarkPalette();
@@ -337,10 +348,9 @@ public class ChromeRenderTests
         });
     }
 
-    [Fact]
+    [Aero2Fact]
     public void TheToolbarPicturesAreTheOnesItShowedBeforeInLightAndLightInkInDark()
     {
-        if (SystemParameters.HighContrast) return;
         ChromePaletteTests.RunSta(() =>
         {
             foreach (var (key, file) in new[] { (ChromeKeys.IconNumberedList, "numbered-list-64.png"), (ChromeKeys.IconSpellCheck, "spellcheck-64.png") })
