@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 
 namespace MarkdownMidget.Chrome;
@@ -82,22 +83,36 @@ public static class ChromePalette
     /// <summary>
     /// THE HOOK for the Windows appearance service: call it once at startup with the effective
     /// mode, before the first window opens, and again from its Changed event. Safe from any
-    /// thread (it moves itself to the application's) and cheap to repeat: applying the mode
-    /// already in force changes nothing. Every open window follows through DynamicResource,
+    /// thread (it moves itself to the application's; when calls cross threads, the last one
+    /// made wins) and cheap to repeat: applying the mode already in force changes nothing. Every open window follows through DynamicResource,
     /// and every window's title bar follows through <see cref="ChromeWindows"/>. With high
     /// contrast on, dark is ignored and the light path is taken.
     /// </summary>
-    public static void Apply(bool dark)
+    public static void Apply(bool dark) =>
+        Apply(dark, Application.Current?.Dispatcher, () => Application.Current?.Resources, () => SystemParameters.HighContrast);
+
+    /// <summary><see cref="Apply(bool)"/> with the application's dispatcher, resources and the
+    /// high contrast reading passed in; a null dispatcher applies on the calling thread.</summary>
+    internal static void Apply(bool dark, System.Windows.Threading.Dispatcher? dispatcher,
+                               Func<ResourceDictionary?> resources, Func<bool> highContrast)
     {
-        var app = Application.Current;
-        if (app is not null && !app.Dispatcher.CheckAccess())
+        Volatile.Write(ref _latestDark, dark ? 1 : 0);
+        if (dispatcher is not null && !dispatcher.CheckAccess())
         {
-            app.Dispatcher.BeginInvoke(new Action(() => Apply(dark)));
+            // The queued call applies whatever was asked last when it runs, so a call that
+            // waited here can never undo a later one.
+            dispatcher.BeginInvoke(new Action(() => ApplyLatest(resources, highContrast)));
             return;
         }
+        ApplyLatest(resources, highContrast);
+    }
+
+    private static int _latestDark;   // the mode of the most recent Apply call, from any thread
+
+    private static void ApplyLatest(Func<ResourceDictionary?> resources, Func<bool> highContrast)
+    {
         ChromeWindows.Register();
-        var effective = Apply(app?.Resources, dark, SystemParameters.HighContrast);
-        ChromeWindows.SetDark(effective);
+        ChromeWindows.SetDark(Apply(resources(), Volatile.Read(ref _latestDark) == 1, highContrast()));
     }
 
     /// <summary>
