@@ -1074,6 +1074,24 @@
   "important": true
  },
  {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "color",
+  "value": "#1f2328",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror a",
+  "prop": "color",
+  "value": "#0550ae",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror th a",
+  "prop": "color",
+  "value": "inherit",
+  "important": true
+ },
+ {
   "where": "@media print > .mdm-mark",
   "prop": "display",
   "value": "none",

@@ -447,3 +447,109 @@ test('Obsidiminutive colours inline code, and not fenced code, with its number g
   assert.deepEqual(colour('.mdm-prosemirror code'), ['var(--mdm-token-number)']);
   assert.deepEqual(colour('.mdm-prosemirror pre code'), ['inherit']);
 });
+
+// ===== headings and links on paper =====
+//
+// A dark theme's heading and link colours are chosen for its dark page and print pale
+// on white paper, so print.css pins them when the theme's --mdm-color-scheme is `dark`,
+// with a style query. jsdom evaluates neither @container nor @layer nor var(), so the
+// query is evaluated here the way the browser does it: the theme's declared value,
+// compared exactly. A print condition this can't evaluate fails the test rather than
+// being guessed at. That WebView2 honours the query on paper is TEST-PLAN PRN-01.
+
+const DARK = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'Obsidiminutive.css'];
+const LIGHT = ['GitHub-Light.css', 'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
+const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+const PAPER = '#ffffff';
+
+/** The print declarations that reach paper with this theme installed over Default. */
+function paperDeclarations(themeCss) {
+  const vars = new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
+  return declarations(read('styles', 'print.css'), vars).filter((d) =>
+    d.where.split(' > ').filter((part) => part.startsWith('@')).every((at) => {
+      if (at === '@media print' || at === '@page') return true;
+      const query = at.match(/^@container style\((--[\w-]+):\s*([^()]*?)\s*\)$/);
+      assert.ok(query, `print.css has a condition this test can't evaluate: ${at}`);
+      return vars.get(query[1]) === query[2];
+    }));
+}
+
+/** The colour paper gives exactly this selector, or undefined when print leaves it alone. */
+function paperColour(themeCss, selector) {
+  const hits = paperDeclarations(themeCss)
+    .filter((d) => d.prop === 'color' && d.where.split(' > ').at(-1).split(', ').includes(selector));
+  assert.ok(hits.length <= 1, `${selector} is coloured on paper ${hits.length} times`);
+  return hits[0]?.value;
+}
+
+/** WCAG contrast of two resolved #rrggbb colours; anything else fails. */
+function contrast(a, b) {
+  const luminance = (hex) => {
+    assert.match(hex ?? '', /^#[0-9a-f]{6}$/, `${hex} is not a resolved colour`);
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test('every built-in is sorted into dark or light by what it declares', () => {
+  // So a new palette has to be placed, and a list can't disagree with its file.
+  assert.deepEqual(readdirSync(builtinDir).filter((f) => f.endsWith('.css')).sort(),
+    [...DARK, ...LIGHT].sort());
+  for (const file of DARK) assert.equal(rootVariables(readTheme(file)).get('--mdm-color-scheme'), 'dark', file);
+  for (const file of LIGHT) assert.equal(rootVariables(readTheme(file)).get('--mdm-color-scheme'), 'light', file);
+});
+
+test('a dark built-in prints every heading and its links dark enough for paper', () => {
+  for (const file of DARK) {
+    const css = readTheme(file);
+    for (const el of HEADINGS) {
+      const colour = paperColour(css, `.mdm-prosemirror ${el}`);
+      assert.ok(contrast(colour, PAPER) >= 4.5, `${file}: ${el} prints ${colour} on white`);
+    }
+
+    // Still a link on paper: its own dark colour, not the text around it, and print
+    // leaves the underline the editor draws.
+    const link = paperColour(css, '.mdm-prosemirror a');
+    assert.ok(contrast(link, PAPER) >= 4.5, `${file}: a link prints ${link} on white`);
+    assert.notEqual(link, paperColour(css, '.mdm-prosemirror'), `${file}: a link prints as body text`);
+    assert.deepEqual(paperDeclarations(css)
+      .filter((d) => d.prop.startsWith('text-decoration') && /(^|, )\.mdm-prosemirror (th )?a(,|$)/.test(d.where.split(' > ').at(-1)))
+      .map((d) => d.where), [], `${file}: print takes the underline off links`);
+
+    // The header row keeps its dark look on paper, where a dark link would vanish.
+    const inHeader = paperColour(css, '.mdm-prosemirror th a') ?? link;
+    const text = inHeader === 'inherit' ? paperColour(css, '.mdm-prosemirror th') : inHeader;
+    const header = paperDeclarations(css)
+      .find((d) => d.where === '@media print > .mdm-prosemirror th' && d.prop === 'background').value;
+    assert.ok(contrast(text, header) >= 4.5, `${file}: a link in a header row prints ${text} on ${header}`);
+  }
+});
+
+test('Default and every light built-in print headings and links in their own colours, as before', () => {
+  // Their colours already read on paper and are part of how they look there. Print
+  // colours none of them, and no dark-only rule reaches paper at all.
+  for (const file of ['', ...LIGHT]) {
+    const css = file ? readTheme(file) : '';
+    assert.deepEqual(paperDeclarations(css).filter((d) => d.where.includes('@container'))
+      .map((d) => `${d.where} { ${d.prop} }`), [], `${file || 'Default'}: dark-only print rules apply`);
+    for (const el of [...HEADINGS, 'a', 'th a']) {
+      assert.equal(paperColour(css, `.mdm-prosemirror ${el}`), undefined, `${file || 'Default'}: print colours ${el}`);
+    }
+  }
+});
+
+test('a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then', () => {
+  const pale = '--mdm-heading: #eeeeee; --mdm-h4: #eeeeee; --mdm-h5: #eeeeee; --mdm-h6: #eeeeee; --mdm-link: #ddddff;';
+  const dark = `:root { --mdm-color-scheme: dark; ${pale} }`;
+  for (const el of [...HEADINGS, 'a']) {
+    assert.ok(contrast(paperColour(dark, `.mdm-prosemirror ${el}`), PAPER) >= 4.5, `dark custom theme: ${el}`);
+  }
+  for (const css of [`:root { --mdm-color-scheme: light; ${pale} }`, `:root { ${pale} }`]) {
+    for (const el of [...HEADINGS, 'a', 'th a']) {
+      assert.equal(paperColour(css, `.mdm-prosemirror ${el}`), undefined, `${css}: print colours ${el}`);
+    }
+  }
+});

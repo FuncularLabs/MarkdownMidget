@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -236,6 +236,17 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 - **Expected:** In step 1, with Dracula saved, light shows Midget Solarized and dark shows Dracula; with `''` (Default) saved, light shows Midget Solarized and dark shows Obsidiminutive. The greyed top line of View ▸ Theme names the current mode. Every switch recolours every open window within about a second, with no restart. In step 2 dark shows Dracula and light One Light. In step 3 the `tables.md` window shows GitHub Dark Dimmed after the switches, and after reopening dark shows GitHub Dark Dimmed and light One Light: turning spell check off and on didn't undo the pick. In step 4 the source view shows One Light in light and Solarized Light in dark, and the formatted view One Light in light and GitHub Dark Dimmed in dark; turning the setting back on gives the source view GitHub Dark Dimmed. In step 5, with the contrast theme on, the top line reads *For Windows light mode* and **One Light** is ticked (the contrast theme may override the page colours); with it off, the line reads *For Windows dark mode*, and GitHub Dark Dimmed is ticked and showing.
 - **Type:** Both. Automated: `ThemeModesTests.TheSlotForTheModeWindowsIsInIsAppliedAndTicked`, `ThemeModesTests.APickWritesOnlyTheSlotForTheModeItWasMadeIn`, `ThemeModesTests.ASavedThemeMigratesToTheModeItMatches`, `ThemeModesTests.SwitchingWindowsModeAppliesTheOtherSlotAndWritesNothing`, `ThemeModesTests.AModeSwitchShowsWhatAnotherWindowPickedForThatMode`, `ThemeModesTests.AnotherSettingsSaveKeepsThemeFieldsAsTheyAreOnDisk`, `ThemeModesTests.TurningLinkingOnOrOffStartsTheSourceViewFromTheDocumentInBothModes`, `WindowsAppearanceTests.AppsUseLightThemeDecidesDarkMode`, `WindowsAppearanceTests.HighContrastCountsAsLight`, `WindowsAppearanceTests.ChangedIsRaisedOncePerFlipOfTheEffectiveMode`. Human: the Windows mode switch, the menu and the windows' colours, which need the app.
+
+### PRN — Printing with a theme
+
+#### PRN-01 Dark themes print dark headings and links; light themes print as before
+- **Change:** Fixed: "Dark themes now print with dark headings and links" · **Documents:** `print-themes.md` · **Settings:** formatted view
+1. Open `print-themes.md`. Choose **View ▸ Theme ▸ Dracula** and press **Ctrl+P**. In the preview, look at the six heading levels, the heading in the quote, the four links (paragraph, quote, table cell, table header row) and the table. Close the preview.
+2. Repeat step 1 with **GitHub Dark Dimmed**, then **Obsidiminutive**. With Obsidiminutive, also use **File ▸ Print ▸ Export to PDF…** and open the PDF.
+3. Repeat step 1 with **Default**, then **Solarized Light**.
+4. **View ▸ Theme ▸ Open Themes Folder**. In that `custom` folder, create `print-dark.css` containing `:root { --mdm-color-scheme: dark; --mdm-heading: #eeeeee; --mdm-link: #ddddff; }`, and `print-light.css` with the same text but `light` in place of `dark`. Repeat step 1 with **Print Dark**, then **Print Light**. Then choose **Default** and delete both files.
+- **Expected:** In steps 1, 2 and the Print Dark part of step 4, the page is white, every heading (the one in the quote too) is near-black, and the paragraph, quote and cell links are dark blue and underlined. The header row's link is in the header's own text colour and readable: light on the dark header in steps 1 and 2, dark on Default's grey header for Print Dark. The PDF looks like the preview. In step 3 and the Print Light part of step 4, headings and links print in the theme's own colours, as in rc2 (Print Light's pale heading and link are hard to read, as before). After each preview closes, the page on screen is unchanged.
+- **Type:** Both. Automated: `theme-parity.test.mjs` "every built-in is sorted into dark or light by what it declares", "a dark built-in prints every heading and its links dark enough for paper", "Default and every light built-in print headings and links in their own colours, as before", "a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't evaluate the style query that tells print a theme is dark, so only the real print preview shows WebView2 applying it.
 
 ### ANC — Heading links
 
@@ -1523,6 +1534,7 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | TIP-01 | | | |
 | TIP-02 | | | |
 | THM-01 | | | |
+| PRN-01 | | | |
 | INST-01 | | | |
 | INST-02 | | | |
 | INST-03 | | | |

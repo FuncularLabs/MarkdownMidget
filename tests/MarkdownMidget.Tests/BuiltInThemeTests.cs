@@ -271,11 +271,11 @@ public class BuiltInThemeTests
             ("--mdm-td-bg", inline.Append("--mdm-text")),
             ("--mdm-row-alt-bg", inline.Append("--mdm-text")),
             ("--mdm-th-bg", inline.Append("--mdm-th-text")),
-            // Paper's header row keeps its screen look, and a link in it keeps its
-            // colour. No hover on paper; bold prints as the text around it. (Paper's
-            // white cells are not here: printed links and headings keep their screen
-            // colour on white in every dark theme - print.css pins neither.)
-            ("--mdm-print-th-bg", new[] { "--mdm-print-th-text", "--mdm-link" }),
+            // Paper's header row keeps its screen look. In a dark theme a link in it
+            // prints in the header's text colour, and headings and links on white
+            // paper print in print.css's own dark colours (theme-parity.test.mjs holds
+            // those to 4.5:1). No hover on paper; bold prints as the text around it.
+            ("--mdm-print-th-bg", new[] { "--mdm-print-th-text" }),
             // Inline code: this theme's own rule reads --mdm-token-number
             // (editor-src/test/theme-parity.test.mjs pins it).
             ("--mdm-code-bg", new[] { "--mdm-token-number" }),

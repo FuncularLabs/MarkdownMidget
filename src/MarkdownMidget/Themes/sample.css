@@ -39,7 +39,9 @@
 
   /* Not a colour, and the one every dark theme forgets. Set it to `dark` and
      the scrollbar, form controls and default canvas follow; leave it and they
-     stay light against your dark page. */
+     stay light against your dark page. `dark` also prints your headings and
+     links in dark colours, because colours chosen for a dark page are too pale
+     on white paper. For printing, only the exact value `dark` counts. */
   --mdm-color-scheme: light;
 
   --mdm-app-bg: #e7e7e7;        /* around the page */
