@@ -4,6 +4,7 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:src="clr-namespace:MarkdownMidget.Source"
         xmlns:local="clr-namespace:MarkdownMidget"
+        xmlns:chrome="clr-namespace:MarkdownMidget.Chrome"
         Title="Markdown Midget" Height="720" Width="1120" MinHeight="360" MinWidth="520"
         Icon="/Assets/midget-256.png"
         WindowStartupLocation="CenterScreen"
@@ -113,7 +114,7 @@
     </Window.Resources>
     <DockPanel>
         <!-- ===== Top header: menu + toolbar on the left, mascot popped out at right ===== -->
-        <Grid DockPanel.Dock="Top" Background="{x:Static SystemColors.ControlBrush}">
+        <Grid DockPanel.Dock="Top" Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -333,7 +334,7 @@
                         <Separator />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Bulleted list — editable documents only" Click="Bullet_Click" Content="&#xE8FD;" />
                         <Button Style="{StaticResource ToolGlyph}" ToolTip="Numbered list — editable documents only" Click="Ordered_Click">
-                            <Image Source="/Assets/numbered-list-64.png" Width="16" Height="16"
+                            <Image Source="{DynamicResource {x:Static chrome:ChromeKeys.IconNumberedList}}" Width="16" Height="16"
                                    RenderOptions.BitmapScalingMode="HighQuality" />
                         </Button>
                         <Button Style="{StaticResource ToolChar}" ToolTip="Block quote — editable documents only" Click="Quote_Click" FontSize="18" Content="&#x275D;" />
@@ -392,7 +393,7 @@
                                       ToolTip="Spell check"
                                       IsChecked="{Binding ElementName=MenuSpellCheck, Path=IsChecked, Mode=TwoWay}"
                                       Click="SpellCheck_Click">
-                            <Image Source="/Assets/spellcheck-64.png" Width="20" Height="14"
+                            <Image Source="{DynamicResource {x:Static chrome:ChromeKeys.IconSpellCheck}}" Width="20" Height="14"
                                    RenderOptions.BitmapScalingMode="HighQuality" />
                         </ToggleButton>
                     </ToolBar>
@@ -435,13 +436,13 @@
                 <TextBlock x:Name="StatusFile" Text="Untitled" />
             </StatusBarItem>
             <StatusBarItem>
-                <TextBlock x:Name="StatusNote" Text="" Foreground="#FF3B6EA5" />
+                <TextBlock x:Name="StatusNote" Text="" Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" />
             </StatusBarItem>
             <!-- Hidden with the count itself, so the no-document splash doesn't show
                  a divider with nothing after it. -->
             <Separator x:Name="StatusCountDivider" Visibility="Collapsed" />
             <StatusBarItem>
-                <TextBlock x:Name="StatusCount" Text="" Foreground="#FF5B6570" />
+                <TextBlock x:Name="StatusCount" Text="" Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextSecondary}}" />
             </StatusBarItem>
             <StatusBarItem DockPanel.Dock="Right">
                 <StackPanel Orientation="Horizontal">
@@ -469,7 +470,7 @@
                      FontFamily="Consolas" FontSize="14"
                      Padding="12"
                      Background="#FFFBFBFB" />
-            <Grid x:Name="BusyOverlay" Visibility="Collapsed" Background="#A0FFFFFF" Panel.ZIndex="100">
+            <Grid x:Name="BusyOverlay" Visibility="Collapsed" Background="{DynamicResource {x:Static chrome:ChromeKeys.BusyVeil}}" Panel.ZIndex="100">
                 <Border Background="#FF2E3440" CornerRadius="6" Padding="20,16"
                         HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel>
@@ -487,7 +488,7 @@
                  left in the hidden editor took Alt+F4 with it (NoDocumentFocus). Not a
                  tab stop, so Tab never lands on an invisible stop. Named with the heading
                  it shows, so Narrator has something to read when focus lands here. -->
-            <Grid x:Name="ClosedSplash" Visibility="Collapsed" Background="#FF707479" AllowDrop="True"
+            <Grid x:Name="ClosedSplash" Visibility="Collapsed" Background="{DynamicResource {x:Static chrome:ChromeKeys.SplashBackground}}" AllowDrop="True"
                   Focusable="True" KeyboardNavigation.IsTabStop="False" AutomationProperties.Name="No document open">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Image Source="/Assets/midget-256.png" Width="96" Height="96"
