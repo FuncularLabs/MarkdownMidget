@@ -132,10 +132,12 @@ tabs, and **·** for the spaces that are hard to see but change what Markdown do
   up with neither. Under `1. ` a nested list needs three spaces; with two it starts a
   separate list.
 
-Other spaces aren't marked, such as ordinary indentation, the spaces after a list marker
-and the padding in a table row that starts with `|`. In a code block, only spaces at the end of a line are marked,
-because spacing inside code is usually on purpose. The marks are only shown: they aren't
-copied, found, printed or saved.
+Other spaces aren't marked, such as ordinary indentation (in a blockquote, counted from
+after the `>`), the spaces after a list marker or a `>`, and the padding in a table row
+that starts with `|`. In a code block, front matter at the top of the file, and an HTML
+comment, only spaces at the end of a line are marked, because spacing there is usually on
+purpose. A code block inside a list item or blockquote ends where the item or quote does.
+The marks are only shown: they aren't copied, found, printed or saved.
 
 ## Find
 

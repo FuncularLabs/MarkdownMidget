@@ -19,6 +19,9 @@ Single spaces between words are never dotted.
 A paragraph whose next line starts with a space and a tab:
  	the leading space is dotted and the tab shows an arrow
 
+> - A quoted list item, nothing dotted
+>   - nested in the quote, nothing dotted
+
 | Table | Padding    |
 | ----- | ---------- |
 | cells | not dotted |

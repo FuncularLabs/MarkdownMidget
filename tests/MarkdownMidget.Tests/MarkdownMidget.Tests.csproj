@@ -74,6 +74,8 @@
           Link="FindDialog.xaml.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\MarkdownMidget\FindDialog.xaml.cs"
           Link="FindDialog.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- SpaceMarksTests' corpus: each document shows · on the spaces it expects marked. -->
+    <None Update="Fixtures\space-marks\*.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- A stand-in for the app's embedded themes, so ThemeStore.Refresh can be driven

@@ -78,29 +78,52 @@ public class SpaceMarksTests
     public void WellFormedIndentationIsNotMarked(string document) =>
         Assert.Equal(string.Join("|", document.Split('\n').Select(_ => "")), Marks(document));
 
-    /// <summary>No false alarms on ordinary documents: this repository's own Markdown, where
-    /// only the two lines the MRK-02 test document plants are suspect.</summary>
-    [Fact]
-    public void TheRepositorysOwnMarkdownHasNoSuspectIndentationButThePlantedLines()
+    [Theory]   // review finding 1: the blockquote prefix is neither indentation nor a run
+    [InlineData("> - a\n>   - nested", "|")]
+    [InlineData("> 1. x\n>    continuation", "|")]
+    [InlineData("> > - a\n> >   - b  c", "|9,10")]
+    [InlineData("> a  b\n>\n> \n>   ", "3,4|||2,3")]
+    [InlineData("> - a\nlazy  x\n>   - b", "|4,5|")]
+    [InlineData("1. one\n>  x", "|")]                      // a quote starts afresh: the list outside it is not its container…
+    [InlineData("> 1. one\n  lazy", "|")]                  // …and the list inside it is not the lazy line's
+    [InlineData("> 1. one\n>   - two", "|2,3")]           // suspect inside the quote, counted from the quote's text
+    [InlineData("> ```\n> a  b\nc  d", "||1,2")]            // a fence ends with its quote
+    public void BlockquoteMarkersAreNeitherIndentationNorRuns(string document, string expected) =>
+        Assert.Equal(expected, Marks(document));
+
+    [Theory]   // review findings 5 and 7: fences in list items, HTML comments, front matter
+    [InlineData("- item\n  ```\n  a  b\nafter  x", "|||5,6")]           // (a) the fence ends with its list item
+    [InlineData("- item\n\n  ```\n  a  b\n      ```\n  c  d", "|||||")]  // (b) four columns past the item is code, not a closing fence
+    [InlineData("<!--\n```\n-->\na  b", "|||1,2")]                      // (c) a fence in a comment opens nothing
+    [InlineData("<!-- note  \nx  y\n-->\na  b", "9,10|||1,2")]  
+    [InlineData("- ```\n  a  b\n  ```\nc  d", "|||1,2")]                // a fence straight after a list marker
+    [InlineData("---\ntitle:  x\n---\na  b", "|||1,2")]                 // front matter
+    [InlineData("---\nk:  v\n...\na  b", "|||1,2")]
+    [InlineData("\n---\nk:  v", "||2,3")]                                // only on the first line
+    [InlineData("Title\n=====\n    a  b", "||")]                         // code may follow a setext heading
+    public void FencesCommentsAndFrontMatterMarkOnlyTrailingSpaces(string document, string expected) =>
+        Assert.Equal(expected, Marks(document));
+
+    public static TheoryData<string> Corpus() =>
+        [.. Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "Fixtures", "space-marks"), "*.md").Select(Path.GetFileName)!];
+
+    /// <summary>Review finding 2: realistic documents, each written with · on exactly the
+    /// spaces that should be marked; the input is the same file with every · a space.</summary>
+    [Theory]
+    [MemberData(nameof(Corpus))]
+    public void EachCorpusDocumentIsDottedExactlyWhereItsFileShows(string file)
     {
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !root.EnumerateFiles("HELP.md").Any()) root = root.Parent;
-        Assert.NotNull(root);
-        var files = root.EnumerateFiles("*.md").Concat(root.GetDirectories("docs")[0].EnumerateFiles("*.md", SearchOption.AllDirectories)).ToList();
-        var alarms = new List<string>();
-        foreach (var file in files)
+        var expected = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "space-marks", file)).Replace("\r\n", "\n").Split('\n');
+        var state = SpaceMarks.State.Start;
+        var wrong = new List<string>();
+        for (var n = 0; n < expected.Length; n++)
         {
-            var state = SpaceMarks.State.Start;
-            var lines = File.ReadAllText(file.FullName).Replace("\r\n", "\n").Split('\n');
-            for (var n = 0; n < lines.Length; n++)
-            {
-                var (marks, next) = SpaceMarks.Step(lines[n], state);
-                var lead = lines[n].Length - lines[n].TrimStart(' ', '\t').Length;
-                if (lead < lines[n].Length && marks.Any(i => i < lead)) alarms.Add($"{file.Name}:{n + 1}");
-                state = next;
-            }
+            var line = expected[n].Replace('·', ' ').ToCharArray();
+            var (marks, next) = SpaceMarks.Step(new string(line), state);
+            foreach (var i in marks) line[i] = '·';
+            if (new string(line) != expected[n]) wrong.Add($"{file}:{n + 1}: [{new string(line)}]");
+            state = next;
         }
-        Assert.True(files.Count > 10, "the documents were found");
-        Assert.Equal(["space-marks.md:17", "space-marks.md:20"], alarms);
+        Assert.Empty(wrong);
     }
 }
