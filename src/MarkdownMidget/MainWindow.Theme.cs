@@ -71,6 +71,7 @@ public partial class MainWindow
         // The chrome first, and now: the constructor runs before the window is shown, so a
         // dark start has no light flash. On a change it goes before the themes below.
         appearance.Follow(Chrome.ChromePalette.Apply);
+        appearance.Follow(ApplyWebBackground);   // after the chrome: it reads the palette
         _themes = new ThemeModes(_loadedThemeSettings ?? new AppSettings(), IsDarkTheme,
             () => appearance.IsDark, change => SavePersistentField(s => change(s)));
         _loadedThemeSettings = null;
@@ -307,7 +308,8 @@ public partial class MainWindow
         if (!_editorReady || Web.CoreWebView2 is null) return;
         try
         {
-            var raw = await Web.CoreWebView2.ExecuteScriptAsync($"window.MDM.setTheme({JsLiteral(css)})");
+            // A dark start's placeholder goes in the same script, before the read-back.
+            var raw = await Web.CoreWebView2.ExecuteScriptAsync(DropDarkStartScript + $"window.MDM.setTheme({JsLiteral(css)})");
             // Unlinked and applying to the document only: the source view keeps its own
             // theme, so the read-back must not be pushed onto it.
             if (alsoSource) ApplySourceColors(raw);
@@ -468,5 +470,8 @@ public partial class MainWindow
         var (document, source) = _themes.Remembered();
         await ApplyDocumentThemeAsync(document, alsoSource: source is null);
         if (source is not null) await ApplySourceThemeAsync(source);
+        // A theme that couldn't be read installs nothing: a dark start's placeholder goes anyway.
+        if (_editorReady && Web.CoreWebView2 is { } core)
+            try { await core.ExecuteScriptAsync(DropDarkStartScript); } catch { /* the page is gone */ }
     }
 }

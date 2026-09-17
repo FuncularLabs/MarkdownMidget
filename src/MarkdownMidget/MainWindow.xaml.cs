@@ -369,6 +369,13 @@ public partial class MainWindow : Window
         Web.ZoomFactorChanged += OnZoomChanged;
         UpdateZoomIndicator();
 
+        // A dark start: no light document area before the theme applies (MainWindow.Mode.cs).
+        // The page part is decided here: a switch while the page loads shows the old mode's
+        // colour until 'ready', about a second (the WebView's own background follows at once).
+        if (DarkStartColor(_appearance?.IsDark == true) is { } dark)
+            try { await core.AddScriptToExecuteOnDocumentCreatedAsync(DarkStartScript($"#{dark.R:X2}{dark.G:X2}{dark.B:X2}")); }
+            catch { /* no placeholder: light until the theme applies */ }
+
         // Per-launch nonce defeats WebView2's disk cache so a rebuilt editor bundle
         // is always loaded fresh (the bundle refs inside index.html are also hashed).
         _editorNavPending = true;
