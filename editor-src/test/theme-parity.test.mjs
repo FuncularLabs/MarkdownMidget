@@ -418,14 +418,24 @@ test('bold inside a heading or a link keeps that element\'s colour', () => {
   assert.equal(hits[0].value, 'inherit');
 });
 
-test('paper ignores the bold colour', () => {
-  // Pale bold on a dark screen is invisible on white paper. inherit, not #000, so
-  // bold keeps what printing gives the text around it (#333 in a quote, say).
-  const hits = declarations(read('styles', 'print.css'))
-    .filter((d) => d.where === '@media print > .mdm-prosemirror strong' && d.prop === 'color');
-  assert.equal(hits.length, 1);
-  assert.equal(hits[0].value, 'inherit');
-  assert.equal(hits[0].important, true);
+test('paper ignores the theme\'s bold colour, and only that', () => {
+  // Pale bold on a dark screen is invisible on white paper, so print pins the
+  // VARIABLE back to currentColor: bold prints as the text around it (#333 in a
+  // quote, say). Not the colour itself. `color: inherit !important` in this first
+  // layer also beat colours the document writes - <strong style="color:#00f">
+  // printed black in every theme - and a custom theme's own strong rule.
+  //
+  // What this can't show is that outcome. jsdom doesn't cascade @layer or var(),
+  // so an inline colour against print's !important isn't expressible here; the
+  // proof is that print declares exactly the variable on strong and no colour.
+  const print = declarations(read('styles', 'print.css'));
+  assert.deepEqual(
+    print.filter((d) => d.where === '@media print > .mdm-prosemirror strong')
+      .map((d) => [d.prop, d.value, d.important]),
+    [['--mdm-strong', 'currentColor', true]]);
+  assert.deepEqual(
+    print.filter((d) => d.prop === 'color' && /\bstrong\b/.test(d.where)).map((d) => d.where), [],
+    'a print colour on strong outranks the document\'s own inline colour');
 });
 
 test('Obsidiminutive colours inline code, and not fenced code, with its number green', () => {

@@ -54,9 +54,12 @@
   }
 
   /* A theme's bold colour is chosen for its screen page; pale bold on white paper
-     disappears. inherit, not #000, so bold prints as the text around it does. */
+     disappears. The variable is pinned, not the colour: bold prints as the text
+     around it does, while a colour the document writes on bold itself - or a
+     theme's own `strong` rule - still reaches paper, as it did before the
+     variable existed. A `color` here would outrank both. */
   .mdm-prosemirror strong {
-    color: inherit !important;
+    --mdm-strong: currentColor !important;
   }
 
   .mdm-mark {

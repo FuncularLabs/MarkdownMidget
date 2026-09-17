@@ -198,7 +198,7 @@
   "@media print > .milkdown { min-height }",
   "@media print > .mdm-prosemirror { padding }",
   "@media print > .mdm-prosemirror { color }",
-  "@media print > .mdm-prosemirror strong { color }",
+  "@media print > .mdm-prosemirror strong { --mdm-strong }",
   "@media print > .mdm-mark { display }",
   "@media print > .mdm-prosemirror [data-gap]::before, .mdm-prosemirror [data-line]::before { display }",
   "@media print > .mdm-prosemirror blockquote { background }",

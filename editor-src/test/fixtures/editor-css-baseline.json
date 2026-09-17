@@ -1069,8 +1069,8 @@
  },
  {
   "where": "@media print > .mdm-prosemirror strong",
-  "prop": "color",
-  "value": "inherit",
+  "prop": "--mdm-strong",
+  "value": "currentColor",
   "important": true
  },
  {

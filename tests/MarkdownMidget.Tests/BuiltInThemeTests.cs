@@ -213,53 +213,77 @@ public class BuiltInThemeTests
     [Fact]
     public void ObsidiminutiveClearsAAOnEveryTextPairItDefines()
     {
-        // WCAG AA for normal text, 4.5:1, on every pair a reader actually meets - not
-        // just body text on the page, which is all the older palettes are held to.
-        // Inline code's colour is this theme's own rule (it reads --mdm-token-number;
-        // editor-src/test/theme-parity.test.mjs pins that), so its pair is named here.
+        // WCAG AA for normal text, 4.5:1, on every background each text colour can land
+        // on - not just body text on the page, which is all the older palettes are held
+        // to. Built from the surfaces rather than listed pair by pair: the hand-picked
+        // list this replaced missed a link in a table header and a heading in a quote.
         var vars = Variables(Read(Obsidiminutive));
-        var pairs = new (string Fg, string Bg)[]
-        {
-            ("--mdm-text", "--mdm-page-bg"),
-            ("--mdm-heading", "--mdm-page-bg"),
-            ("--mdm-h4", "--mdm-page-bg"),
-            ("--mdm-h5", "--mdm-page-bg"),
-            ("--mdm-h6", "--mdm-page-bg"),
-            ("--mdm-link", "--mdm-page-bg"),
-            ("--mdm-link-hover", "--mdm-page-bg"),
-            ("--mdm-strong", "--mdm-page-bg"),
-            ("--mdm-quote-text", "--mdm-quote-bg"),
-            ("--mdm-strong", "--mdm-quote-bg"),
-            ("--mdm-link", "--mdm-quote-bg"),
-            ("--mdm-token-number", "--mdm-code-bg"),
-            ("--mdm-pre-fg", "--mdm-pre-bg"),
-            ("--mdm-th-text", "--mdm-th-bg"),
-            ("--mdm-strong", "--mdm-th-bg"),
-            ("--mdm-text", "--mdm-td-bg"),
-            ("--mdm-strong", "--mdm-td-bg"),
-            ("--mdm-link", "--mdm-td-bg"),
-            ("--mdm-text", "--mdm-row-alt-bg"),
-            ("--mdm-strong", "--mdm-row-alt-bg"),
-            ("--mdm-link", "--mdm-row-alt-bg"),
-            ("--mdm-mermaid-empty", "--mdm-mermaid-bg"),
-            ("--mdm-mermaid-error-text", "--mdm-mermaid-error-bg"),
-            ("--mdm-token-comment", "--mdm-pre-bg"),
-            ("--mdm-token-punctuation", "--mdm-pre-bg"),
-            ("--mdm-token-property", "--mdm-pre-bg"),
-            ("--mdm-token-number", "--mdm-pre-bg"),
-            ("--mdm-token-string", "--mdm-pre-bg"),
-            ("--mdm-token-operator", "--mdm-pre-bg"),
-            ("--mdm-token-keyword", "--mdm-pre-bg"),
-            ("--mdm-token-function", "--mdm-pre-bg"),
-            ("--mdm-token-regex", "--mdm-pre-bg"),
-        };
-
-        var failures = pairs
+        var failures = ReachableTextPairs(vars)
             .Select(p => (p.Fg, p.Bg, Ratio: Contrast(Rgb(vars[p.Fg]), Rgb(vars[p.Bg]))))
             .Where(p => p.Ratio < 4.5)
             .Select(p => $"{p.Fg} ({vars[p.Fg]}) on {p.Bg} ({vars[p.Bg]}) is {p.Ratio:0.00}:1")
             .ToArray();
         Assert.Equal(Array.Empty<string>(), failures);
+    }
+
+    [Fact]
+    public void EveryObsidiminutiveColourIsTestedAsTextOrNamedAsNotText()
+    {
+        // The sweep above is only complete if a new variable can't slip past it: each
+        // one is in a text pair, or named below with the reason it isn't text.
+        var vars = Variables(Read(Obsidiminutive));
+        var inPairs = ReachableTextPairs(vars).SelectMany(p => new[] { p.Fg, p.Bg }).ToHashSet();
+        Assert.Equal(Array.Empty<string>(),
+            vars.Keys.Where(k => !inPairs.Contains(k) && !NotText.ContainsKey(k)).OrderBy(k => k).ToArray());
+        Assert.Equal(Array.Empty<string>(), NotText.Keys.Where(k => !vars.ContainsKey(k)).ToArray());
+    }
+
+    private static readonly Dictionary<string, string> NotText = new(StringComparer.Ordinal)
+    {
+        ["--mdm-color-scheme"] = "not a colour",
+        ["--mdm-mermaid-theme"] = "not a colour",
+        ["--mdm-app-bg"] = "the surround; nothing is written on it",
+        ["--mdm-page-shadow"] = "a shadow",
+        ["--mdm-quote-bar"] = "a rule", ["--mdm-hr"] = "a rule",
+        ["--mdm-table-border"] = "a border", ["--mdm-cell-border"] = "a border",
+        ["--mdm-mermaid-border"] = "a border", ["--mdm-mermaid-error-border"] = "a border",
+        ["--mdm-squiggle"] = "non-text, 3:1 above", ["--mdm-resize-handle"] = "non-text, 3:1 above",
+        ["--mdm-mark"] = "formatting marks, faint on purpose (1.5:1 above)",
+        ["--mdm-cell-selected"] = "a translucent tint over a cell",
+        ["--mdm-print-row-alt-bg"] = "paper stripe under print's #000 text, 12:1 above",
+    };
+
+    /// <summary>
+    /// Every text colour on every background it can be drawn on, by surface. Inline
+    /// text - a link, its hover, bold - goes wherever a paragraph can, so it is crossed
+    /// with every such surface instead of listed where someone thought of it. Headings
+    /// are blocks: a page or a quote holds one; a GFM table cell can't.
+    /// </summary>
+    private static IEnumerable<(string Fg, string Bg)> ReachableTextPairs(IReadOnlyDictionary<string, string> vars)
+    {
+        var headings = vars.Keys.Where(k => k == "--mdm-heading" || Regex.IsMatch(k, @"^--mdm-h\d$")).ToArray();
+        var tokens = vars.Keys.Where(k => k.StartsWith("--mdm-token-", StringComparison.Ordinal));
+        var inline = new[] { "--mdm-link", "--mdm-link-hover", "--mdm-strong" };
+        var surfaces = new (string Bg, IEnumerable<string> Fg)[]
+        {
+            ("--mdm-page-bg", inline.Append("--mdm-text").Concat(headings)),
+            ("--mdm-quote-bg", inline.Append("--mdm-quote-text").Concat(headings)),
+            ("--mdm-td-bg", inline.Append("--mdm-text")),
+            ("--mdm-row-alt-bg", inline.Append("--mdm-text")),
+            ("--mdm-th-bg", inline.Append("--mdm-th-text")),
+            // Paper's header row keeps its screen look, and a link in it keeps its
+            // colour. No hover on paper; bold prints as the text around it. (Paper's
+            // white cells are not here: printed links and headings keep their screen
+            // colour on white in every dark theme - print.css pins neither.)
+            ("--mdm-print-th-bg", new[] { "--mdm-print-th-text", "--mdm-link" }),
+            // Inline code: this theme's own rule reads --mdm-token-number
+            // (editor-src/test/theme-parity.test.mjs pins it).
+            ("--mdm-code-bg", new[] { "--mdm-token-number" }),
+            ("--mdm-pre-bg", tokens.Append("--mdm-pre-fg")),
+            ("--mdm-mermaid-bg", new[] { "--mdm-mermaid-empty" }),
+            ("--mdm-mermaid-error-bg", new[] { "--mdm-mermaid-error-text" }),
+        };
+        return surfaces.SelectMany(s => s.Fg.Select(fg => (fg, s.Bg)));
     }
 
     [Theory]

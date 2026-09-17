@@ -11,7 +11,7 @@ testing before the stable release of the same number.
 
 ### Added
 
-- **New dark theme: Obsidiminutive**, after the Obsidian style in Notepad++: a slate page with pale grey text, orange headings, violet italic links and green inline code. Bold text is a soft yellow you can read, where Obsidian's own dark navy bold almost disappears, and every text colour meets WCAG AA contrast (4.5:1). Pick it from **View ▸ Theme**. Your own themes can colour bold too: set `--mdm-strong` (see `sample.css`). Bold keeps the colour of the text around it in every other theme and in any theme that doesn't set it, and printed bold stays the colour of the printed text.
+- **New dark theme: Obsidiminutive**, after the Obsidian style in Notepad++: a slate page with pale grey text, orange headings, violet italic links and green inline code. Bold text is a soft yellow you can read, where Obsidian's own dark navy bold almost disappears. Text, headings, links, bold, quotes, tables and code all meet WCAG AA contrast (4.5:1) on every background the theme gives them. Pick it from **View ▸ Theme**. Your own themes can colour bold too: set `--mdm-strong: <colour>` in your theme's `:root`. Bold keeps the colour of the text around it in every other theme and in any theme that doesn't set it, and a theme's bold colour isn't printed.
 
 ### Fixed
 
