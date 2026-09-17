@@ -203,10 +203,10 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 #### TIP-02 Toolbar tooltips open below an enlarged mouse pointer
 - **Change:** Fixed: "Toolbar tooltips now open below an enlarged mouse pointer" · **Documents:** `br-forms.md`, the Help window · **Settings:** formatted view; Windows Settings ▸ Accessibility ▸ Mouse pointer and touch ▸ Size
-1. Set the pointer **Size** to 1 (standard) and open `br-forms.md` in a new window. Hover over **Bold**, the **Style** box, the formatted/source view pair, the code-block chevron, and a greyed-out button in Help (F1). On each, rest the pointer near the top edge, move it off the control, then rest it near the bottom edge. Then close Help (an open Help window is reused, not reopened).
-2. Set **Size** to 3. In the `br-forms.md` window that is still open, hover over **Bold** again. Then open `br-forms.md` in a new window and repeat step 1 in it.
-3. Set **Size** back to 1 and open a new window.
-- **Expected:** In step 1 every tooltip opens just below the pointer, exactly as in rc2. In step 2 the window that was already open still places the **Bold** tooltip as in step 1; in the new window each tooltip opens under its control, clear of the whole pointer, wherever the pointer rests on the control. In step 3 tooltips open below the pointer again, as in step 1.
+1. Close every Markdown Midget window. Set the pointer **Size** to 1 (standard) and open `br-forms.md`. Hover over **Bold**, the **Style** box, the formatted/source view pair, the code-block chevron, and a greyed-out button in Help (F1). On each, rest the pointer near the top edge, move it off the control, then rest it near the bottom edge. Then close Help (an open Help window is reused, not reopened).
+2. Set **Size** to 3. In the `br-forms.md` window that is still open, hover over **Bold** again. Then close that window, open `br-forms.md` again (a file open in one window can't open in a second), and repeat step 1.
+3. Close every Markdown Midget window, set **Size** back to 1, open `br-forms.md` and hover over **Bold**.
+- **Expected:** In step 1 every tooltip opens just below the pointer, exactly as in rc2. In step 2 the window that was already open still places the **Bold** tooltip as in step 1; after reopening, each tooltip opens under its control, clear of the whole pointer, wherever the pointer rests on the control. In step 3 the tooltip opens below the pointer again, as in step 1.
 - **Type:** Both. Automated: `ToolbarToolTipTests.AStandardPointerKeepsWpfsPlacementUnderThePointer`, `ToolbarToolTipTests.AnEnlargedPointerMovesTheTooltipUnderTheButtonByItsWholeSize`, `ToolbarToolTipTests.AMissingInvalidOrSmallSizeKeepsWpfsPlacement`, `ToolbarToolTipTests.AReadThatThrowsKeepsWpfsPlacement`, `ToolbarToolTipTests.TheStandardValuesAreWhatToolbarControlsAndTheirTooltipsHaveUnset`. Human: where the tooltips open in the window, which needs the app.
 
 ### ANC — Heading links
