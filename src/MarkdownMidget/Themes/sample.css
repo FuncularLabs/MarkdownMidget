@@ -40,8 +40,11 @@
   /* Not a colour, and the one every dark theme forgets. Set it to `dark` and
      the scrollbar, form controls and default canvas follow; leave it and they
      stay light against your dark page. `dark` also prints your headings and
-     links in dark colours, because colours chosen for a dark page are too pale
-     on white paper. For printing, only the exact value `dark` counts. */
+     links dark and your page white, because colours chosen for a dark page can
+     be too pale on paper. For printing, only the exact value `dark` counts.
+     Printing darkens them through the heading and link variables below, so a
+     rule of your own that colours a heading or a link directly, such as
+     `.mdm-prosemirror h2 { color: … }`, prints as you wrote it. */
   --mdm-color-scheme: light;
 
   --mdm-app-bg: #e7e7e7;        /* around the page */

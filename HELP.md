@@ -381,11 +381,12 @@ document's theme.
 pick, because a dark page on paper is unreadable and empties a toner cartridge.
 Your **tables** are the exception: the header row and the alternating row shading
 print the way they look on screen (dark themes print a light row shade so the text
-stays readable; their header row keeps its dark look). **Headings and links** print
-in a light theme's own colours. A dark theme's are too pale for white paper, so with
-a dark theme headings print near-black and links dark blue, except a link in a
-table's header row, which prints in the header's text colour. Your own theme counts
-as dark when it sets `--mdm-color-scheme: dark`.
+stays readable; their header row keeps its dark look). **Headings and links** keep
+a light theme's colours. A dark theme's can be too pale for white paper, so with a
+dark theme headings print near-black and links dark blue (a link in a table's header
+row prints in the header's text colour), and the page stays white even with
+**Background graphics** ticked in the print preview. Your own theme counts as dark
+when it sets `--mdm-color-scheme: dark`.
 
 ### Writing your own
 

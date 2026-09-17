@@ -450,21 +450,27 @@ test('Obsidiminutive colours inline code, and not fenced code, with its number g
 
 // ===== headings and links on paper =====
 //
-// A dark theme's heading and link colours are chosen for its dark page and print pale
-// on white paper, so print.css pins them when the theme's --mdm-color-scheme is `dark`,
-// with a style query. jsdom evaluates neither @container nor @layer nor var(), so the
-// query is evaluated here the way the browser does it: the theme's declared value,
-// compared exactly. A print condition this can't evaluate fails the test rather than
-// being guessed at. That WebView2 honours the query on paper is TEST-PLAN PRN-01.
+// A dark theme's heading and link colours are chosen for its dark page and can print too
+// pale on white paper, so when the theme's --mdm-color-scheme is `dark` print.css pins
+// their VARIABLES dark, with a style query, and keeps the dark page off paper when the
+// print dialog's "Background graphics" is ticked. jsdom evaluates neither @container
+// nor @layer nor var(), so this resolves declarations as the tests above do, and
+// evaluates the query the way the browser does: the theme's declared value, compared
+// exactly. A print condition it can't evaluate fails rather than being guessed at.
+// That WebView2 does the same on paper is TEST-PLAN PRN-01.
 
 const DARK = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'Obsidiminutive.css'];
 const LIGHT = ['GitHub-Light.css', 'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
 const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
-const PAPER = '#ffffff';
+const themeVariables = (themeCss) => new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
+/** Whether a declaration's rule lists exactly this selector. */
+const names = (d, selector) => d.where.split(' > ').at(-1).split(', ').includes(selector);
+/** A rule that colours a heading or a link as such, in any selector shape. */
+const headingOrLink = (d) => d.prop === 'color' && /(^|[\s>+~])(a|h[1-6])(?![\w-])/.test(d.where.split(' > ').at(-1));
 
 /** The print declarations that reach paper with this theme installed over Default. */
 function paperDeclarations(themeCss) {
-  const vars = new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
+  const vars = themeVariables(themeCss);
   return declarations(read('styles', 'print.css'), vars).filter((d) =>
     d.where.split(' > ').filter((part) => part.startsWith('@')).every((at) => {
       if (at === '@media print' || at === '@page') return true;
@@ -474,13 +480,41 @@ function paperDeclarations(themeCss) {
     }));
 }
 
-/** The colour paper gives exactly this selector, or undefined when print leaves it alone. */
-function paperColour(themeCss, selector) {
-  const hits = paperDeclarations(themeCss)
-    .filter((d) => d.prop === 'color' && d.where.split(' > ').at(-1).split(', ').includes(selector));
-  assert.ok(hits.length <= 1, `${selector} is coloured on paper ${hits.length} times`);
+/** Print's own value for this selector's property, or undefined when print leaves it alone. */
+function onPaper(themeCss, prop, selector) {
+  const hits = paperDeclarations(themeCss).filter((d) => d.prop === prop && names(d, selector));
+  assert.ok(hits.length <= 1, `${selector} { ${prop} } is set on paper ${hits.length} times`);
   return hits[0]?.value;
 }
+
+/** The last screen rule's value for the property on any of these selectors. */
+const onScreen = (vars, prop, selectors) => declarations(editorCss, vars)
+  .filter((d) => !d.where.startsWith('@') && d.prop === prop && selectors.some((s) => names(d, s)))
+  .at(-1)?.value;
+
+/**
+ * The colour an element prints in: a colour print gives it, or else its screen rule
+ * resolved with the variables print pins on it. `selectors` all match the element, least
+ * specific first, so a later selector's pin wins. `currentColor` means its parent's colour.
+ */
+function printedColour(themeCss, selectors) {
+  for (const s of [...selectors].reverse()) {
+    const own = onPaper(themeCss, 'color', s);
+    if (own) return own;
+  }
+  const vars = themeVariables(themeCss);
+  for (const s of selectors) {
+    for (const d of paperDeclarations(themeCss)) if (d.prop.startsWith('--') && names(d, s)) vars.set(d.prop, d.value);
+  }
+  return onScreen(vars, 'color', selectors);
+}
+
+/** What prints behind the text when Background graphics is ticked; unticked, it's white. */
+const paperPage = (themeCss) => onPaper(themeCss, 'background', '.milkdown')
+  ?? onScreen(themeVariables(themeCss), 'background', ['.milkdown']);
+/** The colour scheme paper prints in, which colours the page margins. */
+const paperScheme = (themeCss) => onPaper(themeCss, 'color-scheme', ':root')
+  ?? onScreen(themeVariables(themeCss), 'color-scheme', [':root']);
 
 /** WCAG contrast of two resolved #rrggbb colours; anything else fails. */
 function contrast(a, b) {
@@ -502,54 +536,100 @@ test('every built-in is sorted into dark or light by what it declares', () => {
   for (const file of LIGHT) assert.equal(rootVariables(readTheme(file)).get('--mdm-color-scheme'), 'light', file);
 });
 
-test('a dark built-in prints every heading and its links dark enough for paper', () => {
+test('a dark built-in prints every heading and its links dark enough for paper, with Background graphics on or off', () => {
   for (const file of DARK) {
     const css = readTheme(file);
-    for (const el of HEADINGS) {
-      const colour = paperColour(css, `.mdm-prosemirror ${el}`);
-      assert.ok(contrast(colour, PAPER) >= 4.5, `${file}: ${el} prints ${colour} on white`);
+    // Unticked, backgrounds are dropped and the page is white. Ticked, they print, so
+    // the page and its margins must be light as well.
+    const page = paperPage(css);
+    assert.equal(paperScheme(css), 'light', `${file}: the margins print in a dark colour scheme`);
+    const body = printedColour(css, ['.mdm-prosemirror']);
+    const link = printedColour(css, ['.mdm-prosemirror a']);
+    for (const ground of ['#ffffff', page]) {
+      assert.ok(contrast(body, ground) >= 4.5, `${file}: body text prints ${body} on ${ground}`);
+      for (const el of HEADINGS) {
+        const colour = printedColour(css, [`.mdm-prosemirror ${el}`]);
+        assert.ok(contrast(colour, ground) >= 4.5, `${file}: ${el} prints ${colour} on ${ground}`);
+      }
+      assert.ok(contrast(link, ground) >= 4.5, `${file}: a link prints ${link} on ${ground}`);
     }
 
     // Still a link on paper: its own dark colour, not the text around it, and print
     // leaves the underline the editor draws.
-    const link = paperColour(css, '.mdm-prosemirror a');
-    assert.ok(contrast(link, PAPER) >= 4.5, `${file}: a link prints ${link} on white`);
-    assert.notEqual(link, paperColour(css, '.mdm-prosemirror'), `${file}: a link prints as body text`);
+    assert.notEqual(link, body, `${file}: a link prints as body text`);
     assert.deepEqual(paperDeclarations(css)
       .filter((d) => d.prop.startsWith('text-decoration') && /(^|, )\.mdm-prosemirror (th )?a(,|$)/.test(d.where.split(' > ').at(-1)))
       .map((d) => d.where), [], `${file}: print takes the underline off links`);
 
     // The header row keeps its dark look on paper, where a dark link would vanish.
-    const inHeader = paperColour(css, '.mdm-prosemirror th a') ?? link;
-    const text = inHeader === 'inherit' ? paperColour(css, '.mdm-prosemirror th') : inHeader;
-    const header = paperDeclarations(css)
-      .find((d) => d.where === '@media print > .mdm-prosemirror th' && d.prop === 'background').value;
+    const inHeader = printedColour(css, ['.mdm-prosemirror a', '.mdm-prosemirror th a']);
+    const text = inHeader.toLowerCase() === 'currentcolor' ? printedColour(css, ['.mdm-prosemirror th']) : inHeader;
+    const header = onPaper(css, 'background', '.mdm-prosemirror th');
     assert.ok(contrast(text, header) >= 4.5, `${file}: a link in a header row prints ${text} on ${header}`);
   }
 });
 
-test('Default and every light built-in print headings and links in their own colours, as before', () => {
-  // Their colours already read on paper and are part of how they look there. Print
-  // colours none of them, and no dark-only rule reaches paper at all.
-  for (const file of ['', ...LIGHT]) {
-    const css = file ? readTheme(file) : '';
-    assert.deepEqual(paperDeclarations(css).filter((d) => d.where.includes('@container'))
-      .map((d) => `${d.where} { ${d.prop} }`), [], `${file || 'Default'}: dark-only print rules apply`);
-    for (const el of [...HEADINGS, 'a', 'th a']) {
-      assert.equal(paperColour(css, `.mdm-prosemirror ${el}`), undefined, `${file || 'Default'}: print colours ${el}`);
+test('paper pins a dark theme\'s heading and link variables, not their colours', () => {
+  // As it does for bold. A colour print gives the element itself outranks a colour the
+  // document writes on it - <h2 style="color:green"> printed #1f2328 - where a variable
+  // only replaces the theme's. The accepted cost: a theme's own colour rule on a heading
+  // or a link, not through a variable, reaches paper. No built-in writes one.
+  for (const file of DARK) {
+    assert.deepEqual(paperDeclarations(readTheme(file)).filter(headingOrLink).map((d) => d.where), [],
+      `${file}: print colours a heading or a link itself`);
+    assert.deepEqual(declarations(readTheme(file)).filter(headingOrLink).map((d) => d.where), [],
+      `${file}: colours a heading or a link without a variable, which paper would keep`);
+  }
+
+  // Pinning variables is enough only while every rule of ours that colours a heading or
+  // a link reads one that paper pins on that element.
+  const pinned = (selector) => new Set(paperDeclarations(readTheme('Dracula.css'))
+    .filter((d) => d.prop.startsWith('--') && names(d, selector)).map((d) => d.prop));
+  const rules = declarations(editorCss).filter((d) => !d.where.startsWith('@') && d.prop === 'color');
+  for (const [el, pinnedOn] of [...HEADINGS.map((h) => [h, h]), ['a', 'a'], ['a:hover', 'a']]) {
+    const colouring = rules.filter((d) => names(d, `.mdm-prosemirror ${el}`));
+    assert.ok(colouring.length > 0, `no screen rule colours ${el}`);
+    for (const d of colouring) {
+      const variable = d.value.match(/^var\((--[\w-]+)\)$/)?.[1];
+      assert.ok(variable && pinned(`.mdm-prosemirror ${pinnedOn}`).has(variable),
+        `${d.where} { color: ${d.value} } is not a variable paper pins on ${pinnedOn}`);
     }
   }
 });
 
+test('Default and every light built-in print headings and links in their own colours, as before', () => {
+  // Their colours already read on paper and are part of how they look there. Each
+  // prints as its screen rule gives it, the page too, no dark-only rule reaches paper
+  // at all, and paper's light colour scheme is the one they already have.
+  for (const file of ['', ...LIGHT]) {
+    const css = file ? readTheme(file) : '';
+    const name = file || 'Default';
+    const screen = themeVariables(css);
+    assert.deepEqual(paperDeclarations(css).filter((d) => d.where.includes('@container'))
+      .map((d) => `${d.where} { ${d.prop} }`), [], `${name}: dark-only print rules apply`);
+    for (const el of [...HEADINGS, 'a']) {
+      const selectors = [`.mdm-prosemirror ${el}`];
+      assert.equal(printedColour(css, selectors), onScreen(screen, 'color', selectors), `${name}: ${el} prints differently`);
+    }
+    assert.equal(printedColour(css, ['.mdm-prosemirror a', '.mdm-prosemirror th a']),
+      onScreen(screen, 'color', ['.mdm-prosemirror a']), `${name}: a link in a header prints differently`);
+    assert.equal(paperPage(css), onScreen(screen, 'background', ['.milkdown']), `${name}: the page prints differently`);
+    assert.equal(onScreen(screen, 'color-scheme', [':root']), 'light', `${name} is not light on screen`);
+  }
+});
+
 test('a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then', () => {
-  const pale = '--mdm-heading: #eeeeee; --mdm-h4: #eeeeee; --mdm-h5: #eeeeee; --mdm-h6: #eeeeee; --mdm-link: #ddddff;';
+  const pale = '--mdm-page-bg: #202020; --mdm-heading: #eeeeee; --mdm-h4: #eeeeee; --mdm-h5: #eeeeee; --mdm-h6: #eeeeee; --mdm-link: #ddddff;';
   const dark = `:root { --mdm-color-scheme: dark; ${pale} }`;
+  const page = paperPage(dark);
   for (const el of [...HEADINGS, 'a']) {
-    assert.ok(contrast(paperColour(dark, `.mdm-prosemirror ${el}`), PAPER) >= 4.5, `dark custom theme: ${el}`);
+    for (const ground of ['#ffffff', page]) {
+      assert.ok(contrast(printedColour(dark, [`.mdm-prosemirror ${el}`]), ground) >= 4.5, `dark custom theme: ${el} on ${ground}`);
+    }
   }
   for (const css of [`:root { --mdm-color-scheme: light; ${pale} }`, `:root { ${pale} }`]) {
-    for (const el of [...HEADINGS, 'a', 'th a']) {
-      assert.equal(paperColour(css, `.mdm-prosemirror ${el}`), undefined, `${css}: print colours ${el}`);
-    }
+    assert.equal(paperPage(css), '#202020', `${css}: print changed the page`);
+    for (const el of HEADINGS) assert.equal(printedColour(css, [`.mdm-prosemirror ${el}`]), '#eeeeee', `${css}: ${el}`);
+    assert.equal(printedColour(css, ['.mdm-prosemirror a', '.mdm-prosemirror th a']), '#ddddff', `${css}: a link in a header`);
   }
 });

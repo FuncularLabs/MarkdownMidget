@@ -1020,6 +1020,12 @@
   "important": false
  },
  {
+  "where": "@media print > :root",
+  "prop": "color-scheme",
+  "value": "light",
+  "important": true
+ },
+ {
   "where": "@media print > .milkdown",
   "prop": "margin",
   "value": "0",
@@ -1074,21 +1080,57 @@
   "important": true
  },
  {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .milkdown",
+  "prop": "background",
+  "value": "#ffffff",
+  "important": true
+ },
+ {
   "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
-  "prop": "color",
+  "prop": "--mdm-heading",
+  "value": "#1f2328",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "--mdm-h4",
+  "value": "#1f2328",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "--mdm-h5",
+  "value": "#1f2328",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror h1, .mdm-prosemirror h2, .mdm-prosemirror h3, .mdm-prosemirror h4, .mdm-prosemirror h5, .mdm-prosemirror h6",
+  "prop": "--mdm-h6",
   "value": "#1f2328",
   "important": true
  },
  {
   "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror a",
-  "prop": "color",
+  "prop": "--mdm-link",
+  "value": "#0550ae",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror a",
+  "prop": "--mdm-link-hover",
   "value": "#0550ae",
   "important": true
  },
  {
   "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror th a",
-  "prop": "color",
-  "value": "inherit",
+  "prop": "--mdm-link",
+  "value": "currentColor",
+  "important": true
+ },
+ {
+  "where": "@media print > @container style(--mdm-color-scheme: dark) > .mdm-prosemirror th a",
+  "prop": "--mdm-link-hover",
+  "value": "currentColor",
   "important": true
  },
  {

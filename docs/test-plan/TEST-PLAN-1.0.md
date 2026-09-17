@@ -239,14 +239,32 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
 ### PRN — Printing with a theme
 
-#### PRN-01 Dark themes print dark headings and links; light themes print as before
-- **Change:** Fixed: "Dark themes now print with dark headings and links" · **Documents:** `print-themes.md` · **Settings:** formatted view
-1. Open `print-themes.md`. Choose **View ▸ Theme ▸ Dracula** and press **Ctrl+P**. In the preview, look at the six heading levels, the heading in the quote, the four links (paragraph, quote, table cell, table header row) and the table. Close the preview.
-2. Repeat step 1 with **GitHub Dark Dimmed**, then **Obsidiminutive**. With Obsidiminutive, also use **File ▸ Print ▸ Export to PDF…** and open the PDF.
-3. Repeat step 1 with **Default**, then **Solarized Light**.
-4. **View ▸ Theme ▸ Open Themes Folder**. In that `custom` folder, create `print-dark.css` containing `:root { --mdm-color-scheme: dark; --mdm-heading: #eeeeee; --mdm-link: #ddddff; }`, and `print-light.css` with the same text but `light` in place of `dark`. Repeat step 1 with **Print Dark**, then **Print Light**. Then choose **Default** and delete both files.
-- **Expected:** In steps 1, 2 and the Print Dark part of step 4, the page is white, every heading (the one in the quote too) is near-black, and the paragraph, quote and cell links are dark blue and underlined. The header row's link is in the header's own text colour and readable: light on the dark header in steps 1 and 2, dark on Default's grey header for Print Dark. The PDF looks like the preview. In step 3 and the Print Light part of step 4, headings and links print in the theme's own colours, as in rc2 (Print Light's pale heading and link are hard to read, as before). After each preview closes, the page on screen is unchanged.
-- **Type:** Both. Automated: `theme-parity.test.mjs` "every built-in is sorted into dark or light by what it declares", "a dark built-in prints every heading and its links dark enough for paper", "Default and every light built-in print headings and links in their own colours, as before", "a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't evaluate the style query that tells print a theme is dark, so only the real print preview shows WebView2 applying it.
+#### PRN-01 Dark themes print dark headings and links on a white page; light themes print as before
+- **Change:** Fixed: "Dark themes now print with dark headings and links" · **Documents:** `print-themes.md` · **Settings:** formatted view; the print preview's **More settings ▸ Background graphics**, unticked then ticked in each step; settings.json backed up in step 1 and restored in step 5
+1. Close every Markdown Midget window. View ▸ Theme saves a theme for the Windows mode you're in, so back up your settings first. In PowerShell, back them up and create two custom themes. The script writes the files itself, because Notepad can save them as `print-dark.css.txt`:
+
+   ```powershell
+   $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
+   if (-not (Test-Path "$p.prn-backup")) { Copy-Item $p "$p.prn-backup" }
+   $c = "$env:LOCALAPPDATA\MarkdownMidget\themes\custom"
+   New-Item -ItemType Directory -Force $c | Out-Null
+   $pale = '--mdm-heading: #eeeeee; --mdm-h4: #eeeeee; --mdm-h5: #eeeeee; --mdm-h6: #eeeeee; --mdm-link: #ddddff;'
+   [IO.File]::WriteAllText("$c\print-dark.css", ":root { --mdm-color-scheme: dark; $pale }")
+   [IO.File]::WriteAllText("$c\print-light.css", ":root { --mdm-color-scheme: light; $pale }")
+   ```
+
+2. Open `print-themes.md`. Choose **View ▸ Theme ▸ Dracula** and press **Ctrl+P**. With **More settings ▸ Background graphics** unticked, look at the page, the six heading levels, the heading in the quote, the four links (paragraph, quote, table cell, table header row) and the table. Tick **Background graphics** and look again. Close the preview.
+3. Repeat step 2 with **GitHub Dark Dimmed**, **Obsidiminutive** and **Print Dark**. With Obsidiminutive, also use **File ▸ Print ▸ Export to PDF…** and open the PDF.
+4. Repeat step 2 with **Default**, **Solarized Light** and **Print Light**.
+5. Close every Markdown Midget window, then delete the two themes and put your settings back. If you stop PRN-01 before this step, close every window and run these lines when you stop:
+
+   ```powershell
+   Remove-Item "$env:LOCALAPPDATA\MarkdownMidget\themes\custom\print-dark.css", "$env:LOCALAPPDATA\MarkdownMidget\themes\custom\print-light.css"
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.prn-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   ```
+
+- **Expected:** In steps 2 and 3, with Background graphics unticked or ticked, the page and its margins are white, body text is black, every heading (the one in the quote too) is near-black, and the paragraph, quote and cell links are dark blue and underlined. The table's header row keeps its theme's look (Default's grey for Print Dark), and its link is in the header's text colour and readable. The PDF looks like the unticked preview. In step 4 everything prints as it did before this build: headings and links in the theme's colours, which the preview may darken where they are very light while Background graphics is unticked. Ticked, Solarized Light's page is cream and Print Light's pale headings and link are hard to read, as before. After each preview closes, the page on screen is unchanged.
+- **Type:** Both. Automated: `theme-parity.test.mjs` "every built-in is sorted into dark or light by what it declares", "a dark built-in prints every heading and its links dark enough for paper, with Background graphics on or off", "paper pins a dark theme's heading and link variables, not their colours", "Default and every light built-in print headings and links in their own colours, as before", "a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't evaluate the style query that tells print a theme is dark, nor the print dialog's Background graphics option, so only the real print preview shows WebView2 applying them.
 
 ### ANC — Heading links
 

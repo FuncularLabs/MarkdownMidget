@@ -16,8 +16,8 @@
  * variables — with ONE bounded exception: the three --mdm-print-* table
  * variables at the end of this file, where a theme states its PAPER look
  * explicitly and a test holds the values to paper-safe contrast. (A theme's
- * --mdm-color-scheme also decides whether headings and links print in this
- * file's dark literals or in the theme's own colours; it chooses, it doesn't
+ * --mdm-color-scheme also decides whether this file pins the page and the heading
+ * and link variables to its own dark-on-white literals; it chooses, it doesn't
  * paint. See the block after bold.)
  *
  * The !important is new. These declarations used to win by being last in the file,
@@ -40,6 +40,13 @@
   body {
     background: #ffffff !important;
     height: auto !important;
+  }
+
+  /* Paper is light, so its colour scheme is too. A dark theme's scheme paints the page
+     margins dark (#121212 in Edge) when the print dialog's "Background graphics" is
+     ticked. Default and every light theme already resolve to `light`. */
+  :root {
+    color-scheme: light !important;
   }
 
   .milkdown {
@@ -65,35 +72,52 @@
     --mdm-strong: currentColor !important;
   }
 
-  /* A dark theme's headings and links are chosen for its dark page and print pale
-     on white (Dracula's links measured 1.38:1), so they print dark. A light theme's
-     own colours already read on paper and are part of its look there, so they print
-     as before. What decides is the variable that makes the page dark,
-     --mdm-color-scheme, read by a style query: a built-in or a custom theme gets
-     this by declaring `dark`, with no script to keep in step. The query reads the declared value
-     exactly, so `dark` and nothing else. Where style queries are unsupported the
-     block is skipped and paper prints as it did before it existed. */
+  /* A dark theme's headings and links are chosen for its dark page and can print too
+     pale to read on white (Obsidiminutive's headings measured 2.63:1), so with a dark
+     theme they print dark. A light theme's own colours already read on paper and are
+     part of its look there, so they print as before.
+
+     What decides is the variable that makes the page dark, --mdm-color-scheme, read by
+     a style query: a built-in or a custom theme gets this by declaring `dark`, with no
+     script to keep in step. The query reads the declared value exactly, so `dark` and
+     nothing else. Where style queries are unsupported the block is skipped and paper
+     prints as it did before it existed.
+
+     As with bold, the VARIABLES are pinned, not the colours, so a colour the document
+     writes on a heading or a link itself still prints. The accepted cost: a dark
+     theme's own colour rule on a heading or a link, not through a variable, reaches
+     paper too. */
   @container style(--mdm-color-scheme: dark) {
+    /* With "Background graphics" ticked, backgrounds print, and this one is dark. */
+    .milkdown {
+      background: #ffffff !important;
+    }
+
     .mdm-prosemirror h1,
     .mdm-prosemirror h2,
     .mdm-prosemirror h3,
     .mdm-prosemirror h4,
     .mdm-prosemirror h5,
     .mdm-prosemirror h6 {
-      color: #1f2328 !important;
+      --mdm-heading: #1f2328 !important;
+      --mdm-h4: #1f2328 !important;
+      --mdm-h5: #1f2328 !important;
+      --mdm-h6: #1f2328 !important;
     }
 
     /* A blue, so a link still differs from the #000 text around it; the underline
        the editor draws stays. */
     .mdm-prosemirror a {
-      color: #0550ae !important;
+      --mdm-link: #0550ae !important;
+      --mdm-link-hover: #0550ae !important;
     }
 
     /* The header row keeps the theme's dark look on paper, where that blue would
        vanish: a link there prints in the header's own text colour, the pair each
        theme is contrast-tested on. */
     .mdm-prosemirror th a {
-      color: inherit !important;
+      --mdm-link: currentColor !important;
+      --mdm-link-hover: currentColor !important;
     }
   }
 
