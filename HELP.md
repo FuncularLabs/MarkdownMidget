@@ -365,7 +365,7 @@ window follows straight away.
 | **System** | Follows Windows. This is the default |
 
 The choice is saved, and every open window follows it within about a second. If it
-can't be saved, the status bar says so, and the choice applies to that window only. With a
+can't be saved, the status bar says so, and that window uses it for now. With a
 Windows contrast theme on, Markdown Midget uses its light look in every mode, so the
 contrast theme's colours stay in charge. Windows' own message boxes and its Open and
 Save dialogs stay light, and a toolbar button you point at keeps its pale blue

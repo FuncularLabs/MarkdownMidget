@@ -24,8 +24,8 @@ public partial class MainWindow
         // pick back and follows it, and writes nothing; so does this window's, finding it
         // already applied. A save that fails leaves the pick on this window only, and says so.
         var saved = SavePersistentField(RememberMode(mode));
-        _appearance.SetMode(mode);
-        if (!saved) FlashStatus("Couldn't save the mode — it applies to this window until it closes.");
+        _appearance.SetMode(mode, saved);
+        if (!saved) FlashStatus("Couldn't save the mode — this window uses it for now.");
         SyncModeMenu();
         RefocusEditor();
     }

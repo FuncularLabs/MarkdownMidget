@@ -148,12 +148,14 @@ internal sealed class WindowsAppearance : IDisposable
         Update();
     }
 
-    /// <summary>View ▸ Mode picked in this window: applies at once. The caller saves it first,
-    /// and settings.json is read now, so a save that didn't land leaves the value on disk as
-    /// the one read last (see <see cref="Refresh"/>).</summary>
-    internal void SetMode(AppearanceMode mode)
+    /// <summary>View ▸ Mode picked in this window: applies at once. The caller saves it first
+    /// and says whether the save landed. Saved, the pick is the value on disk, so another
+    /// window's different pick that lands after it still wins; not saved, settings.json is
+    /// read now and its value counts as the one read last (see <see cref="Refresh"/>).</summary>
+    internal void SetMode(AppearanceMode mode, bool saved = false)
     {
-        if (_savedMode() is { } saved) _lastSaved = saved;
+        if (saved) _lastSaved = mode;
+        else if (_savedMode() is { } read) _lastSaved = read;
         Mode = mode;
         Update();
     }

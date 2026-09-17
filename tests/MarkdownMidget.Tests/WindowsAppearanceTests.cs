@@ -159,6 +159,19 @@ public class WindowsAppearanceTests
     }
 
     [Fact]
+    public void APickElsewhereThatLandsJustAfterThisWindowsSaveStillWins()
+    {
+        // This window saved Dark; another window's Light landed before anything read it back.
+        AppearanceMode? saved = AppearanceMode.System;
+        using var appearance = new WindowsAppearance(() => 1, () => false, savedMode: () => saved);
+        saved = AppearanceMode.Light;
+        appearance.SetMode(AppearanceMode.Dark, saved: true);
+
+        appearance.Refresh();                          // the other window's save arrives
+        Assert.Equal((AppearanceMode.Light, false), (appearance.Mode, appearance.IsDark));
+    }
+
+    [Fact]
     public void ThePickInThisWindowAppliesAtOnceAndRaisesOnlyOnAFlip()
     {
         using var appearance = new WindowsAppearance(() => 1, () => false, savedMode: () => AppearanceMode.System);

@@ -223,8 +223,9 @@ public sealed class AppearanceModeTests : IDisposable
         appearance.FollowSettingsFile(path);
 
         Save(path, "Dark");
-        Assert.True(System.Threading.SpinWait.SpinUntil(() => appearance.Mode == AppearanceMode.Dark, EventWait));
-        Assert.True(appearance.IsDark);
+        // IsDark is the last thing a refresh sets (Mode comes first), so wait on it.
+        Assert.True(System.Threading.SpinWait.SpinUntil(() => appearance.IsDark, EventWait));
+        Assert.Equal(AppearanceMode.Dark, appearance.Mode);
 
         appearance.Dispose();
         System.Threading.Thread.Sleep(250);
