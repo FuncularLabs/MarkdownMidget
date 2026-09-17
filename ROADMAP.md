@@ -74,6 +74,37 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
 
 ## Next
 
+### Now — the 1.0.0-rc3 set (started 2026-09-16)
+
+- **The app should follow Windows light and dark mode.** Today it ignores the Windows
+  setting: the title bar, menus, toolbar, status bar and dialogs stay light, and the
+  document keeps whichever theme View ▸ Theme last set. Decided 2026-09-16:
+  - The window chrome keeps today's look in light mode and gets a matching dark
+    palette, and the dark title bar, in dark mode. WPF's Fluent style was considered
+    and passed over because it would change the light-mode look too.
+  - The document theme switches with the mode. The app should remember one theme per
+    mode, and View ▸ Theme sets the one for the mode Windows is in. The defaults become
+    **Midget Solarized** for light mode and a new dark built-in, **Obsidiminutive**,
+    modelled on Notepad++'s Obsidian but with a legible colour for bold text in place
+    of Obsidian's dark indigo.
+  - A theme saved by an earlier build carries over to the mode it matches; a saved
+    Default counts as never chosen.
+  - The switch should happen while the app is running, as soon as Windows changes mode.
+
+  Raised by an rc2 tester on X (2026-09-16) who works at night with Windows set to
+  Dark: a dark theme darkened the document but not the header or footer. The same
+  tester saw Windows SmartScreen's warning on the first two launches; that is the
+  signing work under [Real installer / uninstaller](#real-installer--uninstaller).
+- **Toolbar tooltips should clear an enlarged mouse pointer** — see
+  [Nits](#nits) below.
+
+### Easier JSON editing — needs definition
+
+- **Working with JSON in a markdown document should get easier** — for example
+  pretty-printing and indenting a JSON block. Raised by the same tester, who writes
+  long JSON prompts. Not started: what it covers needs definition and stakeholder
+  input first.
+
 ### Line numbers (#10) — in 1.0.0-rc1
 
 Both phases are in: the cursor's line and column in the status bar and Go to Line
