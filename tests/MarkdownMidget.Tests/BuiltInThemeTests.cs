@@ -28,6 +28,16 @@ public class BuiltInThemeTests
     private static IReadOnlyDictionary<string, string> DefaultVars =>
         Variables(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "theme-default.css")));
 
+    /// <summary>A theme's variables as the PAGE resolves them: Default's, with the theme's
+    /// own laid over. What a theme leaves unset still renders, and renders Default's value,
+    /// so a sweep that reads only the theme's own file measures a page nobody sees.</summary>
+    private static Dictionary<string, string> Effective(string resource)
+    {
+        var vars = new Dictionary<string, string>(DefaultVars, StringComparer.Ordinal);
+        foreach (var (name, value) in Variables(Read(resource))) vars[name] = value;
+        return vars;
+    }
+
     public static TheoryData<string> BuiltIns
     {
         get
@@ -320,7 +330,10 @@ public class BuiltInThemeTests
         // link underline and the mermaid overlay - and 2X carried four more for the size
         // alone. Four of the five are gone: --mdm-list-marker and --mdm-code-fg took the
         // first two, base.css's own `pre code` rule makes the third unnecessary, and
-        // base.css already underlines links. --mdm-font-size took 2X's four. The fifth
+        // base.css already underlines links - the UNDERLINE, not the
+        // `text-underline-offset: 2px` that rule also set, which was dropped because an
+        // offset is a measurement of the app's type rather than a value a palette holds
+        // (ROADMAP, Nits). --mdm-font-size took 2X's four. The fifth
         // cannot become a variable: none of ours reaches inside the SVG mermaid draws, and
         // the overlay works on its pixels from outside.
         //
@@ -337,9 +350,13 @@ public class BuiltInThemeTests
     public void TheOnlyDifferenceBetweenRedSparksAndItsTwoXIsTheSize()
     {
         // 2X is its sibling with one number doubled. As custom themes the difference was
-        // four more rules — a root font-size, the vendor's two `rem` tokens, a table pin
-        // and the gutter's `font` shorthand — every one of which structure.css now derives
-        // from --mdm-font-size. What is left is worth holding: the two palettes cannot
+        // four more rules - a root font-size, the vendor's two `rem` tokens, a table pin and
+        // the gutter's `font` shorthand - and structure.css now derives all four SITES from
+        // --mdm-font-size. It does not reproduce all four VALUES: the old theme pinned
+        // `table` and `table p` together, so its cell text was 24px at 2X, where ours is the
+        // body size (32px) in a cell box that is 0.75 of it. That difference is deliberate,
+        // and editor-src/test/theme-parity.test.mjs pins it - "a table cell's text is the
+        // body size". What is left here is worth holding on its own: the two palettes cannot
         // drift apart, and a correction to one is a correction to both.
         var (a, b) = (Variables(Read(RedSparks)), Variables(Read(RedSparks2X)));
         Assert.Equal(a.Keys.OrderBy(k => k, StringComparer.Ordinal),
@@ -414,38 +431,165 @@ public class BuiltInThemeTests
         => Assert.False(Variables(Read(resource)).ContainsKey("--mdm-strong"),
             $"{resource} sets --mdm-strong; its users would see bold change colour");
 
-    [Fact]
-    public void ObsidiminutiveClearsAAOnEveryTextPairItDefines()
+    /// <summary>
+    /// The palettes held to the FULL pair sweep below: every text colour on every
+    /// background it can land on, not just body text on the page.
+    ///
+    /// Three of nine, and the shortfall is deliberate and measured rather than assumed.
+    /// The sweep was a [Fact] over Obsidiminutive alone - the palette written to clear
+    /// 4.5:1 everywhere - so a new theme was swept nowhere, which is how the Red Sparks
+    /// pair shipped with sixteen sub-floor pairs while its own header claimed everything
+    /// held to a floor cleared it. Widening it to those two closes that.
+    ///
+    /// Widening it to all nine is a bigger thing than it sounds, and the numbers are here
+    /// so nobody has to re-derive them: the other six measure 68 sub-floor pairs between
+    /// them under this model - Solarized Light 21, One Light 16, GitHub Dark Dimmed 11,
+    /// Midget Solarized 10, Dracula 6, GitHub Light 4 - and 18 of those 68 are pairs none
+    /// of the six chose at all, being the list marker and inline code they leave unset and
+    /// therefore draw in the vendor's nord10. None of it is new behaviour: those palettes
+    /// render exactly as they always have, and the numbers were never written down. But
+    /// recording 68 exceptions here would be an audit of six palettes nobody asked for,
+    /// and it would bury the sixteen that are actually new. So: measured, reported, and
+    /// left as one decision per palette.
+    /// </summary>
+    public static TheoryData<string> FullySweptPalettes => new() { Obsidiminutive, RedSparks, RedSparks2X };
+
+    /// <summary>Shared by the pair, which differ only in --mdm-font-size.</summary>
+    private static readonly Dictionary<string, double> RedSparksDimPairs = new(StringComparer.Ordinal)
+    {
+        // 16 of 39, floor 3.9. Grouped as they read: the hover is the largest cluster,
+        // because a hover that can only go dimmer than #FF0000 is dim on every surface.
+        ["--mdm-mermaid-empty on --mdm-mermaid-bg"] = 2.44,
+        ["--mdm-token-comment on --mdm-pre-bg"] = 2.55,
+        ["--mdm-link-hover on --mdm-th-bg"] = 2.59,
+        ["--mdm-link-hover on --mdm-row-alt-bg"] = 2.73,
+        ["--mdm-link-hover on --mdm-page-bg"] = 2.78,
+        ["--mdm-link-hover on --mdm-td-bg"] = 2.78,
+        ["--mdm-link-hover on --mdm-quote-bg"] = 2.81,
+        ["--mdm-token-punctuation on --mdm-pre-bg"] = 3.42,
+        ["--mdm-token-operator on --mdm-pre-bg"] = 3.42,
+        ["--mdm-quote-text on --mdm-quote-bg"] = 3.76,
+        ["--mdm-code-fg on --mdm-code-bg"] = 3.85,
+        ["--mdm-token-string on --mdm-pre-bg"] = 3.87,
+        ["--mdm-token-number on --mdm-pre-bg"] = 3.87,
+        ["--mdm-token-property on --mdm-pre-bg"] = 3.87,
+        ["--mdm-token-regex on --mdm-pre-bg"] = 3.87,
+        ["--mdm-text on --mdm-row-alt-bg"] = 3.89,
+    };
+
+    /// <summary>
+    /// Text pairs a swept palette draws below its own floor, by EXACT resource name and
+    /// exact pair, each with the ratio it measures today - floored to 2dp, so the number
+    /// recorded is one the pair really clears. Two tests read it: the sweep, which lets a
+    /// recorded pair sit below the floor but never below its recorded value, and the
+    /// companion, which fails if an entry names a pair the theme doesn't draw or one that
+    /// has since been brightened. Same exact-name discipline as BodyTextFloors: no
+    /// substrings, no prefixes, one line per pair.
+    ///
+    /// Red Sparks: sixteen, and they are the honest cost of one hue. A single-hue night
+    /// palette has one dim band to work in - that is what it is for - and the alternative
+    /// to writing them down was a theme header claiming a floor nothing enforced.
+    ///
+    /// Obsidiminutive: two, and both arrived with the contract rather than with a palette.
+    /// It predates --mdm-list-marker, so its bullets and numbers render in the vendor's
+    /// nord10 (#5e81ac) rather than in anything it chose: 3.29:1 on its page and 2.94:1 in
+    /// a quote. Every palette that predates the variable has the same markers; these two
+    /// are simply the first to be measured. Worth a look by whoever owns that theme.
+    /// </summary>
+    private static readonly Dictionary<string, Dictionary<string, double>> DimTextPairs =
+        new(StringComparer.Ordinal)
+    {
+        [Obsidiminutive] = new()   // 2 of 44, floor 4.5
+        {
+            ["--mdm-list-marker on --mdm-quote-bg"] = 2.94,
+            ["--mdm-list-marker on --mdm-page-bg"] = 3.29,
+        },
+        [RedSparks] = RedSparksDimPairs,
+        [RedSparks2X] = RedSparksDimPairs,     // the same palette, so the same numbers
+    };
+
+    [Theory]
+    [MemberData(nameof(FullySweptPalettes))]
+    public void EveryThemeClearsItsOwnFloorOnEveryTextPairItDefines(string resource)
     {
         // WCAG AA for normal text, 4.5:1, on every background each text colour can land
-        // on - not just body text on the page, which is all the older palettes are held
-        // to. Built from the surfaces rather than listed pair by pair: the hand-picked
+        // on - not just body text on the page, which is all the older palettes used to be
+        // held to. Built from the surfaces rather than listed pair by pair: the hand-picked
         // list this replaced missed a link in a table header and a heading in a quote.
-        var vars = Variables(Read(Obsidiminutive));
-        var failures = ReachableTextPairs(vars)
-            .Select(p => (p.Fg, p.Bg, Ratio: Contrast(Rgb(vars[p.Fg]), Rgb(vars[p.Bg]))))
-            .Where(p => p.Ratio < 4.5)
-            .Select(p => $"{p.Fg} ({vars[p.Fg]}) on {p.Bg} ({vars[p.Bg]}) is {p.Ratio:0.00}:1")
+        //
+        // This was a [Fact] over Obsidiminutive alone, which meant a palette could ship
+        // with a link its users can't read as long as its body text cleared AA. The floor
+        // is the theme's own (BodyTextFloors), because a palette allowed 3.9 for prose
+        // cannot be held to 4.5 for a link inside it, and the pairs that sit below even
+        // that are recorded one by one in DimTextPairs with what they measure.
+        var vars = Effective(resource);
+        var floor = BodyTextFloors.TryGetValue(resource, out var exempt) ? exempt : 4.5;
+        var dim = DimTextPairs[resource];
+        var failures = ReachableTextPairs(Variables(Read(resource)), resource)
+            .Select(p => (Key: $"{p.Fg} on {p.Bg}", p.Fg, p.Bg,
+                          Ratio: Contrast(Rgb(vars[p.Fg]), Rgb(vars[p.Bg]))))
+            .Where(p => p.Ratio < (dim.TryGetValue(p.Key, out var recorded) ? recorded : floor))
+            .Select(p => $"{p.Fg} ({vars[p.Fg]}) on {p.Bg} ({vars[p.Bg]}) is {p.Ratio:0.00}:1, under " +
+                         (dim.ContainsKey(p.Key)
+                             ? $"the {dim[p.Key]:0.00} recorded for it"
+                             : $"this theme's {floor:0.0} floor"))
             .ToArray();
         Assert.Equal(Array.Empty<string>(), failures);
     }
 
-    [Fact]
-    public void EveryObsidiminutiveColourIsTestedAsTextOrNamedAsNotText()
+    [Theory]
+    [MemberData(nameof(FullySweptPalettes))]
+    public void EveryRecordedDimPairIsOneThePaletteReallyDrawsAndStillNeeds(string resource)
+    {
+        // The other half, and the half an exception table rots without: an entry has to
+        // name a pair the theme actually draws, and to still be below the floor. Brighten
+        // a colour and its entry fails here until it is deleted, so the table is a record
+        // of what a palette does today and never a list of floors nobody rechecks.
+        var vars = Effective(resource);
+        var floor = BodyTextFloors.TryGetValue(resource, out var exempt) ? exempt : 4.5;
+        var reachable = ReachableTextPairs(Variables(Read(resource)), resource).ToDictionary(
+            p => $"{p.Fg} on {p.Bg}", p => Contrast(Rgb(vars[p.Fg]), Rgb(vars[p.Bg])));
+        foreach (var (key, recorded) in DimTextPairs[resource])
+        {
+            Assert.True(reachable.ContainsKey(key),
+                $"{resource} records {key} as dim, but no such text pair is reachable in it");
+            // The recorded number is this pair's own measurement, floored to 2dp - so it is
+            // pinned to within that, not merely "somewhere below the floor". A number parked
+            // well under what the pair measures would be a licence to dim it later, which is
+            // the way a table like this goes soft.
+            Assert.InRange(reachable[key], recorded, recorded + 0.01);
+            Assert.True(recorded < floor,
+                $"{resource} records {key} at {recorded:0.00}, which is not below its " +
+                $"{floor:0.0} floor: the entry is not needed and is hiding nothing");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(FullySweptPalettes))]
+    public void EveryColourAThemeSetsIsTestedAsTextOrNamedAsNotText(string resource)
     {
         // The sweep above is only complete if a new variable can't slip past it: each
-        // one is in a text pair, or named below with the reason it isn't text.
-        var vars = Variables(Read(Obsidiminutive));
-        var inPairs = ReachableTextPairs(vars).SelectMany(p => new[] { p.Fg, p.Bg }).ToHashSet();
+        // one is in a text pair, or named below with the reason it isn't text. Over every
+        // built-in, not Obsidiminutive alone - the sweep widened, and a completeness check
+        // narrower than the thing it certifies is how the marker colour went unswept.
+        var vars = Variables(Read(resource));
+        var inPairs = ReachableTextPairs(vars, resource).SelectMany(p => new[] { p.Fg, p.Bg }).ToHashSet();
         Assert.Equal(Array.Empty<string>(),
             vars.Keys.Where(k => !inPairs.Contains(k) && !NotText.ContainsKey(k)).OrderBy(k => k).ToArray());
-        Assert.Equal(Array.Empty<string>(), NotText.Keys.Where(k => !vars.ContainsKey(k)).ToArray());
     }
+
+    [Fact]
+    public void EveryNameCalledNotTextIsARealVariable()
+        // Checked against the contract rather than one theme's file: a name here that no
+        // palette happens to set would still be excusing a variable that doesn't exist.
+        => Assert.Equal(Array.Empty<string>(),
+            NotText.Keys.Where(k => !DefaultVars.ContainsKey(k)).OrderBy(k => k).ToArray());
 
     private static readonly Dictionary<string, string> NotText = new(StringComparer.Ordinal)
     {
         ["--mdm-color-scheme"] = "not a colour",
         ["--mdm-mermaid-theme"] = "not a colour",
+        ["--mdm-font-size"] = "not a colour: a metric",
         ["--mdm-app-bg"] = "the surround; nothing is written on it",
         ["--mdm-page-shadow"] = "a shadow",
         ["--mdm-quote-bar"] = "a rule", ["--mdm-hr"] = "a rule",
@@ -458,20 +602,49 @@ public class BuiltInThemeTests
     };
 
     /// <summary>
+    /// Inline code's foreground for a theme that colours it with a RULE instead of the
+    /// variable, by exact resource name. Obsidiminutive predates --mdm-code-fg and paints
+    /// inline code with `.mdm-prosemirror code { color: var(--mdm-token-number) }`, which
+    /// editor-src/test/theme-parity.test.mjs pins; a variable-less sweep would check the
+    /// wrong colour for it and none at all for a theme that does use the variable.
+    /// </summary>
+    private static readonly Dictionary<string, string> InlineCodeByRule = new(StringComparer.Ordinal)
+    {
+        [Obsidiminutive] = "--mdm-token-number",
+    };
+
+    /// <summary>
     /// Every text colour on every background it can be drawn on, by surface. Inline
     /// text - a link, its hover, bold - goes wherever a paragraph can, so it is crossed
-    /// with every such surface instead of listed where someone thought of it. Headings
-    /// are blocks: a page or a quote holds one; a GFM table cell can't.
+    /// with every such surface instead of listed where someone thought of it. Headings and
+    /// list markers are blocks: a page or a quote holds one; a GFM table cell can't.
+    ///
+    /// A variable the theme leaves UNSET is left out, because unset means Default's value
+    /// and Default is measured by its own test - and because reading one here threw before
+    /// this sweep covered a palette that leaves --mdm-strong alone.
     /// </summary>
-    private static IEnumerable<(string Fg, string Bg)> ReachableTextPairs(IReadOnlyDictionary<string, string> vars)
+    private static IEnumerable<(string Fg, string Bg)> ReachableTextPairs(
+        IReadOnlyDictionary<string, string> vars, string? resource = null)
     {
         var headings = vars.Keys.Where(k => k == "--mdm-heading" || Regex.IsMatch(k, @"^--mdm-h\d$")).ToArray();
         var tokens = vars.Keys.Where(k => k.StartsWith("--mdm-token-", StringComparison.Ordinal));
-        var inline = new[] { "--mdm-link", "--mdm-link-hover", "--mdm-strong" };
+        var inline = new[] { "--mdm-link", "--mdm-link-hover", "--mdm-strong" }.Where(vars.ContainsKey).ToArray();
+        // A bullet or a number is text the theme paints, and it is drawn whether the theme
+        // sets a colour for it or not - unset, it is the vendor's nord10, which is what the
+        // page really renders and so what the sweep really has to measure. That is not a
+        // technicality: it is how Obsidiminutive's markers turned out to be 3.29:1 on its
+        // own page, a pair no test had ever looked at.
+        var blocks = headings.Append("--mdm-list-marker").ToArray();
+        // Inline code the same way: this theme's variable if it sets one, else the variable
+        // its own rule reads, else Default's --mdm-code-fg - which is nord10 again, on this
+        // theme's code background.
+        var code = vars.ContainsKey("--mdm-code-fg") ? "--mdm-code-fg"
+            : resource is not null && InlineCodeByRule.TryGetValue(resource, out var byRule) ? byRule
+            : "--mdm-code-fg";
         var surfaces = new (string Bg, IEnumerable<string> Fg)[]
         {
-            ("--mdm-page-bg", inline.Append("--mdm-text").Concat(headings)),
-            ("--mdm-quote-bg", inline.Append("--mdm-quote-text").Concat(headings)),
+            ("--mdm-page-bg", inline.Append("--mdm-text").Concat(blocks)),
+            ("--mdm-quote-bg", inline.Append("--mdm-quote-text").Concat(blocks)),
             ("--mdm-td-bg", inline.Append("--mdm-text")),
             ("--mdm-row-alt-bg", inline.Append("--mdm-text")),
             ("--mdm-th-bg", inline.Append("--mdm-th-text")),
@@ -480,9 +653,7 @@ public class BuiltInThemeTests
             // paper print in print.css's own dark colours (theme-parity.test.mjs holds
             // those to 4.5:1). No hover on paper; bold prints as the text around it.
             ("--mdm-print-th-bg", new[] { "--mdm-print-th-text" }),
-            // Inline code: this theme's own rule reads --mdm-token-number
-            // (editor-src/test/theme-parity.test.mjs pins it).
-            ("--mdm-code-bg", new[] { "--mdm-token-number" }),
+            ("--mdm-code-bg", new[] { code }),
             ("--mdm-pre-bg", tokens.Append("--mdm-pre-fg")),
             ("--mdm-mermaid-bg", new[] { "--mdm-mermaid-empty" }),
             ("--mdm-mermaid-error-bg", new[] { "--mdm-mermaid-error-text" }),
@@ -546,7 +717,7 @@ public class BuiltInThemeTests
     /// </summary>
     private static readonly Dictionary<string, double> BodyTextFloors = new(StringComparer.Ordinal)
     {
-        // 4.12:1. Not an oversight but the entire point of Solarized: base00 on base3 is a
+        // 4.13:1. Not an oversight but the entire point of Solarized: base00 on base3 is a
         // deliberately reduced contrast chosen so long reading sessions hurt less.
         ["themes/Solarized-Light.css"] = 4.0,
         // 3.96:1, both files, which share the palette. A single-hue red page has nothing

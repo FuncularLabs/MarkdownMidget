@@ -929,6 +929,57 @@ test('the numbers beside blank lines keep their own size', () => {
   // gives beside it: its box has to fit the fixed 16px margin between two blocks, and its
   // negative margin-top IS its line box. Pinned so "scale everything" can't quietly be
   // extended to it without moving the block margins too.
+
+test('a table cell\'s text is the body size, and only the cell BOX is 0.75 of it', () => {
+  // The one place this derivation does not reproduce what the custom double-size theme it
+  // came from produced, so it is written down rather than left to be rediscovered. That
+  // theme pinned `table` AND `table p`, so its cell TEXT was 24px at 2X. Here the cell BOX
+  // is 0.75 of the document and the text inside it is a paragraph, which follows the
+  // vendor's --text-base like every other paragraph: 32px at 2X, 16px at the default.
+  //
+  // That is not a gap to close. A `th > p, td > p` font-size of ours would match the old
+  // theme and break the premise the whole contract rests on: at the default size it would
+  // take every theme's cell text from 16px to 12px - a visible change to seven palettes
+  // that set nothing at all. Cell text has always been the body size; it still is.
+  const ours = declarations(read('styles', 'structure.css'));
+
+  assert.deepEqual(
+    ours.filter((d) => (d.prop === 'font-size' || d.prop === 'font')
+      && /\b(th|td)\b[^,]*>\s*p\b/.test(d.where)).map((d) => d.where), [],
+    'a font-size on a cell\'s paragraph would shrink every theme\'s cell text to 0.75');
+
+  // What sizes it is the VENDOR's own `p` rule, reading the token the document redefines -
+  // so it is read out of the built bundle, as vendorNord10() reads the palette, and not out
+  // of our five layers, which is where the first draft of this test looked and found
+  // nothing. A vendor bump that stops sizing paragraphs from --text-base fails here.
+  const bundle = readFileSync(
+    join(here, '..', '..', 'src', 'MarkdownMidget', 'wwwroot', 'editor.bundle.css'), 'utf8');
+  assert.deepEqual(
+    declarations(bundle).filter((d) => d.prop === 'font-size'
+      && d.where === '@layer mdm-vendor > .milkdown-theme-nord p').map((d) => d.value),
+    ['var(--text-base)'],
+    'the vendor no longer sizes paragraphs from --text-base; cell text may have moved with it');
+
+  // So at both sizes, measured through the token rather than through a selector, which is
+  // what keeps this true if --text-base is ever declared somewhere else.
+  for (const [size, theme] of [['16px', ''], ['32px', ':root { --mdm-font-size: 32px; }']]) {
+    const resolved = declarations(read('styles', 'structure.css'), themeVariables(theme));
+    const token = resolved.filter((d) => d.prop === '--text-base');
+    assert.equal(token.length, 1, '--text-base is redefined exactly once');
+    assert.equal(token[0].value, size, `a cell's paragraph at --mdm-font-size: ${size}`);
+
+    const box = resolved.filter((d) => d.prop === 'font-size'
+      && /\b(th|td)\b/.test(d.where) && !/>\s*p\b/.test(d.where));
+    assert.equal(box.length, 1, 'one rule sizes the cell box');
+    assert.equal(box[0].value, `calc(${size} * 0.75)`, `the cell box at --mdm-font-size: ${size}`);
+  }
+});
+
+test('the numbers beside blank lines keep their own size, and say why in the file', () => {
+  // The one gutter number that cannot follow the variable: its box has to fit inside the
+  // fixed 16px margin between two blocks, and its negative margin-top IS its line box.
+  // Pinned so that "scale everything" can't quietly be extended to it without moving the
+  // block margins too — and so the comment that explains it can't go missing.
   const gap = declarations(read('styles', 'structure.css'))
     .filter((d) => d.where === '.mdm-prosemirror [data-gap]::before');
   assert.deepEqual(gap.filter((d) => d.prop === 'font-size' || d.prop === 'line-height'), []);
@@ -1016,4 +1067,30 @@ test('paper takes the document\'s text size from the theme, and keeps its own fo
   // ...and its own printout, which is not in the document, still states 10pt.
   assert.deepEqual(print.filter((d) => d.where === '@media print > .mdm-print-source-pre' && d.prop === 'font-size')
     .map((d) => [d.value, d.important]), [['10pt', true]]);
+});
+
+// ===== the README's theme list =====
+//
+// HELP's count and its table are both pinned in BuiltInThemeTests, because HELP is an
+// embedded resource the test assembly can read. The README is not embedded and had no
+// pin at all, so the same drift - a palette added, the docs left saying eight - could
+// still land there. It is checked here instead, where the repository's own files are
+// already what the tests read.
+
+test('the README\'s theme count and list name every built-in that ships', () => {
+  const readme = readFileSync(join(here, '..', '..', 'README.md'), 'utf8');
+  const files = readdirSync(builtinDir).filter((f) => f.endsWith('.css')).sort();
+
+  // The count is of THEMES, which is one more than the files: Default has no file.
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+    'nine', 'ten', 'eleven', 'twelve'];
+  const claim = readme.match(/\*\*Themes\*\* — ([a-z]+) built in/);
+  assert.ok(claim, 'the README no longer says "**Themes** — N built in"');
+  assert.equal(claim[1], words[files.length + 1],
+    `the README says ${claim[1]} themes; ${files.length} files ship, plus Default`);
+
+  // And every one is named, as the menu names it: `GitHub-Light.css` is "GitHub Light".
+  const display = (f) => f.replace(/\.css$/, '').replace(/[-_]/g, ' ');
+  const missing = [...files.map(display), 'Default'].filter((name) => !readme.includes(name));
+  assert.deepEqual(missing, [], 'themes that ship but the README does not name');
 });
