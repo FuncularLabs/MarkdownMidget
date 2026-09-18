@@ -8,8 +8,9 @@
  *  the least disruptive light to dark-adapted eyes and to your circadian
  *  rhythm, so this one is made for editing after dark.
  *
- *  It is the one shipped palette that does not clear WCAG AA for body text:
- *  #DC0000 on the page is 3.96:1. That is the design, not an oversight — a
+ *  It has the dimmest body text of any shipped palette, and does not clear WCAG
+ *  AA for normal text: #DC0000 on the page is 3.96:1. (Solarized Light is the
+ *  other one below AA, at 4.12:1.) That is the design, not an oversight — a
  *  single hue has nothing brighter to offer short of pure #FF0000, which at
  *  5.14:1 is the ceiling and is reserved for the things you must not miss.
  *  The test suite exempts this palette by name with that measurement

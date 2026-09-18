@@ -458,7 +458,8 @@ the table resize handle survive whatever a theme says about them.
 **Text size.** `--mdm-font-size` is the one size the document derives from. Set it
 once — `--mdm-font-size: 32px` — and body text, the six heading levels, list markers,
 inline and fenced code, table text and the line numbers all follow, on screen and on
-paper: a large theme prints large, on more paper. Declare it in `:root` — put it on
+paper: a large theme prints large, on more paper. **Red Sparks 2X** is exactly that: **Red Sparks** with that one line changed.
+Declare it in `:root` — put it on
 `.mdm-prosemirror`, which is a fine place for your colours, and only part of the
 document follows: headings, list markers and the line numbers grow; body text and table
 text stay put, and code follows whatever it sits in. Use a positive absolute size

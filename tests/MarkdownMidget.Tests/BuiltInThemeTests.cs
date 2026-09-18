@@ -315,12 +315,14 @@ public class BuiltInThemeTests
     [InlineData(RedSparks2X)]
     public void TheRedSparksPairIsVariablesAndOneScreenRuleTheContractCannotExpress(string resource)
     {
-        // The pair arrived as custom themes carrying five hand-written rules: a ::marker
-        // colour, an inline-code colour and the `pre code` handback that rule needed, a
-        // link underline, and the mermaid overlay. Four are gone — three became
-        // --mdm-list-marker, --mdm-code-fg and --mdm-font-size, and base.css already
-        // underlines links. The fifth cannot become a variable: none of ours reaches inside
-        // the SVG mermaid draws, and the overlay works on its pixels from outside.
+        // The pair arrived as custom themes carrying five hand-written rules - a ::marker
+        // colour, an inline-code colour, the `pre code` handback that second rule needed, a
+        // link underline and the mermaid overlay - and 2X carried four more for the size
+        // alone. Four of the five are gone: --mdm-list-marker and --mdm-code-fg took the
+        // first two, base.css's own `pre code` rule makes the third unnecessary, and
+        // base.css already underlines links. --mdm-font-size took 2X's four. The fifth
+        // cannot become a variable: none of ours reaches inside the SVG mermaid draws, and
+        // the overlay works on its pixels from outside.
         //
         // Pinned as the whole list of blocks, with nesting, because that is what a
         // regression looks like here: a re-added `.mdm-prosemirror.mdm-prosemirror` rule
