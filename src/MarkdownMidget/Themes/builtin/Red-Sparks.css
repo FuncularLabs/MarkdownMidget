@@ -15,7 +15,7 @@
  *  5.14:1 is the ceiling and is reserved for the things you must not miss.
  *  The test suite exempts this palette by name with that measurement recorded.
  *
- *  And it is not only the body text. Sixteen of the thirty-nine text pairs this
+ *  And it is not only the body text. Seventeen of the forty-one text pairs this
  *  palette draws sit below that same 3.9, and pretending otherwise was the first
  *  thing wrong with this header. Each is recorded, by pair, in BuiltInThemeTests
  *  (DimTextPairs), which fails if any of them goes dimmer still. The dimmest, and
@@ -29,12 +29,15 @@
  *    punctuation / operator  3.42:1, the scaffolding tier of the syntax colours.
  *    --mdm-quote-text        3.76:1 in a quote, --mdm-code-fg 3.85:1 on inline
  *                            code's panel, the string/number/property/regex tier
- *                            3.87:1, body text 3.89:1 on an alternating row.
+ *                            3.87:1, and body text and the list markers both
+ *                            3.89:1 on an alternating row - they are the same
+ *                            colour, so they are the same number.
  *
  *  Those are the trade a single hue makes: one dim band, and everything in it.
  *  What is NOT in it, because it is what you must not miss: the squiggle and the
  *  resize handle at 5.14:1; the six headings 4.27:1 at worst (h6 on the page) and
- *  5.20:1 at best; the list markers 3.96:1; the table header's own text and the
+ *  5.20:1 at best; the list markers 3.96:1 on the page and in a cell, 4.00:1 in a
+ *  quote; the table header's own text and the
  *  printed header pair both 4.78:1; the printed row stripe 21:1. Formatting marks
  *  are 2.14:1 and belong in neither list: they are meant to be faint, and their
  *  floor is 1.5.

@@ -240,25 +240,51 @@ public class BuiltInThemeTests
     private static readonly string[] NewestVariables =
         { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" };
 
+    /// <summary>
+    /// Which of the three each palette sets, by EXACT resource name; absent means none.
+    ///
+    /// This began as a two-way branch - predates them, or sets all three - and that shape
+    /// was wrong the moment a palette had reason to set some. Obsidiminutive sets the two
+    /// COLOURS and not the size: its markers were the vendor's nord10 at 3.29:1 on its own
+    /// page and its inline code was a rule, and both are now variables, while its text size
+    /// is the app's and has no reason to change. A three-way table says that; "sets them
+    /// all" could only have said it by being relaxed into "sets at least one", which is
+    /// how a pin like this stops meaning anything.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> NewestVariablesSet = new(StringComparer.Ordinal)
+    {
+        // The size is the whole point of the pair, so all three.
+        [RedSparks] = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" },
+        [RedSparks2X] = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" },
+        // Colours only: 16px is the size this theme has always rendered at.
+        [Obsidiminutive] = new[] { "--mdm-code-fg", "--mdm-list-marker" },
+    };
+
     [Theory]
     [MemberData(nameof(BuiltIns))]
-    public void EveryShippedPaletteEitherPredatesTheNewestVariablesOrSetsThemAll(string resource)
+    public void EveryShippedPaletteSetsExactlyTheNewestVariablesItIsNamedFor(string resource)
     {
-        // Every palette that shipped before the size and marker work leaves all three
-        // unset, so it renders exactly as it did before they existed. The Red Sparks pair
-        // is the other case and is the reason this is a branch rather than a blanket
-        // "nobody sets one": it was written against the contract and sets all three, which
-        // is what replaced the four rules its custom version hand-wrote. Both directions
-        // are asserted, so a palette can't slip between them - a new theme setting one of
-        // the three fails here until it is named, and a Red Sparks file that quietly
-        // dropped one fails too, which is how the ::marker rule would come back.
+        // Exact equality in both directions, per palette, so nothing slips between the
+        // cases: a palette not named here that sets one of the three fails until someone
+        // decides it should, and a palette named here that drops one fails too - which is
+        // how the ::marker rule would come back, or how Obsidiminutive's markers would
+        // quietly return to the vendor's blue-grey.
         var mine = Variables(Read(resource));
-        var set = NewestVariables.Where(mine.ContainsKey).ToArray();
-        if (resource is RedSparks or RedSparks2X)
-            Assert.Equal(NewestVariables, set);
-        else
-            Assert.Equal(Array.Empty<string>(), set);
+        var expected = NewestVariablesSet.TryGetValue(resource, out var named)
+            ? named : Array.Empty<string>();
+        Assert.Equal(expected.OrderBy(v => v, StringComparer.Ordinal),
+                     NewestVariables.Where(mine.ContainsKey).OrderBy(v => v, StringComparer.Ordinal));
     }
+
+    [Fact]
+    public void EveryPaletteNamedForANewestVariableIsOneThatShips()
+        // A name here that no longer ships would be excusing nothing, and a variable name
+        // with a typo in it would excuse a variable that does not exist.
+        => Assert.Equal(Array.Empty<string>(),
+            NewestVariablesSet.Keys.Where(k => !App.GetManifestResourceNames().Contains(k))
+                .Concat(NewestVariablesSet.Values.SelectMany(v => v).Distinct()
+                    .Where(v => !NewestVariables.Contains(v)))
+                .OrderBy(k => k, StringComparer.Ordinal).ToArray());
 
     // ===== Red Sparks, and a palette written against the contract =====
 
@@ -438,26 +464,31 @@ public class BuiltInThemeTests
     /// Three of nine, and the shortfall is deliberate and measured rather than assumed.
     /// The sweep was a [Fact] over Obsidiminutive alone - the palette written to clear
     /// 4.5:1 everywhere - so a new theme was swept nowhere, which is how the Red Sparks
-    /// pair shipped with sixteen sub-floor pairs while its own header claimed everything
-    /// held to a floor cleared it. Widening it to those two closes that.
+    /// pair shipped with seventeen sub-floor pairs while its own header claimed everything
+    /// held to a floor cleared it. Widening it to those two closes that, and Obsidiminutive
+    /// earned its place back: the two marker pairs it briefly had here are gone, because it
+    /// now sets a marker colour of its own instead of borrowing the vendor's.
     ///
     /// Widening it to all nine is a bigger thing than it sounds, and the numbers are here
-    /// so nobody has to re-derive them: the other six measure 68 sub-floor pairs between
-    /// them under this model - Solarized Light 21, One Light 16, GitHub Dark Dimmed 11,
-    /// Midget Solarized 10, Dracula 6, GitHub Light 4 - and 18 of those 68 are pairs none
-    /// of the six chose at all, being the list marker and inline code they leave unset and
-    /// therefore draw in the vendor's nord10. None of it is new behaviour: those palettes
-    /// render exactly as they always have, and the numbers were never written down. But
-    /// recording 68 exceptions here would be an audit of six palettes nobody asked for,
-    /// and it would bury the sixteen that are actually new. So: measured, reported, and
-    /// left as one decision per palette.
+    /// so nobody has to re-derive them: the other six measure 80 sub-floor pairs between
+    /// them under this model - Solarized Light 23, One Light 18, GitHub Dark Dimmed 13,
+    /// Midget Solarized 12, Dracula 8, GitHub Light 6 - and 30 of those 80 are pairs none
+    /// of the six chose at all, being the list marker and the inline code they leave unset
+    /// and therefore draw in the vendor's nord10 (five each: the marker on the page, in a
+    /// quote, in a cell and on a striped row, and inline code on its panel). That last part
+    /// is the same defect Obsidiminutive was just fixed for, six more times over, and it is
+    /// the strongest argument for doing the audit. None of it is new behaviour: those
+    /// palettes render exactly as they always have, and the numbers were never written
+    /// down. But recording 80 exceptions here would be an audit of six palettes nobody
+    /// asked for, and it would bury the seventeen that are actually new. So: measured,
+    /// reported, and left as one decision per palette.
     /// </summary>
     public static TheoryData<string> FullySweptPalettes => new() { Obsidiminutive, RedSparks, RedSparks2X };
 
     /// <summary>Shared by the pair, which differ only in --mdm-font-size.</summary>
     private static readonly Dictionary<string, double> RedSparksDimPairs = new(StringComparer.Ordinal)
     {
-        // 16 of 39, floor 3.9. Grouped as they read: the hover is the largest cluster,
+        // 17 of 41, floor 3.9. Grouped as they read: the hover is the largest cluster,
         // because a hover that can only go dimmer than #FF0000 is dim on every surface.
         ["--mdm-mermaid-empty on --mdm-mermaid-bg"] = 2.44,
         ["--mdm-token-comment on --mdm-pre-bg"] = 2.55,
@@ -475,6 +506,10 @@ public class BuiltInThemeTests
         ["--mdm-token-property on --mdm-pre-bg"] = 3.87,
         ["--mdm-token-regex on --mdm-pre-bg"] = 3.87,
         ["--mdm-text on --mdm-row-alt-bg"] = 3.89,
+        // The marker is the body text's colour, so it is the body text's ratio on a striped
+        // row. Found by crossing the marker with the cell surfaces, which a list reaches
+        // through raw HTML; on the page and in a cell it is 3.96:1 and clears.
+        ["--mdm-list-marker on --mdm-row-alt-bg"] = 3.89,
     };
 
     /// <summary>
@@ -486,7 +521,7 @@ public class BuiltInThemeTests
     /// has since been brightened. Same exact-name discipline as BodyTextFloors: no
     /// substrings, no prefixes, one line per pair.
     ///
-    /// Red Sparks: sixteen, and they are the honest cost of one hue. A single-hue night
+    /// Red Sparks: seventeen, and they are the honest cost of one hue. A single-hue night
     /// palette has one dim band to work in - that is what it is for - and the alternative
     /// to writing them down was a theme header claiming a floor nothing enforced.
     ///
@@ -499,11 +534,10 @@ public class BuiltInThemeTests
     private static readonly Dictionary<string, Dictionary<string, double>> DimTextPairs =
         new(StringComparer.Ordinal)
     {
-        [Obsidiminutive] = new()   // 2 of 44, floor 4.5
-        {
-            ["--mdm-list-marker on --mdm-quote-bg"] = 2.94,
-            ["--mdm-list-marker on --mdm-page-bg"] = 3.29,
-        },
+        // Nothing: it clears 4.5:1 on all 46 pairs it draws. It briefly had two entries,
+        // for list markers at 3.29:1 on its page and 2.94:1 in a quote, which is what the
+        // vendor's nord10 measured there before this theme set a marker colour of its own.
+        [Obsidiminutive] = new(),
         [RedSparks] = RedSparksDimPairs,
         [RedSparks2X] = RedSparksDimPairs,     // the same palette, so the same numbers
     };
@@ -602,18 +636,6 @@ public class BuiltInThemeTests
     };
 
     /// <summary>
-    /// Inline code's foreground for a theme that colours it with a RULE instead of the
-    /// variable, by exact resource name. Obsidiminutive predates --mdm-code-fg and paints
-    /// inline code with `.mdm-prosemirror code { color: var(--mdm-token-number) }`, which
-    /// editor-src/test/theme-parity.test.mjs pins; a variable-less sweep would check the
-    /// wrong colour for it and none at all for a theme that does use the variable.
-    /// </summary>
-    private static readonly Dictionary<string, string> InlineCodeByRule = new(StringComparer.Ordinal)
-    {
-        [Obsidiminutive] = "--mdm-token-number",
-    };
-
-    /// <summary>
     /// Every text colour on every background it can be drawn on, by surface. Inline
     /// text - a link, its hover, bold - goes wherever a paragraph can, so it is crossed
     /// with every such surface instead of listed where someone thought of it. Headings and
@@ -635,18 +657,22 @@ public class BuiltInThemeTests
         // technicality: it is how Obsidiminutive's markers turned out to be 3.29:1 on its
         // own page, a pair no test had ever looked at.
         var blocks = headings.Append("--mdm-list-marker").ToArray();
-        // Inline code the same way: this theme's variable if it sets one, else the variable
-        // its own rule reads, else Default's --mdm-code-fg - which is nord10 again, on this
-        // theme's code background.
-        var code = vars.ContainsKey("--mdm-code-fg") ? "--mdm-code-fg"
-            : resource is not null && InlineCodeByRule.TryGetValue(resource, out var byRule) ? byRule
-            : "--mdm-code-fg";
+        // A list can sit in a table cell, via raw HTML, so the marker is crossed with the
+        // cell surfaces as well as the page and a quote. Not with the header row: a GFM
+        // header cell holding a list is a stretch, and nothing renders one.
+        var cellBlocks = new[] { "--mdm-list-marker" };
+        // Inline code is always --mdm-code-fg now: the theme's if it sets one, Default's
+        // nord10 if it does not. Obsidiminutive used to colour it with a rule instead, which
+        // this model had to special-case to measure the right colour at all; it sets the
+        // variable since, and NoThemeColoursInlineCodeWithARuleAnyMore keeps it that way, so
+        // the special case is gone rather than kept as dead weight.
+        const string code = "--mdm-code-fg";
         var surfaces = new (string Bg, IEnumerable<string> Fg)[]
         {
             ("--mdm-page-bg", inline.Append("--mdm-text").Concat(blocks)),
             ("--mdm-quote-bg", inline.Append("--mdm-quote-text").Concat(blocks)),
-            ("--mdm-td-bg", inline.Append("--mdm-text")),
-            ("--mdm-row-alt-bg", inline.Append("--mdm-text")),
+            ("--mdm-td-bg", inline.Append("--mdm-text").Concat(cellBlocks)),
+            ("--mdm-row-alt-bg", inline.Append("--mdm-text").Concat(cellBlocks)),
             ("--mdm-th-bg", inline.Append("--mdm-th-text")),
             // Paper's header row keeps its screen look. In a dark theme a link in it
             // prints in the header's text colour, and headings and links on white
@@ -659,6 +685,19 @@ public class BuiltInThemeTests
             ("--mdm-mermaid-error-bg", new[] { "--mdm-mermaid-error-text" }),
         };
         return surfaces.SelectMany(s => s.Fg.Select(fg => (fg, s.Bg)));
+    }
+
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void NoThemeColoursInlineCodeWithARuleAnyMore(string resource)
+    {
+        // What lets the sweep above treat --mdm-code-fg as the truth about inline code.
+        // Obsidiminutive coloured it with `.mdm-prosemirror code { color: ... }` because
+        // there was no variable; a theme doing that again would be measured at whatever the
+        // variable says and drawn in whatever the rule says, which is the kind of
+        // disagreement a sweep cannot see. The variable is the only route now.
+        var bare = Regex.Replace(Read(resource), @"/\*.*?\*/", " ", RegexOptions.Singleline);
+        Assert.DoesNotMatch(new Regex(@"(^|[\s,>+~])code\s*\{[^}]*\bcolor\s*:"), bare);
     }
 
     [Theory]

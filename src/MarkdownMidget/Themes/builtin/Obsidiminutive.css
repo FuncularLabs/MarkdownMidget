@@ -15,9 +15,23 @@
  *    links         #a082bd -> #c4afda     4.06 -> 6.63:1  (4.51 in a table header)
  *    bold          dark navy -> #ebc859   illegible -> 8.17:1  (5.56 in a table header)
  *    code comments #66747b -> #8a9ba2     3.06 -> 5.13:1 on the code block
+ *    list markers  nord10 -> #8cafd2      3.29 -> 5.80:1  (2.94 -> 5.18 in a quote,
+ *                                         3.07 -> 5.40 on a striped row, 5.80 in a cell)
+ *    inline code   #93c763                5.64:1 on the code block
  *
  *  The heading is the smallest lift of Obsidian's orange that clears a quote:
  *  same hue, full saturation, only brighter.
+ *
+ *  The list markers are the one pair that was nobody's choice. Obsidian has no
+ *  marker colour to copy and this theme named none, so until --mdm-list-marker
+ *  existed every bullet and number here was the editor's own nord10 (#5e81ac) -
+ *  a blue-grey from another palette, at 3.29:1 on this page and 2.94:1 in a
+ *  quote, which is below the bar every other colour in this file was lifted to
+ *  clear. It is now this palette's own lifted steel blue, the one the syntax
+ *  colours use for a property: the same family as the blue-grey it replaces, so
+ *  the markers look as they did, and 5.18:1 at worst on the four grounds a list
+ *  can sit on. Inline code moved the same way, from a rule to a variable, at the
+ *  same green and the same 5.64:1 it always had.
  *
  *  Bold is the one real departure. Obsidian draws it in a dark indigo that
  *  all but disappears on this page. Here it is Obsidian's own yellow
@@ -49,6 +63,15 @@
   --mdm-h5: #fa7d00;
   --mdm-h6: #fa7d00;
 
+  /* Bullets and numbers. Obsidian has no marker colour to copy, and until this variable
+     existed they were the vendor's nord10 (#5e81ac) - a blue-grey this theme never chose,
+     at 3.29:1 on its page, 3.07:1 on a striped row and 2.94:1 in a quote. So the marker
+     takes this palette's own lifted steel blue, the one the syntax colours use for a
+     property: same family as the borrowed blue-grey, lifted the way every other colour
+     here was lifted. 5.80:1 on the page and in a cell, 5.40:1 on a striped row, 5.18:1 in
+     a quote. (Paper keeps the marker it has always printed, whatever this says.) */
+  --mdm-list-marker: #8cafd2;
+
   --mdm-link: #c4afda;
   --mdm-link-hover: #d2c2e3;
 
@@ -57,6 +80,13 @@
   --mdm-quote-bar: #678cb1;
   --mdm-quote-text: #d3d8da;
 
+  /* Inline code, in Obsidian's green - the number colour, which is what this theme has
+     always drawn inline code in. It was a rule (`.mdm-prosemirror code { color }`) because
+     there was no variable for it; now there is, so it is a line instead and the `pre code`
+     rule that rule needed is gone with it - base.css hands fenced code back on its own.
+     5.64:1 on the background below, and that background is the only ground inline code
+     ever has, in a paragraph, a heading, a quote, a list or a table cell. */
+  --mdm-code-fg: #93c763;
   --mdm-code-bg: #323d40;
   --mdm-pre-bg: #22292b;
   --mdm-pre-fg: #e0e2e4;
@@ -103,18 +133,6 @@
   --mdm-token-keyword: #ffcd22;
   --mdm-token-function: #b49ad0;
   --mdm-token-regex: #e3a04f;
-}
-
-/* Inline code in Obsidian's green. There is no variable for inline code's colour
- * (the editor takes it from its Nord base, #5e81ac, which is 2.78:1 here), so it
- * is a rule, reading the number green: 5.64:1 on --mdm-code-bg. The second rule
- * keeps fenced code out of it - this layer outranks the one that already says so. */
-.mdm-prosemirror code {
-  color: var(--mdm-token-number);
-}
-
-.mdm-prosemirror pre code {
-  color: inherit;
 }
 
 /* Links in italic, as Obsidian draws them. Screen only, like Midget Solarized's

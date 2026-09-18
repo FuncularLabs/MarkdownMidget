@@ -456,14 +456,31 @@ test('paper ignores the theme\'s bold colour, and only that', () => {
     'a print colour on strong outranks the document\'s own inline colour');
 });
 
-test('Obsidiminutive colours inline code, and not fenced code, with its number green', () => {
-  // Inline code's colour comes from the vendor (Nord's #5e81ac), which is 2.78:1 on this
-  // theme's code background. The theme's own rule replaces it; BuiltInThemeTests
-  // holds --mdm-token-number on --mdm-code-bg to 4.5:1 on the strength of this pin.
-  const decls = declarations(readTheme('Obsidiminutive.css'));
-  const colour = (where) => decls.filter((d) => d.where === where && d.prop === 'color').map((d) => d.value);
-  assert.deepEqual(colour('.mdm-prosemirror code'), ['var(--mdm-token-number)']);
-  assert.deepEqual(colour('.mdm-prosemirror pre code'), ['inherit']);
+test('Obsidiminutive colours inline code and its markers through the variables', () => {
+  // Both were colours it did not choose. Inline code was a rule - a
+  // `.mdm-prosemirror code { color: var(--mdm-token-number) }` plus a `pre code { color:
+  // inherit }` to keep fenced code out of it - because there was no variable for it. The
+  // markers were worse: nothing at all, so the vendor's nord10 at 3.29:1 on this theme's
+  // page, 3.07:1 on a striped row and 2.94:1 in a quote. Now both are lines in :root, the
+  // two rules are gone (base.css hands fenced code back on its own), and what is pinned is
+  // the values and the ABSENCE of the rules - a rule left behind would out-specify the
+  // variable a contrast sweep measures, and the two could disagree for ever.
+  const theme = readTheme('Obsidiminutive.css');
+  const vars = rootVariables(theme);
+
+  assert.equal(vars.get('--mdm-code-fg'), '#93c763');
+  assert.equal(vars.get('--mdm-code-fg'), vars.get('--mdm-token-number'),
+    'inline code is this theme\'s number green; if the palette moves, both move');
+  assert.equal(vars.get('--mdm-list-marker'), '#8cafd2');
+  assert.equal(vars.get('--mdm-list-marker'), vars.get('--mdm-token-property'),
+    'the marker is this theme\'s own lifted steel blue, the colour its properties use');
+  assert.notEqual(vars.get('--mdm-list-marker'), vendorNord10(),
+    'the marker is no longer the vendor\'s blue-grey, which is the point of setting it');
+
+  assert.deepEqual(
+    declarations(theme).filter((d) => d.prop === 'color' && /\bcode$/.test(d.where))
+      .map((d) => d.where), [],
+    'a colour rule on code would out-specify the variable it is now supposed to read');
 });
 
 // ===== headings and links on paper =====
@@ -1002,14 +1019,18 @@ test('the three new variables are inert: only the pair written for them sets one
   const optional = ['--mdm-list-marker', '--mdm-code-fg', '--mdm-font-size'];
   for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
     const vars = rootVariables(file ? readTheme(file) : '');
-    // Red Sparks was written against this contract and sets all three — that is what
-    // replaced the rules its custom version hand-wrote, and the reason the branch is
-    // asserted both ways: every other palette, Default included, renders exactly as it
-    // did before the variables existed, and a Red Sparks file that dropped one would need
-    // a rule back to look the same.
-    const expected = RED_SPARKS.includes(file);
+    // Three cases, not two. Red Sparks was written against this contract and sets all
+    // three. Obsidiminutive sets the two COLOURS and not the size: its markers were the
+    // vendor's nord10 at 3.29:1 on its own page and its inline code was a rule, while 16px
+    // is the size it has always rendered at. Everything else, Default included, renders
+    // exactly as it did before the variables existed, and a file that dropped one of its
+    // own would need a rule back to look the same.
+    const sets = RED_SPARKS.includes(file) ? optional
+      : file === 'Obsidiminutive.css' ? ['--mdm-list-marker', '--mdm-code-fg']
+      : [];
     for (const name of optional)
-      assert.equal(vars.has(name), expected, `${file || 'Default'}: ${name} is ${expected ? 'unset' : 'set'}`);
+      assert.equal(vars.has(name), sets.includes(name),
+        `${file || 'Default'}: ${name} is ${sets.includes(name) ? 'unset' : 'set'}`);
   }
 
   // Both colours are the vendor's marker/inline-code colour, and the size is the 16px
