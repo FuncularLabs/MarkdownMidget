@@ -854,20 +854,30 @@ test('--mdm-font-size has to be declared on :root, and both files a theme author
   // which needs saying twice over — main.js's probe comment tells theme authors that
   // `.mdm-prosemirror` is a fine place for their variables, and for this one it is not.
   //
-  // The scope split IS the mechanism, so it is what this pins: two derivations at :root,
-  // the rest inside the document, and only a :root declaration reaches both.
-  assert.deepEqual(DERIVED.filter(([where]) => where === ':root').map(([, prop]) => prop),
-    ['--text-base', '--text-sm']);
-  assert.ok(DERIVED.some(([where]) => where !== ':root'),
-    'nothing is derived inside the document any more, so the asymmetry may be gone');
+  // The scope split IS the mechanism, so it is what this pins — read out of the CSS that
+  // ships rather than out of a table in this file, which could only ever agree with
+  // itself. Two scopes: the tokens at :root, everything else inside the document. Collapse
+  // them either way and the placement stops mattering, which would make the two documents
+  // below wrong.
+  const scopes = new Set(declarations(editorCss)
+    .filter((d) => d.value.includes('var(--mdm-font-size'))
+    .map((d) => (d.where === ':root' ? ':root' : 'inside the document')));
+  assert.deepEqual([...scopes].sort(), [':root', 'inside the document']);
 
-  // Said next to the variable, not somewhere in the file: the windows are around each
-  // mention, and one of them has to carry the instruction.
+  // Said next to the variable, and both placements said TOGETHER: the window is short
+  // enough that the two names have to be in one passage rather than anywhere in the file.
+  // Two facts rather than an English sentence, so rewording the prose doesn't fail the
+  // build, while deleting the passage or moving it away from the variable still does —
+  // all four checked by mutation. 900 characters and either name alone was vacuous: a
+  // theme file mentions `:root` and `.mdm-prosemirror` all over it.
   for (const [name, text] of [['sample.css', sampleCss], ['HELP.md', helpMd]]) {
     const mentions = [...text.matchAll(/--mdm-font-size/g)].map((m) => m.index);
     assert.ok(mentions.length, `${name} no longer mentions --mdm-font-size at all`);
-    assert.ok(mentions.some((at) => /[Dd]eclare (?:it|this) in `?:root/.test(text.slice(at, at + 900))),
-      `${name} introduces --mdm-font-size without telling an author to declare it in :root`);
+    assert.ok(
+      mentions.some((at) => [':root', '.mdm-prosemirror']
+        .every((needed) => text.slice(at, at + 300).includes(needed))),
+      `${name} introduces --mdm-font-size without saying, in the same breath, that it ` +
+      'belongs in :root and what happens on .mdm-prosemirror');
   }
 });
 

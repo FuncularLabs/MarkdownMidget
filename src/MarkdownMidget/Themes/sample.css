@@ -61,8 +61,9 @@
      theme prints on more paper.
 
      Declare it in `:root`, as below. On `.mdm-prosemirror` - which is a fine place for
-     your colours - only part of the document follows it: headings, list markers, table
-     cells and the line numbers grow, body text and code do not.
+     your colours - only part of the document follows it: headings, list markers and the
+     line numbers grow; body text and table text stay put, and code follows whatever it
+     sits in (bigger in a heading, unchanged in a paragraph).
 
      Use a positive, absolute size: 32px or 18pt. (`2rem` works but measures from the
      page root, so it is 40px in a theme that also sets `html { font-size: 20px }`.) A

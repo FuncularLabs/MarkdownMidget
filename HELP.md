@@ -458,8 +458,9 @@ once — `--mdm-font-size: 32px` — and body text, the six heading levels, list
 inline and fenced code, table text and the line numbers all follow, on screen and on
 paper: a large theme prints large, on more paper. Declare it in `:root` — put it on
 `.mdm-prosemirror`, which is a fine place for your colours, and only part of the
-document follows (headings, markers, table cells and line numbers grow; body text and
-code stay put). Use a positive absolute size (`32px`, `18pt`); a percentage or a
+document follows: headings, list markers and the line numbers grow; body text and table
+text stay put, and code follows whatever it sits in. Use a positive absolute size
+(`32px`, `18pt`); a percentage or a
 nonsense value falls back to 16px. It sizes the
 document only — the page margins and width, the menus, the toolbar and the Markdown
 source view keep their own sizes, the numbers beside blank lines stay small because
