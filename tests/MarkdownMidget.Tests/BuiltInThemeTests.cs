@@ -465,32 +465,30 @@ public class BuiltInThemeTests
     /// The sweep was a [Fact] over Obsidiminutive alone - the palette written to clear
     /// 4.5:1 everywhere - so a new theme was swept nowhere, which is how the Red Sparks
     /// pair shipped with eighteen sub-floor pairs while its own header claimed everything
-    /// held to a floor cleared it. Widening it to those two closes that, and Obsidiminutive
-    /// is down to one: the two marker pairs it briefly had here went when it set a marker
-    /// colour of its own instead of borrowing the vendor's, and the one it keeps needs raw
-    /// HTML to exist.
+    /// held to a floor cleared it. Widening it to those two closes that. Obsidiminutive has
+    /// five, all of them reachable only through a hand-written HTML table: its four heading
+    /// levels and its list marker, in a header cell.
     ///
     /// Widening it to all nine is a bigger thing than it sounds, and the numbers are here
-    /// so nobody has to re-derive them: the other six measure 86 sub-floor pairs between
-    /// them under this model - Solarized Light 24, One Light 19, GitHub Dark Dimmed 14,
-    /// Midget Solarized 13, Dracula 9, GitHub Light 7 - and 36 of those 86 are pairs none
-    /// of the six chose at all, being the list marker and the inline code they leave unset
-    /// and therefore draw in the vendor's nord10 (six each: the marker on the page, in a
-    /// quote, in a body cell, on a striped row and in a header cell, and inline code on its
-    /// panel). That last part
-    /// is the same defect Obsidiminutive was just fixed for, six more times over, and it is
-    /// the strongest argument for doing the audit. None of it is new behaviour: those
-    /// palettes render exactly as they always have, and the numbers were never written
-    /// down. But recording 80 exceptions here would be an audit of six palettes nobody
-    /// asked for, and it would bury the eighteen that are actually new. So: measured,
-    /// reported, and left as one decision per palette.
+    /// so nobody has to re-derive them: the other six measure 115 sub-floor pairs between
+    /// them under this model - Solarized Light 32, One Light 25, GitHub Dark Dimmed 20,
+    /// Midget Solarized 18, Dracula 13, GitHub Light 7 - and 36 of those are pairs none of
+    /// the six chose at all, being the list marker and the inline code they leave unset and
+    /// therefore draw in the vendor's nord10 (six each: the marker on the page, in a quote,
+    /// in a body cell, on a striped row and in a header cell, and inline code on its panel).
+    /// That last part is the same defect Obsidiminutive was fixed for, six more times over,
+    /// and it is the strongest argument for doing the audit. None of it is new behaviour:
+    /// those palettes render exactly as they always have, and the numbers were never
+    /// written down. But recording 115 exceptions here would be an audit of six palettes
+    /// nobody asked for, and it would bury the eighteen that are actually new. So:
+    /// measured, reported, and left as one decision per palette.
     /// </summary>
     public static TheoryData<string> FullySweptPalettes => new() { Obsidiminutive, RedSparks, RedSparks2X };
 
     /// <summary>Shared by the pair, which differ only in --mdm-font-size.</summary>
     private static readonly Dictionary<string, double> RedSparksDimPairs = new(StringComparer.Ordinal)
     {
-        // 18 of 42, floor 3.9. Grouped as they read: the hover is the largest cluster,
+        // 18 of 54, floor 3.9. Grouped as they read: the hover is the largest cluster,
         // because a hover that can only go dimmer than #FF0000 is dim on every surface.
         ["--mdm-mermaid-empty on --mdm-mermaid-bg"] = 2.44,
         ["--mdm-token-comment on --mdm-pre-bg"] = 2.55,
@@ -538,8 +536,20 @@ public class BuiltInThemeTests
     private static readonly Dictionary<string, Dictionary<string, double>> DimTextPairs =
         new(StringComparer.Ordinal)
     {
-        [Obsidiminutive] = new()   // 1 of 47, floor 4.5
+        [Obsidiminutive] = new()   // 5 of 59, floor 4.5
         {
+            // The four headings in a table HEADER cell. All six levels are the same orange
+            // here (size tells them apart), so all four variables measure the same 3.43:1
+            // on the header background - the one ground in this palette lighter than the
+            // page. Reachable only by hand-writing the table: markdown puts no heading in a
+            // cell, raw HTML can, and the heading keeps its own colour there rather than
+            // the header row's. Recorded rather than lifted, as the marker below is: the
+            // orange is Obsidian's, lifted once already to clear a quote, and moving it
+            // again for a hand-written construct would change every heading on every page.
+            ["--mdm-heading on --mdm-th-bg"] = 3.43,
+            ["--mdm-h4 on --mdm-th-bg"] = 3.43,
+            ["--mdm-h5 on --mdm-th-bg"] = 3.43,
+            ["--mdm-h6 on --mdm-th-bg"] = 3.43,
             // The only pair in this palette below AA, and the only one that needs raw HTML
             // to exist at all: a list inside a table HEADER cell. Its own lifted steel blue
             // clears 4.5:1 on every ground a markdown list can occupy - 5.80:1 on the page
@@ -670,22 +680,24 @@ public class BuiltInThemeTests
         // technicality: it is how Obsidiminutive's markers turned out to be 3.29:1 on its
         // own page, a pair no test had ever looked at.
         var blocks = headings.Append("--mdm-list-marker").ToArray();
-        // A list can sit in any table cell, through raw HTML, so the marker is crossed with
-        // every cell surface - the body cell, the striped row AND the header row. The header
-        // row was excluded at first for being "a stretch", which was not a reason that
-        // survived being asked about: editor-src/src/sanitize.js forbids a named list of
-        // tags and allows the rest, so `<th><ul><li>` reaches the DOM intact, and
-        // `.mdm-prosemirror ul > li::marker` matches inside it with `th`'s background
-        // behind. Raw HTML reaches a header cell exactly as well as a body cell, and the
-        // model cannot take the argument for one and refuse it for the other.
+        // Block content - a heading, a list - can sit in any table cell through raw HTML, so
+        // `blocks` is crossed with every cell surface as well as the page and a quote.
+        // Markdown cannot put either in a cell; raw HTML can, and editor-src/src/sanitize.js
+        // FORBIDS a named list of tags and allows the rest, so `<th><h3>` and `<th><ul><li>`
+        // both reach the DOM intact. The heading keeps its own colour there, which is the
+        // part worth spelling out: base.css colours h1-h6 on the HEADING element, and
+        // `.mdm-prosemirror th { color: ... !important }` applies to the CELL, so it is an
+        // inherited value the heading's own declaration outranks - importance only competes
+        // between declarations on the same element. A heading in a header cell is therefore
+        // drawn in --mdm-heading on --mdm-th-bg, and that pair is measured here.
         //
-        // The same argument does reach further than this model goes: a HEADING in a
-        // raw-HTML cell is drawable too, and headings are crossed only with the page and a
-        // quote (`a GFM table cell can't` hold one, which is true of markdown and not of
-        // raw HTML). That asymmetry is left standing deliberately - closing it re-measures
-        // eight palettes this branch does not own - but it is named here rather than
-        // defended, because the reason above would have to be un-said to defend it.
-        var cellBlocks = new[] { "--mdm-list-marker" };
+        // This was asymmetric for one round: the marker was crossed with the cells and the
+        // heading was not, on the reasoning that a GFM cell holds no block - true of
+        // markdown, and the same sentence that lets the marker in. Worse, the asymmetry was
+        // excused as "re-measuring eight palettes this branch does not own", which was
+        // wrong: it is four sub-AA pairs in Obsidiminutive, a palette this file sweeps and
+        // this branch changed in the same layer, and none at all in Red Sparks. A cost that
+        // happens to shield the thing you own is one to re-measure, not to repeat.
         // Inline code is always --mdm-code-fg now: the theme's if it sets one, Default's
         // nord10 if it does not. Obsidiminutive used to colour it with a rule instead, which
         // this model had to special-case to measure the right colour at all; it sets the
@@ -696,9 +708,9 @@ public class BuiltInThemeTests
         {
             ("--mdm-page-bg", inline.Append("--mdm-text").Concat(blocks)),
             ("--mdm-quote-bg", inline.Append("--mdm-quote-text").Concat(blocks)),
-            ("--mdm-td-bg", inline.Append("--mdm-text").Concat(cellBlocks)),
-            ("--mdm-row-alt-bg", inline.Append("--mdm-text").Concat(cellBlocks)),
-            ("--mdm-th-bg", inline.Append("--mdm-th-text").Concat(cellBlocks)),
+            ("--mdm-td-bg", inline.Append("--mdm-text").Concat(blocks)),
+            ("--mdm-row-alt-bg", inline.Append("--mdm-text").Concat(blocks)),
+            ("--mdm-th-bg", inline.Append("--mdm-th-text").Concat(blocks)),
             // Paper's header row keeps its screen look. In a dark theme a link in it
             // prints in the header's text colour, and headings and links on white
             // paper print in print.css's own dark colours (theme-parity.test.mjs holds
