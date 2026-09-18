@@ -148,30 +148,39 @@ test('the rule that must beat a vendor !important is in the first of our layers'
   assert.equal(layerAt(bundle, at), 'mdm-override');
 });
 
-test("our document text size beats the vendor's rem pins, by layer rather than specificity", () => {
-  // The other half of --mdm-font-size, and the half that is not visible in either source
-  // file. The vendor sizes body text and fenced code from its own Tailwind tokens, in
-  // `rem` — which measures from the PAGE root, so a container font-size never reaches
-  // them and the document used to scale its headings while its paragraphs stayed 16px
-  // and its code blocks 14px. Our replacements only win because mdm-structure is a LATER
-  // layer than mdm-vendor: on specificity they are level at (0,1,1) against (0,1,1) for
-  // paragraphs, and the vendor's is emitted second. Move either rule and the sizes go
-  // back to being unthemeable with nothing failing to say so.
-  const pairs = [
-    ['.milkdown-theme-nord p{font-size:var(--text-base)', '.mdm-prosemirror p{font-size:var(--mdm-font-size)'],
-    ['.milkdown-theme-nord pre{', '.mdm-prosemirror pre{border-radius:6px'],
-  ];
-  for (const [vendor, ours] of pairs) {
-    const theirs = bundle.indexOf(vendor);
-    assert.notEqual(theirs, -1, `the vendor rule "${vendor}" is not in the bundle`);
-    assert.equal(layerAt(bundle, theirs), 'mdm-vendor', vendor);
-    const mine = bundle.indexOf(ours);
-    assert.notEqual(mine, -1, `our rule "${ours}" is not in the bundle`);
-    assert.equal(layerAt(bundle, mine), 'mdm-structure', ours);
-    assert.match(bundle.slice(mine, bundle.indexOf('}', mine)), /font-size:calc\(var\(--mdm-font-size\)|font-size:var\(--mdm-font-size\)/);
+test('the vendor tokens the document size rides on are the ones its own rules read', () => {
+  // The other half of --mdm-font-size, and the half that is invisible in either source
+  // file. The vendor sizes body text and fenced code from two Tailwind tokens, in `rem` —
+  // which measures from the PAGE root, so a container font-size never reached a paragraph
+  // and a document scaled its headings while its body text stayed 16px. structure.css
+  // redefines those two tokens on the editor element instead of restating the sizes,
+  // which is what leaves a theme that sets them itself still able to win (mdm-theme is
+  // last). That only works while the tokens WE redefine are the tokens the vendor's own
+  // rules read, and a Tailwind upgrade could rename either: this is where that shows up
+  // rather than as body text quietly ignoring the theme.
+  for (const [rule, token] of [['.milkdown-theme-nord p{', '--text-base'],
+                               ['.milkdown-theme-nord pre{', '--text-sm']]) {
+    const theirs = bundle.indexOf(rule);
+    assert.notEqual(theirs, -1, `the vendor rule "${rule}" is not in the bundle`);
+    assert.equal(layerAt(bundle, theirs), 'mdm-vendor', rule);
+    assert.match(bundle.slice(theirs, bundle.indexOf('}', theirs)),
+      new RegExp(`font-size:var\\(${token}\\)`),
+      `the vendor no longer sizes "${rule}" from ${token}`);
   }
+
+  const ours = bundle.indexOf('.mdm-prosemirror{flex:1 1 auto');
+  assert.notEqual(ours, -1, 'the editor element\'s own rule is not in the bundle');
+  assert.equal(layerAt(bundle, ours), 'mdm-structure');
+  const body = bundle.slice(ours, bundle.indexOf('}', ours));
+  assert.match(body, /--text-base: ?var\(--mdm-font-size\)/);
+  assert.match(body, /--text-sm: ?calc\(var\(--mdm-font-size\) \* \.875\)/);
+
+  // Later than the vendor for a normal declaration, earlier than the theme, which is
+  // exactly the position this depends on at both ends.
   assert.ok(EXPECTED.indexOf('mdm-structure') > EXPECTED.indexOf('mdm-vendor'),
-    'mdm-structure must stay after mdm-vendor or the vendor sizes win again');
+    'mdm-structure must stay after mdm-vendor or the vendor tokens win again');
+  assert.ok(EXPECTED.indexOf('mdm-structure') < EXPECTED.indexOf('mdm-theme'),
+    'mdm-theme must stay last or a theme can no longer set the tokens itself');
 });
 
 test('print is the earliest layer, so nothing a theme writes reaches paper', () => {

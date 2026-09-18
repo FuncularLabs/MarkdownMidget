@@ -38,14 +38,24 @@ body {
 }
 
 /* The one size the document derives from is --mdm-font-size (16px in every theme that
- * doesn't set it), and this is the element it sits on. Two traps, both measured:
+ * doesn't set it), and this is the element it sits on. Three traps, all measured:
  *
  *   - `em` reaches from here, `rem` does not. The headings, inline code and fenced
- *     code inside a block are sized in `em` and follow this element; the vendor sizes
+ *     code inside a block are sized in `em` and follow this element. The vendor sizes
  *     paragraphs from its own `--text-base` token and fenced blocks from `--text-sm`,
- *     both in `rem`, which measures from the PAGE root and no container font-size on
- *     earth reaches. So both are declared here as well, from the same variable — in a
- *     later layer than the vendor, so ours win.
+ *     both in `rem` — which measures from the PAGE root, so no container font-size on
+ *     earth reaches a paragraph.
+ *   - so those two are redefined here, scoped to the document, rather than restated as
+ *     rules of our own on `p` and `pre`. Both would render the same today and the
+ *     difference is not academic: custom double-size themes ALREADY scale a document by
+ *     setting these two tokens, that being the only seam that ever worked, and a rule of
+ *     ours in this layer would silently beat theirs and put their body text back to
+ *     16px. Redefining the token leaves the last word with the theme's layer, where it
+ *     belongs. Measured on the theme this feature came from: 32 computed declarations
+ *     differ the other way, all of them its paragraphs and code.
+ *     The vendor's three larger tokens are not redefined because our own em-based
+ *     heading rules already beat them, and `--text-sm`'s use on tables and inline code
+ *     likewise loses to the rules below.
  *   - the line-number gutter bakes its size into one `font` shorthand, whose line box
  *     is what keeps a number level with its line, so it takes a derived font-size and
  *     line-height of its own below.
@@ -59,6 +69,8 @@ body {
   outline: none;
   font-size: var(--mdm-font-size);
   line-height: 1.5;
+  --text-base: var(--mdm-font-size);                    /* the vendor's, at 1rem */
+  --text-sm: calc(var(--mdm-font-size) * 0.875);        /* the vendor's, at .875rem */
 }
 
 .mdm-prosemirror:focus {
@@ -121,15 +133,6 @@ body {
 .mdm-prosemirror table {
   margin-top: 0;
   margin-bottom: 16px;
-}
-
-/* Body text. EVERY paragraph — the page's, a list item's, a quote's, a table cell's —
-   is 16px today because the vendor pins every `p` to its `--text-base` token, 1rem off
-   the page root, which is why changing the container's size used to leave body text
-   behind while the headings around it grew. One declaration in a later layer ends
-   that. */
-.mdm-prosemirror p {
-  font-size: var(--mdm-font-size);
 }
 
 .mdm-prosemirror h1,
@@ -199,15 +202,13 @@ body {
   font-size: 0.92em;
 }
 
-/* Fenced blocks, the vendor's other `rem` pin — its `--text-sm` token, .875rem = 14px.
-   Same 0.875, measured from the document instead of the page root; `pre code` below is
-   0.875em of this, as it always was. */
+/* A fenced block's size is the vendor's `--text-sm`, redefined at the top of this file,
+   so it follows the document; `pre code` below is 0.875em of that, as it always was. */
 .mdm-prosemirror pre {
   border-radius: 6px;
   padding: 14px 16px;
   overflow-x: auto;
   line-height: 1.45;
-  font-size: calc(var(--mdm-font-size) * 0.875);
 }
 
 .mdm-prosemirror pre code {

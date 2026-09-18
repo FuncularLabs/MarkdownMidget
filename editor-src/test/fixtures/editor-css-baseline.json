@@ -151,6 +151,18 @@
  },
  {
   "where": ".mdm-prosemirror",
+  "prop": "--text-base",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
+  "prop": "--text-sm",
+  "value": "calc(16px * 0.875)",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
   "prop": "color",
   "value": "#1a1a1a",
   "important": false
@@ -296,12 +308,6 @@
  {
   "where": ".mdm-prosemirror blockquote, .mdm-prosemirror ol, .mdm-prosemirror p, .mdm-prosemirror pre, .mdm-prosemirror table, .mdm-prosemirror ul",
   "prop": "margin-bottom",
-  "value": "16px",
-  "important": false
- },
- {
-  "where": ".mdm-prosemirror p",
-  "prop": "font-size",
   "value": "16px",
   "important": false
  },
@@ -567,12 +573,6 @@
   "where": ".mdm-prosemirror pre",
   "prop": "line-height",
   "value": "1.45",
-  "important": false
- },
- {
-  "where": ".mdm-prosemirror pre",
-  "prop": "font-size",
-  "value": "calc(16px * 0.875)",
   "important": false
  },
  {

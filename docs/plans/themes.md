@@ -40,11 +40,23 @@ order. Notes for whoever takes stage 3:
   of the three defaults to the value the editor already produced — nord10 for
   inline code and for markers, 16px for the size — so every palette that predates
   them, and Default, renders identically. Measured in Chromium against the built
-  bundle, Default and all seven built-ins: **0 differing computed declarations**
-  across 39 element/pseudo-element sites. `--mdm-font-size` is the one that is not
-  paint: `structure.css` derives paragraphs, fenced code, table cells and the
-  line-number gutter from it, because the vendor sizes paragraphs and `pre` in
-  `rem` off the page root and a container font-size never reaches them. On paper
+  bundle, Default, all seven built-ins and the custom theme this work came from:
+  **0 differing computed declarations** across 51 element/pseudo-element sites.
+
+  `--mdm-font-size` is the one that is not paint: `structure.css` derives the
+  container, table cells and the line-number gutter from it, and redefines the
+  vendor's own `--text-base` / `--text-sm` on the editor element for body text and
+  fenced code, because the vendor sizes those two in `rem` off the page root and a
+  container font-size never reaches them. **Redefining the token rather than
+  restating the size is load-bearing**, and the first attempt got it wrong:
+  `.mdm-prosemirror p { font-size: … }` renders identically under every built-in and
+  Default — and breaks the custom double-size themes that already exist, because
+  they scale a document by setting those two tokens (the only seam that ever worked)
+  and a rule of ours in `mdm-structure` outranks their `mdm-theme`. Measured on the
+  theme this work came from: 32 computed declarations differed, every paragraph and
+  code block back at 16px and 14px. A token redefinition leaves the last word with
+  the theme's layer; `layers.test.mjs` pins that the tokens we redefine are the ones
+  the vendor's own rules read, since a Tailwind rename would otherwise be silent. On paper
   the two colours are pinned (the marker to Nord's literal, inline code by print's
   own pair) and the SIZE is not, which print.css's header now argues. The one
   number that cannot follow it is the gutter number for a blank line, whose box has

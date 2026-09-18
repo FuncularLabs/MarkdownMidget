@@ -772,11 +772,13 @@ function sizeOf(themeCss, where, prop) {
   return hits[0].value;
 }
 
-/** The sites that read the variable, and what each is a multiple of. */
+/** The sites that read the variable, and what each is a multiple of. The two --text-*
+ *  are the VENDOR's own tokens, redefined on the document: its `p` rule and its `pre`
+ *  rule read them in `rem`, and this is what makes both follow the container. */
 const DERIVED = [
   ['.mdm-prosemirror', 'font-size', 1],
-  ['.mdm-prosemirror p', 'font-size', 1],
-  ['.mdm-prosemirror pre', 'font-size', 0.875],
+  ['.mdm-prosemirror', '--text-base', 1],
+  ['.mdm-prosemirror', '--text-sm', 0.875],
   ['.mdm-prosemirror td, .mdm-prosemirror th', 'font-size', 0.75],
   ['.mdm-prosemirror [data-line]::before', 'font-size', 0.75],
   ['.mdm-prosemirror [data-line]::before', 'line-height', 1.5],
@@ -822,6 +824,34 @@ test('--mdm-font-size set once scales body text, headings, markers, code, tables
   const sized = declarations(read('styles', 'structure.css'))
     .filter((d) => d.prop === 'font-size' && /(::marker|\bli\b)/.test(d.where));
   assert.deepEqual(sized.map((d) => d.where), []);
+});
+
+test('body text and fenced code scale by redefining the vendor\'s tokens, not by a rule of ours', () => {
+  // The regression this shape exists to avoid, and it is not hypothetical: the first
+  // version of this work declared `.mdm-prosemirror p { font-size: var(--mdm-font-size) }`
+  // and `.mdm-prosemirror pre { font-size: … }` instead. Both render identically under
+  // every built-in - and both silently broke the custom double-size theme this feature
+  // came from, which scales a document the only way that ever worked, by setting
+  // --text-base and --text-sm itself. Ours sat in mdm-structure and outranked the theme's
+  // mdm-theme: 32 computed declarations differed, every paragraph and every code block
+  // back at 16px and 14px.
+  //
+  // Redefining the token instead leaves the theme's layer with the last word. So: no
+  // font-size of ours on `p` or on `pre`, and the tokens declared on the document
+  // element rather than on :root, which is what keeps them off anything that is not the
+  // document.
+  const ours = declarations(read('styles', 'structure.css'));
+  assert.deepEqual(
+    ours.filter((d) => d.prop === 'font-size' && /^\.mdm-prosemirror (p|pre)$/.test(d.where))
+      .map((d) => d.where), [],
+    'a font-size of ours on p or pre outranks a theme that scales the vendor tokens');
+
+  for (const token of ['--text-base', '--text-sm']) {
+    const hits = ours.filter((d) => d.prop === token);
+    assert.equal(hits.length, 1, `${token} should be redefined exactly once, is ${hits.length}`);
+    assert.equal(hits[0].where, '.mdm-prosemirror', `${token} is redefined on ${hits[0].where}`);
+    assert.equal(hits[0].important, false, `${token} must not be !important, or a theme can't win`);
+  }
 });
 
 test('the numbers beside blank lines keep their own size, and say why in the file', () => {
