@@ -29,8 +29,12 @@ public class SourcePaletteContrastTests
 {
     public static IEnumerable<object[]> BuiltInThemes()
     {
+        // Red Sparks is the interesting case for this sweep and the reason to keep the list
+        // current: its body text is 3.96:1, below the 4.5 the floor compares against, so
+        // every accent it maps has to come back as body text or clear 4.5 on its own.
         foreach (var name in new[] { "Dracula", "GitHub-Dark-Dimmed", "GitHub-Light",
-                                     "Midget-Solarized", "Obsidiminutive", "One-Light", "Solarized-Light" })
+                                     "Midget-Solarized", "Obsidiminutive", "One-Light",
+                                     "Red-Sparks", "Red-Sparks-2X", "Solarized-Light" })
             yield return new object[] { name };
     }
 

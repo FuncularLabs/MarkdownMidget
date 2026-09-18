@@ -1,0 +1,170 @@
+/* =====================================================================
+ *  Red Sparks — dark: the red channel and nothing else.
+ *
+ *  Palette by Joe Sparks (@joesparks on X), https://x.com/joesparks — a
+ *  red-only palette designed for reading at night.
+ *
+ *  Every colour here is #RR0000: green and blue are zero everywhere. Red is
+ *  the least disruptive light to dark-adapted eyes and to your circadian
+ *  rhythm, so this one is made for editing after dark.
+ *
+ *  It is the one shipped palette that does not clear WCAG AA for body text:
+ *  #DC0000 on the page is 3.96:1. That is the design, not an oversight — a
+ *  single hue has nothing brighter to offer short of pure #FF0000, which at
+ *  5.14:1 is the ceiling and is reserved for the things you must not miss.
+ *  The test suite exempts this palette by name with that measurement
+ *  recorded. Everything held to a floor clears it: the squiggle and the
+ *  resize handle 5.14:1, formatting marks 2.14:1, the printed header pair
+ *  4.78:1, the printed row stripe 21:1.
+ *
+ *  Double-size sibling: Red-Sparks-2X.css, which is this file with one value
+ *  changed — --mdm-font-size, from 16px to 32px.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* ---- surface ------------------------------------------------------ */
+
+  --mdm-color-scheme: dark;     /* not a colour — without it the
+                                   scrollbar and controls stay light */
+
+  --mdm-app-bg: #060000;        /* around the page */
+  --mdm-page-bg: #100000;       /* the page */
+  --mdm-page-shadow: rgba(0, 0, 0, 0.7);
+  --mdm-text: #DC0000;          /* body text, 3.96:1 */
+
+  /* Not a colour: the one size the document derives from — body text, the six
+     heading levels, list markers, inline and fenced code, table text and the
+     line numbers all follow it. It is also the ONE value that differs between
+     the two files of this theme: 16px in Red-Sparks.css, which is what every
+     theme renders at unless it says otherwise, and 32px in Red-Sparks-2X.css.
+     Stated in both, so the pair is one number apart and nothing else. */
+  --mdm-font-size: 16px;
+
+  /* ---- headings and links ------------------------------------------- */
+
+  --mdm-heading: #FF0000;       /* h1-h3 */
+  --mdm-h4: #F60000;
+  --mdm-h5: #EE0000;
+  --mdm-h6: #E60000;
+
+  --mdm-link: #FF0000;          /* hover can only go dimmer — there is
+                                   nothing above #FF0000. The editor
+                                   underlines links already, which is what
+                                   tells them apart from prose here. */
+  --mdm-link-hover: #B00000;
+
+  /* ---- lists -------------------------------------------------------- */
+
+  /* Bullets and numbers, the body text's own colour: a marker is punctuation,
+     not an accent, and the editor's own blue-grey would be the only thing on
+     the page with a hue. Printed markers keep the colour they have always
+     printed in, whatever this says. */
+  --mdm-list-marker: #DC0000;
+
+  /* ---- blockquote --------------------------------------------------- */
+
+  --mdm-quote-bg: #080000;      /* recessed, not lifted: a lighter panel
+                                   would push quoted text below AA */
+  --mdm-quote-bar: #C40000;
+  --mdm-quote-text: #D40000;
+
+  /* ---- code --------------------------------------------------------- */
+
+  /* Inline code's text, the body text's colour again: 3.85:1 on the inline
+     background below, which is prose contrast on a panel a shade lighter
+     than the page. Fenced blocks keep --mdm-pre-fg and the syntax tiers at
+     the foot of this file; paper keeps print's own dark-on-light pair. */
+  --mdm-code-fg: #DC0000;       /* `inline` text */
+  --mdm-code-bg: #1C0000;       /* `inline` background */
+  --mdm-pre-bg: #080000;        /* fenced blocks */
+  --mdm-pre-fg: #DC0000;
+
+  --mdm-hr: #7A0000;
+
+  /* ---- tables ------------------------------------------------------- */
+
+  --mdm-table-border: #8C0000;
+  --mdm-cell-border: #5A0000;
+  --mdm-td-bg: #100000;         /* must match the page, or white cells */
+  --mdm-th-bg: #2A0000;
+  --mdm-th-text: #FF0000;
+  --mdm-row-alt-bg: #180000;
+
+  /* Paper. The stripe has to be light and red has no light tint, so it
+     is white — no ink, no stripe. Want striping, swap in #FBECEC. */
+  --mdm-print-th-bg: #2A0000;
+  --mdm-print-th-text: #FF0000;
+  --mdm-print-row-alt-bg: #ffffff;
+
+  /* ---- the app's own furniture -------------------------------------- */
+
+  /* Mermaid draws its own SVG in its own palette. `dark` gives the best
+     tones to work with; the multiply overlay at the foot of this file
+     forces the result red-only. */
+  --mdm-mermaid-theme: dark;
+
+  --mdm-squiggle: #FF0000;      /* brighter than body text, so the
+                                   misspelling wave still reads */
+  --mdm-mark: #900000;          /* pilcrows, spaces, tabs */
+  --mdm-cell-selected: rgba(255, 0, 0, 0.22);
+  --mdm-resize-handle: #FF0000; /* small target, so: brightest */
+
+  --mdm-mermaid-bg: #100000;
+  --mdm-mermaid-border: #5A0000;
+  --mdm-mermaid-error-bg: #2A0000;
+  --mdm-mermaid-error-border: #FF0000;
+  --mdm-mermaid-error-text: #FF0000;
+  --mdm-mermaid-empty: #A00000;
+
+  /* ---- syntax highlighting ------------------------------------------ */
+
+  /* Nine names, four values. The usable band is too narrow for nine
+     distinguishable reds, so they group into tiers instead. */
+  --mdm-token-keyword: #E80000;         /* structure */
+  --mdm-token-function: #E80000;
+
+  --mdm-token-string: #D80000;          /* values */
+  --mdm-token-number: #D80000;
+  --mdm-token-property: #D80000;
+  --mdm-token-regex: #D80000;
+
+  --mdm-token-punctuation: #C80000;     /* scaffolding */
+  --mdm-token-operator: #C80000;
+
+  --mdm-token-comment: #A40000;         /* recessive on purpose */
+}
+
+/* ---- the one thing no variable covers -------------------------------
+ *
+ * Mermaid. It draws its own SVG in its own palette and no variable of ours
+ * gets inside — but it draws it as inline SVG, and pixels are pixels. This
+ * lays pure red over the diagram in multiply mode, which multiplies every
+ * pixel by (1, 0, 0): the red channel passes through untouched, green and
+ * blue go to exactly zero. So whatever mermaid decides to draw arrives
+ * red-only, like everything else. Delete this pair if you would rather see
+ * diagrams in full colour.
+ *
+ * This is the only rule in the file. Everything else this theme does it does
+ * with variables: --mdm-list-marker, --mdm-code-fg and --mdm-font-size each
+ * replaced a rule an earlier draft needed, and --mdm-mermaid-theme is as far
+ * inside a diagram as a variable reaches.
+ *
+ * Screen only, as Obsidiminutive's italic links are: on paper a printed
+ * diagram is ink on white, where a red multiply is a stain rather than a
+ * palette. Paper keeps the diagram mermaid drew. */
+@media screen {
+  .mdm-mermaid {
+    position: relative;
+  }
+
+  .mdm-mermaid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #FF0000;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+}

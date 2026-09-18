@@ -374,7 +374,7 @@ one of them saves your settings, Mode is back on System.
 
 ## Themes
 
-**View ▸ Theme** recolours the editing surface. Eight ship with the app:
+**View ▸ Theme** recolours the editing surface. Ten ship with the app:
 
 | Theme | |
 |---|---|
@@ -385,6 +385,8 @@ one of them saves your settings, Mode is back on System.
 | **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
 | **Obsidiminutive** | Dark — after Notepad++'s Obsidian, with bold you can read |
 | **One Light** | Light, cool and crisp |
+| **Red Sparks** | Dark, red only — for reading at night, by Joe Sparks (@joesparks on X) |
+| **Red Sparks 2X** | Red Sparks with the text twice the size |
 | **Solarized Light** | Light, warm, low-glare |
 
 Switching is instant, applies to the source view as well as the formatted one, and
@@ -441,7 +443,7 @@ new name appears in the menu without restarting the app.
 
 Two folders, and the difference matters:
 
-- **`themes\`** holds the seven built-in theme files — the eighth theme, Default, is
+- **`themes\`** holds the nine built-in theme files — the tenth theme, Default, is
   the app's own palette and has no file. They are rewritten from the app whenever
   you update, so that a fix to one reaches you — which also means **edits to them
   are lost**.
@@ -978,7 +980,7 @@ into and what to do instead.
 - **Mermaid ships inside the editor bundle whether a document uses it or not.**
   Diagrams work with nothing to install; the cost is download size, and there is
   no way to leave it out.
-- **Edits to the seven built-in theme files are lost when you update.** They are
+- **Edits to the nine built-in theme files are lost when you update.** They are
   rewritten from the app so that a fix reaches you. Keep your own colours in
   `themes\custom\`, where nothing is ever overwritten — see [Writing your
   own](#writing-your-own).

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using MarkdownMidget.Themes;
 using Xunit;
@@ -59,6 +60,8 @@ public class BuiltInThemeTests
             "themes/Midget-Solarized.css",
             "themes/Obsidiminutive.css",
             "themes/One-Light.css",
+            "themes/Red-Sparks-2X.css",
+            "themes/Red-Sparks.css",
             "themes/Solarized-Light.css",
         }, shipped);
     }
@@ -120,6 +123,25 @@ public class BuiltInThemeTests
         Assert.Equal(defined - 2, int.Parse(claim.Groups[1].Value, CultureInfo.InvariantCulture));
     }
 
+    [Fact]
+    public void HelpsThemeTableNamesEveryThemeThatShips()
+    {
+        // The COUNT above was pinned and the LIST was not, so a palette could ship with the
+        // number corrected and the theme itself missing from the table a reader picks from
+        // — the same quiet failure the count test exists to stop, one row further along.
+        // Read as the display names the menu shows, which is what the table lists, so a
+        // file renamed without Help being told fails here as well.
+        var rows = Regex.Matches(Help(), @"^\| \*\*([^*]+)\*\* \|", RegexOptions.Multiline)
+            .Select(m => m.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
+        var missing = App.GetManifestResourceNames()
+            .Where(n => n.StartsWith("themes/", StringComparison.Ordinal))
+            .Select(n => ThemeStore.DisplayName(Path.GetFileName(n)))
+            .Append("Default")          // the theme with no file: the app's own palette
+            .Where(name => !rows.Contains(name))
+            .OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        Assert.Equal(Array.Empty<string>(), missing);
+    }
+
     private static string Help()
     {
         using var stream = App.GetManifestResourceStream("HELP.md");
@@ -134,7 +156,8 @@ public class BuiltInThemeTests
         // derived from them and nothing else — `github-light.css` would appear as
         // "Github Light", which is not what the theme is called.
         => Assert.Equal(
-            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized", "Obsidiminutive", "One Light", "Solarized Light" },
+            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized",
+                    "Obsidiminutive", "One Light", "Red Sparks 2X", "Red Sparks", "Solarized Light" },
             App.GetManifestResourceNames()
                 .Where(n => n.StartsWith("themes/", StringComparison.Ordinal))
                 .OrderBy(n => n, StringComparer.Ordinal)
@@ -203,18 +226,134 @@ public class BuiltInThemeTests
             InertDefaults.Keys.Where(k => !DefaultVars.ContainsKey(k)).OrderBy(k => k).ToArray());
     }
 
+    /// <summary>The three variables the size and marker work added to the contract.</summary>
+    private static readonly string[] NewestVariables =
+        { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" };
+
     [Theory]
     [MemberData(nameof(BuiltIns))]
-    public void TheShippedPalettesLeaveTheNewestVariablesUnset(string resource)
+    public void EveryShippedPaletteEitherPredatesTheNewestVariablesOrSetsThemAll(string resource)
     {
-        // The three that arrived with the size and marker work: no built-in sets one, so
-        // every shipped palette renders exactly as it did before they existed, and a NEW
-        // palette has to decide rather than slip past. (--mdm-strong is the older case and
-        // has its own pair of tests above and below: Obsidiminutive does set that one.)
+        // Every palette that shipped before the size and marker work leaves all three
+        // unset, so it renders exactly as it did before they existed. The Red Sparks pair
+        // is the other case and is the reason this is a branch rather than a blanket
+        // "nobody sets one": it was written against the contract and sets all three, which
+        // is what replaced the four rules its custom version hand-wrote. Both directions
+        // are asserted, so a palette can't slip between them - a new theme setting one of
+        // the three fails here until it is named, and a Red Sparks file that quietly
+        // dropped one fails too, which is how the ::marker rule would come back.
         var mine = Variables(Read(resource));
-        var set = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" }
-            .Where(mine.ContainsKey).ToArray();
-        Assert.Equal(Array.Empty<string>(), set);
+        var set = NewestVariables.Where(mine.ContainsKey).ToArray();
+        if (resource is RedSparks or RedSparks2X)
+            Assert.Equal(NewestVariables, set);
+        else
+            Assert.Equal(Array.Empty<string>(), set);
+    }
+
+    // ===== Red Sparks, and a palette written against the contract =====
+
+    private const string RedSparks = "themes/Red-Sparks.css";
+    private const string RedSparks2X = "themes/Red-Sparks-2X.css";
+
+    [Fact]
+    public void TheRedSparksPairShipsAsDarkBuiltInsThroughTheStoreTheMenuReads()
+    {
+        // Listed, usable and built-in, through the same store the menu reads - in a temp
+        // folder, never the real profile. Two files, so the menu offers the palette and its
+        // double-size sibling as separate entries, which is how a reader picks the size.
+        var root = Path.Combine(Path.GetTempPath(), "mm-red-sparks-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new ThemeStore(root);
+            Assert.True(store.Refresh("1.0.0", App));
+            foreach (var (key, name) in new[] { ("Red-Sparks.css", "Red Sparks"),
+                                                ("Red-Sparks-2X.css", "Red Sparks 2X") })
+            {
+                var listed = store.List().SingleOrDefault(t => t.Key == key);
+                Assert.NotNull(listed);
+                Assert.Equal(name, listed!.Name);
+                Assert.True(listed.IsUsable, listed.Unusable);
+                Assert.False(listed.IsCustom);
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* temp */ }
+        }
+
+        foreach (var resource in new[] { RedSparks, RedSparks2X })
+            Assert.Equal("dark", Variables(Read(resource))["--mdm-color-scheme"]);
+    }
+
+    /// <summary>Each block a theme opens: its prelude, and how deeply it is nested. A small
+    /// scanner rather than a CSS parser — enough for files whose rules are this shape, and
+    /// it strips comments first so a commented-out rule isn't counted as one.</summary>
+    private static (string Prelude, int Depth)[] Blocks(string css)
+    {
+        var bare = Regex.Replace(css, @"/\*.*?\*/", " ", RegexOptions.Singleline);
+        var blocks = new List<(string, int)>();
+        var run = new StringBuilder();
+        var depth = 0;
+        foreach (var c in bare)
+        {
+            if (c is '{')
+            {
+                blocks.Add((Regex.Replace(run.ToString(), @"\s+", " ").Trim(), depth));
+                depth++;
+                run.Clear();
+            }
+            else if (c is '}') { depth--; run.Clear(); }
+            else if (c is ';') run.Clear();
+            else run.Append(c);
+        }
+        Assert.Equal(0, depth);
+        return blocks.ToArray();
+    }
+
+    [Theory]
+    [InlineData(RedSparks)]
+    [InlineData(RedSparks2X)]
+    public void TheRedSparksPairIsVariablesAndOneScreenRuleTheContractCannotExpress(string resource)
+    {
+        // The pair arrived as custom themes carrying five hand-written rules: a ::marker
+        // colour, an inline-code colour and the `pre code` handback that rule needed, a
+        // link underline, and the mermaid overlay. Four are gone — three became
+        // --mdm-list-marker, --mdm-code-fg and --mdm-font-size, and base.css already
+        // underlines links. The fifth cannot become a variable: none of ours reaches inside
+        // the SVG mermaid draws, and the overlay works on its pixels from outside.
+        //
+        // Pinned as the whole list of blocks, with nesting, because that is what a
+        // regression looks like here: a re-added `.mdm-prosemirror.mdm-prosemirror` rule
+        // out-specifying the variable it was replaced by, in a file whose comments say the
+        // variable is doing the work.
+        Assert.Equal(
+            new[] { (":root", 0), ("@media screen", 0), (".mdm-mermaid", 1), (".mdm-mermaid::after", 1) },
+            Blocks(Read(resource)));
+    }
+
+    [Fact]
+    public void TheOnlyDifferenceBetweenRedSparksAndItsTwoXIsTheSize()
+    {
+        // 2X is its sibling with one number doubled. As custom themes the difference was
+        // four more rules — a root font-size, the vendor's two `rem` tokens, a table pin
+        // and the gutter's `font` shorthand — every one of which structure.css now derives
+        // from --mdm-font-size. What is left is worth holding: the two palettes cannot
+        // drift apart, and a correction to one is a correction to both.
+        var (a, b) = (Variables(Read(RedSparks)), Variables(Read(RedSparks2X)));
+        Assert.Equal(a.Keys.OrderBy(k => k, StringComparer.Ordinal),
+                     b.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.Equal(new[] { "--mdm-font-size" },
+            a.Where(kv => b[kv.Key] != kv.Value).Select(kv => kv.Key)
+             .OrderBy(k => k, StringComparer.Ordinal).ToArray());
+        Assert.Equal("16px", a["--mdm-font-size"]);
+        Assert.Equal("32px", b["--mdm-font-size"]);
+
+        // And byte for byte below the header comment, comments included: the palette's
+        // reasoning is written down in both files, so a fix to one that isn't made in the
+        // other leaves a file explaining a value it no longer holds.
+        static string Body(string css) => css[css.IndexOf(":root", StringComparison.Ordinal)..]
+            .Replace("--mdm-font-size: 32px", "--mdm-font-size: 16px", StringComparison.Ordinal);
+        Assert.Equal(Body(Read(RedSparks)), Body(Read(RedSparks2X)));
     }
 
     // ===== Obsidiminutive, and bold with a colour of its own =====
@@ -391,24 +530,60 @@ public class BuiltInThemeTests
 
     // ===== the four things a good-looking palette breaks =====
 
+    /// <summary>
+    /// The palettes whose body text is allowed below WCAG AA, by EXACT resource name, each
+    /// with the floor its own measurement sits just above and the reason the design needs it.
+    ///
+    /// Matched EXACTLY, never by substring. `Contains("Solarized")` also matches
+    /// `Midget-Solarized.css` — a theme whose entire purpose is MORE contrast — so the
+    /// substring form silently handed the lax floor to the one palette that must never have
+    /// it. An exemption that spreads by name-similarity is not an exemption "by name", and
+    /// a dictionary keyed on the resource cannot spread that way. Two names rather than a
+    /// prefix for the same reason: `Red-Sparks` as a prefix would cover a future
+    /// `Red-Sparks-Light.css` that had no claim to it.
+    /// </summary>
+    private static readonly Dictionary<string, double> BodyTextFloors = new(StringComparer.Ordinal)
+    {
+        // 4.12:1. Not an oversight but the entire point of Solarized: base00 on base3 is a
+        // deliberately reduced contrast chosen so long reading sessions hurt less.
+        ["themes/Solarized-Light.css"] = 4.0,
+        // 3.96:1, both files, which share the palette. A single-hue red page has nothing
+        // brighter to offer short of pure #FF0000 (5.14:1), which the theme keeps for the
+        // squiggle and the resize handle; dim red is the point of a palette for
+        // dark-adapted eyes, and lifting the text is the one change that would undo it.
+        [RedSparks] = 3.9,
+        [RedSparks2X] = 3.9,
+    };
+
     [Theory]
     [MemberData(nameof(BuiltIns))]
     public void BodyTextIsReadable(string resource)
     {
-        // 4.5:1 is WCAG AA for body text, and every shipped theme clears it except
-        // one — Solarized, at 4.12:1, which is not an oversight but the entire point
-        // of Solarized: base00 on base3 is a deliberately reduced contrast chosen so
-        // long reading sessions hurt less. Exempted by name, with the measurement
-        // recorded, so that any OTHER theme dropping below AA still fails here.
-        //
-        // Matched EXACTLY, not by substring. `Contains("Solarized")` also matches
-        // `Midget-Solarized.css` — a theme whose entire purpose is MORE contrast —
-        // so the substring form silently handed the lax floor to the one palette
-        // that must never have it. An exemption that spreads by name-similarity is
-        // not the "by name" exemption this comment claims to describe.
+        // 4.5:1 is WCAG AA for body text, and every shipped theme clears it except the
+        // three named above, each exempted by exact name with its measurement recorded, so
+        // that any OTHER theme dropping below AA still fails here.
         var vars = Variables(Read(resource));
-        var floor = resource == "themes/Solarized-Light.css" ? 4.0 : 4.5;
+        var floor = BodyTextFloors.TryGetValue(resource, out var exempt) ? exempt : 4.5;
         AssertContrast(vars, "--mdm-text", floor, resource);
+    }
+
+    [Fact]
+    public void EveryBodyTextExemptionIsForAThemeThatShipsAndStillNeedsIt()
+    {
+        // An exemption is a lax floor with a name on it, and both halves rot. A name that
+        // no longer ships is a floor waiting for a rename to land on; a floor set well
+        // below what the palette measures is a blanket pass wearing a measurement. So each
+        // one has to name a theme that ships and sit within 0.25 of that theme's actual
+        // ratio — tighten a palette to AA and its exemption fails here until it is deleted.
+        var shipped = App.GetManifestResourceNames().ToHashSet(StringComparer.Ordinal);
+        foreach (var (resource, floor) in BodyTextFloors)
+        {
+            Assert.True(shipped.Contains(resource),
+                $"{resource} is exempted from the body-text floor but no longer ships");
+            var vars = Variables(Read(resource));
+            var ratio = Contrast(Rgb(vars["--mdm-text"]), Rgb(vars["--mdm-page-bg"]));
+            Assert.InRange(ratio, floor, Math.Min(floor + 0.25, 4.5));
+        }
     }
 
     [Theory]

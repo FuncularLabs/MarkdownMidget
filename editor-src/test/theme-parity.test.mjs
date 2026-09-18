@@ -387,6 +387,11 @@ const sampleCss = readFileSync(join(builtinDir, '..', 'sample.css'), 'utf8');
 const helpMd = readFileSync(join(here, '..', '..', 'HELP.md'), 'utf8');
 const PREDATE_STRONG = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'GitHub-Light.css',
   'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
+/** The palettes that arrived after --mdm-strong and still leave bold the colour of the
+ *  text around it. Red Sparks has one hue, so a bold colour of its own could only be
+ *  brighter or dimmer red; it sets --mdm-list-marker and --mdm-code-fg instead. */
+const RED_SPARKS = ['Red-Sparks.css', 'Red-Sparks-2X.css'];
+const STRONG_UNSET = [...PREDATE_STRONG, ...RED_SPARKS];
 
 /** What `.mdm-prosemirror strong { color }` resolves to with this theme installed. */
 function strongColour(themeCss) {
@@ -406,14 +411,14 @@ test('bold takes --mdm-strong when a theme sets one', () => {
 });
 
 test('a theme that leaves --mdm-strong unset keeps bold the colour of the text around it', () => {
-  // Every built-in is either one that predates the variable or the one that sets it,
+  // Every built-in is either one that leaves the variable unset or the one that sets it,
   // so a new palette has to decide rather than slip past this.
   assert.deepEqual(readdirSync(builtinDir).filter((f) => f.endsWith('.css')).sort(),
-    [...PREDATE_STRONG, 'Obsidiminutive.css'].sort());
+    [...STRONG_UNSET, 'Obsidiminutive.css'].sort());
 
   // currentColor on `color` is the inherited colour: bold in a paragraph is the body
   // text, exactly as before the variable existed. Default ('' = no theme) included.
-  for (const file of ['', ...PREDATE_STRONG]) {
+  for (const file of ['', ...STRONG_UNSET]) {
     const css = file ? readTheme(file) : '';
     assert.equal(rootVariables(css).has('--mdm-strong'), false, `${file} sets --mdm-strong`);
     assert.equal(strongColour(css).toLowerCase(), 'currentcolor', `${file || 'Default'}: bold gained a colour`);
@@ -472,7 +477,7 @@ test('Obsidiminutive colours inline code, and not fenced code, with its number g
 // exactly. A print condition it can't evaluate fails rather than being guessed at.
 // That WebView2 does the same on paper is TEST-PLAN PRN-01.
 
-const DARK = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'Obsidiminutive.css'];
+const DARK = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'Obsidiminutive.css', ...RED_SPARKS];
 const LIGHT = ['GitHub-Light.css', 'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
 const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 const themeVariables = (themeCss) => new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
@@ -942,12 +947,18 @@ function vendorNord10() {
   return m[1].toLowerCase();
 }
 
-test('the three new variables are inert: no built-in sets one, and Default is what the editor already drew', () => {
+test('the three new variables are inert: only the pair written for them sets one, and Default is what the editor already drew', () => {
   const optional = ['--mdm-list-marker', '--mdm-code-fg', '--mdm-font-size'];
   for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
     const vars = rootVariables(file ? readTheme(file) : '');
+    // Red Sparks was written against this contract and sets all three — that is what
+    // replaced the rules its custom version hand-wrote, and the reason the branch is
+    // asserted both ways: every other palette, Default included, renders exactly as it
+    // did before the variables existed, and a Red Sparks file that dropped one would need
+    // a rule back to look the same.
+    const expected = RED_SPARKS.includes(file);
     for (const name of optional)
-      assert.equal(vars.has(name), false, `${file || 'Default'} sets ${name}`);
+      assert.equal(vars.has(name), expected, `${file || 'Default'}: ${name} is ${expected ? 'unset' : 'set'}`);
   }
 
   // Both colours are the vendor's marker/inline-code colour, and the size is the 16px
