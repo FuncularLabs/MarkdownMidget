@@ -16,6 +16,9 @@
  *    the point: a theme can give keywords and punctuation different colours
  *    without Nord's palette having done so first.
  *
+ *  Two entries are not colours — `--mdm-color-scheme` and `--mdm-font-size` — and
+ *  each says so where it is declared.
+ *
  *  Print is almost entirely absent. Paper stays light whatever theme is
  *  chosen — `@media print` keeps its own literals — with one bounded
  *  exception: the three --mdm-print-* table variables below, which let tables
@@ -30,6 +33,19 @@
   --mdm-page-bg: #ffffff;
   --mdm-page-shadow: rgba(0, 0, 0, 0.18);
   --mdm-text: #1a1a1a;
+
+  /* Text size. Not a colour, and optional: 16px is what `.mdm-prosemirror` has always
+     been, so a theme that says nothing renders at the size it always did. Everything
+     textual in the DOCUMENT derives from this one value — body text, the six
+     headings, list markers, inline and fenced code, table cells and the line-number
+     gutter — so a theme doubles the document with one line. It reaches paper, where
+     print's own source-view type (10pt) still doesn't move. LAYOUT does not follow
+     it: the page's padding, the block margins, the page width, the gutter's width and
+     the app's own measurements (the mermaid frame's padding, the resize handle) are
+     fixed. Anything that is text in the document does follow, including formatting
+     marks and mermaid's own messages, which are sized in `em`. structure.css does the
+     deriving. */
+  --mdm-font-size: 16px;
 
   /* Bold. Optional: `currentColor` means no colour of its own, so bold stays the
      colour of the text around it - how every theme looked before this existed.
@@ -48,14 +64,25 @@
   --mdm-link: #4582b4;
   --mdm-link-hover: #2f5f87;
 
+  /* List markers — the bullets and the numbers. Optional, and the default is not ours:
+     #5e81ac is Nord's nord10, the colour the vendor stylesheet paints every marker, so
+     a theme that says nothing keeps the marker it has always had. On paper print pins
+     this same value, because a marker colour is a screen choice (print.css). */
+  --mdm-list-marker: #5e81ac;
+
   /* Blockquote (Markdown Monster "PDF Output" theme). */
   --mdm-quote-bg: #f2f7fb;
   --mdm-quote-bar: #569ad4;
   --mdm-quote-text: #3a4a58;
 
-  /* Code. Inline code takes its foreground from Nord, not from us, so there is
-     no --mdm-code-fg yet — adding one means adding a declaration the editor
-     doesn't currently make, which is a change rather than a refactor. */
+  /* Code. `--mdm-code-fg` is INLINE code's foreground and nothing else; fenced code
+     keeps --mdm-pre-fg and its syntax tokens, which are more specific. The declaration
+     that reads it is new — base.css never coloured inline code before, Nord did — so
+     the default is Nord's own nord10, and the fixtures were edited by hand to record
+     the added declaration at the value the vendor already produced. Optional in the
+     same sense as --mdm-strong: unset means Nord's colour, as before. Not on paper,
+     where print colours inline code itself (print.css). */
+  --mdm-code-fg: #5e81ac;   /* nord10, the vendor's inline-code colour */
   --mdm-code-bg: #f2f2f2;
   --mdm-pre-bg: #2e3440;   /* nord polar night */
   --mdm-pre-fg: #d8dee9;
@@ -83,8 +110,11 @@
   /* Not a colour: the name of one of mermaid's own built-in themes (default,
      dark, neutral, forest, base). Read back through getComputedStyle after the
      theme is installed and handed to mermaid.initialize — CSS custom properties
-     can't reach inside an SVG mermaid generates, so this is the only lever on it
-     a theme has. An unrecognised name falls back rather than throwing. */
+     can't reach inside an SVG mermaid generates, so this is the only lever a theme
+     has through a VARIABLE. The diagram is inline SVG in the page, so ordinary
+     selectors do reach it, against mermaid's own id-based inline `<style>`; nothing
+     in there is a contract we test. An unrecognised name falls back rather than
+     throwing. */
   --mdm-mermaid-theme: default;
 
   --mdm-squiggle: #e51d1d;

@@ -148,6 +148,32 @@ test('the rule that must beat a vendor !important is in the first of our layers'
   assert.equal(layerAt(bundle, at), 'mdm-override');
 });
 
+test("our document text size beats the vendor's rem pins, by layer rather than specificity", () => {
+  // The other half of --mdm-font-size, and the half that is not visible in either source
+  // file. The vendor sizes body text and fenced code from its own Tailwind tokens, in
+  // `rem` — which measures from the PAGE root, so a container font-size never reaches
+  // them and the document used to scale its headings while its paragraphs stayed 16px
+  // and its code blocks 14px. Our replacements only win because mdm-structure is a LATER
+  // layer than mdm-vendor: on specificity they are level at (0,1,1) against (0,1,1) for
+  // paragraphs, and the vendor's is emitted second. Move either rule and the sizes go
+  // back to being unthemeable with nothing failing to say so.
+  const pairs = [
+    ['.milkdown-theme-nord p{font-size:var(--text-base)', '.mdm-prosemirror p{font-size:var(--mdm-font-size)'],
+    ['.milkdown-theme-nord pre{', '.mdm-prosemirror pre{border-radius:6px'],
+  ];
+  for (const [vendor, ours] of pairs) {
+    const theirs = bundle.indexOf(vendor);
+    assert.notEqual(theirs, -1, `the vendor rule "${vendor}" is not in the bundle`);
+    assert.equal(layerAt(bundle, theirs), 'mdm-vendor', vendor);
+    const mine = bundle.indexOf(ours);
+    assert.notEqual(mine, -1, `our rule "${ours}" is not in the bundle`);
+    assert.equal(layerAt(bundle, mine), 'mdm-structure', ours);
+    assert.match(bundle.slice(mine, bundle.indexOf('}', mine)), /font-size:calc\(var\(--mdm-font-size\)|font-size:var\(--mdm-font-size\)/);
+  }
+  assert.ok(EXPECTED.indexOf('mdm-structure') > EXPECTED.indexOf('mdm-vendor'),
+    'mdm-structure must stay after mdm-vendor or the vendor sizes win again');
+});
+
 test('print is the earliest layer, so nothing a theme writes reaches paper', () => {
   assert.equal(EXPECTED[0], 'mdm-print');
   const at = bundle.indexOf('@media print');

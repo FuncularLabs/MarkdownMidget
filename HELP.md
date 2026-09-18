@@ -448,10 +448,33 @@ Two folders, and the difference matters:
 - **`themes\custom\`** is yours. Nothing there is ever overwritten. A custom file
   with the same name as a built-in wins, and the menu marks it.
 
-A theme mostly just sets variables (`--mdm-page-bg`, `--mdm-text`, and about forty
-more, all listed in the sample). You can write ordinary CSS rules too, but you
+A theme mostly just sets variables — `--mdm-page-bg`, `--mdm-text` and 49 more, all
+listed in the sample. You can write ordinary CSS rules too, but you
 can't switch off the app's own furniture — spelling squiggles, formatting marks and
 the table resize handle survive whatever a theme says about them.
+
+**Text size.** `--mdm-font-size` is the one size the document derives from. Set it
+once and body text, the six heading levels, list markers, inline and fenced code,
+table text and the line numbers all follow, on screen and on paper — so a theme for
+tired eyes is one line, `--mdm-font-size: 32px`. Give it an absolute size (`32px`,
+`18pt`), not `em` or `%`, which measure from whatever encloses each element. It sizes
+the document only: the page's margins, the width, the menus, the toolbar and the
+Markdown source view keep their own sizes, the numbers beside blank lines stay small
+because they have to fit between two blocks, and printing keeps its own type for
+**Markdown source** printouts.
+
+**Diagrams.** No variable of ours reaches inside a mermaid diagram: mermaid draws its
+own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,
+`neutral`, `forest`, `base` — is the supported lever on it. A rendered diagram *is*
+inline SVG in the page, though, so ordinary CSS selectors do reach its shapes and
+text. Mermaid writes its own `<style>` inside each diagram, so expect to out-specify
+it, and nothing about what it draws inside there is a promise that survives a
+mermaid update.
+
+**The printed row stripe has to stay light.** `--mdm-print-row-alt-bg` prints behind
+text that always prints dark, so a dark stripe swallows it. A palette built on one
+hue has no light tint at all — pure red is about a fifth of white's brightness — so
+in one of those, set it to `#ffffff`: no stripe, and nothing else lost.
 
 Three things a theme may **not** do. A file that tries one is greyed out in the
 menu, with the line number and the reason in its tooltip:

@@ -55,6 +55,38 @@ public class CssValidatorTests
         """);
 
     [Fact]
+    public void AThemeThatSetsTheOptionalVariablesIsAccepted()
+        // The three newest ones, and the shapes they are actually written in: a bare
+        // length, two colours, and the calc() the size derivations are built from - a
+        // theme is allowed to do its own arithmetic. The parenthesis tracking in here is
+        // what makes calc() safe to write, and a `;` inside one is the case that used to
+        // be read as a statement.
+        => Accept("""
+        :root {
+          --mdm-font-size: 32px;
+          --mdm-list-marker: #dc0000;
+          --mdm-code-fg: rgb(0, 255, 0);
+          --mdm-page-bg: #100000;
+        }
+
+        .mdm-prosemirror h1 {
+          font-size: calc(var(--mdm-font-size) * 2.5);
+        }
+        """);
+
+    [Fact]
+    public void AThemeThatSetsNoneOfThemIsAccepted()
+        // The other half of "optional": the palettes that predate those variables are
+        // still valid files, and a validator that started requiring them would grey out
+        // every theme anyone already has.
+        => Accept("""
+        :root {
+          --mdm-page-bg: #ffffff;
+          --mdm-text: #1a1a1a;
+        }
+        """);
+
+    [Fact]
     public void AnEmptyFileIsNotAnError()
     {
         // A theme that sets nothing renders the default. That is a pointless theme,

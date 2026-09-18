@@ -34,6 +34,21 @@ order. Notes for whoever takes stage 3:
   cannot be added to a palette until the declaration that reads it exists. Inline
   code takes its foreground from Nord today, and adding our own is a rendering
   change, not a refactor — it belongs with the layer work.
+
+  **Landed, with `--mdm-list-marker` and `--mdm-font-size` beside it.** The
+  declarations exist now, and the rendering change was made to be no change: each
+  of the three defaults to the value the editor already produced — nord10 for
+  inline code and for markers, 16px for the size — so every palette that predates
+  them, and Default, renders identically. Measured in Chromium against the built
+  bundle, Default and all seven built-ins: **0 differing computed declarations**
+  across 39 element/pseudo-element sites. `--mdm-font-size` is the one that is not
+  paint: `structure.css` derives paragraphs, fenced code, table cells and the
+  line-number gutter from it, because the vendor sizes paragraphs and `pre` in
+  `rem` off the page root and a container font-size never reaches them. On paper
+  the two colours are pinned (the marker to Nord's literal, inline code by print's
+  own pair) and the SIZE is not, which print.css's header now argues. The one
+  number that cannot follow it is the gutter number for a blank line, whose box has
+  to fit the fixed 16px margin between two blocks.
 - **Chrome containment holds where it was measured, and there are three holes.**
   A theme cannot remove the spell squiggle by restyling `.mdm-misspelled` —
   verified against a deliberately hostile theme in Chrome, three attempts, all
@@ -72,7 +87,11 @@ order. Notes for whoever takes stage 3:
   `!important`. `theme-default.css` shares `mdm-base` with `base.css` rather than
   taking a layer of its own; nothing needs to separate them.
 - **Adding `--mdm-code-fg` means editing both test fixtures, by hand, and neither
-  may be regenerated.** Adding a declaration the original file never had fails two
+  may be regenerated.** (Done that way: eight keys inserted at the position each
+  one occupies in its file, by a script that refuses to run when an anchor does not
+  match, and nothing regenerated. The added metrics record their derivation —
+  `calc(16px * 0.75)`, not `12px` — so flattening one back to a literal fails the
+  baseline comparison as well as the size test.) Adding a declaration the original file never had fails two
   checks — the key-set comparison against `editor-css-baseline.json`, and
   `rank.has(key)` — so INSERT the new key into both fixtures at the position it
   occupies, rather than rebuilding either from the current files. Inserting keeps
@@ -298,7 +317,11 @@ same" colours is what turns stage 1 from a refactor into a rendering change.
 | Host | `--mdm-source-bg`, `--mdm-source-fg` (§4) |
 | Mermaid | `--mdm-mermaid-theme` (a name, not a colour — §4) |
 
-Roughly 40. Two specific traps for whoever does the refactor:
+Roughly 40 at stage 1; the shipped palette is 51 today — the three `--mdm-print-*`
+table variables, `--mdm-strong`, `--mdm-list-marker`, `--mdm-code-fg` and
+`--mdm-font-size` all arrived after this table was written, and `HELP.md` states the
+count with a test holding it to the palette. Two specific traps for whoever does the
+refactor:
 
 - **`#4682b4` (headings, line 73) and `#4582b4` (links, line 99) differ by one
   digit** and are almost certainly an original typo. Keep them as two variables

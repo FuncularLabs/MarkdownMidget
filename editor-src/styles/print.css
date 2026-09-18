@@ -11,6 +11,14 @@
  * blank pages. The guarantee is that a theme cannot repaint or repaginate what
  * print specifies, not that it cannot ruin a printout.
  *
+ * SIZE is not one of the properties defended here, deliberately. Nothing below
+ * declares a font-size on the document, so `--mdm-font-size` reaches paper exactly as
+ * the 16px it replaced always did: a theme built for tired eyes prints large, and the
+ * page count follows. The argument for pinning colour is that a dark page is
+ * unreadable on white and costs a cartridge; large type is neither, it is what the
+ * theme was chosen for. Print's OWN type is unaffected — `.mdm-print-source-pre`
+ * states 10pt and is not in the document.
+ *
  * That last part is the point. A dark theme on paper is unreadable and empties a
  * toner cartridge, so print keeps its own literals rather than reading theme
  * variables — with ONE bounded exception: the three --mdm-print-* table
@@ -62,6 +70,14 @@
 
   .mdm-prosemirror {
     padding: 0 !important;
+    /* A theme's list-marker colour is a screen choice: it is chosen against the page
+       the theme paints, and a marker pale enough for a dark page is a grey smudge on
+       white. So paper keeps the literal it has always printed — Nord's nord10, which
+       is what painted every marker before --mdm-list-marker existed, and what Default
+       still resolves to. The VARIABLE is pinned rather than the colour, as with bold:
+       a theme's own `::marker` rule reaches paper, a theme's palette does not.
+       Inherited from here, so it reaches a marker in a quote or a nested list. */
+    --mdm-list-marker: #5e81ac !important;
     color: #000 !important;
   }
 
@@ -166,6 +182,10 @@
     background: transparent !important;
   }
 
+  /* Inline code, whose screen foreground is --mdm-code-fg. Print states both ends of
+     the pair as its own literals, so neither a theme's colour nor Nord's reaches
+     paper — the variable is screen-only by construction, and was before it had a
+     name. */
   .mdm-prosemirror code {
     background: #f6f8fa !important;
     color: #24292e !important;

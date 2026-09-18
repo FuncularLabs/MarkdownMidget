@@ -93,6 +93,21 @@ public class BuiltInThemeTests
                 "under themes/ (Default is one more THEME and has no file)");
     }
 
+    [Fact]
+    public void HelpsCountOfThemeVariablesIsTheNumberThePaletteDefines()
+    {
+        // Help tells a theme author how many variables there are to set, and the number
+        // was "about forty" while the palette grew past that - which is how a count in
+        // prose fails: not wrongly, just quietly. The truth is the linked palette, and
+        // the two Help names before the count are excluded because it says "and N more".
+        var defined = DefaultVars.Count;
+        var claim = Regex.Match(Help(), @"`--mdm-page-bg`, `--mdm-text` and (\d+) more");
+        Assert.True(claim.Success,
+            "HELP.md's Writing your own section no longer says \"`--mdm-page-bg`, " +
+            "`--mdm-text` and N more\"; the variable count is what this pins");
+        Assert.Equal(defined - 2, int.Parse(claim.Groups[1].Value, CultureInfo.InvariantCulture));
+    }
+
     private static string Help()
     {
         using var stream = App.GetManifestResourceStream("HELP.md");
@@ -137,21 +152,57 @@ public class BuiltInThemeTests
     }
 
     /// <summary>
-    /// Variables whose Default value means "nothing of its own", so leaving them unset
-    /// is a choice rather than a light value leaking into a dark page. Default's
-    /// <c>--mdm-strong</c> is <c>currentColor</c>: bold stays the colour of the text
-    /// around it, which is how every theme looked before the variable existed.
+    /// Variables a theme may leave unset because Default's value is what the editor
+    /// ALREADY drew, so unset is a choice rather than a light value leaking into a dark
+    /// page — and, for each, the value that makes that true. Every one of them arrived
+    /// after the palettes below it, which is why none of them sets one.
     /// </summary>
-    private static readonly HashSet<string> OptionalVariables = new(StringComparer.Ordinal) { "--mdm-strong" };
+    private static readonly Dictionary<string, string> InertDefaults = new(StringComparer.Ordinal)
+    {
+        // Bold with no colour of its own: it stays the colour of the text around it,
+        // which is how every theme looked before the variable existed.
+        ["--mdm-strong"] = "currentcolor",
+        // Inline code and list markers were painted by Milkdown's Nord palette, never by
+        // us, so Default reproduces nord10 exactly. The value is held to the VENDOR's own
+        // token in editor-src/test/theme-parity.test.mjs, which reads it out of the built
+        // bundle - so a Nord bump fails there rather than silently recolouring both here.
+        ["--mdm-code-fg"] = "#5e81ac",
+        ["--mdm-list-marker"] = "#5e81ac",
+        // The size .mdm-prosemirror has always been. Not a colour, and the one entry here
+        // that is a metric: structure.css derives the document's text from it.
+        ["--mdm-font-size"] = "16px",
+    };
+
+    private static HashSet<string> OptionalVariables => new(InertDefaults.Keys, StringComparer.Ordinal);
 
     [Fact]
-    public void OptionalVariablesReallyAreNoColourOfTheirOwnInDefault()
+    public void OptionalVariablesReallyAreInertInDefault()
     {
-        // The exemption above is only safe while Default's value adds no colour. Give
-        // --mdm-strong a real colour in theme-default.css and every theme that leaves
-        // it unset would inherit a light-page value - the failure the exemption skips.
-        foreach (var name in OptionalVariables)
-            Assert.Equal("currentcolor", DefaultVars[name].ToLowerInvariant());
+        // The exemption above is only safe while Default's value renders what the editor
+        // rendered before the variable existed. Give --mdm-strong a real colour, or
+        // --mdm-code-fg anything but Nord's, and every theme that leaves it unset changes
+        // appearance - the failure the exemption skips. A metric is the same bargain:
+        // 16px is what the editor was, so unset is invisible.
+        foreach (var (name, inert) in InertDefaults)
+            Assert.Equal(inert, DefaultVars[name].ToLowerInvariant());
+
+        // And the list is only honest while every name on it is a real variable.
+        Assert.Equal(Array.Empty<string>(),
+            InertDefaults.Keys.Where(k => !DefaultVars.ContainsKey(k)).OrderBy(k => k).ToArray());
+    }
+
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void TheShippedPalettesLeaveTheNewestVariablesUnset(string resource)
+    {
+        // The three that arrived with the size and marker work: no built-in sets one, so
+        // every shipped palette renders exactly as it did before they existed, and a NEW
+        // palette has to decide rather than slip past. (--mdm-strong is the older case and
+        // has its own pair of tests above and below: Obsidiminutive does set that one.)
+        var mine = Variables(Read(resource));
+        var set = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" }
+            .Where(mine.ContainsKey).ToArray();
+        Assert.Equal(Array.Empty<string>(), set);
     }
 
     // ===== Obsidiminutive, and bold with a colour of its own =====

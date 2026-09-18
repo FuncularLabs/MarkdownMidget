@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { JSDOM } from 'jsdom';
 import { declarations, rootVariables } from './css-declarations.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -219,6 +220,9 @@ test('values that differ stay separate variables', () => {
     ['--mdm-h5', '--mdm-h6'],
     ['--mdm-table-border', '--mdm-cell-border'],
     ['--mdm-pre-bg', '--mdm-code-bg'],
+    // Inline code and fenced code have two foregrounds, which is why there is no one
+    // --mdm-code-text; merging them makes every fenced block take the inline colour.
+    ['--mdm-code-fg', '--mdm-pre-fg'],
   ];
 
   for (const [a, b] of mustDiffer) {
@@ -279,6 +283,10 @@ test('each site reads its own variable, not a twin that matches today', () => {
     ['.token.function', 'color', '--mdm-token-function'],
     ['.token.regex', 'color', '--mdm-token-regex'],
     ['.mdm-prosemirror strong {', 'color', '--mdm-strong'],
+    // The two newest twins: inline code and list markers are both Nord's #5e81ac in
+    // Default, so swapping them is invisible to every resolved-value check here.
+    ['li::marker', 'color', '--mdm-list-marker'],
+    ['.mdm-prosemirror code {', 'color', '--mdm-code-fg'],
   ];
 
   for (const [marker, prop, expected] of wiring) {
@@ -321,8 +329,10 @@ test('the default theme defines nothing the editor never reads', () => {
   // so it is a real declaration on :root and not somewhere a grep for var() will
   // ever find it. Mermaid draws its own SVG from its own palette; no CSS variable
   // of ours reaches inside one, so naming a mermaid built-in is the only lever a
-  // theme has on it. Each entry names where it IS read, so an orphan can't be
-  // parked here to silence the test.
+  // theme has on it through a variable (the diagram is inline SVG, so selectors
+  // reach it — against mermaid's own inline `<style>`, and nothing in there is
+  // tested here or promised anywhere). Each entry names where it IS read, so an
+  // orphan can't be parked here to silence the test.
   const readByScript = new Map([
     ['--mdm-mermaid-theme', 'src/main.js readThemeBack() -> mermaid.js setMermaidTheme()'],
   ]);
@@ -649,4 +659,258 @@ test('a custom theme prints dark headings and links by declaring --mdm-color-sch
     for (const el of HEADINGS) assert.equal(printedColour(css, [`.mdm-prosemirror ${el}`]), '#eeeeee', `${css}: ${el}`);
     assert.equal(printedColour(css, ['.mdm-prosemirror a', '.mdm-prosemirror th a']), '#ddddff', `${css}: a link in a header`);
   }
+});
+
+// ===== list markers, inline code and text size =====
+//
+// --mdm-list-marker and --mdm-code-fg name two colours the editor never declared: both
+// arrived from Milkdown's Nord palette, so no theme could reach them. --mdm-font-size
+// names the one size the document derives from. All three are optional in the
+// --mdm-strong sense — Default gives each the value the editor already produced, so a
+// theme that says nothing renders exactly as before, which the baseline comparison at
+// the top of this file is what actually holds.
+//
+// jsdom cascades neither @layer nor var(), so these tests do what the ones above do:
+// resolve declarations with Default's variables and a theme's laid over them, and reason
+// about specificity in numbers rather than in prose. Which ELEMENTS a selector reaches
+// is a question jsdom can answer, and does below.
+
+/** (ids, classes, elements) for the selectors these rules use: classes, element names,
+ *  pseudo-elements and combinators, with no :where()/:not() and no ids. */
+function specificity(selector) {
+  const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
+  const types = (selector.replace(/\.[\w-]+/g, ' ').match(/[a-z][\w-]*/gi) ?? []).length;
+  return [0, classes, types];
+}
+
+/** Whether a is at least as specific as b, comparing left to right as the cascade does. */
+const atLeast = (a, b) => a.findIndex((n, i) => n !== b[i]) === -1
+  || a[a.findIndex((n, i) => n !== b[i])] > b[a.findIndex((n, i) => n !== b[i])];
+
+/** The editor's DOM as the vendor builds it: one element carries prose, mdm-prosemirror
+ *  and milkdown-theme-nord (@milkdown/theme-nord/lib/index.js sets all three), and
+ *  prosemirror-tables wraps every cell's content in a paragraph — which is why table
+ *  text is a `p` and not the cell. Every place inline code and a list can appear. */
+const DOCUMENT = `<div class="milkdown"><div class="prose mdm-prosemirror milkdown-theme-nord">
+  <p>body <code id="inline">a</code></p>
+  <h2>heading <code id="in-heading">b</code></h2>
+  <ul><li id="item"><p>x <code id="in-item">c</code></p>
+    <ul><li id="nested"><p>y</p></li></ul></li></ul>
+  <ol><li id="numbered"><p>z</p></li></ol>
+  <blockquote><p><code id="in-quote">d</code></p>
+    <ul><li id="quoted-item"><p>q</p></li></ul></blockquote>
+  <pre><code id="fenced">e <span class="token keyword" id="keyword">f</span></code></pre>
+  <table><tbody>
+    <tr><th><p><code id="in-header">g</code></p></th></tr>
+    <tr><td><p><code id="in-cell">h</code></p></td></tr>
+  </tbody></table>
+</div></div>`;
+
+const editorDom = () => new JSDOM(DOCUMENT).window.document;
+const reaches = (doc, selector) => [...doc.querySelectorAll(selector)].map((el) => el.id).sort();
+/** The one declaration in base.css whose value is this var(), and its rule. */
+function soleSite(file, value) {
+  const hits = declarations(read('styles', file)).filter((d) => d.value === value);
+  assert.equal(hits.length, 1, `${file} should have exactly one ${value}, has ${hits.length}`);
+  return hits[0];
+}
+
+test('--mdm-list-marker colours every list marker, nested or quoted, and nothing else', () => {
+  const rule = soleSite('base.css', 'var(--mdm-list-marker)');
+  assert.equal(rule.prop, 'color');
+
+  // Every selector in it is a ::marker on a list's own item, so the declaration cannot
+  // touch the item's text, a paragraph or a cell — and `> li` keeps it off a list
+  // nested inside an item's paragraph structure.
+  const selectors = rule.where.split(', ');
+  for (const s of selectors) assert.match(s, /^\.mdm-prosemirror (ol|ul) > li::marker$/, s);
+
+  // jsdom has no ::marker in querySelectorAll, and it doesn't need one: the pseudo
+  // belongs to the element the rest of the selector names, so the owners are the
+  // question. All four lists, including the nested one and the one in a quote.
+  const owners = selectors.map((s) => s.replace('::marker', '')).join(', ');
+  assert.deepEqual(reaches(editorDom(), owners), ['item', 'nested', 'numbered', 'quoted-item']);
+
+  // Nord's rule is MORE specific — it wins on specificity and loses on layer order,
+  // which is the whole reason this declaration works (layers.test.mjs holds the order).
+  assert.deepEqual(selectors.map(specificity), [[0, 1, 3], [0, 1, 3]]);
+  assert.ok(atLeast([0, 2, 1], specificity(selectors[0])),
+    "if ours out-specified Nord's (0,2,1) this would prove nothing about layer order");
+});
+
+test('--mdm-code-fg colours inline code in quotes, tables, lists and headings, not fenced code', () => {
+  const inline = soleSite('base.css', 'var(--mdm-code-fg)');
+  assert.equal(inline.prop, 'color');
+  assert.equal(inline.where, '.mdm-prosemirror code');
+
+  const doc = editorDom();
+  assert.deepEqual(reaches(doc, inline.where),
+    ['fenced', 'in-cell', 'in-header', 'in-heading', 'in-item', 'in-quote', 'inline']);
+
+  // Fenced code is handed back to the block's own colour, in the SAME layer at a higher
+  // specificity, so of the seven the variable paints the six that are inline.
+  const back = declarations(read('styles', 'base.css'))
+    .filter((d) => d.prop === 'color' && d.value === 'inherit' && d.where.includes('pre code'));
+  assert.equal(back.length, 1, 'one rule hands fenced code back');
+  assert.deepEqual(reaches(doc, back[0].where), ['fenced']);
+  assert.ok(atLeast(specificity(back[0].where), specificity(inline.where)),
+    `${back[0].where} no longer out-specifies ${inline.where}`);
+
+  // ...and the syntax tokens are more specific still, so highlighting is untouched.
+  const token = declarations(read('styles', 'base.css'))
+    .filter((d) => d.prop === 'color' && d.where.includes('.token.keyword'));
+  assert.equal(token.length, 1);
+  assert.ok(atLeast(specificity('.mdm-prosemirror .token.keyword'), specificity(inline.where)));
+  assert.deepEqual(reaches(doc, '.mdm-prosemirror .token.keyword'), ['keyword']);
+});
+
+/** The value a size site resolves to with this theme's variables over Default's. */
+function sizeOf(themeCss, where, prop) {
+  const hits = declarations(read('styles', 'structure.css'), themeVariables(themeCss))
+    .filter((d) => d.where === where && d.prop === prop);
+  assert.equal(hits.length, 1, `structure.css ${where} { ${prop} } matched ${hits.length}`);
+  return hits[0].value;
+}
+
+/** The sites that read the variable, and what each is a multiple of. */
+const DERIVED = [
+  ['.mdm-prosemirror', 'font-size', 1],
+  ['.mdm-prosemirror p', 'font-size', 1],
+  ['.mdm-prosemirror pre', 'font-size', 0.875],
+  ['.mdm-prosemirror td, .mdm-prosemirror th', 'font-size', 0.75],
+  ['.mdm-prosemirror [data-line]::before', 'font-size', 0.75],
+  ['.mdm-prosemirror [data-line]::before', 'line-height', 1.5],
+];
+/** The sites that must FOLLOW the container, in `em`. A `rem` here is the vendor's trap. */
+const RELATIVE = [
+  ...['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map((el) => `.mdm-prosemirror ${el}`),
+  '.mdm-prosemirror code', '.mdm-prosemirror pre code',
+];
+
+test('--mdm-font-size set once scales body text, headings, markers, code, tables and the gutter', () => {
+  // One line, and the theme needs nothing else — which is the claim, so the theme is
+  // written out in full here rather than described.
+  const theme = ':root { --mdm-font-size: 32px; }';
+  assert.equal(theme.match(/--mdm-[\w-]+\s*:/g).length, 1, 'the theme sets one thing');
+
+  for (const [where, prop, multiple] of DERIVED) {
+    assert.equal(sizeOf(theme, where, prop),
+      multiple === 1 ? '32px' : `calc(32px * ${multiple})`, `${where} { ${prop} }`);
+    // Default, for the same sites, is the arithmetic that leaves today's rendering
+    // alone: 16, 14, 12, 12 and a 24px line box.
+    assert.equal(sizeOf('', where, prop), multiple === 1 ? '16px' : `calc(16px * ${multiple})`);
+  }
+
+  // Nothing else has to be set, because no derivation reads a second variable.
+  for (const [where, prop] of DERIVED) {
+    const raw = declarations(read('styles', 'structure.css'))
+      .filter((d) => d.where === where && d.prop === prop)[0].value;
+    assert.deepEqual([...new Set([...raw.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]))],
+      ['--mdm-font-size'], `${where} { ${prop} } reads more than the one variable`);
+  }
+
+  // The headings and both code sizes carry no variable at all: they are `em`, so they
+  // follow the container. A `rem` or a px here is exactly the vendor bug this fixes —
+  // rem measures from the PAGE root, which no container font-size reaches.
+  for (const where of RELATIVE) {
+    const value = sizeOf('', where, 'font-size');
+    assert.match(value, /^[\d.]+em$/, `${where} is sized ${value}, which does not follow the document`);
+  }
+
+  // List markers take the container's size by having none of their own, so nothing of
+  // ours may give a marker or a list item a font-size.
+  const sized = declarations(read('styles', 'structure.css'))
+    .filter((d) => d.prop === 'font-size' && /(::marker|\bli\b)/.test(d.where));
+  assert.deepEqual(sized.map((d) => d.where), []);
+});
+
+test('the numbers beside blank lines keep their own size, and say why in the file', () => {
+  // The one gutter number that cannot follow the variable: its box has to fit inside the
+  // fixed 16px margin between two blocks, and its negative margin-top IS its line box.
+  // Pinned so that "scale everything" can't quietly be extended to it without moving the
+  // block margins too — and so the comment that explains it can't go missing.
+  const gap = declarations(read('styles', 'structure.css'))
+    .filter((d) => d.where === '.mdm-prosemirror [data-gap]::before');
+  assert.deepEqual(gap.filter((d) => d.prop === 'font-size' || d.prop === 'line-height'), []);
+  assert.deepEqual(gap.filter((d) => d.prop === 'margin-top').map((d) => d.value), ['-12px']);
+  assert.match(gap.find((d) => d.prop === 'font').value, /\b12px\/12px\b/);
+  assert.match(read('styles', 'structure.css'),
+    /does NOT follow --mdm-font-size, and it can't/,
+    'the reason a blank line\'s number stays 12px is no longer written down');
+});
+
+/** Nord's own nord10, read out of the built bundle rather than copied: it is the value
+ *  Default has to keep reproducing, so a vendor bump has to show up as a failure here
+ *  and not as inline code quietly changing colour for every theme. */
+function vendorNord10() {
+  const bundle = readFileSync(
+    join(here, '..', '..', 'src', 'MarkdownMidget', 'wwwroot', 'editor.bundle.css'), 'utf8');
+  const m = bundle.match(/--color-nord10:\s*(#[0-9a-f]{6})/i);
+  assert.ok(m, 'the vendor no longer defines --color-nord10; Default\'s inert values need rechecking');
+  return m[1].toLowerCase();
+}
+
+test('the three new variables are inert: no built-in sets one, and Default is what the editor already drew', () => {
+  const optional = ['--mdm-list-marker', '--mdm-code-fg', '--mdm-font-size'];
+  for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
+    const vars = rootVariables(file ? readTheme(file) : '');
+    for (const name of optional)
+      assert.equal(vars.has(name), false, `${file || 'Default'} sets ${name}`);
+  }
+
+  // Both colours are the vendor's marker/inline-code colour, and the size is the 16px
+  // .mdm-prosemirror has always carried. BuiltInThemeTests holds the same three values
+  // from the other side, where the "optional" exemption is granted.
+  const vars = rootVariables(defaultTheme);
+  assert.equal(vars.get('--mdm-list-marker'), vendorNord10());
+  assert.equal(vars.get('--mdm-code-fg'), vendorNord10());
+  assert.equal(vars.get('--mdm-font-size'), '16px');
+});
+
+test('paper keeps the list marker it has always printed, and pins the variable to do it', () => {
+  // A marker colour is chosen against the theme's own page; on white paper a pale one is
+  // a smudge. So print pins the VARIABLE — as it does for bold — to the literal every
+  // marker printed in before the variable existed, which is Nord's. The theme's palette
+  // stops at the paper; a theme's own ::marker rule still reaches it.
+  const print = declarations(read('styles', 'print.css'));
+  assert.deepEqual(
+    print.filter((d) => d.prop === '--mdm-list-marker').map((d) => [d.where, d.value, d.important]),
+    [['@media print > .mdm-prosemirror', vendorNord10(), true]]);
+  assert.deepEqual(print.filter((d) => d.prop === 'color' && d.where.includes('::marker')), [],
+    'a print colour ON the marker would outrank a theme\'s own rule as well');
+
+  // Every built-in and Default print the marker they print today, because none sets it
+  // and print pins Default's value anyway.
+  for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
+    const vars = themeVariables(file ? readTheme(file) : '');
+    for (const d of paperDeclarations(file ? readTheme(file) : '')) if (d.prop === '--mdm-list-marker') vars.set(d.prop, d.value);
+    assert.equal(vars.get('--mdm-list-marker'), vendorNord10(), file || 'Default');
+  }
+});
+
+test('paper colours inline code itself, so --mdm-code-fg cannot reach it', () => {
+  // Unlike the marker, this one needs nothing new: print has always stated both ends of
+  // the inline-code pair as its own literals, which outrank anything later at any
+  // specificity. The test is that it still does — deleting that colour would hand paper
+  // to every theme's screen palette.
+  const code = declarations(read('styles', 'print.css'))
+    .filter((d) => d.where === '@media print > .mdm-prosemirror code');
+  assert.deepEqual(code.map((d) => [d.prop, d.value, d.important]),
+    [['background', '#f6f8fa', true], ['color', '#24292e', true]]);
+});
+
+test('paper takes the document\'s text size from the theme, and keeps its own for the source view', () => {
+  // The deliberate asymmetry, stated in print.css's header: colour is pinned on paper
+  // because a dark page is unreadable there, and size is not, because large type is what
+  // a large-type theme was chosen for. So print declares no size on the document...
+  const print = declarations(read('styles', 'print.css'));
+  const document = ['.mdm-prosemirror', '.mdm-prosemirror p', '.mdm-prosemirror pre',
+    '.mdm-prosemirror code', '.mdm-prosemirror td, .mdm-prosemirror th'];
+  assert.deepEqual(
+    print.filter((d) => (d.prop === 'font-size' || d.prop === 'font' || d.prop === '--mdm-font-size')
+      && document.some((s) => d.where.endsWith(s))).map((d) => `${d.where} { ${d.prop} }`), []);
+
+  // ...and its own printout, which is not in the document, still states 10pt.
+  assert.deepEqual(print.filter((d) => d.where === '@media print > .mdm-print-source-pre' && d.prop === 'font-size')
+    .map((d) => [d.value, d.important]), [['10pt', true]]);
 });

@@ -211,6 +211,18 @@
  },
  {
   "where": ".mdm-prosemirror [data-line]::before",
+  "prop": "font-size",
+  "value": "calc(16px * 0.75)",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-line]::before",
+  "prop": "line-height",
+  "value": "calc(16px * 1.5)",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror [data-line]::before",
   "prop": "color",
   "value": "color-mix(in srgb, #1a1a1a 50%, transparent)",
   "important": false
@@ -284,6 +296,12 @@
  {
   "where": ".mdm-prosemirror blockquote, .mdm-prosemirror ol, .mdm-prosemirror p, .mdm-prosemirror pre, .mdm-prosemirror table, .mdm-prosemirror ul",
   "prop": "margin-bottom",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror p",
+  "prop": "font-size",
   "value": "16px",
   "important": false
  },
@@ -462,6 +480,12 @@
   "important": false
  },
  {
+  "where": ".mdm-prosemirror ol > li::marker, .mdm-prosemirror ul > li::marker",
+  "prop": "color",
+  "value": "#5e81ac",
+  "important": false
+ },
+ {
   "where": ".mdm-prosemirror blockquote > :first-child",
   "prop": "margin-top",
   "value": "0",
@@ -477,6 +501,12 @@
   "where": ".mdm-prosemirror code",
   "prop": "background",
   "value": "#f2f2f2",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror code",
+  "prop": "color",
+  "value": "#5e81ac",
   "important": false
  },
  {
@@ -537,6 +567,12 @@
   "where": ".mdm-prosemirror pre",
   "prop": "line-height",
   "value": "1.45",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror pre",
+  "prop": "font-size",
+  "value": "calc(16px * 0.875)",
   "important": false
  },
  {
@@ -657,6 +693,12 @@
   "where": ".mdm-prosemirror td, .mdm-prosemirror th",
   "prop": "line-height",
   "value": "1.3",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror td, .mdm-prosemirror th",
+  "prop": "font-size",
+  "value": "calc(16px * 0.75)",
   "important": false
  },
  {
@@ -1065,6 +1107,12 @@
   "where": "@media print > .mdm-prosemirror",
   "prop": "padding",
   "value": "0",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror",
+  "prop": "--mdm-list-marker",
+  "value": "#5e81ac",
   "important": true
  },
  {

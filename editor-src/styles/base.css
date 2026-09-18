@@ -1,4 +1,5 @@
-/* Decoration: text, headings, links, quotes, code, tables and syntax colours.
+/* Decoration: text, headings, links, quotes, list markers, code, tables and syntax
+ * colours.
  *
  * Every colour is a variable defined by the selected theme; theme-default.css ships
  * the values Markdown Midget has always used. This layer sits immediately before
@@ -79,8 +80,25 @@ body {
   color: var(--mdm-quote-text);
 }
 
+/* Bullets and numbers. The vendor paints these from its own `--color-nord10`, on
+   `.milkdown-theme-nord.prose :where(ol>li)::marker`,
+   which out-specifies this rule at (0,2,1) against (0,1,3) — and loses anyway, because
+   mdm-base is a later layer and layer order decides a normal declaration before
+   specificity does. Default's value is that same nord10, so nothing moves until a theme
+   says otherwise. Descendant selectors, so a marker in a quote or a nested list is
+   included; `> li` keeps it to the list's own items. */
+.mdm-prosemirror ol > li::marker,
+.mdm-prosemirror ul > li::marker {
+  color: var(--mdm-list-marker);
+}
+
+/* Inline code's foreground — also Nord's until now, and also beaten by layer order.
+   The `pre code` rule below hands fenced code back to the block's own colour at
+   (0,1,2), and the `.token` rules at (0,3,0) keep syntax highlighting, both in this
+   layer, so this reaches inline code only. */
 .mdm-prosemirror code {
   background: var(--mdm-code-bg);
+  color: var(--mdm-code-fg);
 }
 
 .mdm-prosemirror pre {
