@@ -144,10 +144,11 @@
  * red-only, like everything else. Delete this pair if you would rather see
  * diagrams in full colour.
  *
- * This is the only rule in the file. Everything else this theme does it does
- * with variables: --mdm-list-marker, --mdm-code-fg and --mdm-font-size each
- * replaced a rule an earlier draft needed, and --mdm-mermaid-theme is as far
- * inside a diagram as a variable reaches.
+ * It is the only thing in either file of this theme that is not a variable, and
+ * it is one effect in two rules. Everything else is a variable:
+ * --mdm-list-marker and --mdm-code-fg each replaced a rule the custom version of
+ * this theme needed, --mdm-font-size replaced the four its double-size sibling
+ * needed, and --mdm-mermaid-theme is as far inside a diagram as a variable gets.
  *
  * Screen only, as Obsidiminutive's italic links are: on paper a printed
  * diagram is ink on white, where a red multiply is a stain rather than a
