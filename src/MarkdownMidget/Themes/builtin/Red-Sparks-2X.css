@@ -1,16 +1,16 @@
 /* =====================================================================
  *  Red Sparks 2X — dark: Red Sparks with the document's text size doubled.
  *
- *  Palette by Joe Sparks (@joesparks on X), https://x.com/joesparks — a
+ *  Designed by Joe Sparks (@joesparks on X), https://x.com/joesparks — a
  *  red-only palette designed for reading at night.
  *
  *  Same palette as Red-Sparks.css, same reasoning, and the same measured
  *  exceptions: body text #DC0000 on the page is 3.96:1, below WCAG AA and
- *  deliberately so, and seventeen more of its text pairs sit below that too — the
+ *  deliberately so, and eighteen more of its text pairs sit below that too — the
  *  hovered link, the comment tier, the empty-diagram placeholder and the rest.
  *  They are listed in Red-Sparks.css's header and recorded pair by pair in
  *  BuiltInThemeTests (DimTextPairs), which holds both files to them. Not copied
- *  here: the same seventeen written twice is the same seventeen to get wrong twice.
+ *  here: the same eighteen written twice is the same eighteen to get wrong twice.
  *
  *  This file is that one with --mdm-font-size at 32px instead of 16px, which is
  *  the whole of the difference between them — every other line is byte for byte

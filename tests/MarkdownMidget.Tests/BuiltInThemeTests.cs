@@ -464,23 +464,25 @@ public class BuiltInThemeTests
     /// Three of nine, and the shortfall is deliberate and measured rather than assumed.
     /// The sweep was a [Fact] over Obsidiminutive alone - the palette written to clear
     /// 4.5:1 everywhere - so a new theme was swept nowhere, which is how the Red Sparks
-    /// pair shipped with seventeen sub-floor pairs while its own header claimed everything
+    /// pair shipped with eighteen sub-floor pairs while its own header claimed everything
     /// held to a floor cleared it. Widening it to those two closes that, and Obsidiminutive
-    /// earned its place back: the two marker pairs it briefly had here are gone, because it
-    /// now sets a marker colour of its own instead of borrowing the vendor's.
+    /// is down to one: the two marker pairs it briefly had here went when it set a marker
+    /// colour of its own instead of borrowing the vendor's, and the one it keeps needs raw
+    /// HTML to exist.
     ///
     /// Widening it to all nine is a bigger thing than it sounds, and the numbers are here
-    /// so nobody has to re-derive them: the other six measure 80 sub-floor pairs between
-    /// them under this model - Solarized Light 23, One Light 18, GitHub Dark Dimmed 13,
-    /// Midget Solarized 12, Dracula 8, GitHub Light 6 - and 30 of those 80 are pairs none
+    /// so nobody has to re-derive them: the other six measure 86 sub-floor pairs between
+    /// them under this model - Solarized Light 24, One Light 19, GitHub Dark Dimmed 14,
+    /// Midget Solarized 13, Dracula 9, GitHub Light 7 - and 36 of those 86 are pairs none
     /// of the six chose at all, being the list marker and the inline code they leave unset
-    /// and therefore draw in the vendor's nord10 (five each: the marker on the page, in a
-    /// quote, in a cell and on a striped row, and inline code on its panel). That last part
+    /// and therefore draw in the vendor's nord10 (six each: the marker on the page, in a
+    /// quote, in a body cell, on a striped row and in a header cell, and inline code on its
+    /// panel). That last part
     /// is the same defect Obsidiminutive was just fixed for, six more times over, and it is
     /// the strongest argument for doing the audit. None of it is new behaviour: those
     /// palettes render exactly as they always have, and the numbers were never written
     /// down. But recording 80 exceptions here would be an audit of six palettes nobody
-    /// asked for, and it would bury the seventeen that are actually new. So: measured,
+    /// asked for, and it would bury the eighteen that are actually new. So: measured,
     /// reported, and left as one decision per palette.
     /// </summary>
     public static TheoryData<string> FullySweptPalettes => new() { Obsidiminutive, RedSparks, RedSparks2X };
@@ -488,7 +490,7 @@ public class BuiltInThemeTests
     /// <summary>Shared by the pair, which differ only in --mdm-font-size.</summary>
     private static readonly Dictionary<string, double> RedSparksDimPairs = new(StringComparer.Ordinal)
     {
-        // 17 of 41, floor 3.9. Grouped as they read: the hover is the largest cluster,
+        // 18 of 42, floor 3.9. Grouped as they read: the hover is the largest cluster,
         // because a hover that can only go dimmer than #FF0000 is dim on every surface.
         ["--mdm-mermaid-empty on --mdm-mermaid-bg"] = 2.44,
         ["--mdm-token-comment on --mdm-pre-bg"] = 2.55,
@@ -510,6 +512,8 @@ public class BuiltInThemeTests
         // row. Found by crossing the marker with the cell surfaces, which a list reaches
         // through raw HTML; on the page and in a cell it is 3.96:1 and clears.
         ["--mdm-list-marker on --mdm-row-alt-bg"] = 3.89,
+        // And in a header cell, the one cell ground this palette makes darker than the page.
+        ["--mdm-list-marker on --mdm-th-bg"] = 3.68,
     };
 
     /// <summary>
@@ -521,7 +525,7 @@ public class BuiltInThemeTests
     /// has since been brightened. Same exact-name discipline as BodyTextFloors: no
     /// substrings, no prefixes, one line per pair.
     ///
-    /// Red Sparks: seventeen, and they are the honest cost of one hue. A single-hue night
+    /// Red Sparks: eighteen, and they are the honest cost of one hue. A single-hue night
     /// palette has one dim band to work in - that is what it is for - and the alternative
     /// to writing them down was a theme header claiming a floor nothing enforced.
     ///
@@ -534,10 +538,19 @@ public class BuiltInThemeTests
     private static readonly Dictionary<string, Dictionary<string, double>> DimTextPairs =
         new(StringComparer.Ordinal)
     {
-        // Nothing: it clears 4.5:1 on all 46 pairs it draws. It briefly had two entries,
-        // for list markers at 3.29:1 on its page and 2.94:1 in a quote, which is what the
-        // vendor's nord10 measured there before this theme set a marker colour of its own.
-        [Obsidiminutive] = new(),
+        [Obsidiminutive] = new()   // 1 of 47, floor 4.5
+        {
+            // The only pair in this palette below AA, and the only one that needs raw HTML
+            // to exist at all: a list inside a table HEADER cell. Its own lifted steel blue
+            // clears 4.5:1 on every ground a markdown list can occupy - 5.80:1 on the page
+            // and in a body cell, 5.40:1 on a striped row, 5.18:1 in a quote - and the
+            // header row is the one ground lighter than those. Lifting the marker again to
+            // clear it would move a colour chosen to match the blue-grey it replaced, for a
+            // pair a document can only reach by hand-writing a table; recorded instead.
+            // (It briefly had two entries, for markers at 3.29:1 on its page and 2.94:1 in
+            // a quote, which is what the vendor's nord10 measured before it set its own.)
+            ["--mdm-list-marker on --mdm-th-bg"] = 3.94,
+        },
         [RedSparks] = RedSparksDimPairs,
         [RedSparks2X] = RedSparksDimPairs,     // the same palette, so the same numbers
     };
@@ -657,9 +670,21 @@ public class BuiltInThemeTests
         // technicality: it is how Obsidiminutive's markers turned out to be 3.29:1 on its
         // own page, a pair no test had ever looked at.
         var blocks = headings.Append("--mdm-list-marker").ToArray();
-        // A list can sit in a table cell, via raw HTML, so the marker is crossed with the
-        // cell surfaces as well as the page and a quote. Not with the header row: a GFM
-        // header cell holding a list is a stretch, and nothing renders one.
+        // A list can sit in any table cell, through raw HTML, so the marker is crossed with
+        // every cell surface - the body cell, the striped row AND the header row. The header
+        // row was excluded at first for being "a stretch", which was not a reason that
+        // survived being asked about: editor-src/src/sanitize.js forbids a named list of
+        // tags and allows the rest, so `<th><ul><li>` reaches the DOM intact, and
+        // `.mdm-prosemirror ul > li::marker` matches inside it with `th`'s background
+        // behind. Raw HTML reaches a header cell exactly as well as a body cell, and the
+        // model cannot take the argument for one and refuse it for the other.
+        //
+        // The same argument does reach further than this model goes: a HEADING in a
+        // raw-HTML cell is drawable too, and headings are crossed only with the page and a
+        // quote (`a GFM table cell can't` hold one, which is true of markdown and not of
+        // raw HTML). That asymmetry is left standing deliberately - closing it re-measures
+        // eight palettes this branch does not own - but it is named here rather than
+        // defended, because the reason above would have to be un-said to defend it.
         var cellBlocks = new[] { "--mdm-list-marker" };
         // Inline code is always --mdm-code-fg now: the theme's if it sets one, Default's
         // nord10 if it does not. Obsidiminutive used to colour it with a rule instead, which
@@ -673,7 +698,7 @@ public class BuiltInThemeTests
             ("--mdm-quote-bg", inline.Append("--mdm-quote-text").Concat(blocks)),
             ("--mdm-td-bg", inline.Append("--mdm-text").Concat(cellBlocks)),
             ("--mdm-row-alt-bg", inline.Append("--mdm-text").Concat(cellBlocks)),
-            ("--mdm-th-bg", inline.Append("--mdm-th-text")),
+            ("--mdm-th-bg", inline.Append("--mdm-th-text").Concat(cellBlocks)),
             // Paper's header row keeps its screen look. In a dark theme a link in it
             // prints in the header's text colour, and headings and links on white
             // paper print in print.css's own dark colours (theme-parity.test.mjs holds

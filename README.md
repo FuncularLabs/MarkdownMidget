@@ -77,7 +77,8 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Formatting marks** toggle (¶ / ↵ / →) and **spell check** (private dictionary,
   with one-way import from Word's CUSTOM.DIC).
 - **Themes** — ten built in (Dracula, GitHub Dark Dimmed, GitHub Light, Midget
-  Solarized, Obsidiminutive, One Light, Red Sparks and Red Sparks 2X designed by Joe Sparks,
+  Solarized, Obsidiminutive, One Light, Red Sparks and Red Sparks 2X designed by Joe
+  Sparks (@joesparks on X),
   Solarized Light, and the original Default), plus your own:
   drop a CSS file in the themes folder and it appears in the menu. Printing stays
   light whatever you pick.

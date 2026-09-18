@@ -1,7 +1,7 @@
 # The Night Operator's Handbook
 
-For TEST-PLAN-1.0.md, area THM. Work on a copy. From Joe Sparks (@joesparks on
-X), who designed the Red Sparks themes this page is here to check.
+For TEST-PLAN-1.0.md, area THM. Work on a copy. From Joe Sparks (@joesparks on X),
+who designed the Red Sparks themes this page is here to check.
 
 **M.V. *Persistence* — Wireless Room — Third Watch**
 *Issued to: Sparks. Read it in the red light. Do not switch on the white lamp.*

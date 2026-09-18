@@ -8,7 +8,10 @@
  *  Obsidian's slate page, pale grey text and orange headings, kept. Where
  *  one of its colours is too faint to read as text it is lifted just far
  *  enough to clear WCAG AA (4.5:1) on every background it can land on - the
- *  page, a quote, table cells and the header row. On the page, and at worst:
+ *  page, a quote, table cells and the header row. One measured exception, at
+ *  the foot of this note: a list marker in a table HEADER cell, 3.94:1, a
+ *  pair a document can only reach by hand-writing the table in raw HTML.
+ *  On the page, and at worst:
  *
  *    body text     #e0e2e4               10.21:1
  *    headings      #ec7600 -> #fa7d00     4.52 -> 5.05:1  (4.04 -> 4.52 in a quote)
@@ -16,7 +19,8 @@
  *    bold          dark navy -> #ebc859   illegible -> 8.17:1  (5.56 in a table header)
  *    code comments #66747b -> #8a9ba2     3.06 -> 5.13:1 on the code block
  *    list markers  nord10 -> #8cafd2      3.29 -> 5.80:1  (2.94 -> 5.18 in a quote,
- *                                         3.07 -> 5.40 on a striped row, 5.80 in a cell)
+ *                                         3.07 -> 5.40 on a striped row, 5.80 in a
+ *                                         body cell, 2.24 -> 3.94 in a header cell)
  *    inline code   #93c763                5.64:1 on the code block
  *
  *  The heading is the smallest lift of Obsidian's orange that clears a quote:
@@ -32,6 +36,14 @@
  *  the markers look as they did, and 5.18:1 at worst on the four grounds a list
  *  can sit on. Inline code moved the same way, from a rule to a variable, at the
  *  same green and the same 5.64:1 it always had.
+ *
+ *  The exception. A table HEADER cell is the one ground lighter than those four, and
+ *  the marker is 3.94:1 on it - below AA, and the only pair in this palette that is.
+ *  Markdown cannot put a list in a cell at all; raw HTML can, and the sanitiser allows
+ *  it, so the pair is real rather than theoretical. Lifting the marker again to clear
+ *  it would move a colour picked to match the blue-grey it replaced, for a case that
+ *  needs a hand-written table, so it is recorded instead - in BuiltInThemeTests, where
+ *  it fails if it ever gets dimmer.
  *
  *  Bold is the one real departure. Obsidian draws it in a dark indigo that
  *  all but disappears on this page. Here it is Obsidian's own yellow

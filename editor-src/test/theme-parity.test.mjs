@@ -1009,7 +1009,7 @@ function vendorNord10() {
   return m[1].toLowerCase();
 }
 
-test('the three new variables are inert: only the pair written for them sets one, and Default is what the editor already drew', () => {
+test('the three new variables are inert: only the palettes written for them set one, and Default is what the editor already drew', () => {
   const optional = ['--mdm-list-marker', '--mdm-code-fg', '--mdm-font-size'];
   for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
     const vars = rootVariables(file ? readTheme(file) : '');
@@ -1105,7 +1105,29 @@ test('the README\'s theme count and list name every built-in that ships', () => 
     `the README says ${claim[1]} themes; ${files.length} files ship, plus Default`);
 
   // And every one is named, as the menu names it: `GitHub-Light.css` is "GitHub Light".
+  //
+  // Matched as a whole name, not as a substring, which is the same trap the body-text
+  // exemption fell into from the other direction: `includes('Red Sparks')` is satisfied by
+  // "Red Sparks 2X", so dropping the base theme from the list would have passed while the
+  // README named only its double-size sibling. The boundary is the next character: end of
+  // string, or anything that is not a letter, digit or space.
   const display = (f) => f.replace(/\.css$/, '').replace(/[-_]/g, ' ');
-  const missing = [...files.map(display), 'Default'].filter((name) => !readme.includes(name));
+  const all = [...files.map(display), 'Default'];
+  // An occurrence counts when it is not the middle of a longer word ("One Lighthouse" is
+  // not "One Light") and is not the opening of a LONGER theme's name, which is the case
+  // that matters here: the README says "Red Sparks and Red Sparks 2X", so "Red Sparks" is
+  // named in its own right, while a README that had dropped it and kept only the 2X would
+  // offer no occurrence that isn't the start of "Red Sparks 2X".
+  const names = (name) => {
+    const longer = all.filter((other) => other !== name && other.startsWith(name));
+    for (let at = readme.indexOf(name); at !== -1; at = readme.indexOf(name, at + 1)) {
+      const after = readme[at + name.length];
+      if (after !== undefined && /[A-Za-z0-9]/.test(after)) continue;
+      if (longer.some((other) => readme.startsWith(other, at))) continue;
+      return true;
+    }
+    return false;
+  };
+  const missing = all.filter((name) => !names(name));
   assert.deepEqual(missing, [], 'themes that ship but the README does not name');
 });

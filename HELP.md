@@ -385,7 +385,7 @@ one of them saves your settings, Mode is back on System.
 | **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
 | **Obsidiminutive** | Dark — after Notepad++'s Obsidian, with bold you can read |
 | **One Light** | Light, cool and crisp |
-| **Red Sparks** | Dark, red only — for reading at night, by Joe Sparks (@joesparks on X) |
+| **Red Sparks** | Dark, red only — for reading at night, designed by Joe Sparks (@joesparks on X) |
 | **Red Sparks 2X** | Red Sparks with the text twice the size |
 | **Solarized Light** | Light, warm, low-glare |
 
