@@ -373,6 +373,16 @@ the last of the usability gaps raised in the 0.6.x review.
 
 ### Nits
 
+- **A link's underline should sit further from the text at large sizes.** The editor
+  underlines links at the browser's default offset, which is fine at 16px and can
+  strike the descenders of g, p, q and y once a theme sets `--mdm-font-size` high —
+  Red Sparks 2X doubles it to 32px. An offset that scales with the text
+  (`text-underline-offset: 0.125em`, say) would hold at every size. App-wide, not
+  per theme: an offset is a measurement of the app's type, not a colour a palette
+  gets to hold, which is why the Red Sparks pair dropped the
+  `text-underline-offset: 2px` its custom version carried rather than shipping it in
+  one theme. Raised by Joe Sparks (@joesparks on X), whose own draft had it.
+
 - ~~**Toolbar tooltips should clear an enlarged mouse pointer.**~~ **Done 2026-09-16
   (1.0.0-rc3)**: when the pointer is larger than standard, every toolbar tooltip, the
   Style box's included, opens under its button, moved down by the pointer's whole

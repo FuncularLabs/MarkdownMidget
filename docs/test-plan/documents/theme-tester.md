@@ -1,7 +1,7 @@
 # The Night Operator's Handbook
 
-For TEST-PLAN-1.0.md, area THM. Work on a copy. Written by Joe Sparks
-(@joesparks on X), who designed the Red Sparks themes it is here to check.
+For TEST-PLAN-1.0.md, area THM. Work on a copy. From Joe Sparks (@joesparks on
+X), who designed the Red Sparks themes this page is here to check.
 
 **M.V. *Persistence* — Wireless Room — Third Watch**
 *Issued to: Sparks. Read it in the red light. Do not switch on the white lamp.*
@@ -34,7 +34,7 @@ checklist. It is also, conveniently, the table test.
 | Misspellings       | The squiggle further down must be visible | left |
 | Code block         | Keywords, strings, comments all distinct | centre |
 | This table         | Header row, and every other row striped |     right |
-| Mermaid diagram    | The one thing that will not be red      | left |
+| Mermaid diagrams   | Tinted red on screen, own colours on paper | left |
 
 ---
 
@@ -135,6 +135,23 @@ graph LR
     C --> F[Captain, awake]
     D --> G[Day operator, furious]
 ```
+
+And where the night actually went. The day operator likes a picture, so the
+parser draws one.
+
+```mermaid
+pie title Third watch, by band
+    "143 kHz, Aberdeen" : 51
+    "425 kHz, traffic" : 26
+    "Silence periods" : 20
+    "500 kHz, distress" : 3
+```
+
+The two diagrams are not the same test. A flowchart is greys and thin lines,
+which survive a theme that tints diagrams. A pie is four saturated fills whose
+only job is to be four different colours, so under a single-hue theme it is
+where you see what the tint costs — four slices you can no longer tell apart.
+Both are correct for such a theme; only one of them looks it.
 
 ---
 
