@@ -94,6 +94,18 @@ public class BuiltInThemeTests
     }
 
     [Fact]
+    public void TheSampleThemeNamesExactlyTheVariablesThePaletteDefines()
+    {
+        // Help's count and the sample are one promise - "all listed in the sample" - and the
+        // count is measured against the PALETTE, so the two files have to agree or the
+        // sentence is false in the only place a theme author can check it. Both directions:
+        // a variable the palette gained and the sample never mentioned is a promise broken,
+        // and a name only the sample has is a line that sets nothing.
+        var sample = Variables(Read("themes-sample.css")).Keys.OrderBy(k => k, StringComparer.Ordinal);
+        Assert.Equal(DefaultVars.Keys.OrderBy(k => k, StringComparer.Ordinal), sample);
+    }
+
+    [Fact]
     public void HelpsCountOfThemeVariablesIsTheNumberThePaletteDefines()
     {
         // Help tells a theme author how many variables there are to set, and the number
