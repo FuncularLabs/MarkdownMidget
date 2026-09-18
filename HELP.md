@@ -458,17 +458,16 @@ the table resize handle survive whatever a theme says about them.
 **Text size.** `--mdm-font-size` is the one size the document derives from. Set it
 once — `--mdm-font-size: 32px` — and body text, the six heading levels, list markers,
 inline and fenced code, table text and the line numbers all follow, on screen and on
-paper: a large theme prints large, on more paper. **Red Sparks 2X** is exactly that: **Red Sparks** with that one line changed.
-Declare it in `:root` — put it on
+paper: a large theme prints large, on more paper. Declare it in `:root` — put it on
 `.mdm-prosemirror`, which is a fine place for your colours, and only part of the
 document follows: headings, list markers and the line numbers grow; body text and table
 text stay put, and code follows whatever it sits in. Use a positive absolute size
-(`32px`, `18pt`); a percentage or a
-nonsense value falls back to 16px. It sizes the
+(`32px`, `18pt`); a percentage or a nonsense value falls back to 16px. It sizes the
 document only — the page margins and width, the menus, the toolbar and the Markdown
 source view keep their own sizes, the numbers beside blank lines stay small because
 they have to fit between two blocks, and past about double size four-digit line
-numbers start to crowd the line-number gutter.
+numbers start to crowd the line-number gutter. **Red Sparks 2X** is exactly that one
+line: the same palette as **Red Sparks**, at twice the size.
 
 **Diagrams.** No variable of ours reaches inside a mermaid diagram: mermaid draws its
 own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,

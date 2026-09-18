@@ -941,12 +941,6 @@ test('--mdm-font-size is registered as a length, so a value that is not one degr
     [['syntax', '"<length>"'], ['inherits', 'true'], ['initial-value', '16px']]);
 });
 
-test('the numbers beside blank lines keep their own size', () => {
-  // The one gutter number that cannot follow the variable, for the reason structure.css
-  // gives beside it: its box has to fit the fixed 16px margin between two blocks, and its
-  // negative margin-top IS its line box. Pinned so "scale everything" can't quietly be
-  // extended to it without moving the block margins too.
-
 test('a table cell\'s text is the body size, and only the cell BOX is 0.75 of it', () => {
   // The one place this derivation does not reproduce what the custom double-size theme it
   // came from produced, so it is written down rather than left to be rediscovered. That
@@ -992,11 +986,11 @@ test('a table cell\'s text is the body size, and only the cell BOX is 0.75 of it
   }
 });
 
-test('the numbers beside blank lines keep their own size, and say why in the file', () => {
-  // The one gutter number that cannot follow the variable: its box has to fit inside the
-  // fixed 16px margin between two blocks, and its negative margin-top IS its line box.
-  // Pinned so that "scale everything" can't quietly be extended to it without moving the
-  // block margins too — and so the comment that explains it can't go missing.
+test('the numbers beside blank lines keep their own size', () => {
+  // The one gutter number that cannot follow the variable, for the reason structure.css
+  // gives beside it: its box has to fit the fixed 16px margin between two blocks, and its
+  // negative margin-top IS its line box. Pinned so "scale everything" can't quietly be
+  // extended to it without moving the block margins too.
   const gap = declarations(read('styles', 'structure.css'))
     .filter((d) => d.where === '.mdm-prosemirror [data-gap]::before');
   assert.deepEqual(gap.filter((d) => d.prop === 'font-size' || d.prop === 'line-height'), []);
