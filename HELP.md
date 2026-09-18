@@ -456,8 +456,11 @@ the table resize handle survive whatever a theme says about them.
 **Text size.** `--mdm-font-size` is the one size the document derives from. Set it
 once — `--mdm-font-size: 32px` — and body text, the six heading levels, list markers,
 inline and fenced code, table text and the line numbers all follow, on screen and on
-paper: a large theme prints large, on more paper. Use a positive absolute size
-(`32px`, `18pt`); a percentage or a nonsense value falls back to 16px. It sizes the
+paper: a large theme prints large, on more paper. Declare it in `:root` — put it on
+`.mdm-prosemirror`, which is a fine place for your colours, and only part of the
+document follows (headings, markers, table cells and line numbers grow; body text and
+code stay put). Use a positive absolute size (`32px`, `18pt`); a percentage or a
+nonsense value falls back to 16px. It sizes the
 document only — the page margins and width, the menus, the toolbar and the Markdown
 source view keep their own sizes, the numbers beside blank lines stay small because
 they have to fit between two blocks, and past about double size four-digit line

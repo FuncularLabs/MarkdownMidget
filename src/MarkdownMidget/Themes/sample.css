@@ -60,8 +60,14 @@
      double-size theme and needs nothing else. It prints at the size you set, so a large
      theme prints on more paper.
 
-     Use a positive, absolute size: 32px, 18pt, 2rem. A percentage or a nonsense value
-     falls back to 16px, and a negative one collapses your code and line numbers.
+     Declare it in `:root`, as below. On `.mdm-prosemirror` - which is a fine place for
+     your colours - only part of the document follows it: headings, list markers, table
+     cells and the line numbers grow, body text and code do not.
+
+     Use a positive, absolute size: 32px or 18pt. (`2rem` works but measures from the
+     page root, so it is 40px in a theme that also sets `html { font-size: 20px }`.) A
+     percentage or a nonsense value falls back to 16px, and a negative one collapses
+     your code, your table text and your line numbers to nothing.
 
      What does NOT follow it: the page's padding and margins, the page width, the app's
      menus and toolbar, the Markdown source view, and the small numbers beside blank

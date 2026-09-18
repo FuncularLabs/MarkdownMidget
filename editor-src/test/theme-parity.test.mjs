@@ -382,6 +382,9 @@ test('a dark theme can flip the colour scheme', () => {
 
 const builtinDir = join(here, '..', '..', 'src', 'MarkdownMidget', 'Themes', 'builtin');
 const readTheme = (file) => readFileSync(join(builtinDir, file), 'utf8');
+/** The two files a theme author actually reads, checked where a rule of ours can't hold. */
+const sampleCss = readFileSync(join(builtinDir, '..', 'sample.css'), 'utf8');
+const helpMd = readFileSync(join(here, '..', '..', 'HELP.md'), 'utf8');
 const PREDATE_STRONG = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'GitHub-Light.css',
   'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
 
@@ -835,6 +838,36 @@ test('a theme can still scale a rem document itself, whether it sets the tokens 
       `${token} is redefined on ${hits[0].where}; anything nearer than :root is inherited ` +
       'by the document before a theme\'s own :root declaration can be considered');
     assert.equal(hits[0].important, false, `${token} must not be !important, or a theme can't win`);
+  }
+});
+
+test('--mdm-font-size has to be declared on :root, and both files a theme author reads say so', () => {
+  // The other side of deriving the two tokens once, on :root: a theme that declares
+  // --mdm-font-size on `.mdm-prosemirror` instead gets HALF a document, silently.
+  // Measured at 32px: headings 64px, list markers 32, cells 24 and the gutter 24 all
+  // follow, while body text stays 16, inline code 14.72 and fenced code 14 — because the
+  // two tokens are read at :root, where that theme's value never arrives.
+  //
+  // No CSS shape fixes it without giving back something worse: `:root, .mdm-prosemirror`
+  // and `*` both reinstate the regression this scope exists to prevent, and
+  // `--text-base: 1em` changes Default's table cells. So it is documented and pinned,
+  // which needs saying twice over — main.js's probe comment tells theme authors that
+  // `.mdm-prosemirror` is a fine place for their variables, and for this one it is not.
+  //
+  // The scope split IS the mechanism, so it is what this pins: two derivations at :root,
+  // the rest inside the document, and only a :root declaration reaches both.
+  assert.deepEqual(DERIVED.filter(([where]) => where === ':root').map(([, prop]) => prop),
+    ['--text-base', '--text-sm']);
+  assert.ok(DERIVED.some(([where]) => where !== ':root'),
+    'nothing is derived inside the document any more, so the asymmetry may be gone');
+
+  // Said next to the variable, not somewhere in the file: the windows are around each
+  // mention, and one of them has to carry the instruction.
+  for (const [name, text] of [['sample.css', sampleCss], ['HELP.md', helpMd]]) {
+    const mentions = [...text.matchAll(/--mdm-font-size/g)].map((m) => m.index);
+    assert.ok(mentions.length, `${name} no longer mentions --mdm-font-size at all`);
+    assert.ok(mentions.some((at) => /[Dd]eclare (?:it|this) in `?:root/.test(text.slice(at, at + 900))),
+      `${name} introduces --mdm-font-size without telling an author to declare it in :root`);
   }
 });
 

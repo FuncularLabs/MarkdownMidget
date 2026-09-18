@@ -335,7 +335,9 @@ function flattenColor(value, base) {
 function probeTheme(doc, win) {
   // Inside the editing surface when there is one. A theme is free to set its
   // variables on `.mdm-prosemirror` rather than on `:root`, and a probe parked on
-  // <body> would not inherit those.
+  // <body> would not inherit those. One exception, which sample.css and HELP both
+  // state: --mdm-font-size is derived partly at `:root` (structure.css), so put on
+  // `.mdm-prosemirror` it scales only half a document. It is not read back here.
   const host = doc.querySelector('.mdm-prosemirror') || doc.body || doc.documentElement;
 
   const probe = doc.createElement('div');
