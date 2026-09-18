@@ -36,15 +36,9 @@
 
   /* Text size. Not a colour, and optional: 16px is what `.mdm-prosemirror` has always
      been, so a theme that says nothing renders at the size it always did. Everything
-     textual in the DOCUMENT derives from this one value — body text, the six
-     headings, list markers, inline and fenced code, table cells and the line-number
-     gutter — so a theme doubles the document with one line. It reaches paper, where
-     print's own source-view type (10pt) still doesn't move. LAYOUT does not follow
-     it: the page's padding, the block margins, the page width, the gutter's width and
-     the app's own measurements (the mermaid frame's padding, the resize handle) are
-     fixed. Anything that is text in the document does follow, including formatting
-     marks and mermaid's own messages, which are sized in `em`. structure.css does the
-     deriving. */
+     textual in the document derives from this one value, layout from none of it, and it
+     reaches paper. structure.css derives it and is where the how and the why live;
+     sample.css says the same thing to a theme author. */
   --mdm-font-size: 16px;
 
   /* Bold. Optional: `currentColor` means no colour of its own, so bold stays the
@@ -75,13 +69,11 @@
   --mdm-quote-bar: #569ad4;
   --mdm-quote-text: #3a4a58;
 
-  /* Code. `--mdm-code-fg` is INLINE code's foreground and nothing else; fenced code
-     keeps --mdm-pre-fg and its syntax tokens, which are more specific. The declaration
-     that reads it is new — base.css never coloured inline code before, Nord did — so
-     the default is Nord's own nord10, and the fixtures were edited by hand to record
-     the added declaration at the value the vendor already produced. Optional in the
-     same sense as --mdm-strong: unset means Nord's colour, as before. Not on paper,
-     where print colours inline code itself (print.css). */
+  /* Code. `--mdm-code-fg` is INLINE code's foreground and nothing else; fenced code keeps
+     --mdm-pre-fg and its syntax tokens, which are more specific. base.css never coloured
+     inline code before — Nord did — so the default is Nord's own nord10 and the change is
+     no change. Optional like --mdm-strong: unset means Nord's colour, as before. Not on
+     paper, where print colours inline code itself (print.css). */
   --mdm-code-fg: #5e81ac;   /* nord10, the vendor's inline-code colour */
   --mdm-code-bg: #f2f2f2;
   --mdm-pre-bg: #2e3440;   /* nord polar night */

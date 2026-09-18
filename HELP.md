@@ -454,22 +454,21 @@ can't switch off the app's own furniture — spelling squiggles, formatting mark
 the table resize handle survive whatever a theme says about them.
 
 **Text size.** `--mdm-font-size` is the one size the document derives from. Set it
-once and body text, the six heading levels, list markers, inline and fenced code,
-table text and the line numbers all follow, on screen and on paper — so a theme for
-tired eyes is one line, `--mdm-font-size: 32px`. Give it an absolute size (`32px`,
-`18pt`), not `em` or `%`, which measure from whatever encloses each element. It sizes
-the document only: the page's margins, the width, the menus, the toolbar and the
-Markdown source view keep their own sizes, the numbers beside blank lines stay small
-because they have to fit between two blocks, and printing keeps its own type for
-**Markdown source** printouts.
+once — `--mdm-font-size: 32px` — and body text, the six heading levels, list markers,
+inline and fenced code, table text and the line numbers all follow, on screen and on
+paper: a large theme prints large, on more paper. Use a positive absolute size
+(`32px`, `18pt`); a percentage or a nonsense value falls back to 16px. It sizes the
+document only — the page margins and width, the menus, the toolbar and the Markdown
+source view keep their own sizes, the numbers beside blank lines stay small because
+they have to fit between two blocks, and past about double size four-digit line
+numbers start to crowd the line-number gutter.
 
 **Diagrams.** No variable of ours reaches inside a mermaid diagram: mermaid draws its
 own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,
 `neutral`, `forest`, `base` — is the supported lever on it. A rendered diagram *is*
 inline SVG in the page, though, so ordinary CSS selectors do reach its shapes and
 text. Mermaid writes its own `<style>` inside each diagram, so expect to out-specify
-it, and nothing about what it draws inside there is a promise that survives a
-mermaid update.
+it, and what it draws in there is not a promise that survives a mermaid update.
 
 **The printed row stripe has to stay light.** `--mdm-print-row-alt-bg` prints behind
 text that always prints dark, so a dark stripe swallows it. A palette built on one

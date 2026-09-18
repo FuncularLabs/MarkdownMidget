@@ -37,40 +37,61 @@ body {
   flex-direction: column;
 }
 
-/* The one size the document derives from is --mdm-font-size (16px in every theme that
- * doesn't set it), and this is the element it sits on. Three traps, all measured:
+/* ===== the document's text size ======================================================
  *
- *   - `em` reaches from here, `rem` does not. The headings, inline code and fenced
- *     code inside a block are sized in `em` and follow this element. The vendor sizes
+ * --mdm-font-size is the one size the DOCUMENT derives from — 16px in every theme that
+ * doesn't set it, which is what `.mdm-prosemirror` always was. THIS FILE IS THE ONLY
+ * PLACE THAT DERIVES ANYTHING FROM IT, and the only place that explains how; sample.css
+ * is where a theme author reads what it does. Three measured facts decide the shape:
+ *
+ *  1. `em` reaches from the container, `rem` does not. The six headings, inline code and
+ *     `pre code` are sized in `em` below and follow it already. The vendor sizes
  *     paragraphs from its own `--text-base` token and fenced blocks from `--text-sm`,
- *     both in `rem` — which measures from the PAGE root, so no container font-size on
- *     earth reaches a paragraph.
- *   - so those two are redefined here, scoped to the document, rather than restated as
- *     rules of our own on `p` and `pre`. Both would render the same today and the
- *     difference is not academic: custom double-size themes ALREADY scale a document by
- *     setting these two tokens, that being the only seam that ever worked, and a rule of
- *     ours in this layer would silently beat theirs and put their body text back to
- *     16px. Redefining the token leaves the last word with the theme's layer, where it
- *     belongs. Measured on the theme this feature came from: 32 computed declarations
- *     differ the other way, all of them its paragraphs and code.
- *     The vendor's three larger tokens are not redefined because our own em-based
- *     heading rules already beat them, and `--text-sm`'s use on tables and inline code
- *     likewise loses to the rules below.
- *   - the line-number gutter bakes its size into one `font` shorthand, whose line box
- *     is what keeps a number level with its line, so it takes a derived font-size and
- *     line-height of its own below.
+ *     both `rem`, which measures from the PAGE root — so no container font-size on earth
+ *     reaches a paragraph.
+ *  2. So those two tokens are redefined from the same variable, ON `:root`. Not as rules
+ *     of our own on `p`/`pre`, and not on `.mdm-prosemirror`: themes ALREADY scale
+ *     documents by setting these two tokens themselves, that being the only seam that
+ *     ever worked, and both variants have to keep winning. A theme's `:root` wins here
+ *     on layer order; a theme's `.mdm-prosemirror` wins on proximity, because a custom
+ *     property is inherited per element and the nearest declaration decides before the
+ *     cascade is consulted at all. Getting either wrong is silent and was measured: a
+ *     rule on `p` reverted the first variant (32 computed declarations), ours on
+ *     `.mdm-prosemirror` reverted the second (217). Only these two tokens need it — our
+ *     `em` headings and the rules below already beat the vendor's other uses of them.
+ *  3. The gutter bakes its size into one `font` shorthand whose line box is what keeps a
+ *     number level with its line, so it derives both, below.
  *
- * Layout deliberately does not follow: the padding here, the 16px block margins, the
- * page width and the gutter's 56px are fixed, so a very large size leaves the gutter
- * less room for four-digit numbers. */
+ * What does NOT follow it: layout (this padding, the 16px block margins, the page width,
+ * the gutter's 56px), so a very large size leaves little gutter room for four-digit
+ * numbers; a blank line's gutter number, which has its own note below; and a theme that
+ * moves only the page root's `font-size`, since none of these sizes is `rem` any more.
+ * =================================================================================== */
+
+/* Typed, so that a theme writing something that is not a length degrades to 16px instead
+ * of breaking everything derived from it. Unregistered, `--mdm-font-size: banana` left the
+ * document at 16px and took fenced code, `pre code`, table text and every gutter number
+ * with it, because each `calc()` was separately invalid at computed-value time. Typing it
+ * also resolves `em` and `%` once, here, so they stop compounding. A negative length is
+ * still a length: sample.css says not to, and nothing stops it. (Not cascaded, so the
+ * layer it sits in is irrelevant; the vendor ships 23 of these in the same bundle.) */
+@property --mdm-font-size {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 16px;
+}
+
+:root {
+  --text-base: var(--mdm-font-size);                    /* the vendor's, at 1rem */
+  --text-sm: calc(var(--mdm-font-size) * 0.875);        /* the vendor's, at .875rem */
+}
+
 .mdm-prosemirror {
   flex: 1 1 auto;
   padding: 56px 72px;
   outline: none;
   font-size: var(--mdm-font-size);
   line-height: 1.5;
-  --text-base: var(--mdm-font-size);                    /* the vendor's, at 1rem */
-  --text-sm: calc(var(--mdm-font-size) * 0.875);        /* the vendor's, at .875rem */
 }
 
 .mdm-prosemirror:focus {
@@ -108,11 +129,10 @@ body {
 /* The lines between two blocks with no place of their own (line-map.js), looking as a block's number does, on a widget of no height: nothing
  * moves. Its 12px box ends where the 16px margin under the block above does, below that block's numbers; line-map.js draws one only there (roomy).
  *
- * This is the one number that does NOT follow --mdm-font-size, and it can't: the box it
- * has to fit in is that 16px margin, which is layout and stays 16px, and -12px is
- * exactly the 12px line box that puts the box's bottom edge on the widget. Double the
- * type and a 24px box no longer fits the gap it is naming, at any margin. So a blank
- * line's number stays 12px while the numbers beside real lines grow. */
+ * The one number that does NOT follow --mdm-font-size, and it can't: the box has to fit
+ * that 16px margin, which is layout and stays 16px, and -12px IS the 12px line box that
+ * puts the box's bottom edge on the widget. Doubled, a 24px box no longer fits the gap it
+ * names, at any margin. */
 .mdm-prosemirror [data-gap]::before {
   content: attr(data-gap);
   position: absolute;

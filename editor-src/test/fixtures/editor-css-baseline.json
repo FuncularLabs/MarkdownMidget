@@ -120,6 +120,36 @@
   "important": false
  },
  {
+  "where": "@property --mdm-font-size",
+  "prop": "syntax",
+  "value": "\"<length>\"",
+  "important": false
+ },
+ {
+  "where": "@property --mdm-font-size",
+  "prop": "inherits",
+  "value": "true",
+  "important": false
+ },
+ {
+  "where": "@property --mdm-font-size",
+  "prop": "initial-value",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ":root",
+  "prop": "--text-base",
+  "value": "16px",
+  "important": false
+ },
+ {
+  "where": ":root",
+  "prop": "--text-sm",
+  "value": "calc(16px * 0.875)",
+  "important": false
+ },
+ {
   "where": ".mdm-prosemirror",
   "prop": "flex",
   "value": "1 1 auto",
@@ -147,18 +177,6 @@
   "where": ".mdm-prosemirror",
   "prop": "line-height",
   "value": "1.5",
-  "important": false
- },
- {
-  "where": ".mdm-prosemirror",
-  "prop": "--text-base",
-  "value": "16px",
-  "important": false
- },
- {
-  "where": ".mdm-prosemirror",
-  "prop": "--text-sm",
-  "value": "calc(16px * 0.875)",
   "important": false
  },
  {

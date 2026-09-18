@@ -55,17 +55,21 @@
   --mdm-text: #1a1a1a;
 
   /* Not a colour: the one size the DOCUMENT derives from. Change this line alone and
-     body text, all six heading levels, list markers, inline and fenced code, table
-     text and the line numbers all follow, on screen and on paper -
-     `--mdm-font-size: 32px` is a double-size theme and needs nothing else.
+     body text, all six heading levels, list markers, inline and fenced code, table text
+     and the line numbers follow, on screen and on paper - `--mdm-font-size: 32px` is a
+     double-size theme and needs nothing else. It prints at the size you set, so a large
+     theme prints on more paper.
 
-     Give it an absolute size - 32px, 18pt, 2rem. `em` and `%` measure from whatever
-     encloses each element, so they do not do what you want here.
+     Use a positive, absolute size: 32px, 18pt, 2rem. A percentage or a nonsense value
+     falls back to 16px, and a negative one collapses your code and line numbers.
 
      What does NOT follow it: the page's padding and margins, the page width, the app's
      menus and toolbar, the Markdown source view, and the small numbers beside blank
-     lines (they have to fit in the gap between two blocks). A very large size leaves
-     the line-number gutter little room for four-digit numbers. */
+     lines (they have to fit the gap between two blocks). Past about 2x, four-digit line
+     numbers start to crowd the gutter. If you would rather scale the document by setting
+     the editor's own `--text-base` and `--text-sm`, as older themes do, that still works
+     and still wins; changing the page's `html { font-size }` no longer moves the
+     document. */
   --mdm-font-size: 16px;
 
   /* Bold. `currentColor` means no colour of its own: bold stays the colour of
@@ -87,10 +91,9 @@
   /* ---- lists -------------------------------------------------------- */
 
   /* Bullets and numbers, in every list - nested ones and lists inside a quote. The
-     value below is not ours: it is the blue-grey the editor's own palette has always
-     painted markers, so leaving this line out changes nothing. Printed markers keep
-     that same colour whatever you set, because a marker chosen for your page can be a
-     smudge on white paper. */
+     value below is the blue-grey the editor has always painted markers, so leaving
+     this line out changes nothing. Printed markers keep that colour whatever you
+     set: one chosen for your page can be a smudge on white paper. */
   --mdm-list-marker: #5e81ac;
 
   /* ---- blockquote --------------------------------------------------- */
@@ -102,10 +105,9 @@
   /* ---- code --------------------------------------------------------- */
 
   /* Two foregrounds, because there are two kinds of code. --mdm-code-fg is the text of
-     `inline` code, wherever it appears - a paragraph, a heading, a quote, a list, a
-     table cell. Fenced blocks keep --mdm-pre-fg and their syntax colours below, and
-     printed code keeps print's own dark-on-light pair. As with the marker, the value
-     here is the editor's old one, so omitting the line changes nothing. */
+     `inline` code wherever it appears - paragraph, heading, quote, list, table cell.
+     Fenced blocks keep --mdm-pre-fg and their syntax colours below, and printed code
+     keeps print's own pair. Again the value here is the editor's old one. */
   --mdm-code-fg: #5e81ac;       /* `inline` text */
   --mdm-code-bg: #f2f2f2;       /* `inline` background */
   --mdm-pre-bg: #2e3440;        /* fenced blocks */
@@ -128,12 +130,9 @@
      the table header and the alternating row stripe keep the look you name
      here. The stripe must stay LIGHT — printed body text is always dark, so
      a dark stripe would swallow it. A dark header is fine (the text you set
-     in --mdm-print-th-text prints on it).
-
-     If your palette is built on a single hue it has no light tint to use:
-     pure red is about a fifth as bright as white, which is not a stripe, it
-     is a blackout. Set this to #ffffff in that case — no stripe on paper,
-     and nothing else about the table changes. */
+     in --mdm-print-th-text prints on it). A palette built on a single hue has
+     no light tint to offer — pure red is about a fifth as bright as white — so
+     in one of those, set this to #ffffff: no stripe, nothing else lost. */
   --mdm-print-th-bg: #c4c9d1;
   --mdm-print-th-text: #1f2328;
   --mdm-print-row-alt-bg: #f4f6f8;
@@ -149,13 +148,11 @@
      else falls back to `default` rather than filling the page with error boxes.
 
      Variables are what can't get inside. A rendered diagram is INLINE SVG in
-     the page, so ordinary selectors do reach its shapes and text —
-     `.mdm-mermaid path`, `.mdm-mermaid text`, and tricks like a
-     `mix-blend-mode` overlay on `.mdm-mermaid::after` all work. Two warnings if
-     you go that way: mermaid puts its own `<style>` inside each diagram, with
-     id-based selectors you will have to out-specify, and what it draws in there
-     is its business, not a contract of ours — a mermaid update may rename or
-     restructure any of it. --mdm-mermaid-theme is the part that keeps working. */
+     the page, so ordinary selectors do reach its shapes and text
+     (`.mdm-mermaid path`, `.mdm-mermaid text`). Expect to fight for it: mermaid
+     puts its own `<style>` inside each diagram with id-based selectors, and what
+     it draws in there is its business, not a contract of ours — an update may
+     rename any of it. --mdm-mermaid-theme is the part that keeps working. */
   --mdm-mermaid-theme: default;
 
   --mdm-squiggle: #e51d1d;              /* misspelling underline */

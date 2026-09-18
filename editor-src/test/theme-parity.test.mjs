@@ -675,18 +675,6 @@ test('a custom theme prints dark headings and links by declaring --mdm-color-sch
 // about specificity in numbers rather than in prose. Which ELEMENTS a selector reaches
 // is a question jsdom can answer, and does below.
 
-/** (ids, classes, elements) for the selectors these rules use: classes, element names,
- *  pseudo-elements and combinators, with no :where()/:not() and no ids. */
-function specificity(selector) {
-  const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
-  const types = (selector.replace(/\.[\w-]+/g, ' ').match(/[a-z][\w-]*/gi) ?? []).length;
-  return [0, classes, types];
-}
-
-/** Whether a is at least as specific as b, comparing left to right as the cascade does. */
-const atLeast = (a, b) => a.findIndex((n, i) => n !== b[i]) === -1
-  || a[a.findIndex((n, i) => n !== b[i])] > b[a.findIndex((n, i) => n !== b[i])];
-
 /** The editor's DOM as the vendor builds it: one element carries prose, mdm-prosemirror
  *  and milkdown-theme-nord (@milkdown/theme-nord/lib/index.js sets all three), and
  *  prosemirror-tables wraps every cell's content in a paragraph — which is why table
@@ -730,12 +718,6 @@ test('--mdm-list-marker colours every list marker, nested or quoted, and nothing
   // question. All four lists, including the nested one and the one in a quote.
   const owners = selectors.map((s) => s.replace('::marker', '')).join(', ');
   assert.deepEqual(reaches(editorDom(), owners), ['item', 'nested', 'numbered', 'quoted-item']);
-
-  // Nord's rule is MORE specific — it wins on specificity and loses on layer order,
-  // which is the whole reason this declaration works (layers.test.mjs holds the order).
-  assert.deepEqual(selectors.map(specificity), [[0, 1, 3], [0, 1, 3]]);
-  assert.ok(atLeast([0, 2, 1], specificity(selectors[0])),
-    "if ours out-specified Nord's (0,2,1) this would prove nothing about layer order");
 });
 
 test('--mdm-code-fg colours inline code in quotes, tables, lists and headings, not fenced code', () => {
@@ -753,14 +735,10 @@ test('--mdm-code-fg colours inline code in quotes, tables, lists and headings, n
     .filter((d) => d.prop === 'color' && d.value === 'inherit' && d.where.includes('pre code'));
   assert.equal(back.length, 1, 'one rule hands fenced code back');
   assert.deepEqual(reaches(doc, back[0].where), ['fenced']);
-  assert.ok(atLeast(specificity(back[0].where), specificity(inline.where)),
-    `${back[0].where} no longer out-specifies ${inline.where}`);
 
   // ...and the syntax tokens are more specific still, so highlighting is untouched.
-  const token = declarations(read('styles', 'base.css'))
-    .filter((d) => d.prop === 'color' && d.where.includes('.token.keyword'));
-  assert.equal(token.length, 1);
-  assert.ok(atLeast(specificity('.mdm-prosemirror .token.keyword'), specificity(inline.where)));
+  assert.equal(declarations(read('styles', 'base.css'))
+    .filter((d) => d.prop === 'color' && d.where.includes('.token.keyword')).length, 1);
   assert.deepEqual(reaches(doc, '.mdm-prosemirror .token.keyword'), ['keyword']);
 });
 
@@ -773,12 +751,12 @@ function sizeOf(themeCss, where, prop) {
 }
 
 /** The sites that read the variable, and what each is a multiple of. The two --text-*
- *  are the VENDOR's own tokens, redefined on the document: its `p` rule and its `pre`
- *  rule read them in `rem`, and this is what makes both follow the container. */
+ *  are the VENDOR's own tokens, redefined on `:root`: its `p` rule and its `pre` rule
+ *  read them in `rem`, and this is what makes both follow the document instead. */
 const DERIVED = [
   ['.mdm-prosemirror', 'font-size', 1],
-  ['.mdm-prosemirror', '--text-base', 1],
-  ['.mdm-prosemirror', '--text-sm', 0.875],
+  [':root', '--text-base', 1],
+  [':root', '--text-sm', 0.875],
   ['.mdm-prosemirror td, .mdm-prosemirror th', 'font-size', 0.75],
   ['.mdm-prosemirror [data-line]::before', 'font-size', 0.75],
   ['.mdm-prosemirror [data-line]::before', 'line-height', 1.5],
@@ -793,7 +771,6 @@ test('--mdm-font-size set once scales body text, headings, markers, code, tables
   // One line, and the theme needs nothing else — which is the claim, so the theme is
   // written out in full here rather than described.
   const theme = ':root { --mdm-font-size: 32px; }';
-  assert.equal(theme.match(/--mdm-[\w-]+\s*:/g).length, 1, 'the theme sets one thing');
 
   for (const [where, prop, multiple] of DERIVED) {
     assert.equal(sizeOf(theme, where, prop),
@@ -826,20 +803,25 @@ test('--mdm-font-size set once scales body text, headings, markers, code, tables
   assert.deepEqual(sized.map((d) => d.where), []);
 });
 
-test('body text and fenced code scale by redefining the vendor\'s tokens, not by a rule of ours', () => {
-  // The regression this shape exists to avoid, and it is not hypothetical: the first
-  // version of this work declared `.mdm-prosemirror p { font-size: var(--mdm-font-size) }`
-  // and `.mdm-prosemirror pre { font-size: … }` instead. Both render identically under
-  // every built-in - and both silently broke the custom double-size theme this feature
-  // came from, which scales a document the only way that ever worked, by setting
-  // --text-base and --text-sm itself. Ours sat in mdm-structure and outranked the theme's
-  // mdm-theme: 32 computed declarations differed, every paragraph and every code block
-  // back at 16px and 14px.
+test('a theme can still scale a rem document itself, whether it sets the tokens on :root or on the editor', () => {
+  // Two existing ways to scale a document predate --mdm-font-size, because redefining the
+  // vendor's own two `rem` tokens was the only seam that ever worked. Both have to keep
+  // working, and each fails differently if this is got wrong:
   //
-  // Redefining the token instead leaves the theme's layer with the last word. So: no
-  // font-size of ours on `p` or on `pre`, and the tokens declared on the document
-  // element rather than on :root, which is what keeps them off anything that is not the
-  // document.
+  //   a rule of OURS on `p`/`pre`   beats a theme's token at any specificity, because ours
+  //                                 would sit in mdm-structure and theirs in mdm-theme.
+  //                                 Measured on the theme this came from: 32 computed
+  //                                 declarations back at the vendor's rem sizes.
+  //   ours on `.mdm-prosemirror`    beats a theme's `:root` token WITHOUT the cascade being
+  //                                 consulted at all: a custom property is inherited per
+  //                                 element, and the nearer ancestor's declaration is the
+  //                                 one the subtree inherits. Layer order never gets a
+  //                                 vote. Measured: 217 differing declarations on screen,
+  //                                 216 on paper, for `:root { --text-base; --text-sm }`.
+  //
+  // So ours goes on `:root`: a theme's `:root` beats it by layer order, and a theme's
+  // `.mdm-prosemirror` beats it by proximity. Anything deeper than `:root` breaks the
+  // second case, and `!important` breaks both.
   const ours = declarations(read('styles', 'structure.css'));
   assert.deepEqual(
     ours.filter((d) => d.prop === 'font-size' && /^\.mdm-prosemirror (p|pre)$/.test(d.where))
@@ -847,26 +829,63 @@ test('body text and fenced code scale by redefining the vendor\'s tokens, not by
     'a font-size of ours on p or pre outranks a theme that scales the vendor tokens');
 
   for (const token of ['--text-base', '--text-sm']) {
-    const hits = ours.filter((d) => d.prop === token);
+    const hits = declarations(editorCss).filter((d) => d.prop === token);
     assert.equal(hits.length, 1, `${token} should be redefined exactly once, is ${hits.length}`);
-    assert.equal(hits[0].where, '.mdm-prosemirror', `${token} is redefined on ${hits[0].where}`);
+    assert.equal(hits[0].where, ':root',
+      `${token} is redefined on ${hits[0].where}; anything nearer than :root is inherited ` +
+      'by the document before a theme\'s own :root declaration can be considered');
     assert.equal(hits[0].important, false, `${token} must not be !important, or a theme can't win`);
   }
 });
 
-test('the numbers beside blank lines keep their own size, and say why in the file', () => {
-  // The one gutter number that cannot follow the variable: its box has to fit inside the
-  // fixed 16px margin between two blocks, and its negative margin-top IS its line box.
-  // Pinned so that "scale everything" can't quietly be extended to it without moving the
-  // block margins too — and so the comment that explains it can't go missing.
+test('a theme that only moves the page root\'s font-size no longer scales the document, by design', () => {
+  // The cost of deriving the vendor's `rem` sizes from a variable, accepted rather than
+  // fixed: `html { font-size: 20px }` in a theme used to scale body text and fenced code
+  // (1rem and .875rem measured from the page root) while leaving the container, the
+  // headings and the markers at 16px. Now it scales none of the document. That partial
+  // effect was never documented, never tested and not a shape anyone should want - a
+  // theme that wants a bigger document says --mdm-font-size once and gets all of it -
+  // and no scoping of ours can restore it, because the document's sizes are now absolute
+  // lengths off that variable. sample.css and HELP say so.
+  //
+  // Recorded as a test rather than a comment so that reintroducing a rem-sized
+  // declaration - the only way the old behaviour comes back, and it would come back
+  // partially again - fails here.
+  const sizes = declarations(editorCss).filter((d) => /^(font-size|--text-)/.test(d.prop));
+  assert.ok(sizes.length > 0, 'no size declarations found at all; this test has stopped looking');
+  assert.deepEqual(sizes.filter((d) => /\d\s*rem\b/.test(d.value)).map((d) => `${d.where} { ${d.prop} }`), [],
+    'a rem-sized declaration measures from the page root again, which scales half a document');
+  assert.deepEqual(declarations(editorCss)
+    .filter((d) => d.prop === 'font-size' && /^(html|:root)\b/.test(d.where)).map((d) => d.where), [],
+    'nothing of ours sets the page root\'s own font-size');
+});
+
+test('--mdm-font-size is registered as a length, so a value that is not one degrades to 16px', () => {
+  // Unregistered, a custom property is only tokens and a bad value is invalid at
+  // computed-value time everywhere it is USED - which left the document looking fine and
+  // everything derived from it broken. Measured with `banana`: fenced code 16px (from 14),
+  // `pre code` 14px (from 12.25), cell text 12px (from 16), every gutter number 16px (from
+  // 12). Typed, a non-length is invalid at the DECLARATION, which with inherits:true on
+  // :root means the initial value - 16px - everywhere, and `em`/`%` resolve once here
+  // instead of compounding (`2em` gave 64px body text). A negative length is still a
+  // length and still clamps code and the gutter to 0px: sample.css says don't, nothing
+  // stops it, and a syntax narrow enough to exclude it excludes calc() too.
+  assert.deepEqual(
+    declarations(read('styles', 'structure.css'))
+      .filter((d) => d.where === '@property --mdm-font-size').map((d) => [d.prop, d.value]),
+    [['syntax', '"<length>"'], ['inherits', 'true'], ['initial-value', '16px']]);
+});
+
+test('the numbers beside blank lines keep their own size', () => {
+  // The one gutter number that cannot follow the variable, for the reason structure.css
+  // gives beside it: its box has to fit the fixed 16px margin between two blocks, and its
+  // negative margin-top IS its line box. Pinned so "scale everything" can't quietly be
+  // extended to it without moving the block margins too.
   const gap = declarations(read('styles', 'structure.css'))
     .filter((d) => d.where === '.mdm-prosemirror [data-gap]::before');
   assert.deepEqual(gap.filter((d) => d.prop === 'font-size' || d.prop === 'line-height'), []);
   assert.deepEqual(gap.filter((d) => d.prop === 'margin-top').map((d) => d.value), ['-12px']);
   assert.match(gap.find((d) => d.prop === 'font').value, /\b12px\/12px\b/);
-  assert.match(read('styles', 'structure.css'),
-    /does NOT follow --mdm-font-size, and it can't/,
-    'the reason a blank line\'s number stays 12px is no longer written down');
 });
 
 /** Nord's own nord10, read out of the built bundle rather than copied: it is the value

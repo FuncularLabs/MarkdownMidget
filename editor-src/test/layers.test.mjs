@@ -149,15 +149,12 @@ test('the rule that must beat a vendor !important is in the first of our layers'
 });
 
 test('the vendor tokens the document size rides on are the ones its own rules read', () => {
-  // The other half of --mdm-font-size, and the half that is invisible in either source
-  // file. The vendor sizes body text and fenced code from two Tailwind tokens, in `rem` —
-  // which measures from the PAGE root, so a container font-size never reached a paragraph
-  // and a document scaled its headings while its body text stayed 16px. structure.css
-  // redefines those two tokens on the editor element instead of restating the sizes,
-  // which is what leaves a theme that sets them itself still able to win (mdm-theme is
-  // last). That only works while the tokens WE redefine are the tokens the vendor's own
-  // rules read, and a Tailwind upgrade could rename either: this is where that shows up
-  // rather than as body text quietly ignoring the theme.
+  // The half of --mdm-font-size that is invisible in our own files. structure.css sizes
+  // body text and fenced code by redefining two of the vendor's Tailwind tokens (see the
+  // comment there for why redefining rather than restating), which works only while those
+  // tokens are the ones the vendor's own rules still read. A Tailwind rename would
+  // otherwise show up as body text quietly ignoring the theme. Everything else about the
+  // arrangement is pinned by the fixtures.
   for (const [rule, token] of [['.milkdown-theme-nord p{', '--text-base'],
                                ['.milkdown-theme-nord pre{', '--text-sm']]) {
     const theirs = bundle.indexOf(rule);
@@ -167,20 +164,6 @@ test('the vendor tokens the document size rides on are the ones its own rules re
       new RegExp(`font-size:var\\(${token}\\)`),
       `the vendor no longer sizes "${rule}" from ${token}`);
   }
-
-  const ours = bundle.indexOf('.mdm-prosemirror{flex:1 1 auto');
-  assert.notEqual(ours, -1, 'the editor element\'s own rule is not in the bundle');
-  assert.equal(layerAt(bundle, ours), 'mdm-structure');
-  const body = bundle.slice(ours, bundle.indexOf('}', ours));
-  assert.match(body, /--text-base: ?var\(--mdm-font-size\)/);
-  assert.match(body, /--text-sm: ?calc\(var\(--mdm-font-size\) \* \.875\)/);
-
-  // Later than the vendor for a normal declaration, earlier than the theme, which is
-  // exactly the position this depends on at both ends.
-  assert.ok(EXPECTED.indexOf('mdm-structure') > EXPECTED.indexOf('mdm-vendor'),
-    'mdm-structure must stay after mdm-vendor or the vendor tokens win again');
-  assert.ok(EXPECTED.indexOf('mdm-structure') < EXPECTED.indexOf('mdm-theme'),
-    'mdm-theme must stay last or a theme can no longer set the tokens itself');
 });
 
 test('print is the earliest layer, so nothing a theme writes reaches paper', () => {
@@ -209,11 +192,13 @@ test('nothing of ours is left unlayered', () => {
   assert.deepEqual(loose.map((m) => m[0]).slice(0, 5), []);
 });
 
-test("Tailwind's @property registrations survive being nested in a layer", () => {
+test('the @property registrations survive being nested in a layer', () => {
   // They are not cascaded, so layering does not affect them — but dropping them
-  // would break the vendor's custom-property fallbacks, and a wrapping scheme that
-  // silently ate them would look identical here otherwise.
-  assert.equal([...bundle.matchAll(/@property/g)].length, 23);
+  // would break the vendor's custom-property fallbacks, and ours is what makes a bad
+  // --mdm-font-size degrade to 16px instead of breaking every size derived from it. A
+  // wrapping scheme that silently ate either would look identical here otherwise.
+  assert.equal([...bundle.matchAll(/@property/g)].length, 24, "Tailwind's 23, and ours");
+  assert.equal([...bundle.matchAll(/@property --mdm-font-size\s*\{/g)].length, 1);
 });
 
 test('the entry file imports each of our stylesheets exactly once', () => {

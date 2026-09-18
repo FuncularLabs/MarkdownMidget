@@ -40,27 +40,29 @@ order. Notes for whoever takes stage 3:
   of the three defaults to the value the editor already produced — nord10 for
   inline code and for markers, 16px for the size — so every palette that predates
   them, and Default, renders identically. Measured in Chromium against the built
-  bundle, Default, all seven built-ins and the custom theme this work came from:
-  **0 differing computed declarations** across 51 element/pseudo-element sites.
+  bundle, Default, all seven built-ins, both of the custom themes this work came from
+  and four hand-written scaling variants: **0 differing computed declarations** across
+  51 element/pseudo-element sites, with one accepted exception below.
 
-  `--mdm-font-size` is the one that is not paint: `structure.css` derives the
-  container, table cells and the line-number gutter from it, and redefines the
-  vendor's own `--text-base` / `--text-sm` on the editor element for body text and
-  fenced code, because the vendor sizes those two in `rem` off the page root and a
-  container font-size never reaches them. **Redefining the token rather than
-  restating the size is load-bearing**, and the first attempt got it wrong:
-  `.mdm-prosemirror p { font-size: … }` renders identically under every built-in and
-  Default — and breaks the custom double-size themes that already exist, because
-  they scale a document by setting those two tokens (the only seam that ever worked)
-  and a rule of ours in `mdm-structure` outranks their `mdm-theme`. Measured on the
-  theme this work came from: 32 computed declarations differed, every paragraph and
-  code block back at 16px and 14px. A token redefinition leaves the last word with
-  the theme's layer; `layers.test.mjs` pins that the tokens we redefine are the ones
-  the vendor's own rules read, since a Tailwind rename would otherwise be silent. On paper
-  the two colours are pinned (the marker to Nord's literal, inline code by print's
-  own pair) and the SIZE is not, which print.css's header now argues. The one
-  number that cannot follow it is the gutter number for a blank line, whose box has
-  to fit the fixed 16px margin between two blocks.
+  `--mdm-font-size` is the one that is not paint, and the comment block above
+  `:root` in `structure.css` is its only explanation — read that rather than
+  duplicating it. Two decisions from review worth recording here:
+
+  - **Where the vendor tokens are redefined is load-bearing, twice.** Restating the
+    sizes as rules of ours on `p`/`pre` reverts a theme that sets the tokens on
+    `.mdm-prosemirror` (32 computed declarations); redefining them *on*
+    `.mdm-prosemirror` reverts a theme that sets them on `:root` (217 screen, 216
+    paper), because a custom property is inherited per element and proximity decides
+    before layers are consulted. On `:root` both variants win, which is where they are.
+  - **Accepted loss:** a theme that scaled a document with `html { font-size: 20px }`
+    no longer moves it — that only ever scaled body text and fenced code while
+    headings, markers and cells stayed 16px, and no scoping restores it once those
+    tokens are absolute lengths. Documented in `sample.css` and `HELP.md`.
+
+  On paper the two colours are pinned (the marker to Nord's literal, inline code by
+  print's own pair) and the SIZE is not, which print.css's header argues. A bad value
+  degrades to 16px rather than breaking every derived size, via an `@property`
+  registration — the idiom the vendor already ships 23 of.
 - **Chrome containment holds where it was measured, and there are three holes.**
   A theme cannot remove the spell squiggle by restyling `.mdm-misspelled` —
   verified against a deliberately hostile theme in Chrome, three attempts, all
