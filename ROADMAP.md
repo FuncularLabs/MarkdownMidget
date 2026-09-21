@@ -108,6 +108,24 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
   long JSON prompts. Not started: what it covers needs definition and stakeholder
   input first.
 
+### Diagram width — needs a decision
+
+- **Every diagram is stretched to the full page width, whatever its size.** Mermaid
+  gives each SVG `width="100%"` and an inline `max-width` of its natural width, so a
+  small diagram stays small and a wide one shrinks to fit. Since `19a1f62` (themes stage
+  2, the layered cascade), `.mdm-mermaid svg { max-width: 100% !important }` in
+  `chrome.css` outranks that inline `max-width`, so every diagram fills the page instead.
+  Measured in headless Edge, portrait page at 16px: a two-node `graph TD` (natural
+  115×174) renders 680×1030 with 95px labels; the theme tester's pie (655 wide) is
+  stretched to 680. It also limits how much `--mdm-font-size` can enlarge a diagram: one
+  at page width can't grow, larger text only takes a bigger share of it, and this puts
+  every diagram at page width — the tester's (already wide) flowchart labels grow 1.44
+  times at 2X (13.3px to 19.2px), not twice, and the two-node graph's 1.49 times. Found 2026-09-21 while fixing diagram labels at
+  2X. The decision is small diagrams at their natural size (drop the `!important`, or
+  let mermaid's inline value win) against filling the width as now; either way it
+  changes how every existing diagram looks, so it wants its own change and its own
+  before-and-after check.
+
 ### Line numbers (#10) — in 1.0.0-rc1
 
 Both phases are in: the cursor's line and column in the status bar and Go to Line

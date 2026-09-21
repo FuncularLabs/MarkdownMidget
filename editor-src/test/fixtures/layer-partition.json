@@ -138,6 +138,7 @@
   ".mdm-mermaid { margin }",
   ".mdm-mermaid { padding }",
   ".mdm-mermaid p { font-size }",
+  ".mdm-mermaid p { line-height }",
   ".mdm-mermaid-error-msg { margin }",
   ".mdm-html { display }",
   ".mdm-html img { max-width }",

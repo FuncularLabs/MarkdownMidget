@@ -290,14 +290,18 @@ body {
   padding: 12px;
 }
 
-/* A diagram label's text, at the size mermaid measured it at and drew its box for.
-   Mermaid 11 wraps each HTML label in a <p>, and the vendor's paragraph rule gives every
-   <p> the document's size: at --mdm-font-size: 32px the text was twice its box. So a
-   label inherits from its SVG, as it did while mermaid measured it; mermaid is handed the
-   document's size itself (mermaid-look.js), so diagrams still follow it. !important
-   because a theme's own paragraph size would reach the label the same way. */
+/* A diagram label's text, at the size and line height mermaid measured it at and drew its
+   box for. Mermaid 11 wraps each HTML label in a <p>, and the vendor's paragraph rule
+   gives every <p> the document's size and a 1.625 line height: at --mdm-font-size: 32px
+   the text was twice its box, and at any size a label wrapped onto three lines lost the
+   bottom of its last one, measured at 1.5. So a label inherits both from its SVG, as it
+   did while mermaid measured it; mermaid is handed the document's size itself
+   (mermaid-look.js), so diagrams still follow it. The line height does move every label
+   up by 1/16 of its size, to the centre mermaid put it at. !important because a theme's
+   own paragraph rule would reach the label the same way. */
 .mdm-mermaid p {
   font-size: inherit !important;
+  line-height: inherit !important;
 }
 
 .mdm-mermaid-error-msg {

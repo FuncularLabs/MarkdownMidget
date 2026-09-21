@@ -864,6 +864,12 @@
   "important": true
  },
  {
+  "where": ".mdm-mermaid p",
+  "prop": "line-height",
+  "value": "inherit",
+  "important": true
+ },
+ {
   "where": ".mdm-mermaid",
   "prop": "background",
   "value": "#ffffff",
