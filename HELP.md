@@ -469,11 +469,17 @@ they have to fit between two blocks, and past about double size four-digit line
 numbers start to crowd the line-number gutter. **Red Sparks 2X** is exactly that one
 line: the same palette as **Red Sparks**, at twice the size.
 
-Diagrams follow it too. Flowcharts and class, state, entity-relationship and mind-map
-diagrams are drawn at the document's size, with every box drawn to fit its label. Pie
-charts, sequence diagrams and Gantt charts keep mermaid's own text sizes, because the
-rest of their drawing doesn't grow with them. A diagram is always fitted to the page
-width, so a wide one grows less than the text around it.
+Most diagrams follow it too. Flowcharts and class, state, entity-relationship, mind-map,
+timeline, kanban, block, architecture, swimlane, railroad and Ishikawa diagrams are drawn
+at the document's size, with every box drawn to fit its label, and so are a C4 diagram's
+title and a git graph's branch names. Seventeen types keep mermaid's own text sizes,
+because the rest of their drawing doesn't grow with them: sequence, Gantt, pie, user
+journey, requirement, quadrant, XY, Sankey, packet, radar, treemap, Venn, Wardley,
+Cynefin, tree view, event modeling and info diagrams. Every diagram is also fitted to
+the page width, a small one stretched to fill it, so none grows as much as the text
+around it: at double size a flowchart's labels come out about 1.4 times as large.
+Whether a small diagram should keep its own size is an open question (ROADMAP.md,
+"Diagram width").
 
 **Diagrams.** No colour variable of ours reaches inside a mermaid diagram: mermaid draws
 its own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,

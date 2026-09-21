@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import mermaid from 'mermaid';
 import {
-  MERMAID_THEMES, DEFAULT_FONT_PX, themeName, fontPx, documentFontPx,
+  MERMAID_THEMES, DEFAULT_FONT_PX, KEPT_SIZE_TYPES, themeName, fontPx, documentFontPx,
   mermaidLook, sameLook, mermaidConfig, cacheKey,
 } from '../src/mermaid-look.js';
 
@@ -109,7 +109,63 @@ test('a new size or a new theme is a new look, and the same pair is not', () => 
   assert.equal(sameLook(mermaidLook('default', 16), mermaidLook('midnight', 'banana')), true);
 });
 
-test('a drawing is cached under the look it was drawn in', () => {
+test('seventeen diagram types are drawn at mermaid\'s own size, every other type at the document\'s', () => {
+  // Measured in Edge at 32px, four types grow their text inside geometry that does not grow
+  // with it: a journey's task labels spilled out of their fixed 150-unit boxes and its title
+  // was cut at the top; a radar chart's title was cut and ran into an axis label; an event
+  // model's event boxes kept their width around text twice the size; a requirement's rows
+  // ran into one another and across its divider, where at 16px they are clean. A stylesheet
+  // can't take it back afterwards, which was tried: a journey measures its legend at the size
+  // it is given, and a radar chart sizes its title in a rule of its own. The other thirteen
+  // size their text in settings of their own and never grew; listing them means nothing in
+  // them can, whichever of their elements a document uses. THM-04 has the survey.
+  const drawnSmall = ['journey', 'radar', 'eventmodeling', 'requirement'];
+  const neverGrew = ['sequence', 'gantt', 'pie', 'quadrantChart', 'xychart', 'sankey', 'packet',
+    'treemap', 'venn', 'wardley', 'cynefin', 'treeView', 'info'];
+  assert.deepEqual([...KEPT_SIZE_TYPES].sort(), [...drawnSmall, ...neverGrew].sort());
+  const big = mermaidLook('dark', 32);
+  for (const type of KEPT_SIZE_TYPES) {
+    assert.equal(mermaidConfig(big, type).themeVariables.fontSize, `${DEFAULT_FONT_PX}px`, type);
+  }
+  // The types that grow and fit, by mermaid's ids, and a source mermaid can't place.
+  for (const type of ['flowchart-v2', 'flowchart', 'class', 'classDiagram', 'state', 'stateDiagram', 'er',
+    'mindmap', 'timeline', 'kanban', 'block', 'architecture', 'gitGraph', 'c4',
+    'ishikawa', 'railroad', 'railroadEbnf', 'swimlane', null, undefined]) {
+    assert.equal(mermaidConfig(big, type).themeVariables.fontSize, '32px', String(type));
+  }
+
+  // The names are mermaid's own: what it detects each kind of source as, which is also what it
+  // writes as the SVG's aria-roledescription. A directive in front changes nothing.
+  mermaid.initialize(mermaidConfig(big));
+  const sources = {
+    journey: 'journey\n  title Watch\n  section Listening\n    Take over: 5: Sparks',
+    radar: 'radar-beta\n  axis m["Morse"], v["Voice"], l["Log"]\n  curve a["Sparks"]{4, 3, 5}',
+    eventmodeling: 'eventmodeling\n  tf 01 evt WatchStarted',
+    requirement: 'requirementDiagram\n  element log {\n    type: book\n  }',
+    sequence: 'sequenceDiagram\n  A->>B: Hello',
+    gantt: 'gantt\n  section Watch\n  Listening :a1, 2026-01-01, 1d',
+    pie: 'pie title Watch\n  "Traffic" : 26',
+    quadrantChart: 'quadrantChart\n  Distress: [0.9, 0.2]',
+    xychart: 'xychart-beta\n  bar [12, 30]',
+    sankey: 'sankey-beta\nTraffic,Log,20',
+    packet: 'packet-beta\n0-15: "Source Port"',
+    treemap: 'treemap-beta\n"Watch"\n    "Listening": 60',
+    venn: 'venn-beta\n  set A["Morse"]',
+    wardley: 'wardley-beta\n  title Wireless room',
+    cynefin: 'cynefin-beta\n  title Watch decisions',
+    treeView: 'treeView-beta\n  wireless-room',
+    info: 'info',
+  };
+  assert.deepEqual(Object.keys(sources).sort(), [...KEPT_SIZE_TYPES].sort());
+  for (const [type, source] of Object.entries(sources)) {
+    assert.equal(mermaid.detectType(source), type);
+    assert.equal(mermaid.detectType(`%%{init: {'theme': 'forest'}}%%\n${source}`), type);
+  }
+});
+
+test('a drawing is cached under the look it was asked for', () => {
+  // mermaid.js draws each diagram under the look its widget asked for, so that is also the
+  // look the drawing was made in (test/mermaid-render.test.mjs holds that half).
   const src = 'graph LR\n  A --> B';
   const at16 = mermaidLook('dark', 16);
   assert.equal(cacheKey(at16, src), cacheKey(mermaidLook('dark', '16px'), src));

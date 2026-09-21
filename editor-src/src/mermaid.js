@@ -1,7 +1,7 @@
 // Mermaid diagram rendering for fenced ```mermaid code blocks.
 //
 // Strategy: a Prose plugin that adds two decorations per mermaid code_block —
-//   1) A widget after the block containing the rendered SVG (cached by source).
+//   1) A widget after the block containing the rendered SVG (cached by look and source).
 //   2) A `node` decoration that adds the `mdm-mermaid-active` CSS class to the
 //      code_block when the cursor is inside it.
 // The screen CSS hides mermaid code blocks by default and reveals them while
@@ -16,11 +16,27 @@ import { mermaidLook, sameLook, mermaidConfig, cacheKey, DEFAULT_FONT_PX } from 
 // Mermaid's theme and the document's text size (mermaid-look.js).
 let currentLook = mermaidLook('default', DEFAULT_FONT_PX);
 
-let mermaidReady = false;
-function initOnce() {
-  if (mermaidReady) return;
-  mermaid.initialize(mermaidConfig(currentLook));
-  mermaidReady = true;
+// Mermaid's config is global, and a render reads it when it STARTS. So diagrams are drawn
+// one at a time, each under its own config, handed over just before it starts and left
+// alone until it has finished: a diagram waiting its turn is drawn under the look it was
+// asked for, not whatever a later switch set, and a journey can be drawn at mermaid's own
+// size between two flowcharts at the document's (KEPT_SIZE_TYPES).
+let queue = Promise.resolve();
+let handed = null;   // the config mermaid holds, as JSON
+function hand(config) {
+  const json = JSON.stringify(config);
+  if (json !== handed) { mermaid.initialize(config); handed = json; }
+}
+function draw(id, source, look) {
+  const run = queue.then(() => {
+    if (handed === null) hand(mermaidConfig(look));   // mermaid learns its diagram types here
+    let type = null;
+    try { type = mermaid.detectType(source); } catch { /* a type it doesn't know: render says so */ }
+    hand(mermaidConfig(look, type));
+    return mermaid.render(id, source);
+  });
+  queue = run.catch(() => {});
+  return run;
 }
 
 // Cache rendered SVG by look and source text to keep keystrokes fast.
@@ -37,29 +53,28 @@ function escapeHtml(s) {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 }
 
-async function renderInto(container, source, epoch, key) {
+async function renderInto(container, source, epoch, look) {
   if (!source.trim()) {
     container.innerHTML = '<div class="mdm-mermaid-empty">(empty mermaid block)</div>';
     container.classList.remove('mdm-mermaid-error');
     return;
   }
+  const key = cacheKey(look, source);
   const cached = svgCache.get(key);
   if (cached) {
     container.innerHTML = cached.svg;
     container.classList.toggle('mdm-mermaid-error', !!cached.error);
     return;
   }
-  initOnce();
   try {
     const id = 'mdm-mermaid-' + (++renderTicket);
-    const { svg } = await mermaid.render(id, source);
-    // A theme or size switch during the await just cleared the cache and asked
-    // every diagram to re-render under the NEW look — including this exact source,
-    // in a fresh call with the new epoch. This older call's result is stale, and
-    // nothing may show or cache it; the key is the look it was asked for, so even
-    // a write that slipped past here could never be served to the new one. The
-    // container itself is already detached — ProseMirror swapped it for a new one
-    // under the new decoration key — so discarding here loses nothing visible.
+    const { svg } = await draw(id, source, look);
+    // A theme or size switch during the await asked every diagram to render again under
+    // the new look, in a fresh call with a new epoch, and swapped this container out of the
+    // page. So this older result shows nowhere and is not kept. A drawing kept by mistake
+    // would still be of the look its key names (draw() sees to that), but a failure would
+    // not be the diagram's: the look can come back, and the error box with it (the catch
+    // below, test/mermaid-render.test.mjs).
     if (epoch !== themeEpoch) return;
     svgCache.set(key, { svg, error: false });
     container.innerHTML = svg;
@@ -102,15 +117,15 @@ function buildDecorations(doc, selection) {
     // Render the diagram after the block. The epoch is captured HERE, at widget
     // creation, not read fresh inside renderInto — it has to be the epoch this
     // particular render was asked for under, so a later switch can tell this call
-    // apart from the new one it triggered for the same source. The cache key too.
+    // apart from the new one it triggered for the same source. The look too.
     const epoch = themeEpoch;
-    const svgKey = cacheKey(currentLook, source);
+    const look = currentLook;
     const key = 'mermaid:' + epoch + ':' + hash(source) + ':' + source.length;
     decos.push(Decoration.widget(end, () => {
       const container = document.createElement('div');
       container.className = 'mdm-mermaid';
       container.setAttribute('contenteditable', 'false');
-      renderInto(container, source, epoch, svgKey);
+      renderInto(container, source, epoch, look);
       return container;
     }, { side: 1, ignoreSelection: true, key }));
   });
@@ -119,17 +134,14 @@ function buildDecorations(doc, selection) {
 
 /**
  * Point mermaid at a different built-in theme or document text size (px), and redraw
- * what is already on screen.
+ * what is already on screen. What each step does:
  *
- * Three things have to happen together, and leaving any one out looks like the
- * feature half-working rather than like a bug:
- *
- *   - `mermaidReady` goes back to false, or `initialize` never runs again and the
- *     new look is simply never handed to mermaid;
- *   - the SVG cache is cleared: its keys carry the look, so nothing in it could be
- *     served under the new one, and what is left would only take up room;
- *   - the decoration key changes and the plugin is told to rebuild, because
- *     ProseMirror keeps DOM it believes is unchanged.
+ *   - the new look becomes the one every diagram asks for from here on; draw() hands
+ *     it to mermaid as each one's turn comes, so nothing is initialised here;
+ *   - the epoch is bumped and the plugin told to rebuild, because ProseMirror keeps
+ *     DOM it believes is unchanged: without it the diagrams on screen keep the old look;
+ *   - the SVG cache is emptied. Housekeeping only: its keys carry the look, so nothing
+ *     in it could be served under the new one; it would only take up room.
  *
  * Returns false when nothing changed, so the caller can skip the redraw.
  */
@@ -138,7 +150,6 @@ export function setMermaidTheme(view, name, fontSize) {
   if (sameLook(next, currentLook)) return false;
 
   currentLook = next;
-  mermaidReady = false;
   svgCache.clear();
   themeEpoch++;
 

@@ -65,10 +65,15 @@
      line numbers grow; body text and table text stay put, and code follows whatever it
      sits in (bigger in a heading, unchanged in a paragraph).
 
-     Diagrams follow it too: flowcharts and class, state, entity-relationship and
-     mind-map diagrams are drawn at this size, each box drawn to fit its label. Pie
-     charts, sequence diagrams and Gantt charts keep mermaid's own text sizes, and every
-     diagram is fitted to the page width, so a wide one grows less than your text.
+     Most diagrams follow it too: flowcharts and class, state, entity-relationship,
+     mind-map, timeline, kanban, block, architecture, swimlane, railroad and Ishikawa
+     diagrams are drawn at this size, each box drawn to fit its label, and so are a C4
+     diagram's title and a git graph's branch names. Seventeen types keep mermaid's own
+     text sizes, because the rest of their drawing doesn't grow with them: sequence,
+     Gantt, pie, user journey, requirement, quadrant, XY, Sankey, packet, radar,
+     treemap, Venn, Wardley, Cynefin, tree view, event modeling and info. Every diagram
+     is also fitted to the page width, a small one stretched to fill it, so none grows
+     as much as your text (ROADMAP.md, "Diagram width").
 
      Use a positive, absolute size: 32px or 18pt. (`2rem` works but measures from the
      page root, so it is 40px in a theme that also sets `html { font-size: 20px }`.) A
@@ -160,7 +165,7 @@
      neutral, forest, base. Anything else falls back to `default` rather than
      filling the page with error boxes.
 
-     Variables are what can't get inside. A rendered diagram is INLINE SVG in
+     Colour variables are what can't get inside. A rendered diagram is INLINE SVG in
      the page, so ordinary selectors do reach its shapes and text
      (`.mdm-mermaid path`, `.mdm-mermaid text`). Expect to fight for it: mermaid
      puts its own `<style>` inside each diagram with id-based selectors, and what

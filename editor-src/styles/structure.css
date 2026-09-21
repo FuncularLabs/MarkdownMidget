@@ -296,9 +296,9 @@ body {
    the text was twice its box, and at any size a label wrapped onto three lines lost the
    bottom of its last one, measured at 1.5. So a label inherits both from its SVG, as it
    did while mermaid measured it; mermaid is handed the document's size itself
-   (mermaid-look.js), so diagrams still follow it. The line height does move every label
-   up by 1/16 of its size, to the centre mermaid put it at. !important because a theme's
-   own paragraph rule would reach the label the same way. */
+   (mermaid-look.js), so the diagram types that can grow still follow it. The line height
+   does move every label up by 1/16 of its size, to the centre mermaid put it at.
+   !important because a theme's own paragraph rule would reach the label the same way. */
 .mdm-mermaid p {
   font-size: inherit !important;
   line-height: inherit !important;

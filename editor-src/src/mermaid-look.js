@@ -26,15 +26,23 @@ export function documentFontPx(doc, win) {
 export const mermaidLook = (theme, size) => ({ theme: themeName(theme), fontPx: fontPx(size) });
 export const sameLook = (a, b) => a.theme === b.theme && a.fontPx === b.fontPx;
 
+/** Diagram types (mermaid's own ids) drawn at mermaid's size whatever the document's. The
+ *  first four grow their text inside geometry that does not grow with it; the rest size
+ *  their text in their own settings and never grew, and are listed so that nothing in them
+ *  can. THM-04 has the survey of every type. */
+export const KEPT_SIZE_TYPES = ['journey', 'radar', 'eventmodeling', 'requirement',
+  'sequence', 'gantt', 'pie', 'quadrantChart', 'xychart', 'sankey', 'packet', 'treemap',
+  'venn', 'wardley', 'cynefin', 'treeView', 'info'];
+
 /** `themeVariables.fontSize` is what mermaid sizes label text by, in every built-in theme;
  *  top-level `fontSize` only sizes image-only labels. The pie's own three sizes are left
  *  alone: they sit on geometry that does not grow with them. */
-export const mermaidConfig = (look) => ({
+export const mermaidConfig = (look, type) => ({
   startOnLoad: false,
   theme: look.theme,
   securityLevel: 'strict',
-  themeVariables: { fontSize: `${look.fontPx}px` },
+  themeVariables: { fontSize: `${KEPT_SIZE_TYPES.includes(type) ? DEFAULT_FONT_PX : look.fontPx}px` },
 });
 
-/** A drawing is only ever served to the look it was drawn in. */
+/** The key is the look a drawing was asked for; mermaid.js draws it under that look. */
 export const cacheKey = (look, source) => `${look.theme}|${look.fontPx}|${source}`;

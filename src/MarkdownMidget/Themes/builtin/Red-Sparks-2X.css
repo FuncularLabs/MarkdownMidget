@@ -141,8 +141,8 @@
 
 /* ---- the one thing no variable covers -------------------------------
  *
- * Mermaid. It draws its own SVG in its own palette and no variable of ours
- * gets inside — but it draws it as inline SVG, and pixels are pixels. This
+ * Mermaid. It draws its own SVG in its own palette and no colour variable of
+ * ours gets inside — but it draws it as inline SVG, and pixels are pixels. This
  * lays pure red over the diagram in multiply mode, which multiplies every
  * pixel by (1, 0, 0): the red channel passes through untouched, green and
  * blue go to exactly zero. So whatever mermaid decides to draw arrives
@@ -153,7 +153,9 @@
  * it is one effect in two rules. Everything else is a variable:
  * --mdm-list-marker and --mdm-code-fg each replaced a rule the custom version of
  * this theme needed, --mdm-font-size replaced the four its double-size sibling
- * needed, and --mdm-mermaid-theme is as far inside a diagram as a variable gets.
+ * needed, and --mdm-mermaid-theme is as far into a diagram's colours as a
+ * variable gets. (Its text size does follow --mdm-font-size, which mermaid is
+ * handed too, in the diagram types that can grow.)
  *
  * Screen only, as Obsidiminutive's italic links are: on paper a printed
  * diagram is ink on white, where a red multiply is a stain rather than a
