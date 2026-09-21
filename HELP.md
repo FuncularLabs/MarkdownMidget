@@ -476,10 +476,10 @@ title and a git graph's branch names. Seventeen types keep mermaid's own text si
 because the rest of their drawing doesn't grow with them: sequence, Gantt, pie, user
 journey, requirement, quadrant, XY, Sankey, packet, radar, treemap, Venn, Wardley,
 Cynefin, tree view, event modeling and info diagrams. Every diagram is also fitted to
-the page width, a small one stretched to fill it, so none grows as much as the text
-around it: at double size a flowchart's labels come out about 1.4 times as large.
-Whether a small diagram should keep its own size is an open question (ROADMAP.md,
-"Diagram width").
+the page width, a small one stretched to fill it, so most grow less than the text around
+them: a drawing that gets wider with its text is scaled back down, and at double size a
+flowchart's labels come out about 1.4 times as large. Timelines, kanban boards and
+architecture diagrams keep their width, so theirs come out twice as large.
 
 **Diagrams.** No colour variable of ours reaches inside a mermaid diagram: mermaid draws
 its own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,

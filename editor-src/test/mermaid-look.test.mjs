@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import mermaid from 'mermaid';
 import {
-  MERMAID_THEMES, DEFAULT_FONT_PX, KEPT_SIZE_TYPES, themeName, fontPx, documentFontPx,
+  MERMAID_THEMES, DEFAULT_FONT_PX, KEPT_SIZE_TYPES, GROWING_TYPES, themeName, fontPx, documentFontPx,
   mermaidLook, sameLook, mermaidConfig, cacheKey,
 } from '../src/mermaid-look.js';
 
@@ -127,10 +127,8 @@ test('seventeen diagram types are drawn at mermaid\'s own size, every other type
   for (const type of KEPT_SIZE_TYPES) {
     assert.equal(mermaidConfig(big, type).themeVariables.fontSize, `${DEFAULT_FONT_PX}px`, type);
   }
-  // The types that grow and fit, by mermaid's ids, and a source mermaid can't place.
-  for (const type of ['flowchart-v2', 'flowchart', 'class', 'classDiagram', 'state', 'stateDiagram', 'er',
-    'mindmap', 'timeline', 'kanban', 'block', 'architecture', 'gitGraph', 'c4',
-    'ishikawa', 'railroad', 'railroadEbnf', 'swimlane', null, undefined]) {
+  // The types that grow and fit, and a source mermaid can't place.
+  for (const type of [...GROWING_TYPES, null, undefined]) {
     assert.equal(mermaidConfig(big, type).themeVariables.fontSize, '32px', String(type));
   }
 
@@ -161,6 +159,19 @@ test('seventeen diagram types are drawn at mermaid\'s own size, every other type
     assert.equal(mermaid.detectType(source), type);
     assert.equal(mermaid.detectType(`%%{init: {'theme': 'forest'}}%%\n${source}`), type);
   }
+});
+
+test('every diagram type mermaid registers has been placed: kept at mermaid\'s size, or measured to grow and fit', () => {
+  // A type on neither list would grow unsurveyed, which is how journey broke. package.json
+  // allows any mermaid 11, so a new type fails here until someone surveys it at 32px (THM-04)
+  // and puts it on one list. `error` and `---` are mermaid's own placeholders, not diagrams.
+  mermaid.initialize(mermaidConfig(mermaidLook('default', 16)));
+  const registered = mermaid.getRegisteredDiagramsMetadata().map((d) => d.id)
+    .filter((id) => id !== 'error' && id !== '---').sort();
+  const placed = [...KEPT_SIZE_TYPES, ...GROWING_TYPES].sort();
+  assert.deepEqual(placed, [...new Set(placed)], 'a type is on both lists, or twice on one');
+  assert.deepEqual(registered.filter((id) => !placed.includes(id)), [], 'registered but placed on neither list');
+  assert.deepEqual(placed.filter((id) => !registered.includes(id)), [], 'listed but not a type mermaid registers');
 });
 
 test('a drawing is cached under the look it was asked for', () => {

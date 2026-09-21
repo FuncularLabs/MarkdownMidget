@@ -72,8 +72,10 @@
      text sizes, because the rest of their drawing doesn't grow with them: sequence,
      Gantt, pie, user journey, requirement, quadrant, XY, Sankey, packet, radar,
      treemap, Venn, Wardley, Cynefin, tree view, event modeling and info. Every diagram
-     is also fitted to the page width, a small one stretched to fill it, so none grows
-     as much as your text (ROADMAP.md, "Diagram width").
+     is also fitted to the page width, a small one stretched to fill it, so most grow
+     less than your text: one that gets wider with its text is scaled back down.
+     Timelines, kanban boards and architecture diagrams keep their width, and grow as
+     much as your text does.
 
      Use a positive, absolute size: 32px or 18pt. (`2rem` works but measures from the
      page root, so it is 40px in a theme that also sets `html { font-size: 20px }`.) A

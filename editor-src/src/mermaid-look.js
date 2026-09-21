@@ -34,6 +34,13 @@ export const KEPT_SIZE_TYPES = ['journey', 'radar', 'eventmodeling', 'requiremen
   'sequence', 'gantt', 'pie', 'quadrantChart', 'xychart', 'sankey', 'packet', 'treemap',
   'venn', 'wardley', 'cynefin', 'treeView', 'info'];
 
+/** The types measured to grow with the document and still fit (THM-04). Not read here:
+ *  every type mermaid registers has to be on exactly one of the two lists, so a type a
+ *  mermaid upgrade adds fails test/mermaid-look.test.mjs until it has been surveyed. */
+export const GROWING_TYPES = ['flowchart', 'flowchart-v2', 'flowchart-elk', 'class', 'classDiagram',
+  'state', 'stateDiagram', 'er', 'mindmap', 'timeline', 'kanban', 'block', 'architecture',
+  'swimlane', 'gitGraph', 'c4', 'ishikawa', 'railroad', 'railroadEbnf', 'railroadAbnf', 'railroadPeg'];
+
 /** `themeVariables.fontSize` is what mermaid sizes label text by, in every built-in theme;
  *  top-level `fontSize` only sizes image-only labels. The pie's own three sizes are left
  *  alone: they sit on geometry that does not grow with them. */
