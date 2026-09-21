@@ -469,8 +469,14 @@ they have to fit between two blocks, and past about double size four-digit line
 numbers start to crowd the line-number gutter. **Red Sparks 2X** is exactly that one
 line: the same palette as **Red Sparks**, at twice the size.
 
-**Diagrams.** No variable of ours reaches inside a mermaid diagram: mermaid draws its
-own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,
+Diagrams follow it too. Flowcharts and class, state, entity-relationship and mind-map
+diagrams are drawn at the document's size, with every box drawn to fit its label. Pie
+charts, sequence diagrams and Gantt charts keep mermaid's own text sizes, because the
+rest of their drawing doesn't grow with them. A diagram is always fitted to the page
+width, so a wide one grows less than the text around it.
+
+**Diagrams.** No colour variable of ours reaches inside a mermaid diagram: mermaid draws
+its own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,
 `neutral`, `forest`, `base` — is the supported lever on it. A rendered diagram *is*
 inline SVG in the page, though, so ordinary CSS selectors do reach its shapes and
 text. Mermaid writes its own `<style>` inside each diagram, so expect to out-specify

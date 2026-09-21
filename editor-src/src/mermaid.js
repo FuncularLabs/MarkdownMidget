@@ -11,26 +11,23 @@ import { $prose } from '@milkdown/kit/utils';
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import mermaid from 'mermaid';
+import { mermaidLook, sameLook, mermaidConfig, cacheKey, DEFAULT_FONT_PX } from './mermaid-look.js';
 
-// Mermaid's own built-ins. A theme names one in `--mdm-mermaid-theme`; anything
-// else falls back, because that value comes out of a user's stylesheet and mermaid
-// throws on a name it doesn't recognise — which would replace every diagram in the
-// document with an error box.
-const THEMES = ['default', 'dark', 'neutral', 'forest', 'base'];
-let currentTheme = 'default';
+// Mermaid's theme and the document's text size (mermaid-look.js).
+let currentLook = mermaidLook('default', DEFAULT_FONT_PX);
 
 let mermaidReady = false;
 function initOnce() {
   if (mermaidReady) return;
-  mermaid.initialize({ startOnLoad: false, theme: currentTheme, securityLevel: 'strict' });
+  mermaid.initialize(mermaidConfig(currentLook));
   mermaidReady = true;
 }
 
-// Cache rendered SVG by source text to keep keystrokes fast.
-const svgCache = new Map(); // source -> {svg, error}
+// Cache rendered SVG by look and source text to keep keystrokes fast.
+const svgCache = new Map(); // cacheKey(look, source) -> {svg, error}
 let renderTicket = 0;
 
-// Bumped when the theme changes and mixed into the decoration key. Without it
+// Bumped when the theme or size changes and mixed into the decoration key. Without it
 // ProseMirror sees the same key for the same source, reuses the widget DOM it
 // already has, and never calls the factory again — so every diagram already on
 // screen keeps the old theme while anything typed afterwards gets the new one.
@@ -40,13 +37,13 @@ function escapeHtml(s) {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 }
 
-async function renderInto(container, source, epoch) {
+async function renderInto(container, source, epoch, key) {
   if (!source.trim()) {
     container.innerHTML = '<div class="mdm-mermaid-empty">(empty mermaid block)</div>';
     container.classList.remove('mdm-mermaid-error');
     return;
   }
-  const cached = svgCache.get(source);
+  const cached = svgCache.get(key);
   if (cached) {
     container.innerHTML = cached.svg;
     container.classList.toggle('mdm-mermaid-error', !!cached.error);
@@ -56,25 +53,22 @@ async function renderInto(container, source, epoch) {
   try {
     const id = 'mdm-mermaid-' + (++renderTicket);
     const { svg } = await mermaid.render(id, source);
-    // A theme switch during the await just cleared the cache and asked every
-    // diagram to re-render under the NEW theme — including this exact source,
-    // in a fresh call with the new epoch. If this older call is still the one
-    // to resolve, writing its (stale-theme) result to the cache now would
-    // silently overwrite what the new call already wrote — the "stale diagram"
-    // bug this file's whole epoch/cache-clear mechanism exists to prevent,
-    // reintroduced through a race in the cache instead of the decoration key.
-    // The container itself is already detached — ProseMirror swapped it for a
-    // new one under the new decoration key — so discarding here loses nothing
-    // that was still visible.
+    // A theme or size switch during the await just cleared the cache and asked
+    // every diagram to re-render under the NEW look — including this exact source,
+    // in a fresh call with the new epoch. This older call's result is stale, and
+    // nothing may show or cache it; the key is the look it was asked for, so even
+    // a write that slipped past here could never be served to the new one. The
+    // container itself is already detached — ProseMirror swapped it for a new one
+    // under the new decoration key — so discarding here loses nothing visible.
     if (epoch !== themeEpoch) return;
-    svgCache.set(source, { svg, error: false });
+    svgCache.set(key, { svg, error: false });
     container.innerHTML = svg;
     container.classList.remove('mdm-mermaid-error');
   } catch (e) {
     if (epoch !== themeEpoch) return;
     const msg = (e && e.message ? e.message : String(e)).split('\n')[0];
     const html = '<pre class="mdm-mermaid-error-msg">' + escapeHtml(msg) + '</pre>';
-    svgCache.set(source, { svg: html, error: true });
+    svgCache.set(key, { svg: html, error: true });
     container.innerHTML = html;
     container.classList.add('mdm-mermaid-error');
   }
@@ -108,14 +102,15 @@ function buildDecorations(doc, selection) {
     // Render the diagram after the block. The epoch is captured HERE, at widget
     // creation, not read fresh inside renderInto — it has to be the epoch this
     // particular render was asked for under, so a later switch can tell this call
-    // apart from the new one it triggered for the same source.
+    // apart from the new one it triggered for the same source. The cache key too.
     const epoch = themeEpoch;
+    const svgKey = cacheKey(currentLook, source);
     const key = 'mermaid:' + epoch + ':' + hash(source) + ':' + source.length;
     decos.push(Decoration.widget(end, () => {
       const container = document.createElement('div');
       container.className = 'mdm-mermaid';
       container.setAttribute('contenteditable', 'false');
-      renderInto(container, source, epoch);
+      renderInto(container, source, epoch, svgKey);
       return container;
     }, { side: 1, ignoreSelection: true, key }));
   });
@@ -123,26 +118,26 @@ function buildDecorations(doc, selection) {
 }
 
 /**
- * Point mermaid at a different built-in theme and redraw what is already on screen.
+ * Point mermaid at a different built-in theme or document text size (px), and redraw
+ * what is already on screen.
  *
  * Three things have to happen together, and leaving any one out looks like the
  * feature half-working rather than like a bug:
  *
  *   - `mermaidReady` goes back to false, or `initialize` never runs again and the
- *     new theme is simply never handed to mermaid;
- *   - the SVG cache is cleared, because it is keyed on source text alone and would
- *     otherwise re-serve the previous theme's rendering for every diagram already
- *     in the document;
+ *     new look is simply never handed to mermaid;
+ *   - the SVG cache is cleared: its keys carry the look, so nothing in it could be
+ *     served under the new one, and what is left would only take up room;
  *   - the decoration key changes and the plugin is told to rebuild, because
  *     ProseMirror keeps DOM it believes is unchanged.
  *
  * Returns false when nothing changed, so the caller can skip the redraw.
  */
-export function setMermaidTheme(view, name) {
-  const next = THEMES.includes(name) ? name : 'default';
-  if (next === currentTheme) return false;
+export function setMermaidTheme(view, name, fontSize) {
+  const next = mermaidLook(name, fontSize);
+  if (sameLook(next, currentLook)) return false;
 
-  currentTheme = next;
+  currentLook = next;
   mermaidReady = false;
   svgCache.clear();
   themeEpoch++;

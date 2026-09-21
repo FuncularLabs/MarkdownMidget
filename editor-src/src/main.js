@@ -8,6 +8,7 @@ import { undo, redo } from '@milkdown/kit/prose/history';
 import { callCommand, replaceAll, getMarkdown, insert } from '@milkdown/kit/utils';
 import { insertTableAction, runTableCommand, focusTableCell } from './tables.js';
 import { setMermaidTheme } from './mermaid.js';
+import { documentFontPx } from './mermaid-look.js';
 import { getScrollAnchor, restoreScrollAnchor } from './scroll-anchor.js';
 import { setSpellRanges, beginSpellCheck, misspellingAt } from './spell-decorate.js';
 import { extractSpellText } from './spell-extract.js';
@@ -337,7 +338,8 @@ function probeTheme(doc, win) {
   // variables on `.mdm-prosemirror` rather than on `:root`, and a probe parked on
   // <body> would not inherit those. One exception, which sample.css and HELP both
   // state: --mdm-font-size is derived partly at `:root` (structure.css), so put on
-  // `.mdm-prosemirror` it scales only half a document. It is not read back here.
+  // `.mdm-prosemirror` it scales only half a document. It is not read back here: the
+  // host has no use for it, and mermaid reads it from the live page (readThemeBack).
   const host = doc.querySelector('.mdm-prosemirror') || doc.body || doc.documentElement;
 
   const probe = doc.createElement('div');
@@ -414,10 +416,11 @@ function probeTheme(doc, win) {
 function readThemeBack() {
   const result = probeTheme(document, window);
   // Mermaid follows the DOCUMENT theme — a dark editor around a bright white diagram
-  // reads as broken. It redraws itself if the name changed, and runs even when the
-  // colour read-back failed: an empty name isn't one of mermaid's own themes, so
-  // setMermaidTheme falls back to 'default' rather than leaving mermaid stale.
-  setMermaidTheme(editorView, result.mermaid);
+  // reads as broken — and the document's text size, which it has to measure labels at
+  // to draw boxes that fit them. It redraws itself if either changed, and runs even
+  // when the colour read-back failed: an empty name isn't one of mermaid's own themes,
+  // so setMermaidTheme falls back to 'default' rather than leaving mermaid stale.
+  setMermaidTheme(editorView, result.mermaid, documentFontPx(document, window));
   return result;
 }
 

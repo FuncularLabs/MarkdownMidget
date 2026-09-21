@@ -858,6 +858,12 @@
   "important": false
  },
  {
+  "where": ".mdm-mermaid p",
+  "prop": "font-size",
+  "value": "inherit",
+  "important": true
+ },
+ {
   "where": ".mdm-mermaid",
   "prop": "background",
   "value": "#ffffff",

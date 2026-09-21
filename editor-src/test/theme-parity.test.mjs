@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { declarations, rootVariables } from './css-declarations.mjs';
+import { mermaidConfig, mermaidLook } from '../src/mermaid-look.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p) => readFileSync(join(here, '..', ...p), 'utf8');
@@ -984,6 +985,36 @@ test('a table cell\'s text is the body size, and only the cell BOX is 0.75 of it
     assert.equal(box.length, 1, 'one rule sizes the cell box');
     assert.equal(box[0].value, `calc(${size} * 0.75)`, `the cell box at --mdm-font-size: ${size}`);
   }
+});
+
+test('a diagram\'s labels take the size mermaid drew their boxes for, never the document\'s', () => {
+  // Mermaid 11 puts each HTML label in a <p> inside the SVG's foreignObject, measures it
+  // in a scratch element outside the document, and sizes the box to fit. Inside the
+  // editor the vendor's `.milkdown-theme-nord p` reaches that <p> too, and its size is
+  // --text-base, which IS the document's size: at 32px the text was twice its box. So
+  // the label inherits from the SVG, which is what it did while mermaid measured it.
+  const doc = new JSDOM(DOCUMENT.replace(/<\/div><\/div>$/, `
+    <div class="mdm-mermaid" contenteditable="false"><svg><g class="node"><foreignObject>
+      <div><span class="nodeLabel"><p id="label">Aerial</p></span></div>
+    </foreignObject></g></svg></div>
+  </div></div>`)).window.document;
+  assert.ok(reaches(doc, '.milkdown-theme-nord p').includes('label'), 'the premise: the vendor\'s paragraph rule reaches a label');
+
+  const ours = declarations(read('styles', 'structure.css'))
+    .filter((d) => d.prop === 'font-size' && d.where.includes('.mdm-mermaid'));
+  assert.deepEqual(ours.map((d) => [d.where, d.value, d.important]), [['.mdm-mermaid p', 'inherit', true]]);
+  // The label, and not one paragraph of the document around it (theirs have no id).
+  assert.deepEqual(reaches(doc, ours[0].where), ['label']);
+  // !important because a theme is a later layer: its own paragraph size would otherwise
+  // reach the label the same way the vendor's did. It is the one font-size of ours on a
+  // `p`; "a theme can still scale a rem document itself" forbids one on the document's
+  // paragraphs, for the same reason in reverse.
+
+  // Inert where nothing was wrong: at Default's size the vendor gave a label the same
+  // size mermaid is now handed, so no theme at 16px draws a diagram differently.
+  const size = rootVariables(defaultTheme).get('--mdm-font-size');
+  assert.equal(sizeOf('', ':root', '--text-base'), size);
+  assert.equal(mermaidConfig(mermaidLook('default', size)).themeVariables.fontSize, size);
 });
 
 test('the numbers beside blank lines keep their own size', () => {

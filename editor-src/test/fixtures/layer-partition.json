@@ -137,6 +137,7 @@
   ".mdm-prosemirror pre[data-language=\"mermaid\"].mdm-mermaid-active { margin-bottom }",
   ".mdm-mermaid { margin }",
   ".mdm-mermaid { padding }",
+  ".mdm-mermaid p { font-size }",
   ".mdm-mermaid-error-msg { margin }",
   ".mdm-html { display }",
   ".mdm-html img { max-width }",

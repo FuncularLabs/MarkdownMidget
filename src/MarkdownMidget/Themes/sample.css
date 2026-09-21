@@ -65,6 +65,11 @@
      line numbers grow; body text and table text stay put, and code follows whatever it
      sits in (bigger in a heading, unchanged in a paragraph).
 
+     Diagrams follow it too: flowcharts and class, state, entity-relationship and
+     mind-map diagrams are drawn at this size, each box drawn to fit its label. Pie
+     charts, sequence diagrams and Gantt charts keep mermaid's own text sizes, and every
+     diagram is fitted to the page width, so a wide one grows less than your text.
+
      Use a positive, absolute size: 32px or 18pt. (`2rem` works but measures from the
      page root, so it is 40px in a theme that also sets `html { font-size: 20px }`.) A
      percentage or a nonsense value falls back to 16px, and a negative one collapses
@@ -149,10 +154,11 @@
   /* Recolour these; you cannot remove them. Check them after a big change —
      a squiggle or a resize handle that vanishes into the background is the
      usual way a good-looking theme turns out to be broken. */
-  /* Not a colour. Mermaid draws its own SVG, so no variable of ours reaches
-     inside it — instead, name one of mermaid's built-in themes and it is handed
-     to mermaid directly. One of: default, dark, neutral, forest, base. Anything
-     else falls back to `default` rather than filling the page with error boxes.
+  /* Not a colour. Mermaid draws its own SVG, so no colour variable of ours
+     reaches inside it — instead, name one of mermaid's built-in themes and it is
+     handed to mermaid directly, as --mdm-font-size is. One of: default, dark,
+     neutral, forest, base. Anything else falls back to `default` rather than
+     filling the page with error boxes.
 
      Variables are what can't get inside. A rendered diagram is INLINE SVG in
      the page, so ordinary selectors do reach its shapes and text

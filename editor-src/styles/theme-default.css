@@ -102,8 +102,9 @@
   /* Not a colour: the name of one of mermaid's own built-in themes (default,
      dark, neutral, forest, base). Read back through getComputedStyle after the
      theme is installed and handed to mermaid.initialize — CSS custom properties
-     can't reach inside an SVG mermaid generates, so this is the only lever a theme
-     has through a VARIABLE. The diagram is inline SVG in the page, so ordinary
+     can't reach inside an SVG mermaid generates, so this is the only lever on its
+     colours a theme has through a VARIABLE (--mdm-font-size, handed over the same
+     way, is the one on its size). The diagram is inline SVG in the page, so ordinary
      selectors do reach it, against mermaid's own id-based inline `<style>`; nothing
      in there is a contract we test. An unrecognised name falls back rather than
      throwing. */
