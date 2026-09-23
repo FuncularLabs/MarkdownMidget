@@ -97,17 +97,22 @@ public class PickerCrashCluesTests
 
     private static readonly ShellExtensionDll OneDrive = new(OneDriveDll, "Microsoft Corporation", ["icon overlay"], null);
     private static readonly ShellExtensionDll Shell32 = new(@"C:\WINDOWS\System32\shell32.dll", "Microsoft Corporation", ["other"], null);
+    private const string FoxitThumbDll = @"C:\Program Files (x86)\Foxit Software\Foxit PDF Reader\FoxitThumbnailHndlr_x64.dll";
+    private static readonly ShellExtensionDll FoxitThumbnail = new(FoxitThumbDll, "Foxit Software Inc.", ["thumbnail"], null);
+    private static readonly ShellExtensionDll[] Known = [OneDrive, Shell32, FoxitThumbnail];
 
     private const string Missing = "-";   // a company value meaning "no such file"
+    private const string Throws = "!";    // a company value meaning "the lookup throws"
 
     /// <summary>Facts for one row: only a rooted path can be read, so a bare module name that
     /// is not first resolved against the system folder is "not found".</summary>
     private static Func<string, (bool, string?)> FileWith(string? company) =>
-        p => !Path.IsPathRooted(p) || company == Missing ? (false, null) : (true, company);
+        p => company == Throws ? throw new UnauthorizedAccessException("denied")
+           : !Path.IsPathRooted(p) || company == Missing ? (false, null) : (true, company);
 
     private static FaultKind Kind(string module, string path, string? company) =>
         PickerCrashClues.KindOf(PickerCrashClues.ParseApplicationError(Event(Exe, 1, module, path)),
-                                @"C:\Windows\System32", Exe, [OneDrive, Shell32], FileWith(company));
+                                @"C:\Windows\System32", Exe, Known, FileWith(company));
 
     [Theory]
     [InlineData("DropboxExt64.52.dll", DropboxDll, "Dropbox, Inc.", "AddOn")]
@@ -117,18 +122,31 @@ public class PickerCrashCluesTests
     [InlineData("igfxpph.dll", DriverStore + "igfxpph.dll", Missing, "AddOn")]                    // on the list, even unreadable
     [InlineData("NCContextMenu.dll_unloaded", "NCContextMenu.dll", Missing, "AddOn")]             // on the list, bare and gone
     [InlineData("FileSyncShell64.dll", OneDriveDll, "Microsoft Corporation", "AddOn")]         // Microsoft's, but an add-on found here
-    [InlineData("hook.dll", @"C:\Tools\hook.dll", null, "AddOn")]                              // there, with no vendor named
+    [InlineData("FileSyncShell64.dll", @"C:\Program Files\Other\FileSyncShell64.dll", "Microsoft Corporation", "Microsoft")]   // same name, not the one found
+    // Bare and not in System32, but the scan found a DLL of that name: that one is the add-on.
+    [InlineData("FoxitThumbnailHndlr_x64.dll_unloaded", "FoxitThumbnailHndlr_x64.dll", Missing, "AddOn")]
+    // Bare, and the scan found Windows' own DLL of that name: that doesn't make it an add-on.
+    [InlineData("shell32.dll_unloaded", "shell32.dll", "Microsoft Corporation", "Windows")]
     [InlineData("shell32.dll", @"C:\WINDOWS\System32\shell32.dll", "Microsoft Corporation", "Windows")]   // Windows' own shell extension
     [InlineData("ntdll.dll", @"C:\WINDOWS\SYSTEM32\ntdll.dll", "Microsoft Corporation", "Windows")]
+    // The Windows folder, not just System32: side-by-side assemblies are a common crash site.
+    [InlineData("comctl32.dll", @"C:\Windows\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.26100.1_none_1\comctl32.dll",
+                "Microsoft Corporation", "Windows")]
     // Windows names an already-unloaded DLL by its bare file name: resolved against System32 first.
     [InlineData("thumbcache.dll_unloaded", "thumbcache.dll", "Microsoft Corporation", "Windows")]
+    // A bare name can't climb out of System32 into another folder's verdict.
+    [InlineData("evil.dll", @"..\..\Tools\evil.dll", "Microsoft Corporation", "Microsoft")]
     // What .NET 10 records for an access violation in native code under a managed frame
     // (measured 2026-09-23): the runtime, a Microsoft file, not the file that faulted.
     [InlineData("coreclr.dll", @"C:\Program Files\dotnet\shared\Microsoft.NETCore.App\10.0.9\coreclr.dll", "Microsoft Corporation", "Microsoft")]
     [InlineData("msoshext.dll", @"C:\Program Files\Microsoft Office\root\VFS\ProgramFilesCommonX64\Microsoft Shared\OFFICE16\msoshext.dll",
                 "Microsoft Corporation", "Microsoft")]                                            // Microsoft's, not Windows'
-    [InlineData("coreclr.dll", "coreclr.dll", Missing, "Unreadable")]                          // bare, and not in System32 either
-    [InlineData("gone.dll", @"C:\WINDOWS\System32\gone.dll", Missing, "Unreadable")]
+    [InlineData("coreclr.dll", "coreclr.dll", Missing, "Unidentified")]                        // bare, and not in System32 either
+    [InlineData("gone.dll", @"C:\WINDOWS\System32\gone.dll", Missing, "Unidentified")]
+    [InlineData("boom.dll", @"C:\Tools\boom.dll", Throws, "Unidentified")]                     // a lookup that throws
+    // No vendor named: every Windows file names Microsoft, so a vendorless one in System32 isn't Windows'.
+    [InlineData("oddhook.dll", @"C:\Windows\System32\oddhook.dll", null, "Unidentified")]
+    [InlineData("hook.dll", @"C:\Tools\hook.dll", null, "Unidentified")]
     [InlineData("MarkdownMidget.exe", @"C:\Users\me\AppData\Local\Programs\MarkdownMidget\MarkdownMidget.exe", "Funcular Labs", "ThisApp")]
     // What Windows records for Environment.FailFast (measured 2026-09-23).
     [InlineData("unknown", "unknown", null, "Unnamed")]
@@ -145,17 +163,20 @@ public class PickerCrashCluesTests
         string Say(string module, string path, string? company)
         {
             var fault = PickerCrashClues.ParseApplicationError(Event(Exe, 1, module, path, code: "80131623"));
-            return PickerCrashClues.FaultSentence(new PickerCrashFindings(1, fault, Kind(module, path, company), []));
+            return PickerCrashClues.FaultSentence(new PickerCrashFindings(1, fault, Kind(module, path, company), Known));
         }
         Assert.Equal($"Windows recorded the crash in DropboxExt64.52.dll ({DropboxDll}). That file is the best lead: it comes with Dropbox.",
                      Say("DropboxExt64.52.dll", DropboxDll, "Dropbox, Inc."));
-        Assert.Equal(@"Windows recorded the crash in hook.dll (C:\Tools\hook.dll). That file is the best lead: " +
+        Assert.Equal($"Windows recorded the crash in FoxitThumbnailHndlr_x64.dll ({FoxitThumbDll}). That file is the best lead: " +
                      "the Details tab of its Properties in Explorer names the program it came with.",
-                     Say("hook.dll", @"C:\Tools\hook.dll", null));
+                     Say("FoxitThumbnailHndlr_x64.dll_unloaded", "FoxitThumbnailHndlr_x64.dll", Missing));   // the path the scan found
+        Assert.Equal("Windows recorded the crash in NCContextMenu.dll. That file is the best lead: it comes with Nextcloud.",
+                     Say("NCContextMenu.dll_unloaded", "NCContextMenu.dll", Missing));                        // bare, and no path known
         Assert.StartsWith("Windows recorded the crash in coreclr.dll, a Microsoft file. That doesn't name the add-on:",
                           Say("coreclr.dll", @"C:\Program Files\dotnet\shared\Microsoft.NETCore.App\10.0.9\coreclr.dll", "Microsoft Corporation"));
         Assert.StartsWith("Windows recorded the crash in thumbcache.dll, part of Windows.", Say("thumbcache.dll_unloaded", "thumbcache.dll", "Microsoft Corporation"));
-        Assert.StartsWith("Windows recorded the crash in coreclr.dll, a file Markdown Midget couldn't find to check.", Say("coreclr.dll", "coreclr.dll", Missing));
+        Assert.Equal("Windows recorded the crash in coreclr.dll, but Markdown Midget can't tell whose file that is. " +
+                     "If it isn't part of Windows, it may be the add-on.", Say("coreclr.dll", "coreclr.dll", Missing));
         Assert.StartsWith("Windows recorded the crash in MarkdownMidget.exe, Markdown Midget itself.",
                           Say("MarkdownMidget.exe", @"C:\x\MarkdownMidget.exe", "Funcular Labs"));
         Assert.StartsWith("Windows recorded the crash in a file it couldn't name (exception 80131623).", Say("unknown", "unknown", null));
@@ -207,7 +228,6 @@ public class PickerCrashCluesTests
     private const string Thumbnails = "{e357fccd-a995-4576-b01f-234630154e96}";
     private const string Gone = "{00000000-1111-2222-3333-444444444444}";
     private const string Uninstalled = "{00000000-1111-2222-3333-555555555555}";
-
     private static FakeRegistry AMachine() => new FakeRegistry()
         .Key(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DropboxExt01", ("", DropboxA))
         .Key(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ DropboxExt02", ("", DropboxB))
@@ -217,8 +237,7 @@ public class PickerCrashCluesTests
         .Key($@"HKCR\Folder\shellex\ContextMenuHandlers\{Tortoise}")                        // the key's own name is the CLSID
         .Key(@"HKCR\Drive\shellex\ContextMenuHandlers\Missing", ("", Gone))                  // no InprocServer32 anywhere
         .Key(@"HKCR\Drive\shellex\ContextMenuHandlers\Uninstalled", ("", Uninstalled))       // a DLL that is no longer there
-        .Server(Uninstalled, @"C:\Program Files\Old\DropboxExt64.1.dll")
-        .Key(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PreviewHandlers", (AdobePreview, "Adobe PDF Preview Handler"))
+        .Server(Uninstalled, @"C:\Program Files\Old\DropboxExt64.1.dll")        .Key(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PreviewHandlers", (AdobePreview, "Adobe PDF Preview Handler"))
         // A per-user install registers under HKCU, as PowerToys' preview handlers do.
         .Key(@"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\PreviewHandlers", (PerUser, "Markdown preview"))
         .Key(@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PropertySystem\PropertyHandlers\.pdf", ("", AdobeProps))
@@ -255,8 +274,20 @@ public class PickerCrashCluesTests
         _ => (false, null),
     };
 
-    private static ShellScan Scan(IRegistryView reg, Func<string, (bool, string?)> file, Func<bool>? outOfTime = null) =>
-        PickerCrashClues.FindShellExtensions(reg, file, @"C:\Windows\System32", outOfTime ?? (() => false));
+    /// <summary>Each call to the scan's deadline factory takes the next budget from
+    /// <paramref name="checks"/>: how many "out of time?" checks that phase passes before
+    /// time is up (null: never). The scan starts one deadline per phase.</summary>
+    private static ShellScan Scan(IRegistryView reg, Func<string, (bool, string?)> file, params int?[] checks)
+    {
+        var phase = 0;
+        return PickerCrashClues.FindShellExtensions(reg, file, @"C:\Windows\System32", () =>
+        {
+            var budget = phase < checks.Length ? checks[phase] : null;
+            phase++;
+            var used = 0;
+            return () => budget is { } b && ++used > b;
+        });
+    }
 
     private static IReadOnlyList<ShellExtensionDll> Found() => Scan(AMachine(), Files).Found;
 
@@ -295,16 +326,34 @@ public class PickerCrashCluesTests
         Assert.Empty(Scan(AMachine(), _ => throw new IOException("locked")).Found);   // unreadable facts: can't be shown or matched
     }
 
+    private static string[] Names(ShellScan scan) =>
+        scan.Found.Select(e => Path.GetFileName(e.Path)).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+
     [Fact]
-    public void AScanOutOfTimeStopsAndSaysSo()
+    public void AScanOutOfTimeKeepsWhatItFoundContextMenusFirstAndStillLooksAtThumbnails()
     {
-        var calls = 0;
-        var scan = Scan(AMachine(), Files, () => ++calls > 3);
+        // Three checks pass: 7-Zip (*), 7-Zip again (Directory), TortoiseSVN (Folder); then time is up,
+        // before Dropbox's overlays. The thumbnail step has a deadline of its own and finishes.
+        var scan = Scan(AMachine(), Files, 3, null);
         Assert.True(scan.CutShort);
-        Assert.True(scan.Found.Count < 9);
-        Assert.Contains("stopped after 2 seconds", PickerCrashClues.OthersLine(new PickerCrashFindings(1, null, FaultKind.None, scan.Found, true)));
-        Assert.Contains("stopped after 2 seconds", PickerCrashClues.Details(new PickerCrashFindings(1, null, FaultKind.None, scan.Found, true), "v", "os"));
-        Assert.DoesNotContain("stopped", PickerCrashClues.OthersLine(new PickerCrashFindings(1, null, FaultKind.None, scan.Found)));
+        Assert.Equal(new[] { "7-zip.dll", "FoxitThumbnailHndlr_x64.dll", "PaintDotNet.ShellExtension.x64.dll", "TortoiseStub.dll" }, Names(scan));
+
+        var findings = new PickerCrashFindings(1, null, FaultKind.None, scan.Found, scan.CutShort);
+        Assert.EndsWith("The search stopped after 2 seconds, so there may be more.", PickerCrashClues.SuspectLines(findings));
+        Assert.EndsWith("The search stopped after 2 seconds, so there may be more.", PickerCrashClues.OthersLine(findings));
+        Assert.Contains("The search stopped after 2 seconds", PickerCrashClues.Details(findings, "v", "os"));
+        Assert.Equal("None of the add-ons on our list were found. The search stopped after 2 seconds, so there may be more.",
+                     PickerCrashClues.SuspectLines(new PickerCrashFindings(1, null, FaultKind.None, [], true)));
+        Assert.DoesNotContain("stopped", PickerCrashClues.SuspectLines(new PickerCrashFindings(1, null, FaultKind.None, scan.Found)));
+    }
+
+    [Fact]
+    public void TheThumbnailStepStopsOnItsOwnDeadlineAndKeepsTheRest()
+    {
+        var scan = Scan(AMachine(), Files, null, 0);
+        Assert.True(scan.CutShort);
+        Assert.Equal(new[] { "7-zip.dll", "DropboxExt64.52.dll", "MarkdownPreview.dll", "pdf.dll", "shell32.dll", "thumbs.dll", "TortoiseStub.dll" },
+                     Names(scan));
     }
 
     [Theory]

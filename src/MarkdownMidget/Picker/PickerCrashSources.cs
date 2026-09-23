@@ -30,10 +30,13 @@ internal static class PickerCrashSources
             Thread.Sleep(1500);
             fault = PickerCrashClues.FindFault(RecentApplicationErrors, exe, processId, DateTime.UtcNow, Window);
         }
-        var clock = Stopwatch.StartNew();
         ShellScan scan;
-        try { scan = PickerCrashClues.FindShellExtensions(new RegistryView(), FileFacts, Environment.SystemDirectory,
-                                                          () => clock.Elapsed > PickerCrashClues.ScanBudget); }
+        Func<bool> StartDeadline()
+        {
+            var clock = Stopwatch.StartNew();
+            return () => clock.Elapsed > PickerCrashClues.ScanBudget;
+        }
+        try { scan = PickerCrashClues.FindShellExtensions(new RegistryView(), FileFacts, Environment.SystemDirectory, StartDeadline); }
         catch { scan = new ShellScan([], false); }
         var kind = PickerCrashClues.KindOf(fault, Environment.SystemDirectory, exe, scan.Found, FileFacts);
         return new PickerCrashFindings(exitCode, fault, kind, scan.Found, scan.CutShort);

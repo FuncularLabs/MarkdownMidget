@@ -27,8 +27,9 @@ internal enum FaultKind
     Microsoft,
     /// <summary>Markdown Midget's own exe.</summary>
     ThisApp,
-    /// <summary>Named, but not on disk where Windows or the system folder says, so it can't be checked.</summary>
-    Unreadable,
+    /// <summary>Not on disk where Windows or the system folder says, or naming no vendor: whose it
+    /// is can't be told, so it may yet be the add-on.</summary>
+    Unidentified,
     /// <summary>Windows couldn't name the file ("unknown").</summary>
     Unnamed,
 }
@@ -141,16 +142,24 @@ internal static class PickerCrashClues
         if (fault is null) return FaultKind.None;
         if (Unnamed(fault)) return FaultKind.Unnamed;
         if (fault.Module.Equals(exeName, StringComparison.OrdinalIgnoreCase)) return FaultKind.ThisApp;
+        var bare = !Path.IsPathRooted(fault.ModulePath ?? fault.Module);
         var path = DllPath(fault.ModulePath ?? fault.Module, systemDir) ?? fault.Module;
         if (MatchCulprit(path) is not null) return FaultKind.AddOn;          // the list wins, even for a file that's gone
+        var windowsDir = Path.GetDirectoryName(systemDir.TrimEnd('\\')) ?? systemDir;
+        bool InWindows(string p) => p.StartsWith(windowsDir.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+        // A shell extension this scan found, other than Windows' own, is an add-on; a bare name
+        // (the file may be gone from where Windows loaded it) is matched by file name.
+        if (found.Any(e => !(IsMicrosoft(e.Company) && InWindows(e.Path))
+                           && (bare ? Path.GetFileName(e.Path).Equals(Path.GetFileName(path), StringComparison.OrdinalIgnoreCase)
+                                    : e.Path.Equals(path, StringComparison.OrdinalIgnoreCase))))
+            return FaultKind.AddOn;
         (bool Exists, string? Company) facts;
         try { facts = file(path); } catch { facts = (false, null); }
-        if (!facts.Exists) return FaultKind.Unreadable;
-        var windowsDir = Path.GetDirectoryName(systemDir.TrimEnd('\\')) ?? systemDir;
-        var inWindows = path.StartsWith(windowsDir.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
-        if (!inWindows && found.Any(e => e.Path.Equals(path, StringComparison.OrdinalIgnoreCase))) return FaultKind.AddOn;
-        if (IsMicrosoft(facts.Company)) return inWindows ? FaultKind.Windows : FaultKind.Microsoft;
-        return facts.Company is null && inWindows ? FaultKind.Windows : FaultKind.AddOn;
+        // Every Windows file names Microsoft as its vendor, so a file that names none, even in
+        // System32, can't be called Windows'; nor can one that isn't there (it names no vendor).
+        if (facts.Company is null) return FaultKind.Unidentified;
+        if (IsMicrosoft(facts.Company)) return InWindows(path) ? FaultKind.Windows : FaultKind.Microsoft;
+        return FaultKind.AddOn;
     }
 
     /// <summary>The notice's first clue, in words.</summary>
@@ -160,17 +169,24 @@ internal static class PickerCrashClues
             return "Windows has no record of this crash in its Application log. If you closed the helper yourself, " +
                    "or ended it in Task Manager, nothing crashed.";
         if (f.FaultKind == FaultKind.AddOn)
-            return $"Windows recorded the crash in {fault.Module}{(fault.ModulePath is { } p ? $" ({p})" : "")}. That file is the best lead: " +
-                   (MatchCulprit(fault.ModulePath ?? fault.Module) is { } product
+        {
+            // A bare module path shows the path the scan found for that file name, if any.
+            var shown = fault.ModulePath is { } p && Path.IsPathRooted(p) ? p
+                : f.Extensions.FirstOrDefault(e => Path.GetFileName(e.Path).Equals(fault.Module, StringComparison.OrdinalIgnoreCase))?.Path;
+            return $"Windows recorded the crash in {fault.Module}{(shown is null ? "" : $" ({shown})")}. That file is the best lead: " +
+                   (MatchCulprit(fault.Module) is { } product
                        ? $"it comes with {product}."
                        : "the Details tab of its Properties in Explorer names the program it came with.");
+        }
+        if (f.FaultKind == FaultKind.Unidentified)
+            return $"Windows recorded the crash in {fault.Module}, but Markdown Midget can't tell whose file that is. " +
+                   "If it isn't part of Windows, it may be the add-on.";
         var what = f.FaultKind switch
         {
             FaultKind.Unnamed => $"a file it couldn't name (exception {fault.ExceptionCode})",
             FaultKind.Windows => $"{fault.Module}, part of Windows",
             FaultKind.Microsoft => $"{fault.Module}, a Microsoft file",
-            FaultKind.ThisApp => $"{fault.Module}, Markdown Midget itself",
-            _ => $"{fault.Module}, a file Markdown Midget couldn't find to check",
+            _ => $"{fault.Module}, Markdown Midget itself",
         };
         return $"Windows recorded the crash in {what}. That doesn't name the add-on: Windows records where a crash was reported, " +
                "which is not always where it began, so the list below is the better lead.";
@@ -195,21 +211,28 @@ internal static class PickerCrashClues
     /// helper down, but the registry doesn't say which kind a handler is, so all are listed.
     /// One entry per DLL that exists, with what it hooks into. <paramref name="file"/> answers
     /// whether a DLL is there and its vendor (the version resource), and is never asked to load
-    /// it. When <paramref name="outOfTime"/> says so, the scan stops and reports that it did.
+    /// it. The listed handlers are resolved first, right-click menus first (most entries live
+    /// there), on one deadline from <paramref name="startDeadline"/>; the thumbnail step then gets
+    /// a deadline of its own, so neither can spend the other's time. Whatever was found before a
+    /// deadline passed is kept, and the scan says it was cut short.
     /// </summary>
     public static ShellScan FindShellExtensions(IRegistryView reg, Func<string, (bool Exists, string? Company)> file, string systemDir,
-                                                Func<bool> outOfTime)
+                                                Func<Func<bool>> startDeadline)
     {
-        var cutShort = false;
-        var kindsByClsid = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var handlers = new List<(string Clsid, string Kind)>();
         void Add(string? clsid, string kind)
         {
-            if (!Guid.TryParse(clsid?.Trim(), out var guid)) return;
-            var key = guid.ToString("B");
-            if (!kindsByClsid.TryGetValue(key, out var kinds)) kindsByClsid[key] = kinds = new(StringComparer.Ordinal);
-            kinds.Add(kind);
+            if (Guid.TryParse(clsid?.Trim(), out var guid)) handlers.Add((guid.ToString("B"), kind));
         }
-
+        foreach (var cls in ContextMenuClasses)
+        {
+            var menus = $@"HKCR\{cls}\shellex\ContextMenuHandlers";
+            foreach (var name in reg.SubKeyNames(menus))
+            {
+                var value = reg.Value($@"{menus}\{name}", "");
+                Add(Guid.TryParse(value, out _) ? value : name, "right-click menu");   // some use the key's own name
+            }
+        }
         foreach (var hive in new[] { "HKLM", "HKCU" })
         {
             var overlays = $@"{hive}\{CurrentVersion}\Explorer\ShellIconOverlayIdentifiers";
@@ -219,36 +242,35 @@ internal static class PickerCrashClues
             foreach (var ext in reg.SubKeyNames(properties)) Add(reg.Value($@"{properties}\{ext}", ""), "properties");
             foreach (var clsid in reg.ValueNames($@"{hive}\{CurrentVersion}\Shell Extensions\Approved")) Add(clsid, "other");
         }
-        foreach (var cls in ContextMenuClasses)
-        {
-            var handlers = $@"HKCR\{cls}\shellex\ContextMenuHandlers";
-            foreach (var name in reg.SubKeyNames(handlers))
-            {
-                var value = reg.Value($@"{handlers}\{name}", "");
-                Add(Guid.TryParse(value, out _) ? value : name, "right-click menu");   // some use the key's own name
-            }
-        }
-        var thumbnailKeys = reg.SubKeyNames("HKCR").Where(n => n.StartsWith('.')).Select(n => $@"HKCR\{n}")
-            .Concat(reg.SubKeyNames(@"HKCR\SystemFileAssociations").Select(n => $@"HKCR\SystemFileAssociations\{n}"));
-        foreach (var type in thumbnailKeys)
-        {
-            if (outOfTime()) { cutShort = true; break; }
-            Add(reg.Value($@"{type}\ShellEx\{ThumbnailHandler}", ""), "thumbnail");
-        }
 
         var byDll = new Dictionary<string, (SortedSet<string> Kinds, string? Company)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (clsid, kinds) in kindsByClsid)
+        void Record(string clsid, string kind)
         {
-            if (cutShort || outOfTime()) { cutShort = true; break; }
-            if (DllPath(reg.Value($@"HKCR\CLSID\{clsid}\InprocServer32", ""), systemDir) is not { } dll) continue;
+            if (DllPath(reg.Value($@"HKCR\CLSID\{clsid}\InprocServer32", ""), systemDir) is not { } dll) return;
             if (!byDll.TryGetValue(dll, out var entry))
             {
                 (bool Exists, string? Company) facts;
-                try { facts = file(dll); } catch { continue; }   // unreadable: can't be shown or matched
-                if (!facts.Exists) continue;                      // a DLL that isn't there can't crash anything
+                try { facts = file(dll); } catch { return; }   // unreadable: can't be shown or matched
+                if (!facts.Exists) return;                      // a DLL that isn't there can't crash anything
                 byDll[dll] = entry = (new SortedSet<string>(StringComparer.Ordinal), facts.Company);
             }
-            entry.Kinds.UnionWith(kinds);
+            entry.Kinds.Add(kind);
+        }
+
+        var cutShort = false;
+        var outOfTime = startDeadline();
+        foreach (var (clsid, kind) in handlers)
+        {
+            if (outOfTime()) { cutShort = true; break; }
+            Record(clsid, kind);
+        }
+        outOfTime = startDeadline();
+        var fileTypes = reg.SubKeyNames("HKCR").Where(n => n.StartsWith('.')).Select(n => $@"HKCR\{n}")
+            .Concat(reg.SubKeyNames(@"HKCR\SystemFileAssociations").Select(n => $@"HKCR\SystemFileAssociations\{n}"));
+        foreach (var type in fileTypes)
+        {
+            if (outOfTime()) { cutShort = true; break; }
+            if (Guid.TryParse(reg.Value($@"{type}\ShellEx\{ThumbnailHandler}", "")?.Trim(), out var guid)) Record(guid.ToString("B"), "thumbnail");
         }
 
         var found = byDll
@@ -266,7 +288,7 @@ internal static class PickerCrashClues
     {
         var path = Environment.ExpandEnvironmentVariables(value?.Trim().Trim('"') ?? "");
         if (path.Length == 0) return null;
-        try { return Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.Combine(systemDir, path); }
+        try { return Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(systemDir, path)); }   // no "..\" escapes
         catch { return null; }
     }
 
@@ -350,9 +372,9 @@ internal static class PickerCrashClues
 
     /// <summary>The notice's list: one line per match, product first.</summary>
     public static string SuspectLines(PickerCrashFindings f) =>
-        f.Suspects.Any()
+        (f.Suspects.Any()
             ? string.Join("\n", f.Suspects.Select(s => $"• {s.Culprit}: {Path.GetFileName(s.Path)} ({string.Join(", ", s.Kinds)})"))
-            : "None of the add-ons on our list were found.";
+            : "None of the add-ons on our list were found.") + CutShortNote(f);
 
     /// <summary>The notice's count of the rest; Copy details names them.</summary>
     public static string OthersLine(PickerCrashFindings f) => f.Others.Count() switch
