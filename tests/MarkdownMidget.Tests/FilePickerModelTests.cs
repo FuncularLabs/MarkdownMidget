@@ -275,4 +275,41 @@ public class PickerChildTests
     [Fact]
     public void ASwitchMissingItsValueAtTheEndIsIgnoredRatherThanFatal() =>
         Assert.Null(PickerChild.Parse(["--pick-open", "--name"]).FileName);
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("0", false)]
+    [InlineData("true", false)]
+    [InlineData("1", true)]
+    public void OnlyTheExactDevelopmentSwitchSimulatesACrash(string? value, bool expected) =>
+        Assert.Equal(expected, PickerChild.SimulateCrashRequested(name =>
+            name == PickerChild.SimulateCrashVariable ? value : "1"));
+}
+
+/// <summary>
+/// How the parent reads the helper's exit (issue #12, item 1). A cancel read as a
+/// crash shows the crash notice and switches the user to the built-in picker for
+/// good, so every code the helper can end with is pinned here.
+/// </summary>
+public class PickerOutcomeTests
+{
+    [Theory]
+    [InlineData(0, @"C:\docs\a.md", false, "Chose")]
+    [InlineData(2, "", false, "Cancelled")]                          // PickerChild's cancel
+    [InlineData(2, @"C:\stray", false, "Cancelled")]
+    [InlineData(3, "", false, "ManagedFailure")]                     // App's catch around PickerChild.Run
+    [InlineData(0, "", false, "Crashed")]                            // exit 0 with no path is not a cancel
+    [InlineData(0, "  \r\n", false, "Crashed")]
+    [InlineData(1, "", false, "Crashed")]                            // Task Manager's End task
+    [InlineData(unchecked((int)0xC0000005), "", false, "Crashed")]   // an access violation
+    [InlineData(unchecked((int)0x80131623), "", false, "Crashed")]   // Environment.FailFast
+    [InlineData(1, "", true, "ManagedFailure")]                      // the app itself is going away
+    [InlineData(2, "", true, "Cancelled")]
+    public void EveryExitCodeMeansWhatTheParentDoesWithIt(int exitCode, string output, bool shuttingDown, string expected) =>
+        Assert.Equal(expected, FilePickerService.Classify(exitCode, output, shuttingDown).Outcome.ToString());
+
+    [Fact]
+    public void AChosenPathComesBackTrimmed() =>
+        Assert.Equal(@"C:\docs\a.md", FilePickerService.Classify(0, "C:\\docs\\a.md\r\n", false).Path);
 }

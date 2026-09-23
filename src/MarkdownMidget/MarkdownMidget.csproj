@@ -73,6 +73,11 @@
     <EmbeddedResource Include="..\..\CHANGELOG.md">
       <LogicalName>CHANGELOG.md</LogicalName>
     </EmbeddedResource>
+    <!-- The guide the file-dialog crash notice opens in the browser (Picker\PickerCrashDialog):
+         HTML, so a broken file dialog can't stand between the user and reading it. -->
+    <EmbeddedResource Include="Picker\file-dialog-crashes.html">
+      <LogicalName>file-dialog-crashes.html</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <!-- Themes. The built-ins are extracted to the themes folder on launch and

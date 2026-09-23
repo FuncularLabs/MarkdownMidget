@@ -23,6 +23,20 @@ internal static class PickerChild
     public const string OpenSwitch = "--pick-open";
     public const string SaveSwitch = "--pick-save";
 
+    /// <summary>
+    /// Development only, for checking the crash notice by hand (test plan, DLG): with this
+    /// set to 1 in the environment of the Markdown Midget that opens the dialog, the helper
+    /// dies before showing it, of an access violation in native code, as a faulting shell
+    /// extension kills it. The helper inherits the variable from the window that starts it;
+    /// no menu, setting or argument reaches it.
+    /// </summary>
+    public const string SimulateCrashVariable = "MDM_SIMULATE_PICKER_CRASH";
+
+    internal static bool SimulateCrashRequested(Func<string, string?> environment) =>
+        environment(SimulateCrashVariable) == "1";
+
+    [DllImport("kernel32.dll")] private static extern void RtlZeroMemory(IntPtr destination, IntPtr length);
+
     /// <summary>True when these args mean "be a file picker, not an editor".</summary>
     public static bool IsPickerInvocation(IReadOnlyList<string> args)
     {
@@ -84,6 +98,8 @@ internal static class PickerChild
     /// any chosen path to stdout.</summary>
     public static int Run(IReadOnlyList<string> args)
     {
+        // Writing to address 8 faults inside Windows' own code; no catch can stop it.
+        if (SimulateCrashRequested(Environment.GetEnvironmentVariable)) RtlZeroMemory(new IntPtr(8), new IntPtr(8));
         var request = Parse(args);
         // An invisible anchor window (fully transparent, never off-screen) owned
         // by the PARENT's HWND. The dialog is then shown owned by the anchor,

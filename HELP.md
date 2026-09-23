@@ -821,10 +821,31 @@ in a crash dump.
 ## File dialogs
 
 Open and Save use the standard Windows dialog, but Markdown Midget runs it in a
-**separate helper process**. That dialog loads Explorer add-ons (preview and
-thumbnail handlers), and a faulty one can crash whatever program is showing it —
-if that happens here, only the helper dies. Markdown Midget switches to its own
-**built-in picker**, tells you, and carries on.
+**separate helper process**. That dialog loads Explorer add-ons (icon badges,
+right-click menu entries, preview and thumbnail handlers), and a faulty one can
+crash whatever program is showing it — if that happens here, only the helper
+dies. Markdown Midget switches to its own **built-in picker** and opens it so you
+can carry on, and a notice says what it found:
+
+- **What Windows recorded**: the file Windows says the crash happened in, if it
+  recorded one. A file of Windows or .NET, such as `coreclr.dll`, is only where
+  the crash was reported, not where it began.
+- **Add-ons installed here that are commonly reported to crash Windows' file
+  dialogs**, such as cloud-sync, archive, graphics and antivirus add-ons, and how
+  many other add-ons from outside Microsoft you have. A match is a lead, not proof.
+- **Copy details** copies all of it, with every add-on from outside Microsoft and
+  its file path, for a bug report.
+- **Open this folder in Explorer** opens the folder the dialog started in (with
+  no document open, your most recent folder or Documents). Explorer loads the
+  same add-ons in its own process, so their badges and right-click entries show
+  you which are at work there.
+- **How to find the culprit** opens a guide in your web browser
+  (`file-dialog-crashes.html`, saved in `%LocalAppData%\MarkdownMidget`): how to
+  switch add-ons off and on with NirSoft's free ShellExView until the crash stops,
+  the settings some programs have for their add-ons, and how to report it.
+
+Markdown Midget only looks: it never switches an add-on off itself. Cancel in
+Windows' dialog just closes it.
 
 The built-in picker has an address bar, shortcuts (Desktop, Documents,
 Downloads, drives, recent folders), a folder tree, a sortable file list,
@@ -833,7 +854,8 @@ thumbnails, preview pane or right-click shell menus — those are the add-ons th
 crash, so leaving them out is what makes it safe.
 
 Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
-file picker**.
+file picker**, and turn it off there to go back to Windows' dialog once the cause
+is fixed.
 
 **If something goes wrong:** unexpected errors are recorded in
 `%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll

@@ -36,6 +36,14 @@ public partial class App : Application
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         if (Picker.PickerChild.IsPickerInvocation(args))
         {
+            // Only the Shutdown(code) below may end the helper. Under WPF's default,
+            // OnLastWindowClose, closing PickerChild's anchor window - the only window
+            // this process has - shut the app down with exit code 0 first, and WPF
+            // ignores every Shutdown after the first: Cancel (2) and a caught failure
+            // (3) both reached the parent as 0 with no path, which it reads as a
+            // crash (issue #12). Measured 2026-09-23 in a scratch WPF app: show and
+            // close a window, then Shutdown(2), exits 0; with this line it exits 2.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
             int code;
             try { code = Picker.PickerChild.Run(args); }
             catch (Exception ex)

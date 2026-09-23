@@ -1,0 +1,37 @@
+<Window x:Class="MarkdownMidget.Picker.PickerCrashDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="clr-namespace:MarkdownMidget.Chrome"
+        Title="Windows' file dialog crashed" SizeToContent="Height" Width="640"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" Icon="/Assets/midget-256.png">
+    <StackPanel Margin="18">
+        <TextBlock Text="Windows' Open and Save dialog closed unexpectedly."
+                   TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="The usual cause is an add-on from another program that Windows loads into that dialog (a shell extension), such as a cloud-sync, archive or antivirus tool. Markdown Midget shows that dialog from a separate helper, so only the helper was lost: your document is safe." />
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,14"
+                   Text="Markdown Midget has switched to its own built-in file picker, which loads no add-ons, and opens it next so you can carry on. Once the cause is fixed, switch back: Edit ▸ Settings, then clear Always use the built-in file picker." />
+
+        <TextBlock Text="What Windows recorded" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock x:Name="FaultText" Text="Looking…" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+        <TextBlock Text="Add-ons installed here that are commonly reported to crash Windows' file dialogs"
+                   TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock x:Name="SuspectsText" Text="Looking…" TextWrapping="Wrap" Margin="0,0,0,4" />
+        <TextBlock x:Name="OthersText" TextWrapping="Wrap" Margin="0,0,0,14"
+                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.DialogMutedText}}" />
+
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"
+                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" />
+        <DockPanel LastChildFill="False">
+            <Button x:Name="CopyBtn" Content="_Copy details" Padding="10,2" Margin="0,0,8,0" IsEnabled="False"
+                    Click="Copy_Click" ToolTip="Copies everything found, with every add-on from outside Microsoft, for a bug report." />
+            <Button x:Name="ExplorerBtn" Content="Open this _folder in Explorer" Padding="10,2" Margin="0,0,8,0"
+                    Click="Explorer_Click" />
+            <Button Content="_How to find the culprit" Padding="10,2" Click="Guide_Click"
+                    ToolTip="Opens a step-by-step guide in your web browser." />
+            <Button Content="OK" IsDefault="True" IsCancel="True" Width="80" DockPanel.Dock="Right" />
+        </DockPanel>
+    </StackPanel>
+</Window>

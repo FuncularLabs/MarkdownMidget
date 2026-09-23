@@ -38,8 +38,8 @@ internal static class FilePickerService
 
     /// <summary>
     /// Raised when a native-dialog crash flips <see cref="UseBuiltIn"/> on. The
-    /// host persists the setting and tells the user; this class deliberately
-    /// knows nothing about settings files or message boxes.
+    /// host persists the setting; this class knows nothing about settings files.
+    /// Telling the user is <see cref="PickerCrashDialog"/>'s job, shown from here.
     /// </summary>
     public static Action? AutoSwitchedToBuiltIn { get; set; }
 
@@ -78,19 +78,18 @@ internal static class FilePickerService
                 // Our own fault, so no accusation and no permanent switch — just
                 // finish the job in the picker that definitely works.
                 return ShowBuiltIn(owner, request);
-            case { Outcome: NativeOutcome.Crashed }:
+            case { Outcome: NativeOutcome.Crashed } r:
                 // The isolation worked: only the child died. Switch permanently,
-                // say so once, and finish the job the user actually asked for.
+                // say so once, with the clues, and finish the job the user asked for.
                 UseBuiltIn = true;
                 try { AutoSwitchedToBuiltIn?.Invoke(); } catch { /* never let the notice break the pick */ }
-                MessageBox.Show(owner,
-                    "Windows' file picker closed unexpectedly. The usual cause is an Explorer " +
-                    "add-on (a preview or thumbnail handler) failing inside it — Markdown Midget " +
-                    "runs that dialog in a separate process, so it couldn't take the app with it.\n\n" +
-                    "Markdown Midget has switched to its own built-in file picker, which loads no " +
-                    "add-ons. If that wasn't a crash — you closed the helper yourself, say — turn " +
-                    "it back off in Edit ▸ Settings.",
-                    "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+                try { PickerCrashDialog.ShowFor(owner, request, r.ExitCode, r.ProcessId); }
+                catch (Exception ex)
+                {
+                    CrashLog.Write("PickerCrashDialog", ex);
+                    MessageBox.Show(owner, "Windows' file dialog closed unexpectedly, so Markdown Midget has switched to its " +
+                        "built-in file picker. Switch back in Edit ▸ Settings.", "Markdown Midget");
+                }
                 return ShowBuiltIn(owner, request);
             default:
                 // The child could not be started at all (no process path, policy,
@@ -108,9 +107,24 @@ internal static class FilePickerService
         return dlg.ShowDialog() == true ? dlg.SelectedPath : null;
     }
 
-    private enum NativeOutcome { Chose, Cancelled, Crashed, ManagedFailure, CouldNotStart }
+    internal enum NativeOutcome { Chose, Cancelled, Crashed, ManagedFailure, CouldNotStart }
 
-    private readonly record struct NativeResult(NativeOutcome Outcome, string? Path);
+    internal readonly record struct NativeResult(NativeOutcome Outcome, string? Path, int ExitCode = 0, int ProcessId = 0);
+
+    /// <summary>What the helper's exit means (the contract in <see cref="PickerChild"/>).</summary>
+    internal static NativeResult Classify(int exitCode, string output, bool shuttingDown)
+    {
+        if (exitCode == CancelledExitCode) return new(NativeOutcome.Cancelled, null, exitCode);
+        var path = output.Trim();
+        if (exitCode == 0 && path.Length > 0) return new(NativeOutcome.Chose, path, exitCode);
+        // Our own caught failure; or the app is going away (logoff, shutdown, Exit), so the
+        // child dying is a consequence of that, not evidence about anyone's shell. Switching
+        // there would punish the user on their next launch for closing the app.
+        if (exitCode == ManagedFailureExitCode || shuttingDown) return new(NativeOutcome.ManagedFailure, null, exitCode);
+        // Exit 0 with nothing, or any other code: the dialog never gave us a result. An
+        // access violation in a shell extension lands here, and so does End task (exit 1).
+        return new(NativeOutcome.Crashed, null, exitCode);
+    }
 
     private static NativeResult TryNativeOutOfProcess(Window owner, FilePickerRequest request)
     {
@@ -147,9 +161,10 @@ internal static class FilePickerService
         try { child = Process.Start(psi); }
         catch { return new(NativeOutcome.CouldNotStart, null); }
         if (child is null) return new(NativeOutcome.CouldNotStart, null);
+        var childId = child.Id;   // what Windows' crash record names it by
         // Let the child come to the front: without this grant, foreground rules
         // can keep another process's window behind ours.
-        try { AllowSetForegroundWindow(child.Id); } catch { }
+        try { AllowSetForegroundWindow(childId); } catch { }
 
         string output;
         using (child)
@@ -160,19 +175,7 @@ internal static class FilePickerService
             var reader = child.StandardOutput.ReadToEndAsync();
             WaitWhilePumping(owner, child);
             output = reader.GetAwaiter().GetResult();
-            var code = child.ExitCode;
-
-            if (code == CancelledExitCode) return new(NativeOutcome.Cancelled, null);
-            var path = output.Trim();
-            if (code == 0 && path.Length > 0) return new(NativeOutcome.Chose, path);
-            if (code == ManagedFailureExitCode) return new(NativeOutcome.ManagedFailure, null);
-            // The app is going away (logoff, shutdown, Exit): the child dying is
-            // a consequence of that, not evidence about anyone's shell. Switching
-            // here would punish the user on their next launch for closing the app.
-            if (_shuttingDown) return new(NativeOutcome.ManagedFailure, null);
-            // Exit 0 with nothing, or any other code: the dialog never gave us a
-            // result. An access violation in a shell extension lands here.
-            return new(NativeOutcome.Crashed, null);
+            return Classify(child.ExitCode, output, _shuttingDown) with { ProcessId = childId };
         }
     }
 

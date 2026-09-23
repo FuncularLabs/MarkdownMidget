@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [MRK](#mrk--formatting-marks) formatting marks · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [MRK](#mrk--formatting-marks) formatting marks · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update · [DLG](#dlg--file-dialog-crashes) file dialog crashes
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -915,6 +915,39 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** 1: Settings opens on Markdown Midget's page on Windows 11, and on Default apps on Windows 10. 2: the button is greyed out and its tooltip says to register first. 3: "Windows no longer opens .md files with Markdown Midget." shows on the first start only. 4: no notice in the last repeat. 5: no notice. 6: the notice appears once the document has loaded. 7: the second window shows no notice. 8: "Windows doesn't open .md files with Markdown Midget." on the first start only. 9: the note says what `.md` opened with; unless that is Markdown Midget, the notice says "Windows doesn't open .md files with Markdown Midget." 10: Settings opens on Markdown Midget's page (Windows 11 22H2+), as the message says. 11: after the installed copy starts, a message says it's registered and where Settings opens, then Settings opens on Markdown Midget's page (Windows 11 22H2+).
 - **Type:** Human. Only a person can set a Windows default app, and no test may touch the real registry, open Settings or start the app.
 
+### DLG — File dialog crashes
+
+To see the crash notice without a real crash, start Markdown Midget from a PowerShell window with `MDM_SIMULATE_PICKER_CRASH` set to `1`. The helper that shows Windows' Open and Save dialog then dies of an access violation before the dialog appears, as a faulting add-on kills it. Only windows started from that PowerShell window, and the helpers they start, do this; close that PowerShell window to stop. It is a development aid: no menu or setting reaches it.
+
+#### DLG-01 Cancel closes Windows' dialog and nothing else
+- **Change:** Fixed: "Cancel in Windows' file dialog now just closes it" · **Documents:** `br-forms.md` · **Settings:** Always use the built-in file picker cleared in step 1; settings.json backed up in step 1 and restored in step 4
+1. Close every Markdown Midget window and back up your settings: `$p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"; if (-not (Test-Path "$p.dlg-backup")) { Copy-Item $p "$p.dlg-backup" }`. Open `br-forms.md`, and in **Edit ▸ Settings…** clear **Always use the built-in file picker** and click OK.
+2. Open each of these and press **Cancel** in Windows' dialog: **File ▸ Open…**, **File ▸ Save As…**, **File ▸ Export to PDF…**, **Insert ▸ Picture…**, and in **Edit ▸ Settings…** the **Import words from Word's custom dictionary…** button (then Cancel Settings).
+3. Open **Edit ▸ Settings…** and look at **Always use the built-in file picker**; Cancel.
+4. Close every window and put your settings back: `Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.dlg-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force`.
+- **Expected:** Every dialog in step 2 is Windows' own, and Cancel closes it with nothing after it: no notice, no built-in picker. In step 3 the setting is still clear.
+- **Control:** on a build without this fix, such as build 864, the first Cancel in step 2 shows "Windows' file picker closed unexpectedly…", ticks the setting and opens the built-in picker. If it doesn't, this test can't fail; say so in the note.
+- **Type:** Both. Automated: `PickerOutcomeTests.EveryExitCodeMeansWhatTheParentDoesWithIt`, `PickerOutcomeTests.AChosenPathComesBackTrimmed`. Human: the exit code the real helper returns, which needs the app. The cause was WPF ending the helper with code 0 when its anchor window closed, before `Shutdown(2)`; a test process can't host a second WPF application to show it.
+
+#### DLG-02 A crash shows the notice with each clue, and the setting switches back
+- **Change:** Added: "When Windows' Open or Save dialog crashes, Markdown Midget now says what it found" · **Documents:** `br-forms.md` · **Settings:** `MDM_SIMULATE_PICKER_CRASH` (see above); Always use the built-in file picker cleared in step 1; settings.json backed up in step 1 and restored in step 5
+1. Close every Markdown Midget window, back up your settings as in DLG-01 step 1, and in PowerShell run `$env:MDM_SIMULATE_PICKER_CRASH = '1'; & "$env:LOCALAPPDATA\Programs\MarkdownMidget\MarkdownMidget.exe" "$env:TEMP\mdm-test-copies\br-forms.md"`. In **Edit ▸ Settings…** clear **Always use the built-in file picker** and click OK.
+2. Click **File ▸ Open…** and wait for the notice. Read it, and hover over **Open this folder in Explorer**.
+3. Click **Copy details** and paste into Notepad. Click **OK**, then Cancel the built-in picker that opens.
+4. Open **Edit ▸ Settings…** and look at the setting. Clear it, click OK, close the window and the PowerShell window, start Markdown Midget from the Start menu, open `br-forms.md` from File ▸ Open Recent and click **File ▸ Open…**; Cancel it.
+5. Close every window and put your settings back as in DLG-01 step 4.
+- **Expected:** In step 2 Windows' dialog never appears; within a few seconds "Windows' file dialog crashed" opens over the window. It says the dialog closed unexpectedly, that the built-in picker takes over, and how to switch back. Under *What Windows recorded*: "Windows recorded the crash in coreclr.dll, which is part of Windows, .NET or Markdown Midget itself…" (the simulated crash faults inside Windows, and .NET reports it; a self-contained build, rather than the framework-dependent one in 1.1, names `MarkdownMidget.exe` instead). Under the list heading, each installed add-on on the list with its product, file name and what it hooks into, or "None of the add-ons on our list are installed."; then a line counting the other add-ons from outside Microsoft. The tooltip names `%TEMP%\mdm-test-copies`. In step 3 the text starts "Markdown Midget 1.0.0-…: Windows' file dialog closed unexpectedly", gives the exit code `0xC0000005` and a `Module coreclr.dll` line, and lists the same add-ons with their paths, then every other add-on from outside Microsoft; OK opens the built-in picker. In step 4 the setting is ticked; after clearing it, the new window shows Windows' own dialog.
+- **Type:** Both. Automated: `PickerCrashCluesTests.ReadsTheFaultingModuleFromARealApplicationErrorEvent`, `AModuleWindowsHadAlreadyUnloadedIsNamedWithoutWindowsSuffix`, `AnEventThatIsNotAnApplicationErrorReadsAsNothing`, `PicksTheNewestRecordForThisHelperWithinTheWindow`, `NoRecordForThisHelperIsNoRecord`, `ALogThatCannotBeReadMeansNoRecordNotAnError`, `OnlyAFileThatIsNotWindowsDotNetOrOursNamesTheCulprit`, `NoRecordIsItsOwnKind`, `TheFirstClueSaysHowFarTheRecordCanBeTrusted`, `FindsEveryKindOfHandlerOncePerDllWithWhatItDoes`, `AnEmptyOrUnreadableRegistryAndAFileReadThatThrowsFindNothingAndDoNotThrow`, `MatchesTheCuratedListByFileNameOrWholeVendorName`, `EveryCuratedEntryCanBeMatchedAndNamesItsProduct`, `TheOthersAreTheUnmatchedOnesNotFromMicrosoft`, `TheDetailsCarryEveryClueForABugReport`, `TheDetailsSayWhenWindowsRecordedNothingAndNothingIsInstalled`, `ALockedClipboardIsANoteNotACrash`, `TheFolderIsTheDialogsOwnThenTheFirstRecentOneThenDocuments`; `PickerChildTests.OnlyTheExactDevelopmentSwitchSimulatesACrash`. Human: the dialog, and this machine's real event log, registry and clipboard, which no test may read.
+
+#### DLG-03 Explorer, the guide, and dark mode
+- **Change:** Added: "When Windows' Open or Save dialog crashes, Markdown Midget now says what it found" · **Documents:** `br-forms.md` · **Settings:** as DLG-02; View ▸ Mode set to Dark in step 3 and back to what it was in step 4
+1. Do DLG-02 step 1, click **File ▸ Open…**, and in the notice click **Open this folder in Explorer**. Look at the badges on the files and right-click one.
+2. Click **How to find the culprit**, and read the guide.
+3. Click OK, Cancel the built-in picker, pick **View ▸ Mode ▸ Dark**, clear the setting again and click **File ▸ Open…**. Look at the notice, then click **How to find the culprit** with your browser in dark mode.
+4. Put View ▸ Mode back, close every window and the PowerShell window, and put your settings back as in DLG-01 step 4.
+- **Expected:** In step 1 Explorer opens on `%TEMP%\mdm-test-copies` in its own window, and Markdown Midget and the notice are unaffected. In step 2 the guide opens in your default browser from `%LocalAppData%\MarkdownMidget\file-dialog-crashes.html`: what a shell extension is, what we can and can't tell, how to read the clues, finding the culprit with ShellExView, program settings, updates, switching back and reporting. In step 3 the notice is dark with light text, the count line dimmer but readable, and a dark title bar; the guide is dark in a dark browser and light in a light one.
+- **Type:** Both. Automated: `PickerCrashCluesTests.TheGuideShipsSelfContainedAndFollowsDarkMode`, `PickerCrashCluesTests.TheGuideIsWrittenOnceAndRewrittenOnlyWhenItChanges`. Human: Explorer, the browser and how the notice looks, which need the app.
+
 ## 4. Run log
 
 For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
@@ -1674,6 +1707,9 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | INST-01 | | | |
 | INST-02 | | | |
 | INST-03 | | | |
+| DLG-01 | | | |
+| DLG-02 | | | |
+| DLG-03 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 
