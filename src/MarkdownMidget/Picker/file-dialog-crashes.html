@@ -30,14 +30,14 @@
 <h2>What we can and can't tell</h2>
 <ul>
   <li>We can read what Windows recorded about the crash, and which add-ons are installed.</li>
-  <li>We can't see which add-on was running at the moment of the crash, so the add-ons we list are leads, not proof. The list is of products that other people have reported crashing programs, not products known to be faulty.</li>
+  <li>We can't see which add-on was running at the moment of the crash, so the add-ons we list are leads, not proof. Each has been reported to crash Explorer or programs that load it; none is known to be faulty on your PC.</li>
   <li>Markdown Midget never disables, removes or changes anything on your PC. Every step below is yours to take, and each one can be undone.</li>
 </ul>
 
 <h2>Reading the clues in the notice</h2>
 <ul>
   <li><strong>What Windows recorded.</strong> If it names a file such as <code>DropboxExt64.52.dll</code>, that is the strongest lead: find the program it belongs to. If it names <code>coreclr.dll</code>, <code>ntdll.dll</code>, <code>KERNELBASE.dll</code> or Markdown Midget itself, that is only where the crash was reported, not where it started. If there is no record, the helper may have been closed or ended rather than crashed.</li>
-  <li><strong>The add-ons we list.</strong> Start with these: they are installed on your PC, and each has a history of crashing programs that load it.</li>
+  <li><strong>The add-ons we list.</strong> Start with these: they are on your PC, and each has been reported to crash Explorer or programs that load it. The notice counts the other add-ons it found from outside Microsoft, and Copy details names them.</li>
   <li><strong>Open this folder in Explorer.</strong> Explorer loads the same add-ons, in its own process, so it can't crash Markdown Midget. The badges on the files and the extra entries in their right-click menus show you which add-ons are at work there. If Explorer itself misbehaves in that folder, that is the same problem.</li>
 </ul>
 
@@ -45,11 +45,11 @@
 <p><a href="https://www.nirsoft.net/utils/shexview.html">ShellExView</a> is a free tool from NirSoft that lists every shell extension and can switch each one off and on again. Download the version that matches your Windows (almost always 64-bit), unzip it, right-click <code>shexview.exe</code> and choose <strong>Run as administrator</strong>: switching add-ons off needs it.</p>
 <ol>
   <li>Choose <strong>Options ▸ Hide All Microsoft Extensions</strong>, so you only see other programs' add-ons.</li>
-  <li>Select them all (<kbd>Ctrl+A</kbd>) and save the list with <strong>File ▸ Save Selected Items</strong>, so you know what was on before.</li>
-  <li>With them all still selected, choose <strong>File ▸ Disable Selected Items</strong> (<kbd>F7</kbd>).</li>
+  <li>Write down the names you see, or take a screenshot, so you know what was on before.</li>
+  <li>Select them all (<kbd>Ctrl+A</kbd>) and choose <strong>File ▸ Disable Selected Items</strong>.</li>
   <li>Restart Explorer: <strong>Options ▸ Restart Explorer</strong>, or sign out and back in.</li>
   <li>In Markdown Midget, open <strong>Edit ▸ Settings</strong>, clear <strong>Always use the built-in file picker</strong>, and open <strong>File ▸ Open…</strong> in the same folder as before.</li>
-  <li>If it works now, one of the disabled add-ons is the culprit. Enable half of them again (<strong>File ▸ Enable Selected Items</strong>, <kbd>F8</kbd>), restart Explorer and try again. If the crash comes back, the culprit is in that half; if not, it's in the other half. Keep halving until one add-on is left.</li>
+  <li>If it works now, one of the disabled add-ons is the culprit. Select half of them, choose <strong>File ▸ Enable Selected Items</strong>, restart Explorer and try again. If the crash comes back, the culprit is in that half; if not, it's in the other half. Keep halving until one add-on is left.</li>
   <li>Enable everything except the culprit, and restart Explorer once more.</li>
 </ol>
 <p class="note">Each crash switches Markdown Midget back to the built-in picker and shows the notice again. That's expected while you search: clear the setting again before the next try. If the dialog still crashes with every add-on disabled, a shell extension isn't the cause; please tell us.</p>
@@ -71,6 +71,6 @@
 <p>Open <strong>Edit ▸ Settings</strong> and clear <strong>Always use the built-in file picker</strong>. If Windows' dialog crashes again, Markdown Midget switches back and tells you, and nothing is lost.</p>
 
 <h2>Telling us</h2>
-<p>In the notice, <strong>Copy details</strong> copies what it found as plain text: the version, what Windows recorded, and every add-on from outside Microsoft with its file path. The paths can include your Windows user name, so read it before you post it. Paste it into a new issue at <a href="https://github.com/FuncularLabs/MarkdownMidget/issues">github.com/FuncularLabs/MarkdownMidget/issues</a>, with what you tried and what happened. If Markdown Midget itself reported an error, <code>%LocalAppData%\MarkdownMidget\crash.log</code> helps too.</p>
+<p>In the notice, <strong>Copy details</strong> copies what it found as plain text: the version, what Windows recorded, and every add-on it found that isn't Microsoft's, with its file path. The paths can include your Windows user name, so read it before you post it. Paste it into a new issue at <a href="https://github.com/FuncularLabs/MarkdownMidget/issues">github.com/FuncularLabs/MarkdownMidget/issues</a>, with what you tried and what happened. If Markdown Midget itself reported an error, <code>%LocalAppData%\MarkdownMidget\crash.log</code> helps too.</p>
 </body>
 </html>

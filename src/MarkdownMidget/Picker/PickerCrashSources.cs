@@ -34,7 +34,8 @@ internal static class PickerCrashSources
         try { found = PickerCrashClues.FindShellExtensions(new RegistryView(), FileFacts, Environment.SystemDirectory); }
         catch { found = []; }
         var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        return new PickerCrashFindings(exitCode, fault, PickerCrashClues.KindOf(fault, windowsDir, exe), found);
+        var company = fault?.ModulePath is { } path ? FileFacts(path).Item2 : null;
+        return new PickerCrashFindings(exitCode, fault, PickerCrashClues.KindOf(fault, windowsDir, exe, found, company), found);
     }
 
     /// <summary>The newest "Application Error" (1000) events of the last few minutes, as XML.</summary>

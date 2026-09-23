@@ -16,7 +16,7 @@
         <TextBlock Text="What Windows recorded" FontWeight="SemiBold" Margin="0,0,0,4" />
         <TextBlock x:Name="FaultText" Text="Looking…" TextWrapping="Wrap" Margin="0,0,0,12" />
 
-        <TextBlock Text="Add-ons installed here that are commonly reported to crash Windows' file dialogs"
+        <TextBlock Text="Add-ons found here that are reported to crash Explorer or programs that load them"
                    TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,4" />
         <TextBlock x:Name="SuspectsText" Text="Looking…" TextWrapping="Wrap" Margin="0,0,0,4" />
         <TextBlock x:Name="OthersText" TextWrapping="Wrap" Margin="0,0,0,14"
@@ -24,12 +24,14 @@
 
         <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"
                    Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" />
+        <!-- No access keys: in a dialog they fire without Alt, so a stray letter would open
+             Explorer or the browser (OpenLinkDialog leaves them out for the same reason). -->
         <DockPanel LastChildFill="False">
-            <Button x:Name="CopyBtn" Content="_Copy details" Padding="10,2" Margin="0,0,8,0" IsEnabled="False"
-                    Click="Copy_Click" ToolTip="Copies everything found, with every add-on from outside Microsoft, for a bug report." />
-            <Button x:Name="ExplorerBtn" Content="Open this _folder in Explorer" Padding="10,2" Margin="0,0,8,0"
+            <Button x:Name="CopyBtn" Content="Copy details" Padding="10,2" Margin="0,0,8,0" IsEnabled="False"
+                    Click="Copy_Click" ToolTip="Copies what Windows recorded and every add-on found that isn't Microsoft's, with its path, for a bug report." />
+            <Button x:Name="ExplorerBtn" Content="Open this folder in Explorer" Padding="10,2" Margin="0,0,8,0"
                     Click="Explorer_Click" />
-            <Button Content="_How to find the culprit" Padding="10,2" Click="Guide_Click"
+            <Button Content="How to find the culprit" Padding="10,2" Click="Guide_Click"
                     ToolTip="Opens a step-by-step guide in your web browser." />
             <Button Content="OK" IsDefault="True" IsCancel="True" Width="80" DockPanel.Dock="Right" />
         </DockPanel>

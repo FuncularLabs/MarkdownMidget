@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
@@ -50,17 +49,8 @@ public partial class PickerCrashDialog : Window
     {
         _findings = findings;
         FaultText.Text = PickerCrashClues.FaultSentence(findings);
-        var suspects = findings.Suspects.ToList();
-        SuspectsText.Text = suspects.Count == 0
-            ? "None of the add-ons on our list are installed."
-            : string.Join(Environment.NewLine, suspects.Select(s => $"• {s.Culprit}: {Path.GetFileName(s.Path)} ({string.Join(", ", s.Kinds)})"));
-        var others = findings.Others.Count();
-        OthersText.Text = others switch
-        {
-            0 => "No other add-ons from outside Microsoft were found.",
-            1 => "One other add-on from outside Microsoft is installed; Copy details names it.",
-            _ => $"{others} other add-ons from outside Microsoft are installed; Copy details names them all.",
-        };
+        SuspectsText.Text = PickerCrashClues.SuspectLines(findings);
+        OthersText.Text = PickerCrashClues.OthersLine(findings);
         CopyBtn.IsEnabled = true;
     }
 
@@ -85,10 +75,8 @@ public partial class PickerCrashDialog : Window
         // could load the same add-ons into THIS process, which is what the helper was for.
         try
         {
-            var psi = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
-                { UseShellExecute = false };
-            psi.ArgumentList.Add(_folder);
-            Process.Start(psi)?.Dispose();
+            Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"),
+                                               PickerCrashClues.ExplorerArguments(_folder)) { UseShellExecute = false })?.Dispose();
         }
         catch (Exception ex) { Status("Couldn't open Explorer: " + ex.Message); }
     }
