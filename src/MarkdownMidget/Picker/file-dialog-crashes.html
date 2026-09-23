@@ -36,7 +36,7 @@
 
 <h2>Reading the clues in the notice</h2>
 <ul>
-  <li><strong>What Windows recorded.</strong> If it names a file such as <code>DropboxExt64.52.dll</code>, that is the strongest lead: find the program it belongs to. If it names <code>coreclr.dll</code>, <code>ntdll.dll</code>, <code>KERNELBASE.dll</code> or Markdown Midget itself, that is only where the crash was reported, not where it started. If there is no record, the helper may have been closed or ended rather than crashed.</li>
+  <li><strong>What Windows recorded.</strong> If it names a file such as <code>DropboxExt64.52.dll</code>, that is the strongest lead: find the program it belongs to. If it names a file of Windows or Microsoft, such as <code>coreclr.dll</code>, <code>ntdll.dll</code> or <code>KERNELBASE.dll</code>, or Markdown Midget itself, that is where the crash was reported, which is not always where it started, so it doesn't name the add-on. If there is no record, the helper may have been closed or ended rather than crashed.</li>
   <li><strong>The add-ons we list.</strong> Start with these: they are on your PC, and each has been reported to crash Explorer or programs that load it. The notice counts the other add-ons it found from outside Microsoft, and Copy details names them.</li>
   <li><strong>Open this folder in Explorer.</strong> Explorer loads the same add-ons, in its own process, so it can't crash Markdown Midget. The badges on the files and the extra entries in their right-click menus show you which add-ons are at work there. If Explorer itself misbehaves in that folder, that is the same problem.</li>
 </ul>

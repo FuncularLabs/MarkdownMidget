@@ -30,12 +30,13 @@ internal static class PickerCrashSources
             Thread.Sleep(1500);
             fault = PickerCrashClues.FindFault(RecentApplicationErrors, exe, processId, DateTime.UtcNow, Window);
         }
-        IReadOnlyList<ShellExtensionDll> found;
-        try { found = PickerCrashClues.FindShellExtensions(new RegistryView(), FileFacts, Environment.SystemDirectory); }
-        catch { found = []; }
-        var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        var company = fault?.ModulePath is { } path ? FileFacts(path).Item2 : null;
-        return new PickerCrashFindings(exitCode, fault, PickerCrashClues.KindOf(fault, windowsDir, exe, found, company), found);
+        var clock = Stopwatch.StartNew();
+        ShellScan scan;
+        try { scan = PickerCrashClues.FindShellExtensions(new RegistryView(), FileFacts, Environment.SystemDirectory,
+                                                          () => clock.Elapsed > PickerCrashClues.ScanBudget); }
+        catch { scan = new ShellScan([], false); }
+        var kind = PickerCrashClues.KindOf(fault, Environment.SystemDirectory, exe, scan.Found, FileFacts);
+        return new PickerCrashFindings(exitCode, fault, kind, scan.Found, scan.CutShort);
     }
 
     /// <summary>The newest "Application Error" (1000) events of the last few minutes, as XML.</summary>
@@ -63,17 +64,18 @@ internal static class PickerCrashSources
 
     private sealed class RegistryView : IRegistryView
     {
+        /// <summary>A path of the hive alone ("HKCR") opens a new handle to the hive itself.</summary>
         private static RegistryKey? Open(string path)
         {
             var cut = path.IndexOf('\\');
-            var hive = path[..cut] switch
+            var hive = (cut < 0 ? path : path[..cut]) switch
             {
                 "HKLM" => Registry.LocalMachine,
                 "HKCR" => Registry.ClassesRoot,
                 "HKCU" => Registry.CurrentUser,
                 _ => null,
             };
-            return hive?.OpenSubKey(path[(cut + 1)..], writable: false);
+            return hive?.OpenSubKey(cut < 0 ? "" : path[(cut + 1)..], writable: false);
         }
 
         public IReadOnlyList<string> SubKeyNames(string path)

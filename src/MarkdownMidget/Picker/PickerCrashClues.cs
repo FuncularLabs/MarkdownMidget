@@ -13,27 +13,39 @@ namespace MarkdownMidget.Picker;
 /// <summary>What Windows wrote when a process died: an "Application Error" event, id 1000.</summary>
 internal sealed record FaultRecord(DateTime TimeUtc, string AppName, int? ProcessId, string Module, string? ModulePath, string ExceptionCode);
 
-/// <summary>How much a <see cref="FaultRecord"/> tells the user.</summary>
+/// <summary>How much a <see cref="FaultRecord"/> tells the user. Only <see cref="AddOn"/> names a
+/// lead; every other kind with a record says why it doesn't.</summary>
 internal enum FaultKind
 {
     /// <summary>No record: Windows logged nothing, or the helper was ended rather than crashed.</summary>
     None,
-    /// <summary>A file of Windows, .NET or this app, or one Windows couldn't name: where the
-    /// crash was reported, not where it began.</summary>
-    SystemFile,
-    /// <summary>Any other file: the best lead there is.</summary>
+    /// <summary>A file on the list, a shell extension found here, or one from another vendor.</summary>
     AddOn,
+    /// <summary>A Microsoft file in the Windows folder.</summary>
+    Windows,
+    /// <summary>A Microsoft file elsewhere (.NET's runtime, Office).</summary>
+    Microsoft,
+    /// <summary>Markdown Midget's own exe.</summary>
+    ThisApp,
+    /// <summary>Named, but not on disk where Windows or the system folder says, so it can't be checked.</summary>
+    Unreadable,
+    /// <summary>Windows couldn't name the file ("unknown").</summary>
+    Unnamed,
 }
 
 /// <summary>A shell extension's DLL, what it hooks into, its vendor and the curated entry it matched.</summary>
 internal sealed record ShellExtensionDll(string Path, string? Company, IReadOnlyList<string> Kinds, string? Culprit);
 
-/// <summary>A curated entry: the report it rests on, the DLL names that report gives, and the
-/// file-name prefixes (lower case) that match them.</summary>
-internal sealed record CulpritEntry(string Product, string[] FilePrefixes, string Source, string[] SourceDlls);
+/// <summary>What a registry scan found, and whether it ran out of time first.</summary>
+internal sealed record ShellScan(IReadOnlyList<ShellExtensionDll> Found, bool CutShort);
+
+/// <summary>A curated entry: the report it rests on and the DLL names that report gives, matched
+/// whole; <paramref name="Prefix"/> only where a name carries a version.</summary>
+internal sealed record CulpritEntry(string Product, string Source, string[] SourceDlls, string? Prefix = null);
 
 /// <summary>Everything the notice shows and Copy details writes.</summary>
-internal sealed record PickerCrashFindings(int ExitCode, FaultRecord? Fault, FaultKind FaultKind, IReadOnlyList<ShellExtensionDll> Extensions)
+internal sealed record PickerCrashFindings(int ExitCode, FaultRecord? Fault, FaultKind FaultKind,
+                                           IReadOnlyList<ShellExtensionDll> Extensions, bool ScanCutShort = false)
 {
     public IEnumerable<ShellExtensionDll> Suspects => Extensions.Where(e => e.Culprit is not null);
     public IEnumerable<ShellExtensionDll> Others => Extensions.Where(e => e.Culprit is null && !PickerCrashClues.IsMicrosoft(e.Company));
@@ -118,52 +130,77 @@ internal static class PickerCrashClues
     /// <summary>
     /// Whether the faulting file names the culprit. The file decides before its folder: a graphics
     /// driver's shell extension lives under the Windows folder (DriverStore), and OneDrive's is
-    /// Microsoft's. <paramref name="company"/> is the file's vendor, null when unreadable.
-    /// .NET 10 records an access violation in native code under a managed frame against its own
-    /// runtime (measured 2026-09-23), which is Microsoft's and so counts as a reporter, not a culprit.
+    /// Microsoft's. A bare module path (Windows names an unloaded DLL that way) is resolved against
+    /// the system folder first, as registry entries are. <paramref name="file"/> gives whether the
+    /// file is there and its vendor. .NET 10 records an access violation in native code under a
+    /// managed frame against its own runtime (measured 2026-09-23): a Microsoft file, not a culprit.
     /// </summary>
-    public static FaultKind KindOf(FaultRecord? fault, string windowsDir, string exeName, IEnumerable<ShellExtensionDll> found, string? company)
+    public static FaultKind KindOf(FaultRecord? fault, string systemDir, string exeName, IEnumerable<ShellExtensionDll> found,
+                                   Func<string, (bool Exists, string? Company)> file)
     {
         if (fault is null) return FaultKind.None;
-        if (Unnamed(fault) || fault.Module.Equals(exeName, StringComparison.OrdinalIgnoreCase)) return FaultKind.SystemFile;
-        var path = fault.ModulePath ?? fault.Module;
+        if (Unnamed(fault)) return FaultKind.Unnamed;
+        if (fault.Module.Equals(exeName, StringComparison.OrdinalIgnoreCase)) return FaultKind.ThisApp;
+        var path = DllPath(fault.ModulePath ?? fault.Module, systemDir) ?? fault.Module;
+        if (MatchCulprit(path) is not null) return FaultKind.AddOn;          // the list wins, even for a file that's gone
+        (bool Exists, string? Company) facts;
+        try { facts = file(path); } catch { facts = (false, null); }
+        if (!facts.Exists) return FaultKind.Unreadable;
+        var windowsDir = Path.GetDirectoryName(systemDir.TrimEnd('\\')) ?? systemDir;
         var inWindows = path.StartsWith(windowsDir.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
-        if (MatchCulprit(path) is not null
-            || !inWindows && found.Any(e => e.Path.Equals(path, StringComparison.OrdinalIgnoreCase))
-            || company is not null && !IsMicrosoft(company))
-            return FaultKind.AddOn;
-        return IsMicrosoft(company) || inWindows ? FaultKind.SystemFile : FaultKind.AddOn;
+        if (!inWindows && found.Any(e => e.Path.Equals(path, StringComparison.OrdinalIgnoreCase))) return FaultKind.AddOn;
+        if (IsMicrosoft(facts.Company)) return inWindows ? FaultKind.Windows : FaultKind.Microsoft;
+        return facts.Company is null && inWindows ? FaultKind.Windows : FaultKind.AddOn;
     }
 
     /// <summary>The notice's first clue, in words.</summary>
-    public static string FaultSentence(PickerCrashFindings f) => (f.FaultKind, f.Fault) switch
+    public static string FaultSentence(PickerCrashFindings f)
     {
-        (FaultKind.AddOn, { } fault) =>
-            $"Windows recorded the crash in {fault.Module}{(fault.ModulePath is { } p ? $" ({p})" : "")}. That file is the best lead: " +
-            (MatchCulprit(fault.ModulePath ?? fault.Module) is { } product
-                ? $"it comes with {product}."
-                : "the Details tab of its Properties in Explorer names the program it came with."),
-        (FaultKind.SystemFile, { } fault) =>
-            $"Windows recorded the crash in {(Unnamed(fault) ? $"a file it couldn't name (exception {fault.ExceptionCode})" : $"{fault.Module}, part of Windows, .NET or Markdown Midget itself")}. " +
-            "That doesn't name the add-on: Windows records where a crash was reported, which is not always where it began, so the list below is the better lead.",
-        _ => "Windows has no record of this crash in its Application log. If you closed the helper yourself, " +
-             "or ended it in Task Manager, nothing crashed.",
-    };
+        if (f.Fault is not { } fault || f.FaultKind == FaultKind.None)
+            return "Windows has no record of this crash in its Application log. If you closed the helper yourself, " +
+                   "or ended it in Task Manager, nothing crashed.";
+        if (f.FaultKind == FaultKind.AddOn)
+            return $"Windows recorded the crash in {fault.Module}{(fault.ModulePath is { } p ? $" ({p})" : "")}. That file is the best lead: " +
+                   (MatchCulprit(fault.ModulePath ?? fault.Module) is { } product
+                       ? $"it comes with {product}."
+                       : "the Details tab of its Properties in Explorer names the program it came with.");
+        var what = f.FaultKind switch
+        {
+            FaultKind.Unnamed => $"a file it couldn't name (exception {fault.ExceptionCode})",
+            FaultKind.Windows => $"{fault.Module}, part of Windows",
+            FaultKind.Microsoft => $"{fault.Module}, a Microsoft file",
+            FaultKind.ThisApp => $"{fault.Module}, Markdown Midget itself",
+            _ => $"{fault.Module}, a file Markdown Midget couldn't find to check",
+        };
+        return $"Windows recorded the crash in {what}. That doesn't name the add-on: Windows records where a crash was reported, " +
+               "which is not always where it began, so the list below is the better lead.";
+    }
 
     // ===== 2. Shell extensions installed here =====
 
     private const string CurrentVersion = @"SOFTWARE\Microsoft\Windows\CurrentVersion";
     private static readonly string[] ContextMenuClasses = ["*", "AllFilesystemObjects", "Directory", @"Directory\Background", "Folder", "Drive"];
+    private const string ThumbnailHandler = "{e357fccd-a995-4576-b01f-234630154e96}";
+
+    /// <summary>How long the registry scan may take before it stops and says so.</summary>
+    public static readonly TimeSpan ScanBudget = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// Every shell extension DLL the registry names in the places a file dialog reaches — icon
-    /// overlays, right-click menu handlers, preview and property handlers, and the Approved list
-    /// for the rest, each for the machine (HKLM) and for this user (HKCU, where per-user installs
-    /// register) — one entry per DLL that exists, with what it hooks into. <paramref name="file"/>
-    /// answers whether a DLL is there and its vendor (the version resource), and is never asked to load it.
+    /// overlays, right-click menu handlers, preview and property handlers, and the Approved list,
+    /// each for the machine (HKLM) and for this user (HKCU, where per-user installs register), and
+    /// the thumbnail handler of every file type (HKCR\.ext and HKCR\SystemFileAssociations\*),
+    /// which the Approved list does not reliably hold. A thumbnail handler that reads a stream
+    /// usually runs in a COM Surrogate (dllhost.exe), and only the in-process kind can take the
+    /// helper down, but the registry doesn't say which kind a handler is, so all are listed.
+    /// One entry per DLL that exists, with what it hooks into. <paramref name="file"/> answers
+    /// whether a DLL is there and its vendor (the version resource), and is never asked to load
+    /// it. When <paramref name="outOfTime"/> says so, the scan stops and reports that it did.
     /// </summary>
-    public static IReadOnlyList<ShellExtensionDll> FindShellExtensions(IRegistryView reg, Func<string, (bool Exists, string? Company)> file, string systemDir)
+    public static ShellScan FindShellExtensions(IRegistryView reg, Func<string, (bool Exists, string? Company)> file, string systemDir,
+                                                Func<bool> outOfTime)
     {
+        var cutShort = false;
         var kindsByClsid = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
         void Add(string? clsid, string kind)
         {
@@ -191,10 +228,18 @@ internal static class PickerCrashClues
                 Add(Guid.TryParse(value, out _) ? value : name, "right-click menu");   // some use the key's own name
             }
         }
+        var thumbnailKeys = reg.SubKeyNames("HKCR").Where(n => n.StartsWith('.')).Select(n => $@"HKCR\{n}")
+            .Concat(reg.SubKeyNames(@"HKCR\SystemFileAssociations").Select(n => $@"HKCR\SystemFileAssociations\{n}"));
+        foreach (var type in thumbnailKeys)
+        {
+            if (outOfTime()) { cutShort = true; break; }
+            Add(reg.Value($@"{type}\ShellEx\{ThumbnailHandler}", ""), "thumbnail");
+        }
 
         var byDll = new Dictionary<string, (SortedSet<string> Kinds, string? Company)>(StringComparer.OrdinalIgnoreCase);
         foreach (var (clsid, kinds) in kindsByClsid)
         {
+            if (cutShort || outOfTime()) { cutShort = true; break; }
             if (DllPath(reg.Value($@"HKCR\CLSID\{clsid}\InprocServer32", ""), systemDir) is not { } dll) continue;
             if (!byDll.TryGetValue(dll, out var entry))
             {
@@ -206,7 +251,7 @@ internal static class PickerCrashClues
             entry.Kinds.UnionWith(kinds);
         }
 
-        return byDll
+        var found = byDll
             .Select(p =>
             {
                 if (p.Value.Kinds.Count > 1) p.Value.Kinds.Remove("other");   // "other" only when nothing more specific
@@ -214,6 +259,7 @@ internal static class PickerCrashClues
             })
             .OrderBy(e => e.Path, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        return new ShellScan(found, cutShort);
     }
 
     private static string? DllPath(string? value, string systemDir)
@@ -230,41 +276,45 @@ internal static class PickerCrashClues
     /// Shell extensions REPORTED TO CRASH EXPLORER OR PROGRAMS THAT LOAD THEM — never "known
     /// faulty": a match says only that the file has that public history. The rule for a place on
     /// the list: a public report names the DLL, by file, in a crash (a slowdown or a missing menu
-    /// is not enough), and the name is distinctive enough to match on by itself. Matching is by
-    /// file name only, so a vendor's other DLLs are never given this product's name. By that rule
-    /// these are out: 7-Zip (NirSoft reports 7-zip32.dll only for delays; the SourceForge thread's
-    /// faulting module was ntdll.dll), Kaspersky (its row is a missing menu, and shellex.dll is too
-    /// generic), TortoiseOverlays.dll, igfxDTCM.dll and pdfprevhndlr.dll (delays or menus only),
-    /// and OneDrive, Box, MEGA and WinRAR (no report found naming their DLL in a crash).
+    /// is not enough); the name is distinctive enough to match on by itself; and the product is
+    /// widely installed on home and office PCs, because the list's job is to name what the user
+    /// probably has. Names are matched whole, except Dropbox's, which carries its version
+    /// (DropboxExt64.52.dll) and so is matched by prefix; a vendor's other DLLs never get the name.
+    /// Out by that rule: 7-Zip (NirSoft reports 7-zip32.dll only for delays; the SourceForge
+    /// thread's faulting module was ntdll.dll); Kaspersky (NirSoft has an Explorer crash for its
+    /// shellex.dll, but the name is too generic to match on); TortoiseOverlays.dll, igfxDTCM.dll
+    /// and pdfprevhndlr.dll (delays or menus only); WinCDEmu, VirtualCloneDrive, F-Secure and ABBYY
+    /// FineReader (crash reports, but less widely installed); OneDrive, Box, MEGA and WinRAR (no
+    /// report found naming their DLL in a crash). Each record was checked against its source by hand.
     /// </summary>
     public static readonly IReadOnlyList<CulpritEntry> Culprits =
     [
-        new("Dropbox", ["dropboxext"], "https://bugzilla.mozilla.org/show_bug.cgi?id=1330991",
-            ["dropboxext.8.0.dll", "dropboxext64.8.0.dll", "dropboxext.10.0.dll", "dropboxext64.10.0.dll", "DropboxExt64.27.dll"]),
-        new("Google Drive", ["drivefsext", "googledrivesync"], "https://support.google.com/drive/thread/102923206; " + NirSoft,
-            ["drivefsext.dll", "googledrivesync32.dll"]),
-        new("iCloud", ["shellstreams"], NirSoft, ["ShellStreams64.dll"]),
-        new("Nextcloud", ["nccontextmenu"], "https://github.com/nextcloud/desktop/issues/6566", ["NCContextMenu.dll"]),
-        new("TortoiseSVN", ["tortoisestub"], NirSoft, ["TortoiseStub.dll"]),
-        new("Adobe Acrobat or Reader", ["pdfshell", "contextmenushim"], NirSoft, ["PDFShell.dll", "ContextMenuShim64.dll"]),
-        new("Foxit PDF", ["converttopdfshellextension"], NirSoft, ["ConvertToPDFShellExtension_x64.dll"]),
-        new("NVIDIA", ["nvshext", "nv3dappshext"], NirSoft, ["nvshext.dll", "nv3dappshext.dll"]),
-        new("Intel graphics", ["igfxpph"], NirSoft, ["igfxpph.dll"]),
+        new("Dropbox", "https://bugzilla.mozilla.org/show_bug.cgi?id=1330991; " + NirSoft,
+            ["dropboxext.8.0.dll", "dropboxext64.8.0.dll", "dropboxext.10.0.dll", "dropboxext64.10.0.dll", "DropboxExt64.27.dll"], "dropboxext"),
+        new("Google Drive", "https://support.google.com/drive/thread/102923206; " + NirSoft, ["drivefsext.dll", "googledrivesync32.dll"]),
+        new("iCloud", NirSoft, ["ShellStreams64.dll"]),
+        new("Nextcloud", "https://github.com/nextcloud/desktop/issues/6566", ["NCContextMenu.dll"]),
+        new("TortoiseSVN", NirSoft, ["TortoiseStub.dll"]),
+        new("Adobe Acrobat or Reader", NirSoft, ["PDFShell.dll", "ContextMenuShim64.dll"]),
+        new("Adobe Illustrator", NirSoft, ["AIPreviewHandler.dll"]),
+        new("Foxit PDF", NirSoft, ["ConvertToPDFShellExtension_x64.dll"]),
+        new("NVIDIA", NirSoft, ["nvshext.dll", "nv3dappshext.dll"]),
+        new("Intel graphics", NirSoft, ["igfxpph.dll"]),
         // Also Adobe's Substance 3D Painter page "Crash when opening or saving a file", which names these overlays.
-        new("Dell Backup and Recovery", ["dbroverlayicon"], NirSoft, ["DBROverlayIconBackuped.dll"]),
-        new("Norton", ["navshext", "tpshell"], NirSoft, ["NavShExt.dll", "tpShell.dll"]),
-        new("McAfee", ["mcctxmenufrmwrk"], NirSoft, ["McCtxMenuFrmWrk.dll"]),
-        new("Avast or AVG", ["ashshell", "avgsea"], NirSoft, ["ashShell.dll", "avgsea.dll"]),
-        new("Bitdefender", ["bdshellext"], NirSoft, ["bdshellext.dll"]),
-        new("Malwarebytes", ["mbshlext"], "https://forums.malwarebytes.com/topic/236763-mbshlextdll-crashing-explorerexe-in-windows-7/",
-            ["mbshlext.dll"]),
+        new("Dell Backup and Recovery", NirSoft, ["DBROverlayIconBackuped.dll"]),
+        new("Norton", NirSoft, ["NavShExt.dll", "tpShell.dll"]),
+        new("McAfee", NirSoft, ["McCtxMenuFrmWrk.dll"]),
+        new("Avast or AVG", NirSoft, ["ashShell.dll", "avgsea.dll"]),
+        new("Bitdefender", NirSoft, ["bdshellext.dll"]),
+        new("Malwarebytes", "https://forums.malwarebytes.com/topic/236763-mbshlextdll-crashing-explorerexe-in-windows-7/", ["mbshlext.dll"]),
     ];
 
     /// <summary>The curated product a DLL is, by its file name alone, or null.</summary>
     public static string? MatchCulprit(string dllPath)
     {
         var name = Path.GetFileName(dllPath);
-        return Culprits.FirstOrDefault(c => c.FilePrefixes.Any(p => name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))?.Product;
+        return Culprits.FirstOrDefault(c => c.SourceDlls.Any(d => d.Equals(name, StringComparison.OrdinalIgnoreCase))
+                                            || c.Prefix is { } prefix && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))?.Product;
     }
 
     public static bool IsMicrosoft(string? company) =>
@@ -294,6 +344,7 @@ internal static class PickerCrashClues
         var others = f.Others.ToList();
         text.AppendLine().AppendLine($"Other add-ons, not from Microsoft ({others.Count}):");
         foreach (var o in others) text.AppendLine("  " + Line(o));
+        if (f.ScanCutShort) text.AppendLine().AppendLine(CutShortNote(f).Trim());
         return text.ToString();
     }
 
@@ -309,7 +360,11 @@ internal static class PickerCrashClues
         0 => "No other add-ons from outside Microsoft were found.",
         1 => "One other add-on from outside Microsoft was found; Copy details names it.",
         var n => $"{n} other add-ons from outside Microsoft were found; Copy details names them all.",
-    };
+    } + CutShortNote(f);
+
+    private static string CutShortNote(PickerCrashFindings f) => f.ScanCutShort
+        ? $" The search stopped after {ScanBudget.TotalSeconds:0} seconds, so there may be more."
+        : "";
 
     /// <summary>Copy details' clipboard write, <paramref name="setText"/> being Clipboard.SetText outside
     /// tests. Null when copied; otherwise the note to show (the same seam as MainWindow.CopyLinkTo).</summary>
