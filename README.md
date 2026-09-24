@@ -322,13 +322,13 @@ The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 - **v1.0.0-rc3** *(prerelease)* — **The third 1.0 release candidate.** Markdown Midget
   now **follows Windows light and dark mode**: in dark mode the menus, toolbar, dialogs
   and title bar turn dark, and the document shows the theme you picked for that mode;
-  **View ▸ Mode** can keep the app in light or dark mode instead. New built-in themes:
-  **Obsidiminutive**, dark mode's default, and **Amber Phosphor**, **Red Sparks** and
-  **Red Sparks 2X**, designed by Joe Sparks (@joesparks on X). Most diagrams now follow
-  a theme's text size, and dark themes print dark headings and links. **Formatting
-  marks** show in the source view too. **Cancel** in Windows' file dialog now just
-  closes it, and if that dialog crashes, a notice says what it found. Themes made by
-  other people are in the [community-themes](community-themes/) folder.
+  **View ▸ Mode** can keep the app in light or dark mode instead. **Obsidiminutive** is
+  a new dark theme and dark mode's default. **Amber Phosphor**, **Red Sparks** and
+  **Red Sparks 2X** are new night themes, designed by Joe Sparks (@joesparks on X).
+  Most diagrams now follow a theme's text size, and dark themes print dark headings and
+  links. **Formatting marks** show in the source view too. **Cancel** in Windows' file
+  dialog now just closes it, and if that dialog crashes, a notice says what it found.
+  Themes made by other people are in the [community-themes](community-themes/) folder.
 - **v1.0.0-rc2** *(prerelease)* — **The second 1.0 release candidate.** Updating or
   registering now leaves your **`.md` default** alone. The update from an older
   version is still done by that version, so it may reset the default one last time;
