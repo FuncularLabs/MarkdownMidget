@@ -120,9 +120,8 @@ editing the markdown source directly.
 ## Formatting marks (¶)
 
 The **¶** toolbar toggle shows Word-style marks in both views, in the theme's faint mark
-colour (light gray by default). In the
-formatted view: **¶** at paragraph and heading ends, **↵** at manual line breaks, and
-**→** for tabs. In the Markdown source view: **¶** at the end of each line, **→** for
+colour. In the formatted view: **¶** at paragraph and heading ends, **↵** at manual line
+breaks, and **→** for tabs. In the Markdown source view: **¶** at the end of each line, **→** for
 tabs, and **·** for the spaces that are hard to see but change what Markdown does:
 
 - spaces at the end of a line, since two or more there make a line break;
@@ -136,8 +135,8 @@ tabs, and **·** for the spaces that are hard to see but change what Markdown do
 Other spaces aren't marked, such as ordinary indentation (in a blockquote, counted from
 after the `>`), the spaces after a list marker or a `>`, and the padding in a table row
 that starts with `|`. In a code block, front matter (from a `---` on the first line to the
-next `---`), and an HTML comment, only spaces at the end of a line are marked, because
-spacing there is usually on purpose. A code block inside a list item or blockquote ends where the item or quote does.
+next `---`), and an HTML comment that starts a line and runs onto the next, only spaces
+at the end of a line are marked, because spacing there is usually on purpose. A code block inside a list item or blockquote ends where the item or quote does.
 The marks are only shown: they aren't copied, found, printed or saved.
 
 ## Find
@@ -368,8 +367,8 @@ The choice is saved, and every open window follows it within about a second. If 
 can't be saved, the status bar says so, and that window uses it for now. With a
 Windows contrast theme on, Markdown Midget uses its light look in every mode, so the
 contrast theme's colours stay in charge. Windows' own message boxes and its Open and
-Save dialogs stay light, and a toolbar button you point at keeps its pale blue
-highlight in dark mode. Version 1.0.0-rc2 and earlier don't know this setting: once
+Save dialogs stay light, and a toolbar button you point at keeps Windows' own faint
+blue highlight in dark mode. Version 1.0.0-rc2 and earlier don't know this setting: once
 one of them saves your settings, Mode is back on System.
 
 ## Themes
@@ -379,15 +378,15 @@ one of them saves your settings, Mode is back on System.
 | Theme | |
 |---|---|
 | **Default** | Markdown Midget's original look |
-| **Amber Phosphor** | Dark, amber with no blue in any colour it sets — for reading at night, designed by Joe Sparks (@joesparks on X); the selection highlight and the outline round a clicked rule or picture aren't a theme's to colour, and stay blue |
+| **Amber Phosphor** | Dark, amber with no blue in any colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); no theme variable reaches the highlight on selected text and Find matches or the outline round a clicked rule or picture, so they stay blue |
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
 | **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
 | **Obsidiminutive** | Dark — after Notepad++'s Obsidian, with bold you can read |
 | **One Light** | Light, cool and crisp |
-| **Red Sparks** | Dark, red only — for reading at night, designed by Joe Sparks (@joesparks on X) |
-| **Red Sparks 2X** | Red Sparks with the text twice the size |
+| **Red Sparks** | Dark, red only in every colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); no theme variable reaches the highlight on selected text and Find matches or the outline round a clicked rule or picture, so they stay blue |
+| **Red Sparks 2X** | Red Sparks with the text twice the size; the same highlight and outline stay blue |
 | **Solarized Light** | Light, warm, low-glare |
 
 Switching is instant, applies to the source view as well as the formatted one, and
@@ -488,10 +487,11 @@ line: the same palette as **Red Sparks**, at twice the size.
 Most diagrams follow it too. Flowcharts and class, state, entity-relationship, mind-map,
 timeline, kanban, block, architecture, swimlane, railroad and Ishikawa diagrams are drawn
 at the document's size, with every box drawn to fit its label, and so are a C4 diagram's
-title and a git graph's branch names. Seventeen types keep mermaid's own text sizes,
-because the rest of their drawing doesn't grow with them: sequence, Gantt, pie, user
-journey, requirement, quadrant, XY, Sankey, packet, radar, treemap, Venn, Wardley,
-Cynefin, tree view, event modeling and info diagrams. Every diagram is also fitted to
+title and a git graph's branch names. Seventeen types keep mermaid's own text sizes:
+user journey, requirement, radar and event modeling diagrams, because the rest of their
+drawing doesn't grow with the text, and sequence, Gantt, pie, quadrant, XY, Sankey,
+packet, treemap, Venn, Wardley, Cynefin, tree view and info diagrams, which size their
+text in settings of their own. Every diagram is also fitted to
 the page width, a small one stretched to fill it, so most grow less than the text around
 them: a drawing that gets wider with its text is scaled back down, and at double size a
 flowchart's labels come out about 1.4 times as large. Timelines, kanban boards and
