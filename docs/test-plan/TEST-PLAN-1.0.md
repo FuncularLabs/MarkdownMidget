@@ -1652,6 +1652,120 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | INST-02 | | | |
 | INST-03 | | | |
 
+### Build 1126 (1.0.0-rc3+build.1126) — 2026-09-24
+
+Automated items only, run by Claude on 2026-09-24 in `C:\code\MarkdownMidget\.claude\worktrees\agent-a6cda7ba2ef429488` on branch `runlog-1126`. Build 1126 is master c0e5f3b, published as 1.0.0-rc3+build.1126, and is the candidate for the `v1.0.0-rc3` tag. It is build 450 plus the rc3 changes: the menus, toolbar, status bar, dialogs and title bar following Windows light and dark mode, View ▸ Mode, a document theme for each mode, the new dark themes Obsidiminutive, Red Sparks, Red Sparks 2X and Amber Phosphor, a theme's own text size, list-marker and inline-code colours, formatting marks in the Markdown source view, and the notice with clues when Windows' Open or Save dialog crashes. The fixes are dark themes printing dark headings and links, toolbar tooltips opening below an enlarged pointer, registering as the .md default opening Settings on Markdown Midget's page, Cancel in Windows' file dialog just closing it (#12), and line numbers staying in the margin whatever `position` a theme gives the blocks. The project version is now `1.0.0-rc3`.
+
+- `dotnet test tests/MarkdownMidget.Tests`: 2041 passed, 0 failed (`b1126-pre.trx`). All 158 plan-named C# tests were found and passed, including the 116 new ones that TIP-02, THM-01 to THM-05, MRK-01, MRK-02 and DLG-01 to DLG-03 name. The version checks pass with `1.0.0-rc3`: `EmbeddedReaderDocsTests.TheChangelogHasAnEntryForThisBuild`, `TheVersionThisProjectCarriesHasTheChangelogSectionTheReleaseWorkflowCuts`, `TheChangelogsNewestEntryComesFirst` and `BuildNumberVersionTests.ThisVeryBuildCarriesItsNumberInBothVersions`. No test in section 3 names them. The local test build is numbered 1127.
+- `npm test` (editor-src): 501 pass, 0 fail, 0 cancelled, 0 skipped, 0 todo. The full log was kept (`npm-1126.txt`), and each of the 75 plan-named jsdom titles is in it as passed, from the file the plan names (`map-1126.mjs`, adapted from `map-450.mjs`). They are 74 tests, because THM-05 names one of THM-04's, cut short. The 28 new titles are the ones LIN-07, THM-04, THM-05 and PRN-01 name. The three roundtrip suites named whole (ListItemLeadingBlockSurvives, InlineBreakSurvives and ParagraphAfterNestedListKeepsItsBlankLine) pass, and so does every test in the two files PERF-01 names. TBL-02's two titles are cases of the table-fidelity "…: byte-identical; edited, saved, reopened and saved again" loop.
+- Fixture round-trip check: `roundtrip-1126.mjs`, output in `roundtrip-1126.txt`. It is build 450's script, pointed at this worktree, and it also compares each no-edit save with build 450's. Loading, saving, the BOM and line endings are handled as the host does. Since build 450 the editor source has changed only in themes and diagrams (the theme read-back in `main.js`, `mermaid.js`, the new `mermaid-look.js` and four stylesheets), not in loading or saving. Three fixtures are new (`print-themes.md`, `space-marks.md` and `theme-tester.md`), and the rest haven't changed. `make-large.mjs` regenerated the large documents and `front-matter-bom-crlf.md`, which are byte-identical to build 450's. All 16 committed fixtures, the generated `front-matter-bom-crlf.md` and `large-600kb.md`, and a CRLF copy of `source-keep-roundtrip.md` are byte-identical after a no-edit save and stable on pass 2. Each save of a document build 450 also checked is byte-identical to build 450's. Every edit step gives the same change as in build 450 and is stable when reopened and saved.
+- Not re-run: the WEB **link replay**, for the same reason as builds 284, 304, 314, 328 and 450.
+- Stale expectations: none found. FND-05 still names a jsdom title with a straight apostrophe where the test has a typographic one (see FND-05), and THM-05 names a theme-parity title without its last words (see THM-05).
+
+| ID | Result | By | Note |
+|---|---|---|---|
+| LIN-01 | | Claude (2026-09-24) | auto PASS — human pending. `LineColumnTests.TheStatusTextNamesTheLineAndColumn`, `TheColumnCountsCharactersTheWayAReaderDoes` and line-map "the caret's line in a nested list…" pass. |
+| LIN-02 | | Claude (2026-09-24) | auto PASS — human pending. line-map "the margin numbers top-level blocks…" and "the margin redraws…" pass. |
+| LIN-03 | | Claude (2026-09-24) | auto PASS — human pending. line-map range, gap-label, nested-list range and "every line … once and in order" tests pass. |
+| LIN-04 | | Claude (2026-09-24) | auto PASS — human pending. line-map Go to Line tests (3 titles) and `LineColumnTests.GoToLineClampsANumberAndRefusesAnythingElse` pass. |
+| LIN-05 | | Claude (2026-09-24) | auto PASS — human pending. line-map "an untouched document is numbered by the text it was loaded from" and "after an edit, and after a save…" pass. |
+| LIN-06 | | Claude (2026-09-24) | auto PASS — human pending. line-map "a table or a code fence ending a file with no final newline…" passes. |
+| LIN-07 | | Claude (2026-09-24) | auto PASS — human pending. layers "the line numbers are drawn against the editor, and a theme's position cannot move them off it" and line-map "with numbers on, nothing between a number and the editor can be positioned by a theme: …" (all three documents) pass. |
+| VIEW-01 | | | |
+| VIEW-02 | | Claude (2026-09-24) | auto PASS — human pending. `LargeFileTests.The_threshold_is_250_KB`, `A_file_opening_formatted_is_offered…` and `A_file_opening_into_the_source_view_is_never_offered_it` pass. |
+| ANC-01 | | Claude (2026-09-24) | auto PASS — human pending. anchor-links "HELP's Known limits link: a plain click edits, Ctrl+click jumps…" passes. |
+| ANC-02 | | Claude (2026-09-24) | auto PASS — human pending. Same anchor-links test (read-only half) passes. |
+| ANC-03 | | Claude (2026-09-24) | auto PASS — human pending. anchor-links "a repeated heading takes its numbered anchor…" and "an unmatched or malformed fragment does nothing…" pass. |
+| ANC-04 | PASS | Claude (2026-09-24) | `DocAnchorLinksTests.EveryAnchorLinkLandsOnAHeadingThatExists`, `ARepeatedHeadingGetsGitHubsNumberedAnchors` and anchor-links "a slug is DocAnchorLinksTests' slug" pass. |
+| LNK-01 | | Claude (2026-09-24) | auto PASS — human pending. link-at "a right-click on a link reports its mark href…" and `CopyLinkTests.CopyLinkWritesExactlyTheHref…` pass. Link replay not re-run (see WEB-06). |
+| LNK-02 | | Claude (2026-09-24) | auto PASS — human pending. link-at "a right-click off a link or on a raw-HTML <a> reports none…" passes. |
+| LNK-03 | | | |
+| LNK-04 | | Claude (2026-09-24) | auto PASS — human pending. link-at "… a linked picture reports its link …" passes. |
+| LNK-05 | | | |
+| LNK-06 | | Claude (2026-09-24) | auto PASS — human pending. link-at "… with no target the caret decides" passes. |
+| LNK-07 | | Claude (2026-09-24) | auto PASS — human pending. `CopyLinkTests.CopyLinkWritesExactlyTheHrefAndAClipboardAnotherProgramHoldsIsANoteNotACrash` passes. |
+| WEB-01 | | Claude (2026-09-24) | auto PASS — human pending. web-links "Ctrl+click posts openLink with the mark's href…" and `LinkOpeningTests.AnOverlongUrlIsRefusedAndALongOneIsShownWhole` pass. |
+| WEB-02 | | Claude (2026-09-24) | auto PASS — human pending. web-links "… a plain click in the editable view posts nothing" and "… in a read-only view a plain click posts the web link" pass. |
+| WEB-03 | | Claude (2026-09-24) | auto PASS — human pending. web-links "a relative, file:, javascript: or mailto: link is refused…" and `LinkOpeningTests.EverythingElseIsRefused` pass. |
+| WEB-04 | | Claude (2026-09-24) | auto PASS — human pending. `LinkOpeningTests.WebLinksAreAccepted` and `HostsThatCannotShowInPunycodeAreRefused` pass. Link replay not re-run (see WEB-06). |
+| WEB-05 | | Claude (2026-09-24) | auto PASS — human pending. `LinkOpeningTests.EverythingElseIsRefused`, `PaddingCannotHideAHostOrAnAttachment` and `HostsThatCannotShowInPunycodeAreRefused` pass. Link replay not re-run (see WEB-06). |
+| WEB-06 | | Claude (2026-09-24) | auto BLOCKED — human pending. This test's only automated part is the link replay, which runs the links.md addresses through `LinkOpening.TryValidate`. It needs a new .NET harness, which this run doesn't build. The plan last records it as confirmed on master a4577ae. |
+| MENU-01 | | Claude (2026-09-24) | auto PASS — human pending. `MenuAccessKeysTests.OnlyAMenusOwnOpeningIsItsOwn` and `ANestedSubmenuOpeningReachesTheParentButIsNotItsOwn` pass. The second is in the nested class `MenuAccessKeysTests+OnARealMenu`. |
+| SPL-01 | | Claude (2026-09-24) | auto PASS — human pending. `SpellChunkTests.Chunks_BreakAtALineBreak_PreferringABlankLine`, `Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk` and `CheckInChunks_GivesTheRangesOfOneWholeTextCall` pass. |
+| PERF-01 | | Claude (2026-09-24) | auto PASS — human pending. Every test in load-state.test.mjs and parser-types.test.mjs passes, and so does marks "a keystroke keeps every ¶ node already drawn…". |
+| PERF-02 | | Claude (2026-09-24) | auto PASS — human pending. `TimingLogTests.A_line_is_the_time_of_day_sequence_phase_and_whole_milliseconds_in_any_culture` passes. |
+| SWT-01 | | Claude (2026-09-24) | auto PASS — human pending. `SwitchBusyTests.TheLightboxShowsOnlyOverAStillInstallingSourceViewNoOpenHasCovered` and `EditorScriptsTests.ASwitchsPaintWaitAsksForItsOwnLoadsPaintedAfterAFrame` pass. |
+| SWT-02 | | | |
+| SWT-03 | | | |
+| SWT-04 | | Claude (2026-09-24) | auto PASS — human pending. `SwitchBusyTests.OnlyTheSwitchUnderWayOwnsTheIndicator` passes. |
+| SWT-05 | | | |
+| SWT-06 | | | |
+| SWT-07 | | | |
+| FM-01 | | Claude (2026-09-24) | auto PASS — human pending. front-matter "front matter opens as no edit and saves byte for byte…" and "… its words are code to spell check" pass. |
+| FM-02 | | Claude (2026-09-24) | auto PASS — human pending. Fixture check: front-matter.md (242 B), front-matter-blank-lines.md (77 B), front-matter-bom-crlf.md (103 B, BOM and CRLF kept) and front-matter-at-eof.md (72 B) are byte-identical after a no-edit save and stable on pass 2. Step 2 (`draft: true` → `draft: false`) changes only that line. Step 3 (`, edited` at the end of the `title:` line) changes only that line and adds a final newline (72 → 81 B), and a reopen and save changes nothing. The front-matter "opens as no edit and saves byte for byte…" test passes. |
+| FM-03 | | Claude (2026-09-24) | auto PASS — human pending. front-matter "Enter and typing edit its text…" passes. |
+| FM-04 | | Claude (2026-09-24) | auto PASS — human pending. front-matter "… input rules and the toolbar cannot make it another block…" passes. |
+| FM-05 | | Claude (2026-09-24) | auto PASS — human pending. front-matter "its lines, and the lines of the blocks after it, are numbered and reached by Go to Line…" passes. |
+| TBL-01 | | Claude (2026-09-24) | auto PASS — human pending. table-fidelity "…: byte-identical; edited, saved, reopened and saved again" (12 cases) pass. Fixture check: tables.md (1158 B) is byte-identical after a no-edit save, every table included, and stable on pass 2. |
+| TBL-02 | | Claude (2026-09-24) | auto PASS — human pending. table-fidelity "aligned, a cell grows" and "Prettier, a cell grows past its width" pass. Fixture check: step 1 changes only the `apple` row. Step 2 widens that column in every row of **Prettier style** only, delimiter row included. Both are stable when reopened and saved. |
+| TBL-03 | PASS | Claude (2026-09-24) | roundtrip InlineBreakSurvives "a cell holding only a break loads as an empty cell" passes. Fixture check: step 1 is byte-identical. Step 2 (`h2` → `h2X`) changes only that table's header row and its two `<br />` rows, to `\| h1 \| h2X \|`, `\| \| text \|` and `\| text \| \|`. A reopen and save changes nothing. |
+| TBL-04 | | Claude (2026-09-24) | auto PASS — human pending. table-fidelity "a new table: aligned, columns at least 3 wide…" passes. |
+| TBL-05 | PASS | Claude (2026-09-24) | table-fidelity "wide-cell repro: the save is the size of the file…" passes. Fixture check: large-600kb.md (generated, 619,574 B) is byte-identical after a no-edit save and stable on pass 2. |
+| TBL-06 | PASS | Claude (2026-09-24) | Fixture check: step 1 leaves the table identical. Step 2 (`red` → `pink`) re-centres the header and the edited row: `\| Note   \|` becomes `\|  Note  \|`, and the cell saves as `\|  pink  \|`. The `fig` row is identical, and a reopen and save changes nothing. |
+| TBL-07 | PASS | Claude (2026-09-24) | Fixture check: step 1 leaves both tables identical. In step 2, **No outer pipes** gains outer pipes (`\|a\|b\|`, `\|---\|---\|`, `\|1\|3\|`), and the edited **CJK** row `\| 林檎 \| 3  \|` saves as `\| 林檎 \| 4 \|`. A reopen and save changes nothing. |
+| BR-01 | | Claude (2026-09-24) | auto PASS — human pending. roundtrip InlineBreakSurvives "an inline break renders as a line break" passes. |
+| BR-02 | PASS | Claude (2026-09-24) | roundtrip InlineBreakSurvives "the line ending before an inline break is kept…" passes. Fixture check: br-forms.md (534 B) is byte-identical and stable on pass 2. With "Edited " typed at the first text, only that line differs. |
+| BR-03 | PASS | Claude (2026-09-24) | roundtrip InlineBreakSurvives "guard: a whole-paragraph <br /> is still an empty line" passes. |
+| LST-01 | PASS | Claude (2026-09-24) | roundtrip ListItemLeadingBlockSurvives (suite) passes. Fixture check: list-leading-blocks.md (530 B) is byte-identical after a no-edit save and stable on pass 2, so `- > quoted text` and the task checkboxes are kept. For information: with `X` typed at the end of the last task item, only that line changes, and the file still ends with one newline. |
+| LST-02 | PASS | Claude (2026-09-24) | roundtrip ParagraphAfterNestedListKeepsItsBlankLine "inside a quote: the issue…", "outside a quote" and "inside a quote: ordered, deeper, loose…" pass. Fixture check: issue-11-list-paragraph.md (336 B) is byte-identical and stable on pass 2. |
+| LST-03 | | Claude (2026-09-24) | auto PASS — human pending. roundtrip ParagraphAfterNestedListKeepsItsBlankLine "made in the editor outside a quote" passes. |
+| OPN-01 | | Claude (2026-09-24) | auto PASS — human pending. `OpenRoutingTests.The_first_file_opens_here_only_when_the_window_has_no_document` passes. |
+| OPN-02 | | Claude (2026-09-24) | auto PASS — human pending. `OpenRoutingTests.A_window_has_no_document_only_when_nothing_is_in_it_or_on_its_way` passes. |
+| OPN-03 | | Claude (2026-09-24) | auto PASS — human pending. `OpenRoutingTests.Only_dropped_documents_open_each_as_the_path_the_drop_carried_under_its_own_name` and file-drop "postWithFiles hands the host the dropped files…" pass. |
+| OPN-04 | | Claude (2026-09-24) | auto PASS — human pending. `OpenRoutingTests.A_drop_starts_at_most_ten_instances_names_the_rest_and_a_failed_start_is_a_status_note` passes. |
+| OPN-05 | | Claude (2026-09-24) | auto PASS — human pending. `DropRoutingTests.OtherAndUnreadableFilesAreRefused` and `DropRoutingTests.PicturesInsertInDropOrder` pass. |
+| OPN-06 | | | |
+| OPN-07 | | Claude (2026-09-24) | auto PASS — human pending. `OpenGuardTests.SecondAcquireSeesTheHolder` and `OpenRoutingTests.The_first_file_opens_here_only_when_the_window_has_no_document` pass. |
+| OPN-08 | | | |
+| OPN-09 | | | |
+| BIG-01 | | Claude (2026-09-24) | auto PASS — human pending. `LargeDocumentTests.Over_512_KB_of_UTF8_both_start_off_in_both_views_and_the_note_naming_the_menus_shows_once_per_document` passes. |
+| BIG-02 | | Claude (2026-09-24) | auto PASS — human pending. `LargeDocumentTests.Exactly_512_KB_follows_the_saved_settings` and `Turning_one_on_is_the_documents_own_choice_and_sticks…` pass. |
+| BIG-03 | | Claude (2026-09-24) | auto PASS — human pending. `LargeDocumentTests.Turning_one_on_is_the_documents_own_choice_and_sticks_and_a_small_document_follows_the_saved_settings_again` passes. |
+| BIG-04 | PASS | Claude (2026-09-24) | `LargeDocumentTests.A_load_or_switch_over_5_seconds_turns_both_off_with_the_note` passes. |
+| BIG-05 | | | |
+| BIG-06 | | Claude (2026-09-24) | auto PASS — human pending. `LargeDocumentTests.Closing_forgets_the_document_so_the_no_document_screen_follows_the_saved_settings` passes. |
+| BIG-07 | | Claude (2026-09-24) | auto PASS — human pending. `LargeDocumentTests.Keeping_the_document_under_a_new_name_keeps_its_choices` passes. |
+| BIG-08 | | | |
+| SRC-01 | | Claude (2026-09-24) | auto PASS — human pending. Fixture check: all 16 committed fixtures, front-matter-bom-crlf.md, large-600kb.md and a CRLF copy of source-keep-roundtrip.md are byte-identical after a no-edit save and stable on pass 2. That includes source-keep-roundtrip.md (1225 B), its CRLF copy (1281 B), list-leading-blocks.md (530 B), and the three fixtures new in rc3: print-themes.md (499 B), space-marks.md (996 B) and theme-tester.md (6431 B). |
+| SRC-02 | | Claude (2026-09-24) | auto PASS — human pending. Fixture check: with no edit, `MDM.getMarkdown` (what Ctrl+E shows) returns source-keep-roundtrip.md's text exactly, including `* star bullet one`, the setext underline and `~tilde~`. |
+| SRC-03 | | Claude (2026-09-24) | auto PASS — human pending. Fixture check: ` Edited.` typed at the end of the last paragraph. The save is the original with only that line changed (L56; 1225 → 1233 B), and a reopen and save is stable. |
+| SRC-04 | | Claude (2026-09-24) | auto PASS — human pending. Fixture check: `now` → `today` in "Bold around code". Only L10 differs, rewritten in the app's conventions: the bold is split around the code span. The lists, rules, reference definitions and HTML comment are identical, and a reopen and save is stable. |
+| SRC-05 | | Claude (2026-09-24) | auto PASS — human pending. Fixture check: `New paragraph.` inserted after "Rule written with dashes:", and the "Rule written with stars:" paragraph deleted. The save is exactly the original with that paragraph and its blank line added and that one removed (1225 → 1215 B). Blank lines between untouched blocks are kept, and a reopen and save is stable. |
+| SRC-06 | | | |
+| SRC-07 | | | |
+| SRC-08 | | | |
+| FND-01 | | Claude (2026-09-24) | auto PASS — human pending. `FindDialogFocusTests.CtrlHFocusesReplaceWithOnlyWhenFindWhatHasTextAndReplaceCanRun` passes. |
+| FND-02 | | | |
+| FND-03 | | Claude (2026-09-24) | auto PASS — human pending. `FindDialogFocusTests.CtrlHFocusesReplaceWithOnlyWhenFindWhatHasTextAndReplaceCanRun` and `ReplaceIsGreyedWhenReadOnlyOrNoDocument` pass. |
+| FND-05 | | Claude (2026-09-24) | auto PASS — human pending. `FindEngineTests.TheSelectionFillsFindWhatOnlyWhenItIsOneLineOfAtMostTheLimit`, `TheSeededQueryFindsTheSelectedTextItselfInEveryMode` and `OnlyASelectionOverALineBreakLimitsReplaceAll` pass, and so do find "is the text the page shows over marks, links and code, and nothing for Find’s own current match" and "only matches wholly inside a selection over a line break are replaced …". The first title is written with a typographic apostrophe (Find’s) in find.test.mjs, and with a straight one in this plan. |
+| VIEW-03 | | Claude (2026-09-24) | auto PASS — human pending. `ToolBarToggleTests.AGroupedButtonKeepsTheToolbarTemplateAndSize` passes. |
+| TIP-01 | | | |
+| TIP-02 | | Claude (2026-09-24) | auto PASS — human pending. `ToolbarToolTipTests.AStandardPointerKeepsWpfsPlacementUnderThePointer`, `AnEnlargedPointerMovesTheTooltipUnderTheButtonByItsWholeSize`, `AMissingInvalidOrSmallSizeKeepsWpfsPlacement`, `AReadThatThrowsKeepsWpfsPlacement` and `TheStandardValuesAreWhatToolbarControlsAndTheirTooltipsHaveUnset` pass. |
+| THM-01 | | Claude (2026-09-24) | auto PASS — human pending. All 10 C# tests the plan names pass: 7 in `ThemeModesTests` and 3 in `WindowsAppearanceTests`. |
+| THM-02 | | Claude (2026-09-24) | auto PASS — human pending. All 9 C# tests the plan names pass: 2 in `WindowsAppearanceTests`, 3 in `ChromeRenderTests`, and one each in `AppearanceModeTests`, `ChromePaletteTests`, `ChromePaletteHookTests` and `DarkTitleBarTests`. |
+| THM-03 | | Claude (2026-09-24) | auto PASS — human pending. All 20 C# tests the plan names pass: 13 in `AppearanceModeTests`, 5 in `WindowsAppearanceTests` and 2 in `ThemeModesTests`. |
+| THM-04 | | Claude (2026-09-24) | auto PASS — human pending. All 17 C# tests the plan names pass: 15 in `BuiltInThemeTests` and 2 in `SourcePaletteContrastTests`. So do its 21 jsdom titles: 7 in theme-parity, 7 in mermaid-look, 1 in mermaid-first-render and 6 in mermaid-render. The headless Edge survey of diagram types at 2X in this test wasn't re-run; jsdom has no layout, so whether labels fit their boxes is for the human part. |
+| THM-05 | | Claude (2026-09-24) | auto PASS — human pending. `BuiltInThemeTests.AmberPhosphorShipsAsADarkBuiltInThroughTheStoreTheMenuReads`, `AmberPhosphorSetsNoColourWithBlueInIt`, `AmberPhosphorIsItsPaletteAndTheOneScreenRuleThatKeepsDiagramsFreeOfBlue`, `EveryThemeClearsItsOwnFloorOnEveryTextPairItDefines` and `EveryRecordedDimPairIsOneThePaletteReallyDrawsAndStillNeeds` pass, and so does theme-parity "a dark built-in prints every heading and its links dark enough for paper, with Background graphics on or off". This plan names that title without its last words (", with Background graphics on or off"), which THM-04 and PRN-01 include. |
+| PRN-01 | | Claude (2026-09-24) | auto PASS — human pending. theme-parity "every built-in is sorted into dark or light by what it declares", "a dark built-in prints every heading and its links…", "paper pins a dark theme's heading and link variables, not their colours", "Default and every light built-in print headings and links in their own colours, as before" and "a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then" pass, and so does layers "print is the earliest layer, so nothing a theme writes reaches paper". |
+| MRK-01 | | Claude (2026-09-24) | auto PASS — human pending. All 11 C# tests the plan names pass: 10 in `SourceFormattingMarksTests` and `SourcePaletteTests.TheMarkColourIsKeptWhenThePageSendsOne`. |
+| MRK-02 | | Claude (2026-09-24) | auto PASS — human pending. All 15 C# tests the plan names pass: 7 in `SpaceMarksTests`, including `EachCorpusDocumentIsDottedExactlyWhereItsFileShows`, and 8 in `SourceFormattingMarksTests`. |
+| INST-01 | | | |
+| INST-02 | | | |
+| INST-03 | | | |
+| DLG-01 | | Claude (2026-09-24) | auto PASS — human pending. `PickerOutcomeTests.EveryExitCodeMeansWhatTheParentDoesWithIt` and `AChosenPathComesBackTrimmed` pass. |
+| DLG-02 | | Claude (2026-09-24) | auto PASS — human pending. All 22 C# tests the plan names pass: 21 in `PickerCrashCluesTests` and `PickerChildTests.OnlyTheExactDevelopmentSwitchSimulatesACrash`. |
+| DLG-03 | | Claude (2026-09-24) | auto PASS — human pending. `PickerCrashCluesTests.ExplorerIsGivenTheFolderQuoted`, `TheGuideShipsSelfContainedAndFollowsDarkMode` and `TheGuideIsWrittenOnceAndRewrittenOnlyWhenItChanges` pass. |
+
 ### Build ___ (1.0.0-…+build.N) — date
 
 | ID | Result | By | Note |
