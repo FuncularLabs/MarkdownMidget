@@ -413,6 +413,7 @@ public class ThemeModesTests
     }
 
     [Theory]
+    [InlineData("themes/Amber-Phosphor.css", true)]
     [InlineData("themes/Dracula.css", true)]
     [InlineData("themes/GitHub-Dark-Dimmed.css", true)]
     [InlineData("themes/Midget-Solarized.css", false)]

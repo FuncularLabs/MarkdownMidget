@@ -1,0 +1,174 @@
+/* =====================================================================
+ *  Amber Phosphor — dark: the colours of an amber terminal, and no blue.
+ *
+ *  Designed by Joe Sparks (@joesparks on X), https://x.com/joesparks — the
+ *  second of his palettes for reading at night, after Red Sparks.
+ *
+ *  Every colour on screen here is #RRGG00: the blue channel is zero
+ *  everywhere. Blue is the part of the light that does most to keep you
+ *  awake, so it is the part a night palette gives up. Red Sparks gives up
+ *  green as well; keeping it is what lets this one run to amber and yellow,
+ *  much brighter than red can go, and lets the syntax colours differ by hue.
+ *  The one colour that is not #RRGG00 is paper's: the printed row stripe is
+ *  white, which on paper is no ink rather than a colour.
+ *
+ *  Measured, WCAG contrast, on the grounds each colour can land on:
+ *
+ *    body text        #D89200   7.58:1 on the page, 7.28:1 on a striped row
+ *                               and 7.14:1 as inline code on its panel -
+ *                               above AAA (7:1) for normal text on all three
+ *    quoted text      #C08200   6.21:1 in a quote: AA, not AAA
+ *    headings         10.82:1 (h1-h3) down to 7.94:1 (h6) on the page;
+ *                     6.97:1 at worst, h6 in a table header cell
+ *    list markers     the body text's colour: 7.58:1 on the page, 6.66:1
+ *                     in a table header cell
+ *    links            12.41:1 on the page. A hover gets BRIGHTER here
+ *                     (13.85:1), which Red Sparks can't do.
+ *    squiggle         #FF2000, 5.15:1: a real red, a different hue from
+ *                     every amber on the page
+ *
+ *  So the text you read clears AA (4.5:1) everywhere and the body text clears
+ *  AAA; the palette as a whole is not AAA. Two pairs sit below AA, both dim on
+ *  purpose, and are recorded by name in BuiltInThemeTests (DimTextPairs),
+ *  which fails if either gets dimmer:
+ *
+ *    --mdm-token-comment   4.03:1 - code comments, on the code block
+ *    --mdm-mermaid-empty   3.50:1 - the placeholder in an empty diagram frame
+ *
+ *  Formatting marks are 2.50:1, faint on purpose, as in every theme.
+ *
+ *  Colours only. The version Joe sent also had scanlines, a glow and a
+ *  slow breathing animation on the headings; the palette is what ships.
+ *
+ *  A built-in. Edits here are overwritten the next time the app updates —
+ *  copy it into the `custom` folder and rename it to keep your changes.
+ * ===================================================================== */
+:root {
+  /* ---- surface ------------------------------------------------------ */
+
+  --mdm-color-scheme: dark;     /* not a colour — without it the
+                                   scrollbar and controls stay light */
+
+  --mdm-app-bg: #050400;        /* around the page */
+  --mdm-page-bg: #0C0A00;       /* the page */
+  --mdm-page-shadow: rgba(0, 0, 0, 0.7);
+  --mdm-text: #D89200;          /* body text, 7.58:1 */
+
+  /* ---- headings and links ------------------------------------------- */
+
+  --mdm-heading: #FFB000;       /* h1-h3, the P3 phosphor's amber, 10.82:1 */
+  --mdm-h4: #F5A800;
+  --mdm-h5: #E89E00;
+  --mdm-h6: #DC9600;
+
+  /* The hover goes BRIGHTER. Red Sparks can't do that: its links are
+     already at the top of its one channel. */
+  --mdm-link: #FFC400;
+  --mdm-link-hover: #FFD400;
+
+  /* ---- lists -------------------------------------------------------- */
+
+  /* Bullets and numbers, the body text's colour. Printed markers keep the
+     colour they have always printed in, whatever this says. */
+  --mdm-list-marker: #D89200;
+
+  /* ---- blockquote --------------------------------------------------- */
+
+  --mdm-quote-bg: #080600;
+  --mdm-quote-bar: #B87A00;
+  --mdm-quote-text: #C08200;
+
+  /* ---- code --------------------------------------------------------- */
+
+  /* Inline code's text, the body text's colour again: 7.14:1 on the panel
+     below. Fenced blocks keep --mdm-pre-fg and the syntax colours at the
+     foot of this file; paper keeps print's own pair. */
+  --mdm-code-fg: #D89200;       /* `inline` text */
+  --mdm-code-bg: #181200;       /* `inline` background */
+  --mdm-pre-bg: #080600;        /* fenced blocks */
+  --mdm-pre-fg: #D89200;
+
+  --mdm-hr: #6E4A00;
+
+  /* ---- tables ------------------------------------------------------- */
+
+  --mdm-table-border: #8C5E00;
+  --mdm-cell-border: #543800;
+  --mdm-td-bg: #0C0A00;         /* must match the page, or white cells */
+  --mdm-th-bg: #241800;
+  --mdm-th-text: #FFB000;
+  --mdm-row-alt-bg: #141000;
+
+  /* Paper. With no blue there is no pale tint either — the lightest colour
+     this palette has is yellow — so the printed stripe is white: no ink,
+     no stripe. */
+  --mdm-print-th-bg: #241800;
+  --mdm-print-th-text: #FFB000;
+  --mdm-print-row-alt-bg: #ffffff;
+
+  /* ---- the app's own furniture -------------------------------------- */
+
+  /* Mermaid draws its own SVG in its own palette. `dark` gives the best
+     tones to work with; the multiply overlay at the foot of this file
+     takes the blue out of the result. */
+  --mdm-mermaid-theme: dark;
+
+  /* Red has no blue either, so this palette gets a real error colour — a
+     different hue from the amber rather than a shade of it. */
+  --mdm-squiggle: #FF2000;
+  --mdm-mark: #6E4A00;          /* pilcrows, spaces, tabs */
+  --mdm-cell-selected: rgba(255, 176, 0, 0.22);
+  --mdm-resize-handle: #FFB000;
+
+  --mdm-mermaid-bg: #0C0A00;
+  --mdm-mermaid-border: #543800;
+  --mdm-mermaid-error-bg: #2A0800;
+  --mdm-mermaid-error-border: #FF2000;
+  --mdm-mermaid-error-text: #FF6000;
+  --mdm-mermaid-empty: #8C5E00;
+
+  /* ---- syntax highlighting ------------------------------------------ */
+
+  /* Nine names, nine values — where Red Sparks could only manage four.
+     Giving up one channel instead of two leaves a whole plane to move in:
+     red through orange and amber to yellow-green is all free of blue, so
+     the tokens differ by hue rather than by a dozen steps of brightness. */
+  --mdm-token-comment: #8C6A00;         /* recessive on purpose */
+  --mdm-token-punctuation: #C08200;
+  --mdm-token-operator: #FF6000;
+  --mdm-token-keyword: #FF8000;
+  --mdm-token-function: #FFD400;
+  --mdm-token-string: #B0D400;
+  --mdm-token-number: #FFE800;
+  --mdm-token-property: #E0B000;
+  --mdm-token-regex: #FF4000;
+}
+
+/* ---- the one thing no variable covers -------------------------------
+ *
+ * Mermaid, as in Red Sparks. It draws its own SVG in its own palette and no
+ * colour variable of ours gets inside — but it draws it as inline SVG, and
+ * pixels are pixels. This lays the heading's amber over the diagram in
+ * multiply mode, which multiplies every pixel by (1, 0.69, 0): red passes
+ * through, green is scaled to match, and blue goes to exactly zero. So
+ * whatever mermaid decides to draw arrives with no blue in it, like
+ * everything else. Delete this pair if you would rather see diagrams in
+ * full colour.
+ *
+ * Screen only: on paper a printed diagram is ink on white, where an amber
+ * multiply is a stain rather than a palette. Paper keeps the diagram
+ * mermaid drew. */
+@media screen {
+  .mdm-mermaid {
+    position: relative;
+  }
+
+  .mdm-mermaid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #FFB000;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+}

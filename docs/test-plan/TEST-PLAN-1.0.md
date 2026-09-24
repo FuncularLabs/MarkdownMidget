@@ -327,6 +327,27 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 
   Pre-existing at every size and unchanged: a radar chart's title is cut 3px at the top, and a treemap's section names overlap their values.
 
+#### THM-05 Amber Phosphor has no blue in it
+- **Change:** Added: "New dark theme: Amber Phosphor" · **Documents:** `theme-tester.md` (its checklist says red: read it as amber) · **Settings:** formatted view; ¶ on in step 2; settings.json backed up in step 1 and restored in step 4, because View ▸ Theme saves a theme for the current mode
+1. Close every Markdown Midget window and back up your settings:
+
+   ```powershell
+   $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
+   if (-not (Test-Path "$p.thm5-backup")) { Copy-Item $p "$p.thm5-backup" }
+   ```
+
+   Open `theme-tester.md` and pick **View ▸ Theme ▸ Amber Phosphor**. Work down the page against its checklist table, as in THM-04 step 1, and point at a link.
+2. Click **¶** on the toolbar and look at the marks, then press Ctrl+E and look at the Markdown source view. Press Ctrl+E back to the formatted view and click **¶** off.
+3. Press Ctrl+P and look at the preview with **More settings ▸ Background graphics** unticked, then ticked.
+4. Close every Markdown Midget window and put your settings back. If you stop THM-05 before this step, close every window and run this line when you stop:
+
+   ```powershell
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.thm5-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   ```
+
+- **Expected:** In step 1 Amber Phosphor is in View ▸ Theme, not greyed out, and nothing on the page is blue or has a blue cast: amber, orange, yellow and yellow-green only, with list markers and inline code amber and both mermaid diagrams tinted amber. Body text is easy to read and clearly brighter than Red Sparks'; h4, h5 and h6 are each a little dimmer than the one above; a link gets brighter when you point at it. Both misspellings carry a red squiggle you can see. The fenced block's syntax colours are distinct hues, comments the dimmest. In step 2 the marks are faint but visible, the same colour in both views, and the source view has no blue either. In step 3 paper is white with black text, unticked or ticked; the table's header row keeps its dark brown with amber text, the row stripe is white, list markers and inline code print in their usual colours, and the diagrams print in mermaid's own colours with no amber cast.
+- **Type:** Both. Automated: `BuiltInThemeTests.AmberPhosphorShipsAsADarkBuiltInThroughTheStoreTheMenuReads`, `BuiltInThemeTests.AmberPhosphorDrawsNothingWithBlueInIt`, `BuiltInThemeTests.AmberPhosphorIsItsPaletteAndTheOneScreenRuleThatKeepsDiagramsFreeOfBlue`, `BuiltInThemeTests.EveryThemeClearsItsOwnFloorOnEveryTextPairItDefines`, `BuiltInThemeTests.EveryRecordedDimPairIsOneThePaletteReallyDrawsAndStillNeeds`, and in `editor-src/test/theme-parity.test.mjs`, "a dark built-in prints every heading and its links dark enough for paper". Human: what the colours look like on a real screen, the overlay on the diagrams, and the print preview.
+
 ### PRN — Printing with a theme
 
 #### PRN-01 Dark themes print dark headings and links on a white page; light themes print as before
@@ -1701,6 +1722,7 @@ Automated items only, run by Claude on 2026-09-16 in `C:\code\MarkdownMidget\.cl
 | THM-02 | | | |
 | THM-03 | | | |
 | THM-04 | | | |
+| THM-05 | | | |
 | PRN-01 | | | |
 | MRK-01 | | | |
 | MRK-02 | | | |

@@ -374,11 +374,12 @@ one of them saves your settings, Mode is back on System.
 
 ## Themes
 
-**View ▸ Theme** recolours the editing surface. Ten ship with the app:
+**View ▸ Theme** recolours the editing surface. Eleven ship with the app:
 
 | Theme | |
 |---|---|
 | **Default** | Markdown Midget's original look |
+| **Amber Phosphor** | Dark, amber with no blue at all — for reading at night, designed by Joe Sparks (@joesparks on X) |
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
@@ -443,7 +444,7 @@ new name appears in the menu without restarting the app.
 
 Two folders, and the difference matters:
 
-- **`themes\`** holds the nine built-in theme files — the tenth theme, Default, is
+- **`themes\`** holds the ten built-in theme files — the eleventh theme, Default, is
   the app's own palette and has no file. They are rewritten from the app whenever
   you update, so that a fix to one reaches you — which also means **edits to them
   are lost**.
@@ -1008,7 +1009,7 @@ into and what to do instead.
 - **Mermaid ships inside the editor bundle whether a document uses it or not.**
   Diagrams work with nothing to install; the cost is download size, and there is
   no way to leave it out.
-- **Edits to the nine built-in theme files are lost when you update.** They are
+- **Edits to the ten built-in theme files are lost when you update.** They are
   rewritten from the app so that a fix reaches you. Keep your own colours in
   `themes\custom\`, where nothing is ever overwritten — see [Writing your
   own](#writing-your-own).

@@ -64,6 +64,7 @@ public class BuiltInThemeTests
 
         Assert.Equal(new[]
         {
+            "themes/Amber-Phosphor.css",
             "themes/Dracula.css",
             "themes/GitHub-Dark-Dimmed.css",
             "themes/GitHub-Light.css",
@@ -166,7 +167,7 @@ public class BuiltInThemeTests
         // derived from them and nothing else — `github-light.css` would appear as
         // "Github Light", which is not what the theme is called.
         => Assert.Equal(
-            new[] { "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized",
+            new[] { "Amber Phosphor", "Dracula", "GitHub Dark Dimmed", "GitHub Light", "Midget Solarized",
                     "Obsidiminutive", "One Light", "Red Sparks 2X", "Red Sparks", "Solarized Light" },
             App.GetManifestResourceNames()
                 .Where(n => n.StartsWith("themes/", StringComparison.Ordinal))
@@ -258,6 +259,9 @@ public class BuiltInThemeTests
         [RedSparks2X] = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" },
         // Colours only: 16px is the size this theme has always rendered at.
         [Obsidiminutive] = new[] { "--mdm-code-fg", "--mdm-list-marker" },
+        // Colours only, as it arrived: its custom version carried a ::marker rule and an
+        // inline-code rule, and these two lines are what replaced them.
+        [AmberPhosphor] = new[] { "--mdm-code-fg", "--mdm-list-marker" },
     };
 
     [Theory]
@@ -401,6 +405,70 @@ public class BuiltInThemeTests
         Assert.Equal(Body(Read(RedSparks)), Body(Read(RedSparks2X)));
     }
 
+    // ===== Amber Phosphor, and a palette with no blue in it =====
+
+    private const string AmberPhosphor = "themes/Amber-Phosphor.css";
+
+    [Fact]
+    public void AmberPhosphorShipsAsADarkBuiltInThroughTheStoreTheMenuReads()
+    {
+        // Listed, usable and built-in, through the same store the menu reads - in a temp
+        // folder, never the real profile.
+        var root = Path.Combine(Path.GetTempPath(), "mm-amber-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new ThemeStore(root);
+            Assert.True(store.Refresh("1.0.0", App));
+            var listed = store.List().SingleOrDefault(t => t.Key == "Amber-Phosphor.css");
+            Assert.NotNull(listed);
+            Assert.Equal("Amber Phosphor", listed!.Name);
+            Assert.True(listed.IsUsable, listed.Unusable);
+            Assert.False(listed.IsCustom);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* temp */ }
+        }
+        Assert.Equal("dark", Variables(Read(AmberPhosphor))["--mdm-color-scheme"]);
+    }
+
+    [Fact]
+    public void AmberPhosphorIsItsPaletteAndTheOneScreenRuleThatKeepsDiagramsFreeOfBlue()
+    {
+        // It arrived as a custom theme with a ::marker rule, an inline-code rule, the `pre code`
+        // handback that needed, a link underline offset, a caret colour, scanlines, a glow and a
+        // breathing animation. The first two are variables now, base.css hands fenced code back on
+        // its own, and the rest are effects the built-in leaves out. What is left is what Red
+        // Sparks keeps, for the same reason: the mermaid overlay is not an effect but the only way
+        // to hold a diagram to the palette's promise.
+        Assert.Equal(
+            new[] { (":root", 0), ("@media screen", 0), (".mdm-mermaid", 1), (".mdm-mermaid::after", 1) },
+            Blocks(Read(AmberPhosphor)));
+    }
+
+    [Fact]
+    public void AmberPhosphorDrawsNothingWithBlueInIt()
+    {
+        // The palette's one promise: every colour it puts on screen is #RRGG00, the diagram
+        // overlay's included - multiplying by a colour with no blue takes the blue out of
+        // whatever mermaid draws. The one exception is paper's: the printed row stripe is
+        // white, which on paper is no ink rather than a colour. Every colour literal in the file
+        // is checked, not just the variables, so a rule that grew a colour would be caught too.
+        var bare = Regex.Replace(Read(AmberPhosphor), @"/\*.*?\*/", " ", RegexOptions.Singleline);
+        var declarations = Regex.Matches(bare, @"([\w-]+)\s*:\s*([^;{}]+)")
+            .Where(m => m.Groups[1].Value != "--mdm-print-row-alt-bg")
+            .ToArray();
+        var colours = declarations
+            .SelectMany(m => Regex.Matches(m.Groups[2].Value, @"#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)")
+                .Select(c => (Name: m.Groups[1].Value, Value: c.Value)))
+            .ToArray();
+        Assert.True(colours.Length >= 45, $"only {colours.Length} colours found: the premise failed");
+        Assert.Contains(colours, c => c.Name == "background");     // the overlay's
+        Assert.Equal(Array.Empty<string>(),
+            colours.Where(c => Rgb(c.Value).B != 0).Select(c => $"{c.Name}: {c.Value}").ToArray());
+        Assert.Equal("#ffffff", Variables(Read(AmberPhosphor))["--mdm-print-row-alt-bg"]);
+    }
+
     // ===== Obsidiminutive, and bold with a colour of its own =====
 
     private const string Obsidiminutive = "themes/Obsidiminutive.css";
@@ -461,7 +529,9 @@ public class BuiltInThemeTests
     /// The palettes held to the FULL pair sweep below: every text colour on every
     /// background it can land on, not just body text on the page.
     ///
-    /// Three of nine, and the shortfall is deliberate and measured rather than assumed.
+    /// Four of ten - Obsidiminutive and the three palettes written against the current contract,
+    /// the Red Sparks pair and Amber Phosphor - and the shortfall is deliberate and measured
+    /// rather than assumed.
     /// The sweep was a [Fact] over Obsidiminutive alone - the palette written to clear
     /// 4.5:1 everywhere - so a new theme was swept nowhere, which is how the Red Sparks
     /// pair shipped with eighteen sub-floor pairs while its own header claimed everything
@@ -483,7 +553,7 @@ public class BuiltInThemeTests
     /// nobody asked for, and it would bury the eighteen that are actually new. So:
     /// measured, reported, and left as one decision per palette.
     /// </summary>
-    public static TheoryData<string> FullySweptPalettes => new() { Obsidiminutive, RedSparks, RedSparks2X };
+    public static TheoryData<string> FullySweptPalettes => new() { AmberPhosphor, Obsidiminutive, RedSparks, RedSparks2X };
 
     /// <summary>Shared by the pair, which differ only in --mdm-font-size.</summary>
     private static readonly Dictionary<string, double> RedSparksDimPairs = new(StringComparer.Ordinal)
@@ -563,6 +633,15 @@ public class BuiltInThemeTests
         },
         [RedSparks] = RedSparksDimPairs,
         [RedSparks2X] = RedSparksDimPairs,     // the same palette, so the same numbers
+        [AmberPhosphor] = new()   // 2 of 54, floor 4.5
+        {
+            // The two recessive tiers, both chosen dim by its designer: the placeholder in an
+            // empty diagram frame, and code comments on the code block. Everything a reader
+            // reads is well clear - body text 7.58:1 on the page, the dimmest heading 6.97:1
+            // in a header cell, quoted text 6.21:1.
+            ["--mdm-mermaid-empty on --mdm-mermaid-bg"] = 3.50,
+            ["--mdm-token-comment on --mdm-pre-bg"] = 4.03,
+        },
     };
 
     [Theory]

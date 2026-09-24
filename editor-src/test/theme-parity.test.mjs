@@ -392,7 +392,8 @@ const PREDATE_STRONG = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'GitHub-Light.c
  *  text around it. Red Sparks has one hue, so a bold colour of its own could only be
  *  brighter or dimmer red; it sets --mdm-list-marker and --mdm-code-fg instead. */
 const RED_SPARKS = ['Red-Sparks.css', 'Red-Sparks-2X.css'];
-const STRONG_UNSET = [...PREDATE_STRONG, ...RED_SPARKS];
+/** Amber Phosphor, the same: bold in its own amber would only be a brighter or dimmer amber. */
+const STRONG_UNSET = [...PREDATE_STRONG, ...RED_SPARKS, 'Amber-Phosphor.css'];
 
 /** What `.mdm-prosemirror strong { color }` resolves to with this theme installed. */
 function strongColour(themeCss) {
@@ -495,7 +496,7 @@ test('Obsidiminutive colours inline code and its markers through the variables',
 // exactly. A print condition it can't evaluate fails rather than being guessed at.
 // That WebView2 does the same on paper is TEST-PLAN PRN-01.
 
-const DARK = ['Dracula.css', 'GitHub-Dark-Dimmed.css', 'Obsidiminutive.css', ...RED_SPARKS];
+const DARK = ['Amber-Phosphor.css', 'Dracula.css', 'GitHub-Dark-Dimmed.css', 'Obsidiminutive.css', ...RED_SPARKS];
 const LIGHT = ['GitHub-Light.css', 'Midget-Solarized.css', 'One-Light.css', 'Solarized-Light.css'];
 const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 const themeVariables = (themeCss) => new Map([...rootVariables(defaultTheme), ...rootVariables(themeCss)]);
@@ -1064,9 +1065,10 @@ test('the three new variables are inert: only the palettes written for them set 
     // vendor's nord10 at 3.29:1 on its own page and its inline code was a rule, while 16px
     // is the size it has always rendered at. Everything else, Default included, renders
     // exactly as it did before the variables existed, and a file that dropped one of its
-    // own would need a rule back to look the same.
+    // own would need a rule back to look the same. Amber Phosphor, written against the
+    // contract, sets the two colours in place of the rules its custom version carried.
     const sets = RED_SPARKS.includes(file) ? optional
-      : file === 'Obsidiminutive.css' ? ['--mdm-list-marker', '--mdm-code-fg']
+      : ['Obsidiminutive.css', 'Amber-Phosphor.css'].includes(file) ? ['--mdm-list-marker', '--mdm-code-fg']
       : [];
     for (const name of optional)
       assert.equal(vars.has(name), sets.includes(name),
