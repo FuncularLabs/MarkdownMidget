@@ -379,7 +379,7 @@ one of them saves your settings, Mode is back on System.
 | Theme | |
 |---|---|
 | **Default** | Markdown Midget's original look |
-| **Amber Phosphor** | Dark, amber with no blue at all — for reading at night, designed by Joe Sparks (@joesparks on X) |
+| **Amber Phosphor** | Dark, amber with no blue in any colour it sets — for reading at night, designed by Joe Sparks (@joesparks on X); the selection highlight and the outline round a clicked rule or picture aren't a theme's to colour, and stay blue |
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
@@ -466,7 +466,10 @@ drawn against the document, so a `filter`, `transform`, `perspective`, `contain`
 `will-change` or `backdrop-filter` on a paragraph, heading, list, list item, quote,
 code block or table — or on anything that holds one — drags the numbers inside it in
 over your text. `position` on those is overridden while line numbers show; on the
-document itself (`.mdm-prosemirror`) it moves every number.
+document itself (`.mdm-prosemirror`) it moves every number. So while line numbers
+show, an absolutely positioned `::before` or `::after` on those elements is placed
+against the whole document: draw decorations with a border, a background or a
+box-shadow instead.
 
 **Text size.** `--mdm-font-size` is the one size the document derives from. Set it
 once — `--mdm-font-size: 32px` — and body text, the six heading levels, list markers,

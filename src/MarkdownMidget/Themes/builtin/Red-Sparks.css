@@ -4,9 +4,12 @@
  *  Designed by Joe Sparks (@joesparks on X), https://x.com/joesparks — a
  *  red-only palette designed for reading at night.
  *
- *  Every colour here is #RR0000: green and blue are zero everywhere. Red is
- *  the least disruptive light to dark-adapted eyes and to your circadian
- *  rhythm, so this one is made for editing after dark.
+ *  Every colour this theme sets for the screen is #RR0000: green and blue are
+ *  zero. Red is the least disruptive light to dark-adapted eyes and to your
+ *  circadian rhythm, so this one is made for editing after dark. Two things on
+ *  screen are not a theme's to colour, and stay blue: the highlight behind
+ *  selected text and Find matches, and the light blue outline (#88ccff) round
+ *  a rule or picture you click. No variable reaches either.
  *
  *  It has the dimmest body text of any shipped palette, and does not clear WCAG
  *  AA for normal text: #DC0000 on the page is 3.96:1. (Solarized Light is the
@@ -170,8 +173,8 @@
  * lays pure red over the diagram in multiply mode, which multiplies every
  * pixel by (1, 0, 0): the red channel passes through untouched, green and
  * blue go to exactly zero. So whatever mermaid decides to draw arrives
- * red-only, like everything else. Delete this pair if you would rather see
- * diagrams in full colour.
+ * red-only, like every colour this theme sets. Delete this pair if you would
+ * rather see diagrams in full colour.
  *
  * It is the only thing in either file of this theme that is not a variable, and
  * it is one effect in two rules. Everything else is a variable:

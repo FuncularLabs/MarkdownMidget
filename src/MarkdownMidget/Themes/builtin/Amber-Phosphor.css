@@ -1,16 +1,21 @@
 /* =====================================================================
- *  Amber Phosphor — dark: the colours of an amber terminal, and no blue.
+ *  Amber Phosphor — dark: the colours of an amber terminal, none with blue.
  *
  *  Designed by Joe Sparks (@joesparks on X), https://x.com/joesparks — the
  *  second of his palettes for reading at night, after Red Sparks.
  *
- *  Every colour on screen here is #RRGG00: the blue channel is zero
- *  everywhere. Blue is the part of the light that does most to keep you
- *  awake, so it is the part a night palette gives up. Red Sparks gives up
- *  green as well; keeping it is what lets this one run to amber and yellow,
- *  much brighter than red can go, and lets the syntax colours differ by hue.
- *  The one colour that is not #RRGG00 is paper's: the printed row stripe is
- *  white, which on paper is no ink rather than a colour.
+ *  Every colour this theme sets for the screen is #RRGG00: its blue channel
+ *  is zero. Blue is the part of the light that does most to keep you awake,
+ *  so it is the part a night palette gives up. Red Sparks gives up green as
+ *  well; keeping it is what lets this one run to amber and yellow, much
+ *  brighter than red can go, and lets the syntax colours differ by hue. The
+ *  one colour it sets that is not #RRGG00 is paper's: the printed row stripe
+ *  is white, which on paper is no ink rather than a colour.
+ *
+ *  Two things on screen are not a theme's to colour, and stay blue: the
+ *  highlight behind selected text and Find matches, and the light blue
+ *  outline (#88ccff) round a rule or picture you click. No variable reaches
+ *  either.
  *
  *  Measured, WCAG contrast, on the grounds each colour can land on:
  *
@@ -153,9 +158,9 @@
  * pixels are pixels. This lays the heading's amber over the diagram in
  * multiply mode, which multiplies every pixel by (1, 0.69, 0): red passes
  * through, green is scaled to match, and blue goes to exactly zero. So
- * whatever mermaid decides to draw arrives with no blue in it, like
- * everything else. Delete this pair if you would rather see diagrams in
- * full colour.
+ * whatever mermaid decides to draw arrives with no blue in it, like every
+ * colour this theme sets. Delete this pair if you would rather see diagrams
+ * in full colour.
  *
  * Screen only: on paper a printed diagram is ink on white, where an amber
  * multiply is a stain rather than a palette. Paper keeps the diagram

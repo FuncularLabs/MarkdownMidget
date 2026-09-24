@@ -105,6 +105,19 @@ public class BuiltInThemeTests
                         || claim == shipped.ToString(CultureInfo.InvariantCulture),
                 $"HELP.md says \"{claim} built-in theme files\"; {shipped} .css files ship " +
                 "under themes/ (Default is one more THEME and has no file)");
+
+        // And the two places it counts THEMES, which is one more: the sentence above the theme
+        // table, and the one saying which theme has no file. Both were left at the old number
+        // once while the file count beside them was corrected.
+        Assert.InRange(shipped + 1, 1, word.Length - 1);
+        var ordinal = new[] { "zeroth", "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+                              "eighth", "ninth", "tenth", "eleventh", "twelfth" };
+        var themes = Regex.Match(Help(), @"\b([A-Za-z]+) ship with the app\b");
+        Assert.True(themes.Success, "HELP.md no longer says \"N ship with the app\" above the theme table");
+        Assert.Equal(word[shipped + 1], themes.Groups[1].Value, StringComparer.OrdinalIgnoreCase);
+        var nth = Regex.Match(Help(), @"\bthe ([a-z]+) theme, Default\b");
+        Assert.True(nth.Success, "HELP.md no longer says \"the Nth theme, Default\"");
+        Assert.Equal(ordinal[shipped + 1], nth.Groups[1].Value);
     }
 
     [Fact]
@@ -405,7 +418,7 @@ public class BuiltInThemeTests
         Assert.Equal(Body(Read(RedSparks)), Body(Read(RedSparks2X)));
     }
 
-    // ===== Amber Phosphor, and a palette with no blue in it =====
+    // ===== Amber Phosphor, and a palette that sets no blue =====
 
     private const string AmberPhosphor = "themes/Amber-Phosphor.css";
 
@@ -446,21 +459,41 @@ public class BuiltInThemeTests
             Blocks(Read(AmberPhosphor)));
     }
 
+    /// <summary>Every word in Amber Phosphor's values that is not a hex or rgb() colour, a
+    /// number or a string - each one a keyword the file really uses, and none of them a colour.
+    /// A name that is not here fails the test below rather than slipping past its blue check,
+    /// which reads hex and rgb() only: `blue`, `navy` or `hsl(220 ...)` would otherwise pass.</summary>
+    private static readonly string[] AmberKeywords = { "dark", "relative", "absolute", "multiply", "none" };
+
     [Fact]
-    public void AmberPhosphorDrawsNothingWithBlueInIt()
+    public void AmberPhosphorSetsNoColourWithBlueInIt()
     {
-        // The palette's one promise: every colour it puts on screen is #RRGG00, the diagram
-        // overlay's included - multiplying by a colour with no blue takes the blue out of
-        // whatever mermaid draws. The one exception is paper's: the printed row stripe is
-        // white, which on paper is no ink rather than a colour. Every colour literal in the file
-        // is checked, not just the variables, so a rule that grew a colour would be caught too.
+        // The palette's one promise: every colour it sets for the screen is #RRGG00, the
+        // diagram overlay's included - multiplying by a colour with no blue takes the blue out
+        // of whatever mermaid draws. The one exception is paper's: the printed row stripe is
+        // white, which on paper is no ink rather than a colour. What it can't promise is the
+        // screen: the selection highlight and a clicked picture's outline are not a theme's to
+        // colour, and stay blue. Every declaration in the file is read, not just the variables,
+        // so a rule that grew a colour would be caught too - and every value has to be one this
+        // test can read, so a colour written some other way fails loudly instead of passing.
         var bare = Regex.Replace(Read(AmberPhosphor), @"/\*.*?\*/", " ", RegexOptions.Singleline);
-        var declarations = Regex.Matches(bare, @"([\w-]+)\s*:\s*([^;{}]+)")
-            .Where(m => m.Groups[1].Value != "--mdm-print-row-alt-bg")
+        var declarations = Regex.Matches(bare, @"\{([^{}]*)\}")
+            .SelectMany(block => block.Groups[1].Value.Split(';'))
+            .Where(d => d.Contains(':'))
+            .Select(d => (Name: d[..d.IndexOf(':')].Trim(), Value: d[(d.IndexOf(':') + 1)..].Trim()))
+            .Where(d => d.Name != "--mdm-print-row-alt-bg")
             .ToArray();
+        const string colour = @"#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)";
+        var unreadable = declarations
+            .SelectMany(d => Regex.Replace(Regex.Replace(d.Value, colour, " "), "\"[^\"]*\"", " ")
+                .Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(word => !Regex.IsMatch(word, @"^-?[\d.]+(px|em|%)?$") && !AmberKeywords.Contains(word))
+                .Select(word => $"{d.Name}: {word}"))
+            .ToArray();
+        Assert.Equal(Array.Empty<string>(), unreadable);
+
         var colours = declarations
-            .SelectMany(m => Regex.Matches(m.Groups[2].Value, @"#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)")
-                .Select(c => (Name: m.Groups[1].Value, Value: c.Value)))
+            .SelectMany(d => Regex.Matches(d.Value, colour).Select(c => (d.Name, c.Value)))
             .ToArray();
         Assert.True(colours.Length >= 45, $"only {colours.Length} colours found: the premise failed");
         Assert.Contains(colours, c => c.Name == "background");     // the overlay's

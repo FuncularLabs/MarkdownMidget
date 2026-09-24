@@ -69,7 +69,7 @@
   ".mdm-prosemirror { line-height }",
   ".mdm-prosemirror { position }",
   ".mdm-prosemirror:focus { outline }",
-  ".mdm-line-numbers [data-gap], .mdm-line-numbers [data-line], .mdm-line-numbers blockquote, .mdm-line-numbers dd, .mdm-line-numbers li, .mdm-line-numbers ol, .mdm-line-numbers ul { position }",
+  "@media screen > .mdm-line-numbers [data-gap], .mdm-line-numbers [data-line], .mdm-line-numbers blockquote, .mdm-line-numbers dd, .mdm-line-numbers dl, .mdm-line-numbers li, .mdm-line-numbers ol, .mdm-line-numbers ul { position }",
   ".mdm-prosemirror [data-line]::before { content }",
   ".mdm-prosemirror [data-line]::before { position }",
   ".mdm-prosemirror [data-line]::before { left }",

@@ -3,6 +3,12 @@
 Themes for Markdown Midget made by people who use it. They don't ship with the
 app: to use one, copy it in yourself.
 
+**If motion or flicker bothers you,** use the built-in Amber Phosphor instead of
+Amber Phosphor CRT, and skip Code Breaker. Amber Phosphor CRT draws scanlines and
+makes the glow on its headings pulse for as long as it is on; Code Breaker flickers
+text in and out every time you point at it. Neither follows Windows' setting to
+turn animations off.
+
 | File | Menu name | By |
 |---|---|---|
 | `Amber-Phosphor-CRT.css` | Amber Phosphor CRT | Joe Sparks (@joesparks on X) |
@@ -12,10 +18,10 @@ app: to use one, copy it in yourself.
 ## The themes
 
 **Amber Phosphor CRT** is an old amber terminal screen. Its colours are the
-built-in **Amber Phosphor** palette, amber with no blue at all; on top of that
-it draws scanlines and a darkened edge like a curved tube across the page,
-gives the text a soft glow, and makes the three largest heading levels glow
-brighter and dimmer on a slow seven-second cycle. It is Joe's original file,
+built-in **Amber Phosphor** palette, amber with no blue in any colour it sets.
+On top of that it draws scanlines and a darkened edge like a curved tube across
+the page, gives the text a soft glow, and makes the three largest heading levels
+glow brighter and dimmer on a slow seven-second cycle. It is Joe's original file,
 renamed so that it sits beside the built-in in **View ▸ Theme** instead of
 replacing it.
 

@@ -23,7 +23,10 @@
  *  heading, list, list item, quote, code block or table - or on anything that
  *  holds one - drags the numbers inside it in over your text. `position` on
  *  those is overridden while line numbers show; on the document itself
- *  (`.mdm-prosemirror`) it moves every number.
+ *  (`.mdm-prosemirror`) it moves every number. So while line numbers show,
+ *  an absolutely positioned ::before or ::after on those elements is placed
+ *  against the whole document: draw decorations with a border, a background
+ *  or a box-shadow instead.
  *
  *  Three things a theme may not do, and the menu will tell you which one you
  *  hit and on what line:

@@ -106,18 +106,27 @@ body {
  * measured in Edge, 72px for a paragraph, heading, code block or table, 78px for a quote and a list in it, and
  * 92-136px for a list item.
  * The vendor positions list items; a theme can position anything. So while numbers show, every numbered element, and
- * everything that can hold one - a list, an item, a quote, a footnote's body (its `dd`) - is static: !important,
- * because a theme sits in a later layer and an earlier layer's !important beats it. Not pinned, because they are a
- * theme's to use: filter, transform, perspective, contain, will-change and backdrop-filter do the same thing without
- * `position`, and sample.css and HELP tell a theme author to keep effects on backgrounds and text-shadow instead. */
-.mdm-line-numbers [data-line],
-.mdm-line-numbers [data-gap],
-.mdm-line-numbers ul,
-.mdm-line-numbers ol,
-.mdm-line-numbers li,
-.mdm-line-numbers blockquote,
-.mdm-line-numbers dd {
-  position: static !important;
+ * everything that can hold one - a list, an item, a quote, a footnote (its `dl` and `dd`, which in a quote or a list
+ * item carry no number of their own) - is static: !important, because a theme sits in a later layer and an earlier
+ * layer's !important beats it. Not pinned, because they are a theme's to use: filter, transform, perspective, contain,
+ * will-change and backdrop-filter do the same thing without `position`, and sample.css and HELP tell a theme author
+ * to keep effects on backgrounds and text-shadow instead.
+ *
+ * The cost, accepted and documented there too: a theme that positions one of these blocks to place its own absolute
+ * ::before/::after (an underline under a heading, a tag on a code block) has it placed against the whole document
+ * while numbers show. Screen only, because that is the only place a number is: print.css hides them, so on paper the
+ * pin would be all cost - measured, a heading's underline printed at the foot of the document. */
+@media screen {
+  .mdm-line-numbers [data-line],
+  .mdm-line-numbers [data-gap],
+  .mdm-line-numbers ul,
+  .mdm-line-numbers ol,
+  .mdm-line-numbers li,
+  .mdm-line-numbers blockquote,
+  .mdm-line-numbers dl,
+  .mdm-line-numbers dd {
+    position: static !important;
+  }
 }
 
 .mdm-prosemirror [data-line]::before {

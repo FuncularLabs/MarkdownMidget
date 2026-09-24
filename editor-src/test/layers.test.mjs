@@ -175,13 +175,17 @@ test('the line numbers are drawn against the editor, and a theme\'s position can
   // read out of the bundle that ships, where its layer is part of what it says. (Which elements it reaches is checked
   // on the editor's own DOM, in line-map.test.mjs.) Measured without it in Edge: a theme's
   // `.mdm-prosemirror li { position: relative }` moved ten of 36 numbers 92-136px in from the margin, onto the text.
+  //
+  // Screen only. The pin costs a theme its own absolutely placed ::before/::after on those blocks, which then sits
+  // against the whole document, and paper never shows a number (print.css hides them), so there it would be all cost:
+  // a heading's underline printed at the foot of the document. `@media screen` keeps paper as the theme drew it.
   const position = declarations(bundle)
     .filter((d) => d.prop === 'position' && d.where.startsWith('@layer mdm-structure > '))
     .map((d) => [d.where.slice('@layer mdm-structure > '.length), d.value, d.important]);
   assert.deepEqual(position.filter(([where]) => where === '.mdm-prosemirror'), [['.mdm-prosemirror', 'relative', false]],
     'the editor does not declare its own containing block');
   const pins = position.filter(([, value]) => value === 'static');
-  assert.deepEqual(pins, [[['blockquote', 'dd', 'li', 'ol', 'ul', '[data-gap]', '[data-line]']
+  assert.deepEqual(pins, [['@media screen > ' + ['blockquote', 'dd', 'dl', 'li', 'ol', 'ul', '[data-gap]', '[data-line]']
     .map((s) => `.mdm-line-numbers ${s}`).sort().join(', '), 'static', true]]);
   assert.ok(EXPECTED.indexOf('mdm-structure') < EXPECTED.indexOf('mdm-theme'));
 });

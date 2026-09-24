@@ -198,7 +198,7 @@
   "important": false
  },
  {
-  "where": ".mdm-line-numbers [data-gap], .mdm-line-numbers [data-line], .mdm-line-numbers blockquote, .mdm-line-numbers dd, .mdm-line-numbers li, .mdm-line-numbers ol, .mdm-line-numbers ul",
+  "where": "@media screen > .mdm-line-numbers [data-gap], .mdm-line-numbers [data-line], .mdm-line-numbers blockquote, .mdm-line-numbers dd, .mdm-line-numbers dl, .mdm-line-numbers li, .mdm-line-numbers ol, .mdm-line-numbers ul",
   "prop": "position",
   "value": "static",
   "important": true

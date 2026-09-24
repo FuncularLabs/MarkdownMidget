@@ -126,7 +126,7 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
   changes how every existing diagram looks, so it wants its own change and its own
   before-and-after check.
 
-### Text cursor colour — a theme variable
+### Cursor and selection colours — theme variables
 
 - **A theme should be able to colour the text cursor.** No variable reaches it, so in
   every theme it is the colour of the text it sits in. All three community themes from
@@ -135,6 +135,13 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
   you can't read. A `--mdm-caret` whose default is the text colour would change nothing
   for a theme that leaves it out. Open: whether the source view's cursor follows it too.
   Raised 2026-09-24 with [community-themes](community-themes/README.md).
+- **A theme should be able to colour the selection.** Selected text and Find matches
+  are drawn in the browser's own blue highlight behind white text, and a clicked rule
+  or picture gets the editor's light blue outline (#88ccff), in every theme. So Red
+  Sparks and Amber Phosphor, whose promise is no blue, still show blue there, and
+  their theme files say so. A `--mdm-selection` pair (background and text) and
+  a selected-node outline variable, each defaulting to what is drawn today, would
+  change nothing for a theme that leaves them out. Raised 2026-09-24 in review.
 
 ### Line numbers (#10) — in 1.0.0-rc1
 

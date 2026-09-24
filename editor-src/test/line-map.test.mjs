@@ -419,9 +419,13 @@ test('a table or a code fence ending a file with no final newline, and an empty 
 });
 
 // Every block, every container a number can sit in, and a list at each depth: in a list, a quote, a quote in a quote,
-// a footnote and a task list. (A list's first item is on its list's line, so each holder has a second one.)
+// a footnote, a footnote in a quote, a footnote in a list item and a task list. (A list's first item is on its list's
+// line, so each holder has a second one.) A footnote is a `dl` holding a `dd`, and neither carries a number of its own
+// when it is not at the top: the one in a quote is `blockquote > dl > dd > ul > li[data-line]`.
 const HOLDERS = '# H\n\n- a\n  - b\n    - c\n- d\n\n> q\n>\n> - e\n>   - f\n>\n> after\n\n> > - deep\n> > - deeper\n\n1. one\n   1. nested\n\n'
   + '- [ ] task\n  - [x] done\n\nText[^n].\n\n[^n]: note\n\n    - in a footnote\n\n| x |\n| - |\n| 1 |\n\n```js\na\n```\n\n'
+  + '> Quoted[^q].\n>\n> [^q]: in a quote\n>\n>     - listed\n>     - again\n\n'
+  + '- item[^i]\n\n  [^i]: in an item\n\n      - listed\n      - again\n\n'
   + '```mermaid\ngraph TD\n```\n\n<div>\nhtml\n</div>\n\n***\n\n\nlast\n';
 
 for (const [name, md] of [['every kind of holder', HOLDERS], ...['../../HELP.md', 'fixtures/roundtrip-audit.md']
@@ -436,10 +440,12 @@ for (const [name, md] of [['every kind of holder', HOLDERS], ...['../../HELP.md'
     const pins = declarations(readFileSync(new URL('../styles/structure.css', import.meta.url), 'utf8'))
       .filter((d) => d.prop === 'position' && d.value === 'static');
     assert.deepEqual(pins.map((d) => d.important), [true], 'one static pin, and !important, or a later layer outranks it');
+    const [media, selector] = pins[0].where.split(' > ');   // screen only: paper shows no numbers (layers.test.mjs)
+    assert.equal(media, '@media screen');
     showLineNumbers(true);
     try {
       load(md);
-      const root = ed.view().dom, pinned = new Set(root.querySelectorAll(pins[0].where));
+      const root = ed.view().dom, pinned = new Set(root.querySelectorAll(selector));
       const numbered = [...root.querySelectorAll('[data-line], [data-gap]')], loose = new Set();
       for (const el of numbered) for (let n = el; n !== root; n = n.parentElement) if (!pinned.has(n)) loose.add(`${n.tagName} (holding ${el.tagName}:${el.dataset.line ?? el.dataset.gap})`);
       assert.ok(numbered.length > 20, `only ${numbered.length} numbers drawn: the premise failed`);
