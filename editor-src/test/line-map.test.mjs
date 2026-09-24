@@ -12,6 +12,7 @@ import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { undo, undoDepth } from '@milkdown/kit/prose/history';
 import { serializerCtx } from '@milkdown/kit/core';
 import { mountEditor } from './jsdom-editor.mjs';
+import { declarations } from './css-declarations.mjs';
 import { settleDocument } from '../src/settle.js';
 import { setSpellRanges } from '../src/spell-decorate.js';
 import {
@@ -416,6 +417,36 @@ test('a table or a code fence ending a file with no final newline, and an empty 
   const empty = [true, 'P:1', 'GAP:2', 'PRE:3–4', 'GAP:5', 'P:6', 'GAP:7'];
   assert.deepEqual(reads, [[true, 'P:1', 'GAP:2', 'TABLE:3–5'], [true, 'P:1', 'GAP:2', 'PRE:3–5'], empty, empty]);
 });
+
+// Every block, every container a number can sit in, and a list at each depth: in a list, a quote, a quote in a quote,
+// a footnote and a task list. (A list's first item is on its list's line, so each holder has a second one.)
+const HOLDERS = '# H\n\n- a\n  - b\n    - c\n- d\n\n> q\n>\n> - e\n>   - f\n>\n> after\n\n> > - deep\n> > - deeper\n\n1. one\n   1. nested\n\n'
+  + '- [ ] task\n  - [x] done\n\nText[^n].\n\n[^n]: note\n\n    - in a footnote\n\n| x |\n| - |\n| 1 |\n\n```js\na\n```\n\n'
+  + '```mermaid\ngraph TD\n```\n\n<div>\nhtml\n</div>\n\n***\n\n\nlast\n';
+
+for (const [name, md] of [['every kind of holder', HOLDERS], ...['../../HELP.md', 'fixtures/roundtrip-audit.md']
+  .map((file) => [file, readFileSync(new URL(file, import.meta.url), 'utf8')])]) {
+  test(`with numbers on, nothing between a number and the editor can be positioned by a theme: ${name}`, () => {
+    // A number is an absolute ::before at left 0, drawn against its nearest positioned ancestor, which has to be the
+    // editor (structure.css). So every element from a numbered one up to the editor is pinned static, !important, by
+    // ONE rule of structure.css - read out of the file rather than restated here, so the rule this checks is the rule
+    // that ships. Any element left out is one a theme's `position: relative` still turns into the anchor, dragging
+    // the numbers inside it in over the text. Checked on the real editor's DOM, so a holder nobody thought to list -
+    // a footnote, a quote in a quote - shows up here rather than in a theme.
+    const pins = declarations(readFileSync(new URL('../styles/structure.css', import.meta.url), 'utf8'))
+      .filter((d) => d.prop === 'position' && d.value === 'static');
+    assert.deepEqual(pins.map((d) => d.important), [true], 'one static pin, and !important, or a later layer outranks it');
+    showLineNumbers(true);
+    try {
+      load(md);
+      const root = ed.view().dom, pinned = new Set(root.querySelectorAll(pins[0].where));
+      const numbered = [...root.querySelectorAll('[data-line], [data-gap]')], loose = new Set();
+      for (const el of numbered) for (let n = el; n !== root; n = n.parentElement) if (!pinned.has(n)) loose.add(`${n.tagName} (holding ${el.tagName}:${el.dataset.line ?? el.dataset.gap})`);
+      assert.ok(numbered.length > 20, `only ${numbered.length} numbers drawn: the premise failed`);
+      assert.deepEqual([...loose], []);
+    } finally { showLineNumbers(false); }
+  });
+}
 
 for (const file of ['../../HELP.md', '../../CHANGELOG.md', 'fixtures/roundtrip-audit.md']) {
   test(`the margin shows every line of ${file} once and in order, untouched and after an edit and a read`, () => {

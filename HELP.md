@@ -455,6 +455,13 @@ listed in the sample. You can write ordinary CSS rules too, but you
 can't switch off the app's own furniture — spelling squiggles, formatting marks and
 the table resize handle survive whatever a theme says about them.
 
+**Keep effects on backgrounds and `text-shadow`.** The line numbers in the margin are
+drawn against the document, so a `filter`, `transform`, `perspective`, `contain`,
+`will-change` or `backdrop-filter` on a paragraph, heading, list, list item, quote,
+code block or table — or on anything that holds one — drags the numbers inside it in
+over your text. `position` on those is overridden while line numbers show; on the
+document itself (`.mdm-prosemirror`) it moves every number.
+
 **Text size.** `--mdm-font-size` is the one size the document derives from. Set it
 once — `--mdm-font-size: 32px` — and body text, the six heading levels, list markers,
 inline and fenced code, table text and the line numbers all follow, on screen and on

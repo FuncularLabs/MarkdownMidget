@@ -17,6 +17,14 @@
  *  turn off the app's own furniture — spelling squiggles, formatting marks and
  *  the table resize handle survive whatever you say about them, on purpose.
  *
+ *  Keep effects on backgrounds and `text-shadow`. The line numbers in the
+ *  margin are drawn against the document, so `filter`, `transform`,
+ *  `perspective`, `contain`, `will-change` or `backdrop-filter` on a paragraph,
+ *  heading, list, list item, quote, code block or table - or on anything that
+ *  holds one - drags the numbers inside it in over your text. `position` on
+ *  those is overridden while line numbers show; on the document itself
+ *  (`.mdm-prosemirror`) it moves every number.
+ *
  *  Three things a theme may not do, and the menu will tell you which one you
  *  hit and on what line:
  *

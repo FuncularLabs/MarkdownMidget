@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { declarations } from './css-declarations.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bundle = readFileSync(
@@ -164,6 +165,25 @@ test('the vendor tokens the document size rides on are the ones its own rules re
       new RegExp(`font-size:var\\(${token}\\)`),
       `the vendor no longer sizes "${rule}" from ${token}`);
   }
+});
+
+test('the line numbers are drawn against the editor, and a theme\'s position cannot move them off it', () => {
+  // A number is an absolute ::before at left 0, so the editor has to be its nearest positioned ancestor. The editor
+  // says so itself rather than leaning on the vendor's `.ProseMirror { position: relative }`, and while numbers show,
+  // everything between a number and the editor is pinned static. The pin is only worth anything with !important in a
+  // layer EARLIER than the theme's - an earlier layer's !important beats a later one's at any specificity - so it is
+  // read out of the bundle that ships, where its layer is part of what it says. (Which elements it reaches is checked
+  // on the editor's own DOM, in line-map.test.mjs.) Measured without it in Edge: a theme's
+  // `.mdm-prosemirror li { position: relative }` moved ten of 36 numbers 92-136px in from the margin, onto the text.
+  const position = declarations(bundle)
+    .filter((d) => d.prop === 'position' && d.where.startsWith('@layer mdm-structure > '))
+    .map((d) => [d.where.slice('@layer mdm-structure > '.length), d.value, d.important]);
+  assert.deepEqual(position.filter(([where]) => where === '.mdm-prosemirror'), [['.mdm-prosemirror', 'relative', false]],
+    'the editor does not declare its own containing block');
+  const pins = position.filter(([, value]) => value === 'static');
+  assert.deepEqual(pins, [[['blockquote', 'dd', 'li', 'ol', 'ul', '[data-gap]', '[data-line]']
+    .map((s) => `.mdm-line-numbers ${s}`).sort().join(', '), 'static', true]]);
+  assert.ok(EXPECTED.indexOf('mdm-structure') < EXPECTED.indexOf('mdm-theme'));
 });
 
 test('print is the earliest layer, so nothing a theme writes reaches paper', () => {

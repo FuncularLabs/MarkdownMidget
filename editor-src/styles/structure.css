@@ -92,6 +92,7 @@ body {
   outline: none;
   font-size: var(--mdm-font-size);
   line-height: 1.5;
+  position: relative;   /* the line numbers' anchor: see below */
 }
 
 .mdm-prosemirror:focus {
@@ -99,9 +100,24 @@ body {
 }
 
 /* View ▸ Line Numbers (#10): a block's markdown line in the left padding, as generated content, never selected or
- * copied. The vendor positions list items, which puts their numbers in the indent; while numbers show, they aren't. */
-.mdm-line-numbers li {
-  position: static;
+ * copied. Each number is an absolute ::before at left: 0, so it is drawn against its nearest positioned ancestor, and
+ * that has to be the editor - which is why the editor says `position: relative` above rather than relying on the
+ * vendor's `.ProseMirror` rule. Anything positioned in between takes over and drags the numbers in over the text:
+ * measured in Edge, 72px for a paragraph, heading, code block or table, 78px for a quote and a list in it, and
+ * 92-136px for a list item.
+ * The vendor positions list items; a theme can position anything. So while numbers show, every numbered element, and
+ * everything that can hold one - a list, an item, a quote, a footnote's body (its `dd`) - is static: !important,
+ * because a theme sits in a later layer and an earlier layer's !important beats it. Not pinned, because they are a
+ * theme's to use: filter, transform, perspective, contain, will-change and backdrop-filter do the same thing without
+ * `position`, and sample.css and HELP tell a theme author to keep effects on backgrounds and text-shadow instead. */
+.mdm-line-numbers [data-line],
+.mdm-line-numbers [data-gap],
+.mdm-line-numbers ul,
+.mdm-line-numbers ol,
+.mdm-line-numbers li,
+.mdm-line-numbers blockquote,
+.mdm-line-numbers dd {
+  position: static !important;
 }
 
 .mdm-prosemirror [data-line]::before {

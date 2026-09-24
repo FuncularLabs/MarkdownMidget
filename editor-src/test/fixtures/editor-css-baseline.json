@@ -181,6 +181,12 @@
  },
  {
   "where": ".mdm-prosemirror",
+  "prop": "position",
+  "value": "relative",
+  "important": false
+ },
+ {
+  "where": ".mdm-prosemirror",
   "prop": "color",
   "value": "#1a1a1a",
   "important": false
@@ -192,10 +198,10 @@
   "important": false
  },
  {
-  "where": ".mdm-line-numbers li",
+  "where": ".mdm-line-numbers [data-gap], .mdm-line-numbers [data-line], .mdm-line-numbers blockquote, .mdm-line-numbers dd, .mdm-line-numbers li, .mdm-line-numbers ol, .mdm-line-numbers ul",
   "prop": "position",
   "value": "static",
-  "important": false
+  "important": true
  },
  {
   "where": ".mdm-prosemirror [data-line]::before",
