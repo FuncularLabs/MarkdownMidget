@@ -7,9 +7,9 @@
  *  Every colour this theme sets for the screen is #RR0000: green and blue are
  *  zero. Red is the least disruptive light to dark-adapted eyes and to your
  *  circadian rhythm, so this one is made for editing after dark. Two things on
- *  screen are not a theme's to colour, and stay blue: the highlight behind
- *  selected text and Find matches, and the light blue outline (#88ccff) round
- *  a rule or picture you click. No variable reaches either.
+ *  screen stay blue, because no theme variable reaches them: the highlight
+ *  behind selected text and Find matches, and the light blue outline (#88ccff)
+ *  round a rule or picture you click.
  *
  *  It has the dimmest body text of any shipped palette, and does not clear WCAG
  *  AA for normal text: #DC0000 on the page is 3.96:1. (Solarized Light is the

@@ -12,6 +12,11 @@
  *  BuiltInThemeTests (DimTextPairs), which holds both files to them. Not copied
  *  here: the same eighteen written twice is the same eighteen to get wrong twice.
  *
+ *  Every colour it sets for the screen is #RR0000. Two things on screen stay
+ *  blue, because no theme variable reaches them: the highlight behind selected
+ *  text and Find matches, and the light blue outline (#88ccff) round a rule or
+ *  picture you click.
+ *
  *  This file is that one with --mdm-font-size at 32px instead of 16px, which is
  *  the whole of the difference between them — every other line is byte for byte
  *  the same, and a test holds them that way.

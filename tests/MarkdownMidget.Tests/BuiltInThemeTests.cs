@@ -630,11 +630,11 @@ public class BuiltInThemeTests
     /// palette has one dim band to work in - that is what it is for - and the alternative
     /// to writing them down was a theme header claiming a floor nothing enforced.
     ///
-    /// Obsidiminutive: two, and both arrived with the contract rather than with a palette.
-    /// It predates --mdm-list-marker, so its bullets and numbers render in the vendor's
-    /// nord10 (#5e81ac) rather than in anything it chose: 3.29:1 on its page and 2.94:1 in
-    /// a quote. Every palette that predates the variable has the same markers; these two
-    /// are simply the first to be measured. Worth a look by whoever owns that theme.
+    /// Obsidiminutive: five, all on the table header cell, the one ground lighter than its
+    /// page, and all reachable only by hand-writing the table in raw HTML: the four heading
+    /// variables at 3.43:1 and the list marker at 3.94:1. Its markers are its own steel
+    /// blue, set through --mdm-list-marker; before it set them they were the vendor's
+    /// nord10 (#5e81ac), at 3.29:1 on its page and 2.94:1 in a quote.
     /// </summary>
     private static readonly Dictionary<string, Dictionary<string, double>> DimTextPairs =
         new(StringComparer.Ordinal)
@@ -653,7 +653,7 @@ public class BuiltInThemeTests
             ["--mdm-h4 on --mdm-th-bg"] = 3.43,
             ["--mdm-h5 on --mdm-th-bg"] = 3.43,
             ["--mdm-h6 on --mdm-th-bg"] = 3.43,
-            // The only pair in this palette below AA, and the only one that needs raw HTML
+            // The list-marker pair below AA, and like the headings above it needs raw HTML
             // to exist at all: a list inside a table HEADER cell. Its own lifted steel blue
             // clears 4.5:1 on every ground a markdown list can occupy - 5.80:1 on the page
             // and in a body cell, 5.40:1 on a striped row, 5.18:1 in a quote - and the

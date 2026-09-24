@@ -368,8 +368,10 @@ can't be saved, the status bar says so, and that window uses it for now. With a
 Windows contrast theme on, Markdown Midget uses its light look in every mode, so the
 contrast theme's colours stay in charge. Windows' own message boxes and its Open and
 Save dialogs stay light, and a toolbar button you point at keeps Windows' own faint
-blue highlight in dark mode. Version 1.0.0-rc2 and earlier don't know this setting: once
-one of them saves your settings, Mode is back on System.
+blue highlight in dark mode. Version 1.0.0-rc2 and earlier know neither this setting nor
+the theme for each mode: once one of them saves your settings, Mode is back on System,
+and the theme picked last is handled as on your first update (*Coming from an earlier
+version*, under [Themes](#themes)), for the source view's own themes too.
 
 ## Themes
 

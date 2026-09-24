@@ -339,12 +339,12 @@ public class PickerCrashCluesTests
         Assert.Equal(new[] { "7-zip.dll", "FoxitThumbnailHndlr_x64.dll", "PaintDotNet.ShellExtension.x64.dll", "TortoiseStub.dll" }, Names(scan));
 
         var findings = new PickerCrashFindings(1, null, FaultKind.None, scan.Found, scan.CutShort);
-        Assert.EndsWith("The search stopped after 2 seconds, so there may be more.", PickerCrashClues.SuspectLines(findings));
-        Assert.EndsWith("The search stopped after 2 seconds, so there may be more.", PickerCrashClues.OthersLine(findings));
-        Assert.Contains("The search stopped after 2 seconds", PickerCrashClues.Details(findings, "v", "os"));
-        Assert.Equal("None of the add-ons on our list were found. The search stopped after 2 seconds, so there may be more.",
+        Assert.EndsWith("The search ran out of time before it finished, so there may be more.", PickerCrashClues.SuspectLines(findings));
+        Assert.EndsWith("The search ran out of time before it finished, so there may be more.", PickerCrashClues.OthersLine(findings));
+        Assert.Contains("The search ran out of time before it finished", PickerCrashClues.Details(findings, "v", "os"));
+        Assert.Equal("None of the add-ons on our list were found. The search ran out of time before it finished, so there may be more.",
                      PickerCrashClues.SuspectLines(new PickerCrashFindings(1, null, FaultKind.None, [], true)));
-        Assert.DoesNotContain("stopped", PickerCrashClues.SuspectLines(new PickerCrashFindings(1, null, FaultKind.None, scan.Found)));
+        Assert.DoesNotContain("out of time", PickerCrashClues.SuspectLines(new PickerCrashFindings(1, null, FaultKind.None, scan.Found)));
     }
 
     [Fact]

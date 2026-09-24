@@ -198,7 +198,7 @@ internal static class PickerCrashClues
     private static readonly string[] ContextMenuClasses = ["*", "AllFilesystemObjects", "Directory", @"Directory\Background", "Folder", "Drive"];
     private const string ThumbnailHandler = "{e357fccd-a995-4576-b01f-234630154e96}";
 
-    /// <summary>How long the registry scan may take before it stops and says so.</summary>
+    /// <summary>How long each of the registry scan's two steps may take before it stops and says so.</summary>
     public static readonly TimeSpan ScanBudget = TimeSpan.FromSeconds(2);
 
     /// <summary>
@@ -384,8 +384,9 @@ internal static class PickerCrashClues
         var n => $"{n} other add-ons from outside Microsoft were found; Copy details names them all.",
     } + CutShortNote(f);
 
+    // No number: each step has a deadline of its own, so the search can run past one budget.
     private static string CutShortNote(PickerCrashFindings f) => f.ScanCutShort
-        ? $" The search stopped after {ScanBudget.TotalSeconds:0} seconds, so there may be more."
+        ? " The search ran out of time before it finished, so there may be more."
         : "";
 
     /// <summary>Copy details' clipboard write, <paramref name="setText"/> being Clipboard.SetText outside

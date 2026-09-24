@@ -74,7 +74,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 - **Links** rendered like a browser, with the URL as a hover tooltip.
 - **Fenced code blocks** with syntax highlighting (C#, JavaScript, TypeScript,
   HTML, CSS).
-- **Formatting marks** toggle (¶ / ↵ / →) and **spell check** (private dictionary,
+- **Formatting marks** toggle (¶ / ↵ / → / ·) and **spell check** (private dictionary,
   with one-way import from Word's CUSTOM.DIC).
 - **Themes** — eleven built in (Amber Phosphor, Red Sparks and Red Sparks 2X designed
   by Joe Sparks (@joesparks on X), Dracula, GitHub Dark Dimmed, GitHub Light, Midget

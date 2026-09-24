@@ -12,10 +12,9 @@
  *  one colour it sets that is not #RRGG00 is paper's: the printed row stripe
  *  is white, which on paper is no ink rather than a colour.
  *
- *  Two things on screen are not a theme's to colour, and stay blue: the
+ *  Two things on screen stay blue, because no theme variable reaches them: the
  *  highlight behind selected text and Find matches, and the light blue
- *  outline (#88ccff) round a rule or picture you click. No variable reaches
- *  either.
+ *  outline (#88ccff) round a rule or picture you click.
  *
  *  Measured, WCAG contrast, on the grounds each colour can land on:
  *
