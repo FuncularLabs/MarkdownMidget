@@ -11,7 +11,7 @@ not planned, and the deliberate limits, are in
 
 ---
 
-## 1.0 (cut as 1.0.0-beta1 on 2026-09-13, 1.0.0-rc1 on 2026-09-15 and 1.0.0-rc2 on 2026-09-16; 0.10.0 was promoted 2026-09-10)
+## 1.0 (cut as 1.0.0-beta1 on 2026-09-13, 1.0.0-rc1 on 2026-09-15, 1.0.0-rc2 on 2026-09-16 and 1.0.0-rc3 on 2026-09-24; 0.10.0 was promoted 2026-09-10)
 
 The 2026-09-10 readiness audit, planned in detail in
 [docs/plans/release-1.0.md](docs/plans/release-1.0.md). The verdict was "close on
@@ -69,16 +69,22 @@ the README's promise true as written.
 ["Won't unless asked"](docs/parked-ideas.md#wont-unless-asked-known-limits-parked-deliberately)
 list (at the foot of this file until 2026-09-14), and a README opening paragraph that
 says what a trip through the formatted view does change. The beta was tagged
-`v1.0.0-beta1` and published as a GitHub prerelease on 2026-09-13, and 1.0.0-rc1
-on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after dogfooding.
+`v1.0.0-beta1` and published as a GitHub prerelease on 2026-09-13, 1.0.0-rc1
+on 2026-09-15 and 1.0.0-rc2 on 2026-09-16; the 1.0.0-rc3 cut is dated 2026-09-24, and
+1.0.0 follows after dogfooding.
 
 ## Next
 
-### Now — the 1.0.0-rc3 set (started 2026-09-16)
+### The 1.0.0-rc3 set (started 2026-09-16) — cut as 1.0.0-rc3 on 2026-09-24
 
-- **The app should follow Windows light and dark mode.** Today it ignores the Windows
-  setting: the title bar, menus, toolbar, status bar and dialogs stay light, and the
-  document keeps whichever theme View ▸ Theme last set. Decided 2026-09-16:
+Both items below are done and in the cut, with the rest of what the CHANGELOG lists
+under 1.0.0-rc3.
+
+- ~~**The app should follow Windows light and dark mode.**~~ **Done 2026-09-16
+  (1.0.0-rc3)**, as decided below; the CHANGELOG's first three Added entries describe
+  it. Was: the app ignored the Windows setting: the title bar, menus, toolbar, status
+  bar and dialogs stayed light, and the document kept whichever theme View ▸ Theme
+  last set. Decided 2026-09-16:
   - The window chrome keeps today's look in light mode and gets a matching dark
     palette, and the dark title bar, in dark mode. WPF's Fluent style was considered
     and passed over because it would change the light-mode look too.
@@ -98,8 +104,8 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
   Dark: a dark theme darkened the document but not the header or footer. The same
   tester saw Windows SmartScreen's warning on the first two launches; that is the
   signing work under [Real installer / uninstaller](#real-installer--uninstaller).
-- **Toolbar tooltips should clear an enlarged mouse pointer** — see
-  [Nits](#nits) below.
+- ~~**Toolbar tooltips should clear an enlarged mouse pointer**~~ **Done 2026-09-16
+  (1.0.0-rc3)** — see [Nits](#nits) below.
 
 ### Easier JSON editing — needs definition
 
@@ -153,7 +159,7 @@ formatted view, and its margin labels the lines between blocks.
 ### Themes — shipped in 0.7.0
 
 **Not Next work — kept as the design record.** Nothing here is planned; its one open
-question (below) matters only if a second theme ever wants a font size.
+question (below) was settled in 1.0.0-rc3, when a second theme wanted a font size.
 
 Delivered: **View ▸ Theme**, seven built-in palettes, user CSS in `themes\custom`,
 and invalid files listed-but-disabled with the first error in the tooltip. The
@@ -165,7 +171,9 @@ over-rejection and the network rule moving to the request layer — is kept in
 Left here only as the open tail: **Midget Solarized is the one built-in carrying a
 non-`:root` rule** (a screen-only body font-size). If a second theme ever wants
 typography as well as colour, that is the point to decide whether size becomes part
-of the theme contract rather than an ordinary rule each theme repeats.
+of the theme contract rather than an ordinary rule each theme repeats. **Settled in
+1.0.0-rc3**: it is part of the contract, as `--mdm-font-size`, which Red Sparks 2X sets
+to double the text; Midget Solarized's screen-only rule is unchanged.
 
 **Second open tail — RESOLVED in 0.8.1 (raised 2026-08-18, shipped with the
 print-table variables).** Kept as the design record: Not cosmetics: print.css pins page, text,

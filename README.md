@@ -106,7 +106,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**1.0.0-rc2 — the second 1.0 release candidate; 0.10.0 is still the latest stable**, so
+**1.0.0-rc3 — the third 1.0 release candidate; 0.10.0 is still the latest stable**, so
 the badge above and the entry marked **Latest** on the releases page both point at
 0.10.0 until 1.0.0. In daily use and signed on every release.
 Windows-only for now; the editor core is web-based, so a cross-platform shell
@@ -187,9 +187,9 @@ the one it replaced:
 | Where | Looks like |
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc2+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc2+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc2+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc3+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc3+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc3+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -319,6 +319,16 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.0-rc3** *(prerelease)* — **The third 1.0 release candidate.** Markdown Midget
+  now **follows Windows light and dark mode**: in dark mode the menus, toolbar, dialogs
+  and title bar turn dark, and the document shows the theme you picked for that mode;
+  **View ▸ Mode** can keep the app in light or dark mode instead. New built-in themes:
+  **Obsidiminutive**, dark mode's default, and **Amber Phosphor**, **Red Sparks** and
+  **Red Sparks 2X**, designed by Joe Sparks (@joesparks on X). Most diagrams now follow
+  a theme's text size, and dark themes print dark headings and links. **Formatting
+  marks** show in the source view too. **Cancel** in Windows' file dialog now just
+  closes it, and if that dialog crashes, a notice says what it found. Themes made by
+  other people are in the [community-themes](community-themes/) folder.
 - **v1.0.0-rc2** *(prerelease)* — **The second 1.0 release candidate.** Updating or
   registering now leaves your **`.md` default** alone. The update from an older
   version is still done by that version, so it may reset the default one last time;
