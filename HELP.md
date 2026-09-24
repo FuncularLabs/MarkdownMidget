@@ -442,6 +442,11 @@ when it sets `--mdm-color-scheme: dark`.
 `sample.css` explains the whole thing. Copy it, rename it, edit the colours — the
 new name appears in the menu without restarting the app.
 
+**Themes made by other people** are in the
+[community-themes folder](https://github.com/FuncularLabs/MarkdownMidget/tree/master/community-themes)
+on GitHub. Copy one into `custom\` to use it; they aren't checked the way the
+built-ins are.
+
 Two folders, and the difference matters:
 
 - **`themes\`** holds the ten built-in theme files — the eleventh theme, Default, is

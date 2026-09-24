@@ -1,0 +1,126 @@
+/* Community theme by Joe Sparks (@joesparks on X); it relies on rules, not just variables. */
+/* =====================================================================
+ *  Patriot — red, white and blue. White text on deep navy, red for the
+ *  major headings, blue for the minor ones.
+ *
+ *  Both accents are fully saturated; the blue simply has to sit at the
+ *  bright end of its hue to be legible, because blue carries only 7% of
+ *  perceived luminance. A dark saturated blue on a dark navy page reads
+ *  at under 3:1 and disappears.
+ *
+ *  Written by Claude Opus, to requests by Joe Sparks.
+ *
+ *  View > Theme > "Patriot".
+ * ===================================================================== */
+
+:root {
+  /* ---- surface ----------------------------------------------------- */
+
+  --mdm-color-scheme: dark;
+
+  --mdm-app-bg: #04070F;
+  --mdm-page-bg: #080F20;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.6);
+  --mdm-text: #EEF1F7;          /* 16:1 */
+
+  /* ---- headings and links ------------------------------------------ */
+
+  --mdm-heading: #FF2E3C;       /* h1-h3, 5.2:1 */
+  --mdm-h4: #6E96FF;            /* and blue from here down */
+  --mdm-h5: #5C88FF;
+  --mdm-h6: #4D7CFF;            /* 5.1:1 */
+
+  --mdm-link: #7FA8FF;
+  --mdm-link-hover: #A8C4FF;
+
+  /* ---- blockquote --------------------------------------------------- */
+
+  --mdm-quote-bg: #0C1428;
+  --mdm-quote-bar: #FF2E3C;
+  --mdm-quote-text: #C8D2E4;
+
+  /* ---- code --------------------------------------------------------- */
+
+  --mdm-code-bg: #131C34;
+  --mdm-pre-bg: #060C1A;
+  --mdm-pre-fg: #EEF1F7;
+
+  --mdm-hr: #8C2634;
+
+  /* ---- tables ------------------------------------------------------- */
+
+  --mdm-table-border: #3A4E7A;
+  --mdm-cell-border: #243252;
+  --mdm-td-bg: #080F20;
+  --mdm-th-bg: #142348;
+  --mdm-th-text: #EEF1F7;
+  --mdm-row-alt-bg: #0D1426;
+
+  /* This palette has real light values, so the printed stripe is an
+     actual stripe rather than the white non-answer the single-hue
+     themes are stuck with. */
+  --mdm-print-th-bg: #142348;
+  --mdm-print-th-text: #EEF1F7;
+  --mdm-print-row-alt-bg: #EDF1F8;
+
+  /* ---- rc3 settings, inert on older builds -------------------------- */
+
+  --mdm-list-marker: #FF2E3C;
+  --mdm-code-fg: #C8D8FF;
+
+  /* ---- the app's own furniture -------------------------------------- */
+
+  --mdm-mermaid-theme: dark;
+
+  --mdm-squiggle: #FF2E3C;
+  --mdm-mark: #2A3A5E;
+  --mdm-cell-selected: rgba(77, 124, 255, 0.22);
+  --mdm-resize-handle: #FF2E3C;
+
+  --mdm-mermaid-bg: #080F20;
+  --mdm-mermaid-border: #243252;
+  --mdm-mermaid-error-bg: #2A0C12;
+  --mdm-mermaid-error-border: #FF2E3C;
+  --mdm-mermaid-error-text: #FF8894;
+  --mdm-mermaid-empty: #3A4E7A;
+
+  /* ---- syntax highlighting ------------------------------------------ */
+
+  /* Three hues and nothing else, so the tokens are two reds, three blues
+     and the neutrals in between. */
+  --mdm-token-comment: #5A6E96;
+  --mdm-token-punctuation: #A8B8D8;
+  --mdm-token-operator: #FF8894;
+  --mdm-token-keyword: #FF5C68;
+  --mdm-token-function: #7FA8FF;
+  --mdm-token-string: #A8C4FF;
+  --mdm-token-number: #EEF1F7;
+  --mdm-token-property: #4D7CFF;
+  --mdm-token-regex: #FF2E3C;
+}
+
+/* ---- things no variable covers -------------------------------------- */
+
+.mdm-prosemirror.milkdown-theme-nord.prose ol > li::marker,
+.mdm-prosemirror.milkdown-theme-nord.prose ul > li::marker {
+  color: var(--mdm-list-marker, var(--mdm-text));
+}
+
+.mdm-prosemirror.mdm-prosemirror code {
+  color: var(--mdm-code-fg, var(--mdm-text));
+}
+
+.mdm-prosemirror.mdm-prosemirror pre code {
+  color: var(--mdm-pre-fg);
+}
+
+.mdm-prosemirror a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The text cursor, which no theme variable reaches and every one of ours
+   has so far left at the default. */
+.mdm-prosemirror {
+  caret-color: #FF2E3C;
+}

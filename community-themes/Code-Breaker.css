@@ -1,0 +1,241 @@
+/* Community theme by Joe Sparks (@joesparks on X); it relies on rules, not just variables. */
+/* =====================================================================
+ *  Code Breaker — the document arrives encrypted.
+ *
+ *  Every paragraph, list item and table cell renders as unreadable
+ *  signal. Point at one and it decodes under the cursor, with a flicker,
+ *  and re-encrypts the moment you leave. Headings stay legible so you
+ *  can still navigate. Nothing is hidden from the file — only from you.
+ *
+ *  Written by Claude Opus, to requests by Joe Sparks.
+ *
+ *  View > Theme > "Code Breaker".
+ * ===================================================================== */
+
+:root {
+  /* ---- surface ----------------------------------------------------- */
+
+  --mdm-color-scheme: dark;
+
+  --mdm-app-bg: #020503;
+  --mdm-page-bg: #040A06;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.75);
+  --mdm-text: #3FE07A;          /* 11.6:1 when decoded */
+
+  /* ---- headings and links ------------------------------------------ */
+
+  --mdm-heading: #8CFFC0;
+  --mdm-h4: #6CF0A4;
+  --mdm-h5: #5AE494;
+  --mdm-h6: #4AD886;
+
+  --mdm-link: #B0FFD8;
+  --mdm-link-hover: #E0FFF0;
+
+  /* ---- blockquote --------------------------------------------------- */
+
+  --mdm-quote-bg: #020806;
+  --mdm-quote-bar: #2FA85E;
+  --mdm-quote-text: #34C068;
+
+  /* ---- code --------------------------------------------------------- */
+
+  --mdm-code-bg: #08140C;
+  --mdm-pre-bg: #020806;
+  --mdm-pre-fg: #3FE07A;
+
+  --mdm-hr: #1E6E40;
+
+  /* ---- tables ------------------------------------------------------- */
+
+  --mdm-table-border: #2A8C52;
+  --mdm-cell-border: #185434;
+  --mdm-td-bg: #040A06;
+  --mdm-th-bg: #0C2414;
+  --mdm-th-text: #8CFFC0;
+  --mdm-row-alt-bg: #061008;
+
+  /* Unlike the two night themes, this palette is not channel-locked, so
+     it can actually honour the print contract: a genuinely light stripe. */
+  --mdm-print-th-bg: #0C2414;
+  --mdm-print-th-text: #8CFFC0;
+  --mdm-print-row-alt-bg: #EDF7F1;
+
+  /* ---- rc3 settings, inert on older builds -------------------------- */
+
+  --mdm-list-marker: #2FA85E;
+  --mdm-code-fg: #3FE07A;
+
+  /* ---- the app's own furniture -------------------------------------- */
+
+  --mdm-mermaid-theme: dark;
+
+  --mdm-squiggle: #FF4060;      /* off the green axis entirely, so a
+                                   misspelling still announces itself */
+  --mdm-mark: #1E6E40;
+  --mdm-cell-selected: rgba(63, 224, 122, 0.20);
+  --mdm-resize-handle: #8CFFC0;
+
+  --mdm-mermaid-bg: #040A06;
+  --mdm-mermaid-border: #185434;
+  --mdm-mermaid-error-bg: #200A0E;
+  --mdm-mermaid-error-border: #FF4060;
+  --mdm-mermaid-error-text: #FF8098;
+  --mdm-mermaid-empty: #2A8C52;
+
+  /* ---- syntax highlighting ------------------------------------------ */
+
+  --mdm-token-comment: #2A7A4A;
+  --mdm-token-punctuation: #46A870;
+  --mdm-token-operator: #7CFFB0;
+  --mdm-token-keyword: #B0FFD8;
+  --mdm-token-function: #6CF0A4;
+  --mdm-token-string: #D0FF80;
+  --mdm-token-number: #FFE070;
+  --mdm-token-property: #58E0A0;
+  --mdm-token-regex: #FF9A70;
+
+  /* ---- the cipher ---------------------------------------------------- */
+
+  --cb-glow: rgba(63, 224, 122, 0.55);  /* colour of encrypted text */
+  --cb-radius: 7px;                     /* lower = easier to cheat */
+}
+
+/* ---- things no variable covers -------------------------------------- */
+
+.mdm-prosemirror.milkdown-theme-nord.prose ol > li::marker,
+.mdm-prosemirror.milkdown-theme-nord.prose ul > li::marker {
+  color: var(--mdm-list-marker, var(--mdm-text));
+}
+
+.mdm-prosemirror.mdm-prosemirror code {
+  color: var(--mdm-code-fg, var(--mdm-text));
+}
+
+.mdm-prosemirror.mdm-prosemirror pre code {
+  color: var(--mdm-pre-fg);
+}
+
+.mdm-prosemirror a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The text cursor, which no variable reaches — and which matters more
+   here than anywhere else, since it is the only thing telling you where
+   you are in a paragraph you cannot read. */
+.mdm-prosemirror {
+  caret-color: #8CFFC0;
+}
+
+/* ---- intercept traffic ---------------------------------------------- */
+
+/* Monospace throughout: this is a cable, not an essay. */
+.mdm-prosemirror.mdm-prosemirror {
+  font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+}
+
+/* Headings stay readable — they are the index to a document you cannot
+   otherwise read, and without them you would be lost in it. */
+.mdm-prosemirror h1,
+.mdm-prosemirror h2,
+.mdm-prosemirror h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 8px rgba(140, 255, 192, 0.35);
+}
+
+/* ---- the encryption -------------------------------------------------- */
+
+/* The glyphs are drawn, then thrown out of focus: the letter itself is
+   transparent and only its blurred shadow survives. Shapes and rhythm
+   stay, words do not.
+
+   This is deliberately NOT `filter: blur()`. A filter makes its element
+   the containing block for absolutely positioned descendants, and these
+   very elements carry the line numbers in the margin as :before — so a
+   blur here would drag the whole gutter in on top of the text. A
+   text-shadow changes no geometry whatsoever. */
+.mdm-prosemirror.mdm-prosemirror p,
+.mdm-prosemirror.mdm-prosemirror li,
+.mdm-prosemirror.mdm-prosemirror td,
+.mdm-prosemirror.mdm-prosemirror th {
+  color: transparent;
+  text-shadow: 0 0 var(--cb-radius) var(--cb-glow);
+}
+
+/* Fenced code is redacted rather than blurred, because syntax colours
+   are set by rules we would have to fight one at a time. Character
+   security replaces every glyph with a disc whatever colour it is, and
+   hands all nine token colours back intact on hover. */
+.mdm-prosemirror.mdm-prosemirror pre {
+  -webkit-text-security: disc;
+}
+
+/* ---- the decryption --------------------------------------------------- */
+
+/* Not a fade. It gropes for the signal, half-finds it, loses it, then
+   locks on — which is the whole pleasure of the thing. */
+@keyframes cb-decode {
+  0%   { color: transparent;
+         text-shadow: 0 0 var(--cb-radius) var(--cb-glow); }
+  35%  { color: rgba(140, 255, 192, 0.45);
+         text-shadow: 0 0 4px var(--cb-glow); }
+  48%  { color: transparent;
+         text-shadow: 0 0 6px var(--cb-glow); }
+  70%  { color: rgba(140, 255, 192, 0.75);
+         text-shadow: 0 0 2px var(--cb-glow); }
+  100% { color: var(--mdm-text);
+         text-shadow: 0 0 1px rgba(63, 224, 122, 0.30); }
+}
+
+.mdm-prosemirror.mdm-prosemirror p:hover,
+.mdm-prosemirror.mdm-prosemirror li:hover,
+.mdm-prosemirror.mdm-prosemirror td:hover {
+  animation: cb-decode 0.45s ease-out forwards;
+}
+
+.mdm-prosemirror.mdm-prosemirror th:hover {
+  animation: cb-decode 0.45s ease-out forwards;
+  color: var(--mdm-th-text);
+}
+
+.mdm-prosemirror.mdm-prosemirror pre:hover {
+  -webkit-text-security: none;
+}
+
+/* Leaving re-encrypts instantly. That asymmetry is on purpose: decoding
+   is work, forgetting is not. */
+
+/* ---- diagrams -------------------------------------------------------- */
+
+@media screen {
+  .mdm-mermaid {
+    position: relative;
+  }
+
+  .mdm-mermaid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #3FE07A;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+}
+
+/* =====================================================================
+ *  Two knobs, if you want them.
+ *
+ *  Too hard to read: drop --cb-radius to 4px or 5px. At 3px you can
+ *  cheat and read it straight, which rather spoils the effect.
+ *
+ *  Too easy: swap the encryption block's two lines for character
+ *  security, and prose is replaced by discs the way the code blocks are
+ *  — no shapes, no word lengths, nothing to go on at all.
+ *
+ *    color: inherit;
+ *    -webkit-text-security: disc;
+ *
+ *  It cannot animate, so the decode flicker is lost. Traded for menace.
+ * ===================================================================== */

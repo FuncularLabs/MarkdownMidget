@@ -126,6 +126,16 @@ on 2026-09-15; the 1.0.0-rc2 cut is dated 2026-09-16, and 1.0.0 follows after do
   changes how every existing diagram looks, so it wants its own change and its own
   before-and-after check.
 
+### Text cursor colour — a theme variable
+
+- **A theme should be able to colour the text cursor.** No variable reaches it, so in
+  every theme it is the colour of the text it sits in. All three community themes from
+  Joe Sparks (@joesparks on X) set `caret-color` with a rule instead, each to its
+  accent; in Code Breaker the cursor is the only thing showing where you are in text
+  you can't read. A `--mdm-caret` whose default is the text colour would change nothing
+  for a theme that leaves it out. Open: whether the source view's cursor follows it too.
+  Raised 2026-09-24 with [community-themes](community-themes/README.md).
+
 ### Line numbers (#10) — in 1.0.0-rc1
 
 Both phases are in: the cursor's line and column in the status bar and Go to Line

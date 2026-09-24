@@ -1,0 +1,209 @@
+/* Community theme by Joe Sparks (@joesparks on X); it relies on rules, not just variables. Renamed from Amber-Phosphor.css, so the menu calls it "Amber Phosphor CRT". */
+/* =====================================================================
+ *  Amber Phosphor — the other night display. Every colour here has a
+ *  blue channel of exactly zero: #RRGG00, all the way through.
+ *
+ *  Red Sparks zeroes green AND blue. This one zeroes only blue, which is
+ *  the channel that actually suppresses melatonin — and the trade is
+ *  enormous. Red tops out at 5.25:1 and can never reach AAA. Amber runs
+ *  to 13:1. Body text here is 7.6:1, so this is the first of the two
+ *  that passes AAA for normal text while still emitting no blue at all.
+ *
+ *  Written by Claude Opus, to requests by Joe Sparks.
+ *
+ *  View > Theme > "Amber Phosphor".
+ * ===================================================================== */
+
+:root {
+  /* ---- surface ----------------------------------------------------- */
+
+  --mdm-color-scheme: dark;
+
+  --mdm-app-bg: #050400;
+  --mdm-page-bg: #0C0A00;
+  --mdm-page-shadow: rgba(0, 0, 0, 0.7);
+  --mdm-text: #D89200;          /* 7.6:1 — AAA */
+
+  /* ---- headings and links ------------------------------------------ */
+
+  --mdm-heading: #FFB000;       /* P3 phosphor amber, 10.8:1 */
+  --mdm-h4: #F5A800;
+  --mdm-h5: #E89E00;
+  --mdm-h6: #DC9600;
+
+  /* Note the direction: hover gets BRIGHTER. Red Sparks could not do
+     this — it was already at the top of its one channel. */
+  --mdm-link: #FFC400;
+  --mdm-link-hover: #FFD400;
+
+  /* ---- blockquote --------------------------------------------------- */
+
+  --mdm-quote-bg: #080600;
+  --mdm-quote-bar: #B87A00;
+  --mdm-quote-text: #C08200;
+
+  /* ---- code --------------------------------------------------------- */
+
+  --mdm-code-bg: #181200;
+  --mdm-pre-bg: #080600;
+  --mdm-pre-fg: #D89200;
+
+  --mdm-hr: #6E4A00;
+
+  /* ---- tables ------------------------------------------------------- */
+
+  --mdm-table-border: #8C5E00;
+  --mdm-cell-border: #543800;
+  --mdm-td-bg: #0C0A00;
+  --mdm-th-bg: #241800;
+  --mdm-th-text: #FFB000;
+  --mdm-row-alt-bg: #141000;
+
+  /* Zero-blue has no pale tint either — its lightest colour is yellow,
+     not a tint — so the printed stripe is white: no ink, no stripe. */
+  --mdm-print-th-bg: #241800;
+  --mdm-print-th-text: #FFB000;
+  --mdm-print-row-alt-bg: #ffffff;
+
+  /* ---- rc3 settings, inert on older builds -------------------------- */
+
+  --mdm-list-marker: #D89200;
+  --mdm-code-fg: #D89200;
+
+  /* ---- the app's own furniture -------------------------------------- */
+
+  --mdm-mermaid-theme: dark;
+
+  /* Red is zero-blue too, so this palette gets a real error colour back
+     — hue-distinct from the amber instead of a shade of it. */
+  --mdm-squiggle: #FF2000;
+
+  --mdm-mark: #6E4A00;
+  --mdm-cell-selected: rgba(255, 176, 0, 0.22);
+  --mdm-resize-handle: #FFB000;
+
+  --mdm-mermaid-bg: #0C0A00;
+  --mdm-mermaid-border: #543800;
+  --mdm-mermaid-error-bg: #2A0800;
+  --mdm-mermaid-error-border: #FF2000;
+  --mdm-mermaid-error-text: #FF6000;
+  --mdm-mermaid-empty: #8C5E00;
+
+  /* ---- syntax highlighting ------------------------------------------ */
+
+  /* Nine names, nine values — and worth comparing with Red Sparks, which
+     could only manage four. Zeroing one channel instead of two leaves a
+     whole plane to move in: red through orange through amber to yellow-
+     green is all still blue-free, so the tokens can differ by HUE here
+     rather than fighting over a dozen steps of brightness. */
+  --mdm-token-comment: #8C6A00;
+  --mdm-token-punctuation: #C08200;
+  --mdm-token-operator: #FF6000;
+  --mdm-token-keyword: #FF8000;
+  --mdm-token-function: #FFD400;
+  --mdm-token-string: #B0D400;
+  --mdm-token-number: #FFE800;
+  --mdm-token-property: #E0B000;
+  --mdm-token-regex: #FF4000;
+}
+
+/* ---- things no variable covers -------------------------------------- */
+
+/* Markers and inline code, for builds before rc3. On rc3 and later the
+   variables above already cover it and these fall through to them. */
+.mdm-prosemirror.milkdown-theme-nord.prose ol > li::marker,
+.mdm-prosemirror.milkdown-theme-nord.prose ul > li::marker {
+  color: var(--mdm-list-marker, var(--mdm-text));
+}
+
+.mdm-prosemirror.mdm-prosemirror code {
+  color: var(--mdm-code-fg, var(--mdm-text));
+}
+
+.mdm-prosemirror.mdm-prosemirror pre code {
+  color: var(--mdm-pre-fg);
+}
+
+.mdm-prosemirror a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The text cursor, which no variable reaches. */
+.mdm-prosemirror {
+  caret-color: #FFB000;
+}
+
+/* ---- the glass ------------------------------------------------------ */
+
+/* Scanlines and the corner falloff of a curved tube, as two background
+   layers on the page itself.
+
+   This is deliberately NOT an overlay element. The line numbers in the
+   margin are absolutely positioned and anchor a long way up the tree, so
+   giving .milkdown or .mdm-prosemirror a `position` or a `filter` would
+   make one of them the new containing block and haul the whole gutter
+   inwards. Background layers change no geometry at all. */
+.milkdown.milkdown {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.22) 2px,
+      rgba(0, 0, 0, 0.22) 3px
+    ),
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 55%,
+      rgba(0, 0, 0, 0.40) 100%
+    );
+}
+
+/* Phosphor does not stop at the edge of the glyph. A little bloom, small
+   enough to stay out of the way of reading. */
+.mdm-prosemirror.mdm-prosemirror {
+  text-shadow: 0 0 5px rgba(255, 176, 0, 0.28);
+}
+
+/* And the tube breathes. Only the headings animate: there are a few
+   dozen of them rather than a few thousand words, so this repaints
+   almost nothing and will not fight you while you type. */
+@keyframes mdm-phosphor-breathe {
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 176, 0, 0.30); }
+  50%      { text-shadow: 0 0 10px rgba(255, 176, 0, 0.45); }
+}
+
+.mdm-prosemirror h1,
+.mdm-prosemirror h2,
+.mdm-prosemirror h3 {
+  animation: mdm-phosphor-breathe 7s ease-in-out infinite;
+}
+
+/* Want the whole document to breathe? Uncomment this. It is off by
+   default because animating a text-shadow across every word in a long
+   file is real repaint work, and a laggy editor is not a fun theme.
+
+.mdm-prosemirror.mdm-prosemirror {
+  animation: mdm-phosphor-breathe 7s ease-in-out infinite;
+}
+
+*/
+
+/* Diagrams, multiplied by amber: blue goes to zero, green is scaled to
+   match, red passes. @media screen because on paper this is ink, and a
+   multiplied diagram printed on white is a mess. */
+@media screen {
+  .mdm-mermaid {
+    position: relative;
+  }
+
+  .mdm-mermaid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #FFB000;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+}
