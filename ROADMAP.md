@@ -426,6 +426,15 @@ the last of the usability gaps raised in the 0.6.x review.
   `text-underline-offset: 2px` its custom version carried rather than shipping it in
   one theme. Raised by Joe Sparks (@joesparks on X), whose own draft had it.
 
+- **Print should pin every code-token colour, so no dark theme's code prints in its
+  screen colours.** `print.css` states its own colour for seventeen kinds of
+  highlighted token, but twelve more (variable, regex, symbol, selector, url,
+  important, inserted, deleted, doctype, prolog, cdata, entity) keep the colour
+  `base.css` gives them from the theme. Amber Phosphor's CSS selectors, for one, print
+  in #B0D400: 1.71:1 on white, 1.61:1 on the printed code block's #f6f8fa. Pinning
+  them changes printed code in every theme, so it wants its own change and review.
+  Raised 2026-09-24 in the 1.0.0-rc3 review.
+
 - ~~**Toolbar tooltips should clear an enlarged mouse pointer.**~~ **Done 2026-09-16
   (1.0.0-rc3)**: when the pointer is larger than standard, every toolbar tooltip, the
   Style box's included, opens under its button, moved down by the pointer's whole
