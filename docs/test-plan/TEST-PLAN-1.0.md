@@ -1036,7 +1036,7 @@ To see the crash notice without a real crash, start Markdown Midget from a Power
 
 ## 4. Run log
 
-For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
+For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. Tests marked `[TakesFocusFact]` skip on a developer machine, because they activate a window and can take the keyboard: they run on CI, and locally only with `MDM_TESTS_MAY_TAKE_FOCUS=1`. Unless a run sets that variable, record them as "skipped locally (CI)". For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
 
 ### Build 284 (1.0.0-beta1+build.284) — 2026-09-15
 
