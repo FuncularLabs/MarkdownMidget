@@ -862,13 +862,17 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** On the "No document open" screen, the ticks show your saved settings again.
 - **Type:** Both. Automated: `LargeDocumentTests.Closing_forgets_the_document_so_the_no_document_screen_follows_the_saved_settings`. Human: the close wiring.
 
-#### BIG-07 Save As in the external-change conflict keeps the choices
-- **Change:** Added: large documents · **Documents:** `large-copy.md`, made as in BIG-05 step 1 · **Settings:** as BIG-01
+#### BIG-07 Save As in the external-change conflict keeps the choices, and the name decides encryption
+- **Change:** Added: large documents; Fixed: "Save your current version as… now encrypts a file you name .mdenc" · **Documents:** `large-copy.md`, made as in BIG-05 step 1; `br-forms.md` in `%TEMP%\mdm-test-copies` for steps 4 to 7 · **Settings:** as BIG-01
 1. Open `large-copy.md`, turn on **Show Line Numbers**, and type a word without saving.
 2. In PowerShell, append a line to the same file: `Add-Content "$env:TEMP\mdm-test-copies\large-copy.md" "External line."`
 3. When the app reports the conflict, choose to save under a new name.
-- **Expected:** The document is saved under the new name, line numbers are still on, and spell check is still off.
-- **Type:** Both. Automated: `LargeDocumentTests.Keeping_the_document_under_a_new_name_keeps_its_choices`. Human: the conflict dialog.
+4. Open `br-forms.md` and type a word without saving. In PowerShell, run `Add-Content "$env:TEMP\mdm-test-copies\br-forms.md" "External line."`. When the app reports the conflict, choose to save under a new name, pick **All files (\*.\*)**, type `mine.mdenc`, and click **Cancel** in the password prompt.
+5. Run the same `Add-Content` again. At the conflict, save under a new name again: **All files (\*.\*)**, `mine.mdenc`, and this time choose a password. Answer **Yes** to keep editing your saved version. Close the window and open `mine.mdenc` from **File ▸ Open Recent**.
+6. In PowerShell, run `$d = "$env:TEMP\mdm-test-copies"; Copy-Item "$d\mine.mdenc" "$d\mine-old.mdenc"`. In the app, type a word and press Ctrl+S, then type another word without saving. Run `Copy-Item "$d\mine-old.mdenc" "$d\mine.mdenc" -Force`. At the conflict, save under a new name: **All files (\*.\*)**, `mine.md`. Read the warning, click **Yes**, and open `mine.md` in Notepad.
+7. Close every window and make fresh copies of the test documents as in section 1.2 step 1.
+- **Expected:** In step 3 the document is saved under the new name, line numbers are still on, and spell check is still off. In step 4 nothing is saved: there is no `mine.mdenc`, and the window still shows your word, marked unsaved. In step 5 a password prompt appears, `mine.mdenc` is saved, the title bar shows `mine.mdenc` with 🔒, and opening it again asks for the password. In step 6 a warning says the copy will be readable by anyone; after Yes, `mine.md` is saved and Notepad shows your words as plain text.
+- **Type:** Both. Automated: `LargeDocumentTests.Keeping_the_document_under_a_new_name_keeps_its_choices`, `SecureUiTests.TheNameDecidesWhatASaveAsksAndThePasswordTheWindowKeeps`, `SecureUiTests.BackingOutOfThePasswordOrTheWarningWritesNothing`. Human: the conflict dialog, the password prompt, the warning and the files saved, which need the app.
 
 #### BIG-08 A 3 MB document opens and switches without a long hang
 - **Change:** Added: large documents (Ctrl+E on a 2.8 MB document used to hang for about 20 seconds) · **Documents:** `large-3mb.md` · **Settings:** start with `MDM_TIMING=1`

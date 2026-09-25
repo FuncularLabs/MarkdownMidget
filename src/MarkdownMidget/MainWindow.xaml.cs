@@ -1781,22 +1781,10 @@ public partial class MainWindow : Window
             });
             if (picked is null) return false;
             path = picked;
-            wantEncrypted = Secure.SecureUi.IsEncryptedPath(path);
-            if (wantEncrypted && !_docEncrypted)
-            {
-                newPassword = PasswordDialog.Set(this, "Encrypt Document",
-                    $"Choose a password for {Path.GetFileName(path)}.");
-                if (newPassword is null) return false;
-            }
-            else if (!wantEncrypted && _docEncrypted)
-            {
-                // Design section 8: the user must not stumble into a readable copy.
-                if (MessageBox.Show(this,
-                        "This writes a readable copy with no password. Anyone with the " +
-                        "file can read it. The encrypted file stays where it is.\n\nContinue?",
-                        "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning)
-                    != MessageBoxResult.Yes) return false;
-            }
+            var choice = ChooseSave(path);
+            if (!choice.Write) return false;
+            wantEncrypted = choice.Encrypt;
+            if (wantEncrypted && !_docEncrypted) newPassword = choice.Password;
         }
 
         // TryGet, not Get. Get reports "the editor didn't answer" as an empty
@@ -1883,6 +1871,14 @@ public partial class MainWindow : Window
         if (leftNoDocument) await TryFocusDocumentAsync();
         return true;
     }
+
+    /// <summary>Save As's rule and questions (SecureUi.ChooseSave), shared with "Save your current version as…".</summary>
+    private Secure.SecureUi.SaveChoice ChooseSave(string path) => Secure.SecureUi.ChooseSave(path, _docEncrypted, _docPassword,
+        () => PasswordDialog.Set(this, "Encrypt Document", $"Choose a password for {Path.GetFileName(path)}."),
+        () => MessageBox.Show(this,
+                "This writes a readable copy with no password. Anyone with the " +
+                "file can read it. The encrypted file stays where it is.\n\nContinue?",
+                "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes);
 
     // ===== Secure Markdown operations =====
 
@@ -3202,9 +3198,9 @@ public partial class MainWindow : Window
             FileName = suggested,
             RecentFolders = PickerRecentFolders(),
         });
-        if (picked is null)
+        if (picked is null || ChooseSave(picked) is not { Write: true } choice)
         {
-            // User backed out of save-as — treat like Keep Current.
+            // User backed out of save-as, its password or its warning — treat like Keep Current.
             AcceptDiskAsBaseline(disk);
             _ = UpdateDirtyAsync();
             return;
@@ -3212,11 +3208,12 @@ public partial class MainWindow : Window
 
         try
         {
-            // An encrypted document's "your version" stays encrypted - a plaintext
-            // file wearing the .mdenc name would be both a leak and a lie. Either
+            // The picked name decides, as in Save As: a .mdenc name is sealed, never
+            // plaintext wearing the encrypted name: a leak and a lie. Either
             // way it is written in the document's own conventions, as Save would.
-            if (_docEncrypted && _docPassword is { } savePw)
+            if (choice.Encrypt)
             {
+                var savePw = choice.Password ?? throw new InvalidOperationException("encrypted save without a password");
                 var plaintext = DocumentText.ApplyLineEnding(inMemory, _lineEnding);
                 await Task.Run(() => Secure.SecureMarkdownFile.Save(picked, plaintext, savePw));
             }
@@ -3237,7 +3234,7 @@ public partial class MainWindow : Window
         var pick = MessageBox.Show(
             $"Saved your version to:\n{picked}\n\nKeep editing your saved version ({savedFileName})?\n\nYes = open '{savedFileName}'\nNo = continue with the externally-modified '{fileName}'",
             "Markdown Midget", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        // Both loads keep the encryption state (rounds 1 and 2 each found a
+        // Each load passes the password of the file it loads (rounds 1 and 2 each found a
         // password-dropping load; these are call sites 3 and 4 of 4 - every
         // LoadDocumentAsync caller on an encrypted path now passes it through).
         if (pick == MessageBoxResult.Yes)
@@ -3245,7 +3242,7 @@ public partial class MainWindow : Window
             // Already on disk with inMemory content, in this document's conventions;
             // load + retarget.
             await LoadDocumentAsync(new DocumentText.Decoded(inMemory, _lineEnding, _hadBom), picked,
-                _docEncrypted ? _docPassword : null, keepLargeChoices: true);   // the same document, now under the picked name
+                choice.Password, keepLargeChoices: true);   // the same document, now under the picked name
             RekeyDocumentClaim(picked);   // a Save As by another name: the claim moves too
         }
         else

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MarkdownMidget.Secure;
 using Xunit;
 
@@ -43,6 +44,41 @@ public class SecureUiTests
         // catches the constant going stale.
         var groups = SecureUi.SaveFilter.Split('|');
         Assert.Contains("mdenc", groups[(SecureUi.SaveFilterEncryptedIndex - 1) * 2]);
+    }
+
+    // ---- what a save to a picked name asks first: Save As and "Save your current version as…" ----
+
+    private static SecureUi.SaveChoice Choose(string path, bool docEncrypted, List<string> asked,
+        string? typedPassword = "new", bool continueReadable = true) =>
+        SecureUi.ChooseSave(path, docEncrypted, docEncrypted ? "old" : null,
+            () => { asked.Add("password"); return typedPassword; },
+            () => { asked.Add("warning"); return continueReadable; });
+
+    [Theory]
+    [InlineData(false, @"C:\d\x.mdenc", "password", true, "new")]   // readable document, .mdenc name: new password
+    [InlineData(false, @"C:\d\x.md", "", false, null)]              // readable, any other name: nothing
+    [InlineData(true, @"C:\d\x.md", "warning", false, null)]        // encrypted, any other name: the warning
+    [InlineData(true, @"C:\d\x.MDENC", "", true, "old")]            // encrypted, .mdenc name: nothing
+    public void TheNameDecidesWhatASaveAsksAndThePasswordTheWindowKeeps(
+        bool docEncrypted, string path, string expectedAsk, bool encrypt, string? password)
+    {
+        var asked = new List<string>();
+        var choice = Choose(path, docEncrypted, asked);
+        Assert.Equal(expectedAsk.Length == 0 ? [] : [expectedAsk], asked);
+        Assert.True(choice.Write);
+        Assert.Equal(encrypt, choice.Encrypt);
+        // What the file is sealed with, and what Save As and "keep editing your saved
+        // version" both leave the window with (null: a readable document).
+        Assert.Equal(password, choice.Password);
+    }
+
+    [Fact]
+    public void BackingOutOfThePasswordOrTheWarningWritesNothing()
+    {
+        var asked = new List<string>();
+        Assert.False(Choose(@"C:\d\x.mdenc", docEncrypted: false, asked, typedPassword: null).Write);
+        Assert.False(Choose(@"C:\d\x.md", docEncrypted: true, asked, continueReadable: false).Write);
+        Assert.Equal(["password", "warning"], asked);
     }
 
     [Theory]

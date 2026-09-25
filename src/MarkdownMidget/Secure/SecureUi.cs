@@ -68,6 +68,20 @@ internal static class SecureUi
         Filter = encrypted ? EncryptedType + "|All files (*.*)|*.*" : "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
     };
 
+    /// <summary>A save to a picked name. Write false: the user backed out, write nothing. Password
+    /// seals the file and is what the window keeps if it edits that file on (null: readable).</summary>
+    internal readonly record struct SaveChoice(bool Write, bool Encrypt, string? Password);
+
+    /// <summary>The NAME decides, in Save As and "Save your current version as…": a .mdenc name for a
+    /// readable document asks for a new password; any other name for an encrypted one warns (design §8).</summary>
+    public static SaveChoice ChooseSave(string path, bool docEncrypted, string? docPassword, Func<string?> askNewPassword, Func<bool> confirmReadableCopy)
+    {
+        var encrypt = IsEncryptedPath(path);
+        if (encrypt == docEncrypted) return new(true, encrypt, encrypt ? docPassword : null);
+        if (encrypt) return askNewPassword() is { } pw ? new(true, true, pw) : default;
+        return new(confirmReadableCopy(), false, null);
+    }
+
     /// <summary>
     /// A coarse, honest strength readout for the set-password dialog. Not a
     /// cracking-time estimate — those overpromise — just the three bands users
