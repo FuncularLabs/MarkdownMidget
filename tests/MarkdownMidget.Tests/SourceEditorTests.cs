@@ -19,8 +19,8 @@ namespace MarkdownMidget.Tests;
 /// difference (a hit test below the text). AvalonEdit itself is not under test.
 ///
 /// Anything that reads glyph geometry needs a laid-out control, so those cases show a
-/// real (off-screen) window on an STA thread and force a layout pass — the same shape
-/// <see cref="ContextMenuFocusTests"/> uses for WPF menus.
+/// real window on an STA thread and force a layout pass. The window never reaches a
+/// screen and is never activated (<see cref="OffscreenWindow"/>).
 /// </summary>
 [Collection("WpfSta")]
 public class SourceEditorTests
@@ -48,15 +48,7 @@ public class SourceEditorTests
                 };
                 if (laidOut)
                 {
-                    win = new Window
-                    {
-                        Width = 300,
-                        Height = height,
-                        Left = -10000,
-                        Top = -10000,
-                        ShowInTaskbar = false,
-                        Content = ed,
-                    };
+                    win = OffscreenWindow.Create(ed, 300, height);
                     win.Show();
                     ed.UpdateLayout();
                     ed.TextArea.TextView.EnsureVisualLines();

@@ -300,7 +300,10 @@ public class MenuAccessKeysTests
 
     // ===== the WPF side, against a real menu =====
 
-    private static T OnMenuWindow<T>(Func<Window, Menu, T> body)
+    /// <param name="takesFocus">True only for a <see cref="TakesFocusFactAttribute"/> case:
+    /// a plain window, which showing activates, so keyboard focus can move in it. Otherwise
+    /// a window that is never activated (<see cref="OffscreenWindow"/>).</param>
+    private static T OnMenuWindow<T>(Func<Window, Menu, T> body, bool takesFocus = false)
     {
         var result = default(T)!;
         Exception? error = null;
@@ -324,7 +327,9 @@ public class MenuAccessKeysTests
                 var host = new TextBox();
                 panel.Children.Add(host);
 
-                win = new Window { Width = 300, Height = 200, Left = -10000, Top = -10000, ShowInTaskbar = false, Content = panel };
+                win = takesFocus
+                    ? new Window { Width = 300, Height = 200, Left = -10000, Top = -10000, ShowInTaskbar = false, Content = panel }
+                    : OffscreenWindow.Create(panel, 300, 200);
                 win.Show();
                 host.Focus();
                 Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
@@ -357,11 +362,11 @@ public class MenuAccessKeysTests
     [Collection("WpfSta")]
     public class OnARealMenu
     {
-        [Fact]
+        [TakesFocusFact]
         public void FocusingTheFirstItemEntersTheMenu()
         {
             // This is what an Alt tap becomes.
-            var (focusWithin, firstFocused) = OnMenuWindow((_, menu) =>
+            var (focusWithin, firstFocused) = OnMenuWindow(takesFocus: true, body: (_, menu) =>
             {
                 var first = (MenuItem)menu.Items[0];
                 first.Focus();

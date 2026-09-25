@@ -24,7 +24,7 @@ namespace MarkdownMidget.Tests;
 /// and the calls that move focus onto the window's own surface and back off it. The
 /// wiring, and the with-a-document paths the fix must leave alone, are pinned by
 /// reading the source (<see cref="RepoSources"/>). A pin proves a call is there;
-/// the runtime tests prove what it does.
+/// the runtime tests prove what it does, on CI or on request (<see cref="OnARealWindow"/>).
 /// </summary>
 public class AltF4NoDocumentTests
 {
@@ -183,10 +183,16 @@ public class AltF4NoDocumentTests
 
     // ===== the mechanism, on a real window =====
 
+    /// <summary>
+    /// Every case here needs a window that can take keyboard focus, and only a window
+    /// that is activated can, so each is a <see cref="TakesFocusFactAttribute"/> case.
+    /// The ones asserting that focus does NOT move need that too: in a window that
+    /// cannot take focus at all they would pass whatever the code did.
+    /// </summary>
     [Collection("WpfSta")]
     public class OnARealWindow
     {
-        [Fact]
+        [TakesFocusFact]
         public void TheSplashTakesFocusBackFromAChildWindowThatHoldsIt()
         {
             // The bug's shape: Win32 focus in a child window, which is the editor's
@@ -222,7 +228,7 @@ public class AltF4NoDocumentTests
             Assert.True(outcome.stillOnWindow, "hiding the editor afterwards must not move focus off the window");
         }
 
-        [Fact]
+        [TakesFocusFact]
         public void TheSplashTakesFocusBackFromAChildWindowWhileItStillHoldsLogicalFocus()
         {
             // F1. The splash had focus before (a document closed earlier), a child window
@@ -263,7 +269,7 @@ public class AltF4NoDocumentTests
             Assert.True(outcome.took, "Take must report the focus it took");
         }
 
-        [Fact]
+        [TakesFocusFact]
         public void ASplashThatCannotHoldFocusDoesNotClaimIt()
         {
             var outcome = OnStaWindow((_, root) =>
@@ -277,7 +283,7 @@ public class AltF4NoDocumentTests
             Assert.False(outcome.focused);
         }
 
-        [Fact]
+        [TakesFocusFact]
         public void ACollapsedSplashTakesNothingFromTheViewThatHasFocus()
         {
             // With a document showing the splash is collapsed; the source view (a
@@ -298,7 +304,7 @@ public class AltF4NoDocumentTests
             Assert.True(outcome.sourceKeeps, "a collapsed splash must not take focus from the view that has it");
         }
 
-        [Fact]
+        [TakesFocusFact]
         public void LeavingTheStateHandsTheSplashsFocusToTheViewNowShowing()
         {
             // F2. As SetClosed(false) does it, with no pump between: the focused splash
@@ -327,7 +333,7 @@ public class AltF4NoDocumentTests
             Assert.True(outcome.viewStillFocused, "WPF's later re-evaluation of the collapsed splash must not undo it");
         }
 
-        [Fact]
+        [TakesFocusFact]
         public void LeavingTheStateLeavesFocusAloneWhenTheSplashDidNotHoldIt()
         {
             // A dialog, the menu, or the document itself already has focus: the

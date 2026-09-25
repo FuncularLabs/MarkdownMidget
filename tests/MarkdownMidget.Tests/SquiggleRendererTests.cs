@@ -29,7 +29,7 @@ public class SquiggleRendererTests
             try
             {
                 var ed = new SourceEditor { FontFamily = new FontFamily("Consolas"), FontSize = 14, Text = text };
-                win = new Window { Width = 400, Height = height, Left = -10000, Top = -10000, ShowInTaskbar = false, Content = ed };
+                win = OffscreenWindow.Create(ed, 400, height);
                 win.Show();
                 ed.UpdateLayout();
                 ed.TextArea.TextView.EnsureVisualLines();

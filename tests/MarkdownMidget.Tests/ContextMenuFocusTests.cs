@@ -16,7 +16,10 @@ namespace MarkdownMidget.Tests;
 /// plenty of words it has no correction for (keyboard mashes, coined terms), and
 /// those menus open with a disabled "(no suggestions)" placeholder first — which
 /// used to strand keyboard focus on the ContextMenu and put Add to Dictionary out
-/// of reach. WPF menus need a real window + STA thread, so each case runs one.
+/// of reach. WPF menus need a real window + STA thread, so each case runs one, and
+/// opens the menu with its popup kept off every monitor
+/// (<see cref="OffscreenWindow.KeepPopupOffscreen"/>): a ContextMenu opens at the
+/// mouse pointer, on the screen of whoever is using the desktop.
 /// </summary>
 [Collection("WpfSta")]
 public class ContextMenuFocusTests
@@ -61,6 +64,11 @@ public class ContextMenuFocusTests
     /// weaker than "the item holds it" — in practice the holder is the ContextMenu,
     /// and requiring the item itself would be waiting for the assertion's own answer.
     /// It removes the race without touching what is asserted.
+    ///
+    /// The popup gets keyboard focus only while its thread holds Win32 focus, which a
+    /// plain window gets by being shown, activated. So only these cases show a plain
+    /// window, and they are <see cref="TakesFocusFactAttribute"/> cases; the others
+    /// use a window that is never activated (<see cref="OffscreenWindow"/>).
     /// </param>
     private static T OnStaWindow<T>(Func<ContextMenu, T> build, Action<ContextMenu> fill,
                                     bool needsKeyboardFocus = false)
@@ -74,13 +82,15 @@ public class ContextMenuFocusTests
             ContextMenu? menu = null;
             try
             {
-                win = new Window { Width = 200, Height = 150, Left = -10000, Top = -10000, ShowInTaskbar = false };
                 var host = new TextBox();
-                win.Content = host;
+                win = needsKeyboardFocus
+                    ? new Window { Width = 200, Height = 150, Left = -10000, Top = -10000, ShowInTaskbar = false, Content = host }
+                    : OffscreenWindow.Create(host, 200, 150);
                 win.Show();
 
                 menu = new ContextMenu { PlacementTarget = host };
                 fill(menu);
+                OffscreenWindow.KeepPopupOffscreen(menu);
                 menu.IsOpen = true;   // realize the item containers
 
                 ContextMenu opened = menu;   // the closures below must not see a nullable local
@@ -171,7 +181,7 @@ public class ContextMenuFocusTests
         Assert.Equal("Add to Dictionary", header);
     }
 
-    [Fact]
+    [TakesFocusFact]
     public void NoSuggestions_TheChosenItemCanActuallyTakeFocus()
     {
         var outcome = OnStaWindow(
@@ -218,7 +228,7 @@ public class ContextMenuFocusTests
         Assert.Equal("Insert", header);
     }
 
-    [Fact]
+    [TakesFocusFact]
     public void CollapsedFirstItem_TheChosenItemCanTakeFocus()
     {
         var outcome = OnStaWindow(
