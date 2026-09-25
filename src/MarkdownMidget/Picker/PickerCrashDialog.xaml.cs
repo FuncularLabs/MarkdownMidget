@@ -41,34 +41,34 @@ public partial class PickerCrashDialog : Window
                 CrashLog.Write("PickerCrashSources", ex);
                 findings = new PickerCrashFindings(exitCode, null, FaultKind.None, []);
             }
-            dialog.Fill(findings);
+            dialog.Fill(findings, crashed);
             // Once the clues are up, and off the UI thread: a slow or failing disk never holds them back.
             var logs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MarkdownMidget", "logs");
             var details = dialog._details!;
             var (path, note) = await Task.Run(() => PickerCrashClues.SaveLog(logs, details, crashed));
-            dialog.ShowLog(path, note);
+            dialog.ShowLog(path, note, findings);
         };
         dialog.ShowDialog();
     }
 
-    private void Fill(PickerCrashFindings findings)
+    private void Fill(PickerCrashFindings findings, DateTimeOffset crashed)
     {
         FaultText.Text = PickerCrashClues.FaultSentence(findings);
         SuspectsText.Text = PickerCrashClues.SuspectLines(findings);
         OthersText.Text = PickerCrashClues.OthersLine(findings);
         var version = typeof(PickerCrashDialog).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
-        _details = PickerCrashClues.Details(findings, version, Environment.OSVersion.VersionString);
+        _details = PickerCrashClues.LogText(PickerCrashClues.Details(findings, version, Environment.OSVersion.VersionString), crashed);
     }
 
     /// <summary>Where the log was saved, or why it wasn't; without one, Copy details takes Open the log's place.</summary>
-    private void ShowLog(string? path, string note)
+    private void ShowLog(string? path, string note, PickerCrashFindings findings)
     {
         _log = path;
         LogText.Text = note;
         LogText.Visibility = Visibility.Visible;
         LogBtn.IsEnabled = path is not null;
-        if (path is null) { LogBtn.Visibility = Visibility.Collapsed; CopyBtn.Visibility = Visibility.Visible; }
+        if (path is null) { LogBtn.Visibility = Visibility.Collapsed; CopyBtn.Visibility = Visibility.Visible; OthersText.Text = PickerCrashClues.OthersLine(findings, false); }
     }
 
     private void Status(string text)

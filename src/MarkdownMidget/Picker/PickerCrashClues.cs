@@ -378,12 +378,12 @@ internal static class PickerCrashClues
             ? string.Join("\n", f.Suspects.Select(s => $"• {s.Culprit}: {Path.GetFileName(s.Path)} ({string.Join(", ", s.Kinds)})"))
             : "None of the add-ons on our list were found.") + CutShortNote(f);
 
-    /// <summary>The notice's count of the rest; the log names them.</summary>
-    public static string OthersLine(PickerCrashFindings f) => f.Others.Count() switch
+    /// <summary>The notice's count of the rest; the log names them, or Copy details when the log couldn't be saved.</summary>
+    public static string OthersLine(PickerCrashFindings f, bool logSaved = true) => f.Others.Count() switch
     {
         0 => "No other add-ons from outside Microsoft were found.",
-        1 => "One other add-on from outside Microsoft was found; the log names it.",
-        var n => $"{n} other add-ons from outside Microsoft were found; the log names them all.",
+        1 => $"One other add-on from outside Microsoft was found; {(logSaved ? "the log" : "Copy details")} names it.",
+        var n => $"{n} other add-ons from outside Microsoft were found; {(logSaved ? "the log" : "Copy details")} names them all.",
     } + CutShortNote(f);
 
     // No number: each step has a deadline of its own, so the search can run past one budget.
@@ -422,16 +422,20 @@ internal static class PickerCrashClues
     /// <summary>How many of its own logs the folder keeps.</summary>
     public const int LogsKept = 20;
 
+    /// <summary>The log's text, which Copy details copies when there is no log: the details under the date and time.</summary>
+    public static string LogText(string details, DateTimeOffset now) =>
+        now.ToString("yyyy-MM-dd HH:mm:ss 'UTC'zzz", CultureInfo.InvariantCulture) + Environment.NewLine + details;
+
     // Only names this code writes: the time of the crash, then a number for a second crash that second.
     private static readonly Regex LogName = new(@"^file-dialog-crash-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}(-[0-9]{2})?\.txt$",
                                                 RegexOptions.CultureInvariant);
 
-    /// <summary>Write <paramref name="details"/> under the date and time to a new log in <paramref name="logsDir"/>, then keep
+    /// <summary>Write <paramref name="details"/>, as <see cref="LogText"/> gives them, to a new log in <paramref name="logsDir"/>, then keep
     /// the newest <see cref="LogsKept"/> logs there. Never throws: the path and the notice's line, or no path and why not.</summary>
     public static (string? Path, string Note) SaveLog(string logsDir, string details, DateTimeOffset now)
     {
         string path;
-        try { path = WriteLog(logsDir, now.ToString("yyyy-MM-dd HH:mm:ss 'UTC'zzz", CultureInfo.InvariantCulture) + Environment.NewLine + details, now); }
+        try { path = WriteLog(logsDir, details, now); }
         catch (Exception ex)
         {
             return (null, $"The log couldn't be saved ({ex.Message.TrimEnd('.', ' ')}). Copy details copies what it would have held.");

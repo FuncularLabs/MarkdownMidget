@@ -5,7 +5,10 @@
         Title="Windows' file dialog crashed" SizeToContent="Height" Width="640"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ShowInTaskbar="False" Icon="/Assets/midget-256.png">
-    <StackPanel Margin="18">
+    <!-- When a short screen caps the notice's height, the clues scroll and the log line, status and buttons stay in view. -->
+    <Grid Margin="18">
+    <Grid.RowDefinitions><RowDefinition /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False"><StackPanel>
         <TextBlock Text="Windows' Open and Save dialog closed unexpectedly."
                    TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
         <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
@@ -21,7 +24,9 @@
         <TextBlock x:Name="SuspectsText" Text="Looking…" TextWrapping="Wrap" Margin="0,0,0,4" />
         <TextBlock x:Name="OthersText" TextWrapping="Wrap" Margin="0,0,0,14"
                    Foreground="{DynamicResource {x:Static chrome:ChromeKeys.DialogMutedText}}" />
+    </StackPanel></ScrollViewer>
 
+    <StackPanel Grid.Row="1">
         <TextBlock x:Name="LogText" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
         <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"
                    Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" />
@@ -40,4 +45,5 @@
             <Button Content="OK" IsDefault="True" IsCancel="True" Width="80" DockPanel.Dock="Right" />
         </DockPanel>
     </StackPanel>
+    </Grid>
 </Window>

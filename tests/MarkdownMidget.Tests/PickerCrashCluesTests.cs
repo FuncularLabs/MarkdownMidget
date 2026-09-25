@@ -413,6 +413,15 @@ public class PickerCrashCluesTests
         Assert.Equal("One other add-on from outside Microsoft was found; the log names it.", PickerCrashClues.OthersLine(one));
     }
 
+    [Fact]
+    public void WithoutALogTheCountLineSendsYouToCopyDetails()
+    {
+        Assert.Equal("6 other add-ons from outside Microsoft were found; Copy details names them all.",
+                     PickerCrashClues.OthersLine(new PickerCrashFindings(1, null, FaultKind.None, Found()), logSaved: false));
+        Assert.Equal("One other add-on from outside Microsoft was found; Copy details names it.",
+                     PickerCrashClues.OthersLine(new PickerCrashFindings(1, null, FaultKind.None, [new(@"C:\x\a.dll", null, ["other"], null)]), logSaved: false));
+    }
+
     // ===== the copied details =====
 
     [Fact]
@@ -568,9 +577,20 @@ public class PickerCrashCluesTests
     {
         var details = PickerCrashClues.Details(new PickerCrashFindings(unchecked((int)0xC0000005), null, FaultKind.None, Found()),
                                                "1.0.0-rc4", "Microsoft Windows NT 10.0.26200.0");
-        var (path, note) = PickerCrashClues.SaveLog(dir, details, Crashed);
-        Assert.Equal("2026-09-25 09:37:00 UTC-05:00" + Environment.NewLine + details, File.ReadAllText(path!));
+        var text = PickerCrashClues.LogText(details, Crashed);
+        Assert.Equal("2026-09-25 09:37:00 UTC-05:00" + Environment.NewLine + details, text);
+        var (path, note) = PickerCrashClues.SaveLog(dir, text, Crashed);
+        Assert.Equal(text, File.ReadAllText(path!));
         Assert.Equal("The log was saved as " + path, note);
+    });
+
+    [Fact]
+    public void CopyDetailsCopiesExactlyWhatTheLogHolds() => InLogsFolder(dir =>
+    {
+        var text = PickerCrashClues.LogText(PickerCrashClues.Details(new PickerCrashFindings(1, null, FaultKind.None, []), "v", "os"), Crashed);
+        string? copied = null;
+        Assert.Null(PickerCrashClues.CopyTo(text, s => copied = s));
+        Assert.Equal(File.ReadAllText(PickerCrashClues.SaveLog(dir, text, Crashed).Path!), copied);
     });
 
     [Fact]
@@ -594,7 +614,8 @@ public class PickerCrashCluesTests
         var days = Enumerable.Range(1, 25).Select(day => OldLog(dir, $"2026-09-{day:00}-120000")).ToList();
         var sameSecond = OldLog(dir, "2026-09-07-120000-02");   // after 09-07's first log, before 09-08's
         string[] others = ["notes.txt", "file-dialog-crash-notes.txt", "file-dialog-crash-2026-09-01-120000.log",
-                           "file-dialog-crash-2026-09-01-120000.txt.bak", "file-dialog-crash-2026-09-01-120000.txtx", "file-dialog-crashes.html"];
+                           "file-dialog-crash-2026-09-01-120000.txt.bak", "file-dialog-crash-2026-09-01-120000.txtx", "file-dialog-crashes.html",
+                           "FILE-DIALOG-CRASH-2026-08-01-120000.TXT"];   // older than all of ours, so a case-blind match would delete it
         foreach (var other in others) File.WriteAllText(Path.Combine(dir, other), other);
 
         var saved = PickerCrashClues.SaveLog(dir, "x", Crashed).Path;
