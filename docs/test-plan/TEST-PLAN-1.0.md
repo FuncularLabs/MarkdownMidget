@@ -1763,7 +1763,7 @@ Automated items only, run by Claude on 2026-09-24 in `C:\code\MarkdownMidget\.cl
 | INST-02 | | | |
 | INST-03 | | | |
 | DLG-01 | | Claude (2026-09-24) | auto PASS — human pending. `PickerOutcomeTests.EveryExitCodeMeansWhatTheParentDoesWithIt` and `AChosenPathComesBackTrimmed` pass. |
-| DLG-02 | | Claude (2026-09-24) | auto PASS — human pending. All 22 C# tests the plan names pass: 21 in `PickerCrashCluesTests` and `PickerChildTests.OnlyTheExactDevelopmentSwitchSimulatesACrash`. |
+| DLG-02 | PASS | Claude (2026-09-24); Paul (2026-09-25) | human PASS: Paul ran DLG-02 on the released v1.0.0-rc3, which the release workflow built from c0e5f3b, the same source as build 1126. The notice named coreclr.dll. auto PASS. All 22 C# tests the plan names pass: 21 in `PickerCrashCluesTests` and `PickerChildTests.OnlyTheExactDevelopmentSwitchSimulatesACrash`. |
 | DLG-03 | | Claude (2026-09-24) | auto PASS — human pending. `PickerCrashCluesTests.ExplorerIsGivenTheFolderQuoted`, `TheGuideShipsSelfContainedAndFollowsDarkMode` and `TheGuideIsWrittenOnceAndRewrittenOnlyWhenItChanges` pass. |
 
 ### Build ___ (1.0.0-…+build.N) — date
