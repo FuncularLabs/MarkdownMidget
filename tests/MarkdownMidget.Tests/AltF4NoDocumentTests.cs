@@ -187,7 +187,8 @@ public class AltF4NoDocumentTests
     /// Every case here needs a window that can take keyboard focus, and only a window
     /// that is activated can, so each is a <see cref="TakesFocusFactAttribute"/> case.
     /// The ones asserting that focus does NOT move need that too: in a window that
-    /// cannot take focus at all they would pass whatever the code did.
+    /// cannot take focus, ASplashThatCannotHoldFocusDoesNotClaimIt would pass whatever
+    /// the code did, and the other two would stop at their RequireKeyboardFocus check.
     /// </summary>
     [Collection("WpfSta")]
     public class OnARealWindow
