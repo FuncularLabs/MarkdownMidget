@@ -41,7 +41,10 @@
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="18">
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="18,18,18,0">
         <TextBlock TextWrapping="Wrap" Margin="0,0,0,14">
             Choose what to undo. Each is optional — check only what you want removed.
         </TextBlock>
@@ -119,9 +122,11 @@
             <TextBlock x:Name="RemoveCopyCaption" Style="{StaticResource Caption}" />
         </StackPanel>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+    </StackPanel>
+    </ScrollViewer>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="18,0,18,18">
             <Button x:Name="OkBtn" Content="_Apply" Width="100" IsDefault="True" Click="Ok_Click" Margin="0,0,8,0" />
             <Button Content="Cancel" Width="80" IsCancel="True" />
         </StackPanel>
-    </StackPanel>
+    </Grid>
 </Window>

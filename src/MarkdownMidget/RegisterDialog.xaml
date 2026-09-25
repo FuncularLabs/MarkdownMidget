@@ -35,7 +35,10 @@
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="18">
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="18,18,18,0">
         <TextBlock TextWrapping="Wrap" Margin="0,0,0,4">
             Add Markdown Midget to the Windows <Bold>"Open with"</Bold> list for
             <Bold>.md</Bold> files, and choose how it's installed. Earlier Markdown
@@ -106,9 +109,11 @@
             <Button x:Name="MakeDefaultBtn" Content="Ma_ke Markdown Midget the default…" HorizontalAlignment="Left" Margin="26,8,0,0" Padding="10,2" Click="MakeDefault_Click" ToolTipService.ShowOnDisabled="True" />
         </StackPanel>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+    </StackPanel>
+    </ScrollViewer>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="18,0,18,18">
             <Button x:Name="OkBtn" Content="_Register" Width="100" IsDefault="True" Click="Ok_Click" Margin="0,0,8,0" />
             <Button Content="Cancel" Width="80" IsCancel="True" />
         </StackPanel>
-    </StackPanel>
+    </Grid>
 </Window>
