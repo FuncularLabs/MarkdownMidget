@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -403,13 +404,13 @@ public class PickerCrashCluesTests
         var findings = new PickerCrashFindings(1, null, FaultKind.None, Found());
         Assert.Equal("• Dropbox: DropboxExt64.52.dll (icon overlay)\n• TortoiseSVN: TortoiseStub.dll (right-click menu)",
                      PickerCrashClues.SuspectLines(findings));
-        Assert.Equal("6 other add-ons from outside Microsoft were found; Copy details names them all.", PickerCrashClues.OthersLine(findings));
+        Assert.Equal("6 other add-ons from outside Microsoft were found; the log names them all.", PickerCrashClues.OthersLine(findings));
 
         var none = new PickerCrashFindings(1, null, FaultKind.None, []);
         Assert.Equal("None of the add-ons on our list were found.", PickerCrashClues.SuspectLines(none));
         Assert.Equal("No other add-ons from outside Microsoft were found.", PickerCrashClues.OthersLine(none));
         var one = new PickerCrashFindings(1, null, FaultKind.None, [new(@"C:\x\a.dll", null, ["other"], null)]);
-        Assert.Equal("One other add-on from outside Microsoft was found; Copy details names it.", PickerCrashClues.OthersLine(one));
+        Assert.Equal("One other add-on from outside Microsoft was found; the log names it.", PickerCrashClues.OthersLine(one));
     }
 
     // ===== the copied details =====
@@ -474,6 +475,17 @@ public class PickerCrashCluesTests
     public void ExplorerIsGivenTheFolderQuoted(string folder, string expected) =>
         Assert.Equal(expected, PickerCrashClues.ExplorerArguments(folder));
 
+    [Fact]
+    public void OpenTheLogHandsTheLogQuotedToExplorerItself()
+    {
+        // Nothing is started: the test reads what the button would start.
+        const string log = @"C:\Users\Jo Smith,Jr\AppData\Local\MarkdownMidget\logs\file-dialog-crash-2026-09-25-093700.txt";
+        var start = PickerCrashClues.ExplorerStart(@"C:\Windows", log);
+        Assert.Equal(@"C:\Windows\explorer.exe", start.FileName);
+        Assert.Equal("\"" + log + "\"", start.Arguments);
+        Assert.False(start.UseShellExecute);   // Explorer opens it with the .txt program, in that program's process
+    }
+
     // ===== 4. The guide =====
 
     private static string Guide()
@@ -519,4 +531,116 @@ public class PickerCrashCluesTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    // ===== 5. The log =====
+
+    private static readonly DateTimeOffset Crashed = new(2026, 9, 25, 9, 37, 0, TimeSpan.FromHours(-5));
+
+    /// <summary>Runs <paramref name="test"/> on a new temp folder standing in for the logs folder, under a
+    /// culture whose calendar isn't the Gregorian one (Thai Buddhist: this year is 2569), then deletes it.</summary>
+    private static void InLogsFolder(Action<string> test)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mdm-logs-" + Guid.NewGuid().ToString("N"));
+        var culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("th-TH");
+        try { test(dir); }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+            if (Directory.Exists(dir))
+            {
+                foreach (var file in Directory.GetFiles(dir)) File.SetAttributes(file, FileAttributes.Normal);
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    private static string OldLog(string dir, string stamp)
+    {
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"file-dialog-crash-{stamp}.txt");
+        File.WriteAllText(path, stamp);
+        return path;
+    }
+
+    [Fact]
+    public void TheLogHoldsTheDetailsUnderTheDateAndTime() => InLogsFolder(dir =>
+    {
+        var details = PickerCrashClues.Details(new PickerCrashFindings(unchecked((int)0xC0000005), null, FaultKind.None, Found()),
+                                               "1.0.0-rc4", "Microsoft Windows NT 10.0.26200.0");
+        var (path, note) = PickerCrashClues.SaveLog(dir, details, Crashed);
+        Assert.Equal("2026-09-25 09:37:00 UTC-05:00" + Environment.NewLine + details, File.ReadAllText(path!));
+        Assert.Equal("The log was saved as " + path, note);
+    });
+
+    [Fact]
+    public void TheLogIsNamedForTheLocalTimeOfTheCrashSoTheNamesSortByAge() => InLogsFolder(dir =>
+        Assert.Equal(Path.Combine(dir, "file-dialog-crash-2026-09-25-093700.txt"), PickerCrashClues.SaveLog(dir, "x", Crashed).Path));
+
+    [Fact]
+    public void TwoCrashesInOneSecondKeepBothLogs() => InLogsFolder(dir =>
+    {
+        var first = PickerCrashClues.SaveLog(dir, "first", Crashed).Path;
+        var second = PickerCrashClues.SaveLog(dir, "second", Crashed).Path;
+        Assert.Equal(Path.Combine(dir, "file-dialog-crash-2026-09-25-093700.txt"), first);
+        Assert.Equal(Path.Combine(dir, "file-dialog-crash-2026-09-25-093700-02.txt"), second);
+        Assert.EndsWith("first", File.ReadAllText(first!));
+        Assert.EndsWith("second", File.ReadAllText(second!));
+    });
+
+    [Fact]
+    public void OnlyTheNewestTwentyOfOurOwnLogsAreKeptAndNothingElseIsTouched() => InLogsFolder(dir =>
+    {
+        var days = Enumerable.Range(1, 25).Select(day => OldLog(dir, $"2026-09-{day:00}-120000")).ToList();
+        var sameSecond = OldLog(dir, "2026-09-07-120000-02");   // after 09-07's first log, before 09-08's
+        string[] others = ["notes.txt", "file-dialog-crash-notes.txt", "file-dialog-crash-2026-09-01-120000.log",
+                           "file-dialog-crash-2026-09-01-120000.txt.bak", "file-dialog-crash-2026-09-01-120000.txtx", "file-dialog-crashes.html"];
+        foreach (var other in others) File.WriteAllText(Path.Combine(dir, other), other);
+
+        var saved = PickerCrashClues.SaveLog(dir, "x", Crashed).Path;
+
+        Assert.All(days.Take(7), p => Assert.False(File.Exists(p), p));                          // 09-01 to 09-07
+        Assert.All(days.Skip(7).Append(sameSecond).Append(saved!), p => Assert.True(File.Exists(p), p));   // 19 and the new one
+        Assert.All(others, other => Assert.True(File.Exists(Path.Combine(dir, other)), other));
+    });
+
+    [Fact]
+    public void ALogFromBeforeTheClockWentBackIsNotKeptInPlaceOfTheNewOne() => InLogsFolder(dir =>
+    {
+        for (var day = 1; day <= 20; day++) OldLog(dir, $"2030-01-{day:00}-120000");   // named later than now
+        Assert.True(File.Exists(PickerCrashClues.SaveLog(dir, "x", Crashed).Path));
+    });
+
+    [Fact]
+    public void ALogThatCannotBeDeletedStaysAndNeitherStopsTheRestNorThrows() => InLogsFolder(dir =>
+    {
+        var days = Enumerable.Range(1, 23).Select(day => OldLog(dir, $"2026-09-{day:00}-120000")).ToList();
+        File.SetAttributes(days[2], FileAttributes.ReadOnly);                                // 09-03
+        using (File.Open(days[1], FileMode.Open, FileAccess.Read, FileShare.Read))           // 09-02, open without FileShare.Delete
+        {
+            var (path, note) = PickerCrashClues.SaveLog(dir, "x", Crashed);
+            Assert.True(File.Exists(path));
+            Assert.Equal("The log was saved as " + path, note);
+        }
+        Assert.False(File.Exists(days[0]));                                                  // the ones either side still go
+        Assert.False(File.Exists(days[3]));
+        Assert.True(File.Exists(days[1]));
+        Assert.True(File.Exists(days[2]));
+    });
+
+    [Fact]
+    public void AnUnwritableLogsFolderFallsBackToCopyDetailsWithAMessage() => InLogsFolder(dir =>
+    {
+        Directory.CreateDirectory(dir);
+        var blocked = Path.Combine(dir, "logs");
+        File.WriteAllText(blocked, "a file where the folder should be");
+        foreach (var logs in new[] { blocked, Path.Combine(blocked, "logs"), @"MarkdownMidget\logs" })   // the last: no app data folder
+        {
+            var (path, note) = PickerCrashClues.SaveLog(logs, "details", Crashed);
+            Assert.Null(path);
+            Assert.StartsWith("The log couldn't be saved (", note);
+            Assert.EndsWith("). Copy details copies what it would have held.", note);
+        }
+        Assert.Equal(new[] { blocked }, Directory.GetFileSystemEntries(dir));   // nothing half-written left behind
+    });
 }

@@ -22,12 +22,16 @@
         <TextBlock x:Name="OthersText" TextWrapping="Wrap" Margin="0,0,0,14"
                    Foreground="{DynamicResource {x:Static chrome:ChromeKeys.DialogMutedText}}" />
 
+        <TextBlock x:Name="LogText" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
         <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"
                    Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" />
         <!-- No access keys: in a dialog they fire without Alt, so a stray letter would open
-             Explorer or the browser (OpenLinkDialog leaves them out for the same reason). -->
+             Explorer, the browser or the log (OpenLinkDialog leaves them out for the same reason). -->
         <DockPanel LastChildFill="False">
-            <Button x:Name="CopyBtn" Content="Copy details" Padding="10,2" Margin="0,0,8,0" IsEnabled="False"
+            <Button x:Name="LogBtn" Content="Open the log" Padding="10,2" Margin="0,0,8,0" IsEnabled="False"
+                    Click="Log_Click" ToolTip="Opens the saved log, for a bug report: what Windows recorded and every add-on found that isn't Microsoft's, with its path." />
+            <!-- In Open the log's place when the log couldn't be saved. -->
+            <Button x:Name="CopyBtn" Content="Copy details" Padding="10,2" Margin="0,0,8,0" Visibility="Collapsed"
                     Click="Copy_Click" ToolTip="Copies what Windows recorded and every add-on found that isn't Microsoft's, with its path, for a bug report." />
             <Button x:Name="ExplorerBtn" Content="Open this folder in Explorer" Padding="10,2" Margin="0,0,8,0"
                     Click="Explorer_Click" />

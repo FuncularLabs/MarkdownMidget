@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -44,7 +45,7 @@ internal sealed record ShellScan(IReadOnlyList<ShellExtensionDll> Found, bool Cu
 /// whole; <paramref name="Prefix"/> only where a name carries a version.</summary>
 internal sealed record CulpritEntry(string Product, string Source, string[] SourceDlls, string? Prefix = null);
 
-/// <summary>Everything the notice shows and Copy details writes.</summary>
+/// <summary>Everything the notice shows and the log holds.</summary>
 internal sealed record PickerCrashFindings(int ExitCode, FaultRecord? Fault, FaultKind FaultKind,
                                            IReadOnlyList<ShellExtensionDll> Extensions, bool ScanCutShort = false)
 {
@@ -65,6 +66,7 @@ internal interface IRegistryView
 /// The clues the file-dialog crash notice gives (PickerCrashDialog), as pure functions over
 /// what <see cref="PickerCrashSources"/> reads from the machine. Nothing here loads, calls
 /// or instantiates a shell extension: it reads the registry and file version resources only.
+/// The files it writes are the guide and the log, each into the folder it is given.
 /// </summary>
 internal static class PickerCrashClues
 {
@@ -342,7 +344,7 @@ internal static class PickerCrashClues
     public static bool IsMicrosoft(string? company) =>
         company is not null && Regex.IsMatch(company, @"\bMicrosoft\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    // ===== Copy details =====
+    // ===== The details: the log's text, and Copy details' when the log can't be saved =====
 
     private static string Line(ShellExtensionDll e) =>
         $"{e.Path} ({string.Join(", ", e.Kinds)}; {e.Company ?? "no vendor named"})";
@@ -376,12 +378,12 @@ internal static class PickerCrashClues
             ? string.Join("\n", f.Suspects.Select(s => $"• {s.Culprit}: {Path.GetFileName(s.Path)} ({string.Join(", ", s.Kinds)})"))
             : "None of the add-ons on our list were found.") + CutShortNote(f);
 
-    /// <summary>The notice's count of the rest; Copy details names them.</summary>
+    /// <summary>The notice's count of the rest; the log names them.</summary>
     public static string OthersLine(PickerCrashFindings f) => f.Others.Count() switch
     {
         0 => "No other add-ons from outside Microsoft were found.",
-        1 => "One other add-on from outside Microsoft was found; Copy details names it.",
-        var n => $"{n} other add-ons from outside Microsoft were found; Copy details names them all.",
+        1 => "One other add-on from outside Microsoft was found; the log names it.",
+        var n => $"{n} other add-ons from outside Microsoft were found; the log names them all.",
     } + CutShortNote(f);
 
     // No number: each step has a deadline of its own, so the search can run past one budget.
@@ -405,10 +407,67 @@ internal static class PickerCrashClues
         new[] { request.InitialDirectory }.Concat(request.RecentFolders)
             .FirstOrDefault(d => !string.IsNullOrEmpty(d) && dirExists(d)) ?? documents;
 
-    /// <summary>explorer.exe's command line for a folder: always quoted, because Explorer splits its
+    /// <summary>explorer.exe's command line for a folder or a file: always quoted, because Explorer splits its
     /// own command line on commas as well as spaces. A trailing backslash goes, except on a root.</summary>
     public static string ExplorerArguments(string folder) =>
         "\"" + (folder.Length > 3 ? folder.TrimEnd('\\') : folder) + "\"";
+
+    /// <summary>What Open this folder in Explorer and Open the log start: explorer.exe itself (PickerCrashDialog.Explorer_Click says why).
+    /// Given a file, Explorer opens it with the program Windows uses for its type, in that program's own process.</summary>
+    public static ProcessStartInfo ExplorerStart(string windowsDir, string target) =>
+        new(Path.Combine(windowsDir, "explorer.exe"), ExplorerArguments(target)) { UseShellExecute = false };
+
+    // ===== 5. The log =====
+
+    /// <summary>How many of its own logs the folder keeps.</summary>
+    public const int LogsKept = 20;
+
+    // Only names this code writes: the time of the crash, then a number for a second crash that second.
+    private static readonly Regex LogName = new(@"^file-dialog-crash-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}(-[0-9]{2})?\.txt$",
+                                                RegexOptions.CultureInvariant);
+
+    /// <summary>Write <paramref name="details"/> under the date and time to a new log in <paramref name="logsDir"/>, then keep
+    /// the newest <see cref="LogsKept"/> logs there. Never throws: the path and the notice's line, or no path and why not.</summary>
+    public static (string? Path, string Note) SaveLog(string logsDir, string details, DateTimeOffset now)
+    {
+        string path;
+        try { path = WriteLog(logsDir, now.ToString("yyyy-MM-dd HH:mm:ss 'UTC'zzz", CultureInfo.InvariantCulture) + Environment.NewLine + details, now); }
+        catch (Exception ex)
+        {
+            return (null, $"The log couldn't be saved ({ex.Message.TrimEnd('.', ' ')}). Copy details copies what it would have held.");
+        }
+        try
+        {
+            // Newest first by name, which is the time; a name ending "-02" (a second crash that second) is the newer.
+            // The new log is never a candidate, even if the clock went back.
+            var older = Directory.EnumerateFiles(logsDir)
+                .Where(p => LogName.IsMatch(Path.GetFileName(p)) && !p.Equals(path, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(p => Path.GetFileNameWithoutExtension(p), StringComparer.Ordinal)
+                .Skip(LogsKept - 1).ToList();
+            foreach (var old in older)
+                try { File.Delete(old); } catch { /* open or read-only: the next crash tries again */ }
+        }
+        catch { /* the folder can't be listed: the log is saved, and the next crash tidies */ }
+        return (path, "The log was saved as " + path);
+    }
+
+    private static string WriteLog(string logsDir, string text, DateTimeOffset now)
+    {
+        // Relative when Windows gave no app data folder: never the working folder instead.
+        if (!Path.IsPathFullyQualified(logsDir)) throw new IOException("Windows gave no folder for it");
+        Directory.CreateDirectory(logsDir);
+        var name = "file-dialog-crash-" + now.ToString("yyyy-MM-dd-HHmmss", CultureInfo.InvariantCulture);
+        for (var n = 1; ; n++)
+        {
+            var path = Path.Combine(logsDir, name + (n == 1 ? "" : "-" + n.ToString("00", CultureInfo.InvariantCulture)) + ".txt");
+            FileStream file;
+            try { file = new FileStream(path, FileMode.CreateNew, FileAccess.Write); }
+            catch (IOException) when (n < 99 && File.Exists(path)) { continue; }   // a crash earlier this second
+            // A write that fails part-way (a full disk) leaves a short file the notice doesn't offer; later crashes prune it.
+            using (var writer = new StreamWriter(file, new UTF8Encoding(false))) writer.Write(text);
+            return path;
+        }
+    }
 
     // ===== 4. The guide =====
 

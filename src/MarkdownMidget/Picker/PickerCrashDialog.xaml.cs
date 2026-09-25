@@ -15,7 +15,7 @@ namespace MarkdownMidget.Picker;
 public partial class PickerCrashDialog : Window
 {
     private readonly string _folder;
-    private PickerCrashFindings? _findings;
+    private string? _details, _log;
 
     private PickerCrashDialog(string folder)
     {
@@ -28,6 +28,7 @@ public partial class PickerCrashDialog : Window
     /// <summary>Show the notice, modal to <paramref name="owner"/>, for a helper that died.</summary>
     internal static void ShowFor(Window owner, FilePickerRequest request, int exitCode, int processId)
     {
+        var crashed = DateTimeOffset.Now;   // the helper has only just died; the clues take seconds more
         var folder = PickerCrashClues.FolderToShow(request, Directory.Exists,
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
         var dialog = new PickerCrashDialog(folder) { Owner = owner };
@@ -41,17 +42,33 @@ public partial class PickerCrashDialog : Window
                 findings = new PickerCrashFindings(exitCode, null, FaultKind.None, []);
             }
             dialog.Fill(findings);
+            // Once the clues are up, and off the UI thread: a slow or failing disk never holds them back.
+            var logs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MarkdownMidget", "logs");
+            var details = dialog._details!;
+            var (path, note) = await Task.Run(() => PickerCrashClues.SaveLog(logs, details, crashed));
+            dialog.ShowLog(path, note);
         };
         dialog.ShowDialog();
     }
 
     private void Fill(PickerCrashFindings findings)
     {
-        _findings = findings;
         FaultText.Text = PickerCrashClues.FaultSentence(findings);
         SuspectsText.Text = PickerCrashClues.SuspectLines(findings);
         OthersText.Text = PickerCrashClues.OthersLine(findings);
-        CopyBtn.IsEnabled = true;
+        var version = typeof(PickerCrashDialog).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
+        _details = PickerCrashClues.Details(findings, version, Environment.OSVersion.VersionString);
+    }
+
+    /// <summary>Where the log was saved, or why it wasn't; without one, Copy details takes Open the log's place.</summary>
+    private void ShowLog(string? path, string note)
+    {
+        _log = path;
+        LogText.Text = note;
+        LogText.Visibility = Visibility.Visible;
+        LogBtn.IsEnabled = path is not null;
+        if (path is null) { LogBtn.Visibility = Visibility.Collapsed; CopyBtn.Visibility = Visibility.Visible; }
     }
 
     private void Status(string text)
@@ -62,11 +79,8 @@ public partial class PickerCrashDialog : Window
 
     private void Copy_Click(object sender, RoutedEventArgs e)
     {
-        if (_findings is null) return;
-        var version = typeof(PickerCrashDialog).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
-        var text = PickerCrashClues.Details(_findings, version, Environment.OSVersion.VersionString);
-        Status(PickerCrashClues.CopyTo(text, Clipboard.SetText) ?? "Copied. Paste it into your report.");
+        if (_details is null) return;
+        Status(PickerCrashClues.CopyTo(_details, Clipboard.SetText) ?? "Copied. Paste it into your report.");
     }
 
     private void Explorer_Click(object sender, RoutedEventArgs e)
@@ -75,10 +89,16 @@ public partial class PickerCrashDialog : Window
         // could load the same add-ons into THIS process, which is what the helper was for.
         try
         {
-            Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"),
-                                               PickerCrashClues.ExplorerArguments(_folder)) { UseShellExecute = false })?.Dispose();
+            Process.Start(PickerCrashClues.ExplorerStart(Environment.GetFolderPath(Environment.SpecialFolder.Windows), _folder))?.Dispose();
         }
         catch (Exception ex) { Status("Couldn't open Explorer: " + ex.Message); }
+    }
+
+    private void Log_Click(object sender, RoutedEventArgs e)
+    {
+        if (_log is null) return;
+        try { Process.Start(PickerCrashClues.ExplorerStart(Environment.GetFolderPath(Environment.SpecialFolder.Windows), _log))?.Dispose(); }
+        catch (Exception ex) { Status("Couldn't open the log: " + ex.Message); }
     }
 
     private void Guide_Click(object sender, RoutedEventArgs e)

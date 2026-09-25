@@ -9,6 +9,10 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Changed
+
+- **The file-dialog crash notice now saves a log you can open**: when Windows' Open or Save dialog crashes, the notice saves what it found as a text file in `%LocalAppData%\MarkdownMidget\logs`, named for the date and time, such as `file-dialog-crash-2026-09-25-093700.txt`, and shows its path. **Open the log** opens it in your text editor. The log starts with the date and time, then gives the version, the helper's exit code, what Windows recorded, and every add-on found that isn't Microsoft's, with its path. Two crashes in the same second get a log each, and the newest 20 logs are kept: older logs the notice saved are deleted, and nothing else in the folder is touched. If the log can't be saved, the clues show as before, the notice says the log couldn't be saved, and **Copy details** takes the place of **Open the log**. Before, **Copy details** copied the same text to the clipboard and nothing was saved.
+
 ## [1.0.0-rc3] - 2026-09-24
 
 The third 1.0 release candidate: 1.0.0-rc2 plus the changes below. Markdown Midget now follows Windows light and dark

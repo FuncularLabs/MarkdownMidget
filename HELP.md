@@ -854,9 +854,13 @@ the crash in, and the add-ons on your PC that are reported to crash Explorer or
 programs that load them. Its **How to find the culprit** button opens a guide in
 your web browser (`file-dialog-crashes.html`, saved in
 `%LocalAppData%\MarkdownMidget`) that explains the clues and how to find the
-add-on; **Copy details** copies every add-on found that isn't Microsoft's, with
-its path, for a bug report. Markdown Midget only looks: it never switches an
-add-on off itself. Cancel in Windows' dialog just closes it.
+add-on. The notice also saves what it found as a log, a text file named for the
+date and time in `%LocalAppData%\MarkdownMidget\logs`, and shows its path.
+**Open the log** opens it in your text editor, for a bug report: it names every
+add-on found that isn't Microsoft's, with its path. The newest 20 logs are kept.
+If the log can't be saved, the notice says so, and **Copy details** in its place
+copies the same text. Markdown Midget only looks: it never switches an add-on
+off itself. Cancel in Windows' dialog just closes it.
 
 The built-in picker has an address bar, shortcuts (Desktop, Documents,
 Downloads, drives, recent folders), a folder tree, a sortable file list,
