@@ -1329,11 +1329,8 @@ public partial class MainWindow : Window
 
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
-        var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
+        var picked = Picker.FilePickerService.Show(this, Secure.SecureUi.OpenRequest(_showEncryptedInOpen) with
         {
-            Filter = Secure.SecureUi.OpenFilter(_showEncryptedInOpen),
-            DefaultExt = ".md",
-            CheckFileExists = true,
             // RecentFolders only reaches the BUILT-IN picker's rail; the native
             // dialog needs this to start anywhere in particular.
             InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
@@ -1772,14 +1769,8 @@ public partial class MainWindow : Window
         string? newPassword = null;   // set when THIS save establishes encryption
         if (forcePrompt || path is null)
         {
-            var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
+            var picked = Picker.FilePickerService.Show(this, Secure.SecureUi.SaveAsRequest(_docEncrypted) with
             {
-                Save = true,
-                // Secure Markdown in the type dropdown is the design's second path
-                // to encryption - equivalent to File > Encrypt Document.
-                Filter = Secure.SecureUi.SaveFilter,
-                DefaultExt = _docEncrypted ? Secure.SecureMarkdownFormat.Extension : ".md",
-                FilterIndex = _docEncrypted ? Secure.SecureUi.SaveFilterEncryptedIndex : 1,
                 // Recovered content may already have a sensible name; offer it rather
                 // than making the user retype it. Through GetFileName even so — it
                 // reaches us from a snapshot file on disk.
@@ -1922,11 +1913,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
+            var picked = Picker.FilePickerService.Show(this, Secure.SecureUi.EncryptRequest() with
             {
-                Save = true,
-                Filter = "Secure Markdown (*.mdenc)|*.mdenc",
-                DefaultExt = Secure.SecureMarkdownFormat.Extension,
                 InitialDirectory = _currentPath is not null ? Path.GetDirectoryName(_currentPath) : null,
                 FileName = _displayName is null ? "Untitled.mdenc"
                          : Path.ChangeExtension(Path.GetFileName(_displayName), Secure.SecureMarkdownFormat.Extension),
@@ -3208,14 +3196,8 @@ public partial class MainWindow : Window
         var nameNoExt = Path.GetFileNameWithoutExtension(_currentPath);
         var ext = Path.GetExtension(_currentPath);
         var suggested = Path.GetFileName(backupPath).Replace(".bak", "");
-        var picked = Picker.FilePickerService.Show(this, new Picker.FilePickerRequest
+        var picked = Picker.FilePickerService.Show(this, Secure.SecureUi.SaveYourVersionRequest(_docEncrypted, ext) with
         {
-            Save = true,
-            Title = "Save your current version as…",
-            Filter = _docEncrypted
-                ? "Secure Markdown (*.mdenc)|*.mdenc|All files (*.*)|*.*"
-                : "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
-            DefaultExt = ext.Length > 0 ? ext : ".md",
             InitialDirectory = dir,
             FileName = suggested,
             RecentFolders = PickerRecentFolders(),

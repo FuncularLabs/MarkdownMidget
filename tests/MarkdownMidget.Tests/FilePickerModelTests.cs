@@ -199,7 +199,7 @@ public class FilePickerModelTests
         // Not cosmetic: the CALLER decides what to write from the returned
         // path's extension, so a name left as .md after the user picked Secure
         // Markdown would write plaintext into a file they believe is encrypted.
-        var mdenc = FilePickerModel.ParseFilter("Secure Markdown (*.mdenc)|*.mdenc")[0];
+        var mdenc = FilePickerModel.ParseFilter(Secure.SecureUi.EncryptedType)[0];
         Assert.Equal("notes.mdenc", FilePickerModel.RetypeForFilter("notes.md", mdenc));
         Assert.Equal("notes.mdenc", FilePickerModel.RetypeForFilter("notes", mdenc));
     }
@@ -207,7 +207,7 @@ public class FilePickerModelTests
     [Fact]
     public void RetypingLeavesANameThatAlreadyFits()
     {
-        var mdenc = FilePickerModel.ParseFilter("Secure Markdown (*.mdenc)|*.mdenc")[0];
+        var mdenc = FilePickerModel.ParseFilter(Secure.SecureUi.EncryptedType)[0];
         Assert.Equal("notes.mdenc", FilePickerModel.RetypeForFilter("notes.mdenc", mdenc));
     }
 

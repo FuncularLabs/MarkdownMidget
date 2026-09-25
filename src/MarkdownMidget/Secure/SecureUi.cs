@@ -1,13 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
+using MarkdownMidget.Picker;
 
 namespace MarkdownMidget.Secure;
 
 /// <summary>
 /// The pure, testable half of the Secure Markdown UI: path shapes, dialog
-/// filters, and the password strength readout. Everything here is string-in/
-/// string-out so the dialogs and menu handlers stay thin.
+/// filters and requests, and the password strength readout. Nothing here shows
+/// UI or touches disk, so the dialogs and menu handlers stay thin.
 /// </summary>
 internal static class SecureUi
 {
@@ -23,8 +24,8 @@ internal static class SecureUi
     public static string PlaintextPathFor(string path) =>
         Path.ChangeExtension(path, ".md");
 
-    /// <summary>The encrypted type, one spelling for Open and Save As.</summary>
-    private const string EncryptedType = "Secure Markdown (*.mdenc)|*.mdenc";
+    /// <summary>The encrypted type, one spelling for every dialog that offers it.</summary>
+    internal const string EncryptedType = "Secure Markdown (*.mdenc)|*.mdenc";
 
     /// <summary>
     /// The Open dialog's filter: Markdown (the type it opens on), Secure Markdown,
@@ -42,6 +43,30 @@ internal static class SecureUi
 
     /// <summary>1-based index of the Secure Markdown entry in SaveFilter.</summary>
     public const int SaveFilterEncryptedIndex = 2;
+
+    // What each document dialog offers, for its call site and tests alike; where it starts stays at the call site.
+
+    /// <summary>File ▸ Open, starting on Markdown.</summary>
+    public static FilePickerRequest OpenRequest(bool showEncrypted) =>
+        new() { Filter = OpenFilter(showEncrypted), DefaultExt = ".md", CheckFileExists = true };
+
+    /// <summary>Save and Save As; an encrypted document starts on Secure Markdown.</summary>
+    public static FilePickerRequest SaveAsRequest(bool encrypted) => new()
+    {
+        Save = true, Filter = SaveFilter, FilterIndex = encrypted ? SaveFilterEncryptedIndex : 1,
+        DefaultExt = encrypted ? SecureMarkdownFormat.Extension : ".md",
+    };
+
+    /// <summary>File ▸ Encrypt Document on a document with no file yet.</summary>
+    public static FilePickerRequest EncryptRequest() =>
+        new() { Save = true, Filter = EncryptedType, DefaultExt = SecureMarkdownFormat.Extension };
+
+    /// <summary>"Save your current version as…", in the changed file's type (<paramref name="ext"/>).</summary>
+    public static FilePickerRequest SaveYourVersionRequest(bool encrypted, string ext) => new()
+    {
+        Save = true, Title = "Save your current version as…", DefaultExt = ext.Length > 0 ? ext : ".md",
+        Filter = encrypted ? EncryptedType + "|All files (*.*)|*.*" : "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*",
+    };
 
     /// <summary>
     /// A coarse, honest strength readout for the set-password dialog. Not a

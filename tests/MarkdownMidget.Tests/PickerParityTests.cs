@@ -19,22 +19,34 @@ namespace MarkdownMidget.Tests;
 /// </summary>
 public class PickerParityTests
 {
-    private const string EncryptFilter = "Secure Markdown (*.mdenc)|*.mdenc";
-
-    /// <summary>MainWindow's requests, by call site: File ▸ Open, Save As, File ▸ Encrypt
-    /// Document on an untitled document, and "Save your current version as…" after an
-    /// external change. Only File ▸ Open reads the setting.</summary>
+    /// <summary>The requests MainWindow sends, from the builders its call sites use: File ▸
+    /// Open, Save As, File ▸ Encrypt Document on an untitled document, and "Save your current
+    /// version as…" after an external change. Only File ▸ Open reads the setting.</summary>
     private static FilePickerRequest Site(string site) => site switch
     {
-        "Open, setting off" => new() { Filter = SecureUi.OpenFilter(false), DefaultExt = ".md", CheckFileExists = true },
-        "Open, setting on" => new() { Filter = SecureUi.OpenFilter(true), DefaultExt = ".md", CheckFileExists = true },
-        "Save As, plain" => new() { Save = true, Filter = SecureUi.SaveFilter, FilterIndex = 1, DefaultExt = ".md" },
-        "Save As, encrypted" => new() { Save = true, Filter = SecureUi.SaveFilter, FilterIndex = SecureUi.SaveFilterEncryptedIndex, DefaultExt = SecureMarkdownFormat.Extension },
-        "Encrypt Document, untitled" => new() { Save = true, Filter = EncryptFilter, DefaultExt = SecureMarkdownFormat.Extension },
-        "Save your version, encrypted" => new() { Save = true, Filter = EncryptFilter + "|All files (*.*)|*.*", DefaultExt = SecureMarkdownFormat.Extension },
-        "Save your version, plain" => new() { Save = true, Filter = "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*", DefaultExt = ".md" },
+        "Open, setting off" => SecureUi.OpenRequest(showEncrypted: false),
+        "Open, setting on" => SecureUi.OpenRequest(showEncrypted: true),
+        "Save As, plain" => SecureUi.SaveAsRequest(encrypted: false),
+        "Save As, encrypted" => SecureUi.SaveAsRequest(encrypted: true),
+        "Encrypt Document, untitled" => SecureUi.EncryptRequest(),
+        "Save your version, encrypted" => SecureUi.SaveYourVersionRequest(encrypted: true, ".mdenc"),
+        "Save your version, plain" => SecureUi.SaveYourVersionRequest(encrypted: false, ".md"),
         _ => throw new ArgumentOutOfRangeException(nameof(site), site, null),
     };
+
+    [Theory]
+    [InlineData(false, ".markdown", ".markdown")]
+    [InlineData(false, ".txt", ".txt")]
+    [InlineData(false, "", ".md")]
+    [InlineData(true, ".mdenc", ".mdenc")]
+    public void SaveYourVersionKeepsTheDocumentsOwnExtension(bool encrypted, string ext, string expected)
+    {
+        var request = SecureUi.SaveYourVersionRequest(encrypted, ext);
+        Assert.True(request.Save);
+        Assert.Equal(expected, request.DefaultExt);
+        Assert.Equal(encrypted ? SecureUi.EncryptedType + "|All files (*.*)|*.*"
+            : "Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*", request.Filter);
+    }
 
     public static TheoryData<string> Sites => new("Open, setting off", "Open, setting on", "Save As, plain",
         "Save As, encrypted", "Encrypt Document, untitled", "Save your version, encrypted", "Save your version, plain");
