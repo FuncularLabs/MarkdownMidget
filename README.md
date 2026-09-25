@@ -106,7 +106,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**1.0.0-rc3 — the third 1.0 release candidate; 0.10.0 is still the latest stable**, so
+**1.0.0-rc4 — the fourth 1.0 release candidate; 0.10.0 is still the latest stable**, so
 the badge above and the entry marked **Latest** on the releases page both point at
 0.10.0 until 1.0.0. In daily use and signed on every release.
 Windows-only for now; the editor core is web-based, so a cross-platform shell
@@ -187,9 +187,9 @@ the one it replaced:
 | Where | Looks like |
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc3+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc3+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc3+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc4+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc4+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc4+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -319,6 +319,13 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.0-rc4** *(prerelease)* — **The fourth 1.0 release candidate.** **File ▸ Open**
+  now always lists encrypted documents as their own type, *Secure Markdown*. If
+  Windows' file dialog crashes, the notice now **saves what it found as a log**, and
+  **Open the log** opens it. **Settings** and the other dialogs, Help, and the main
+  window on its first start now **open fully on screen**, even on a short screen at
+  high display scaling. **"Save your current version as…"** now encrypts a file you
+  name `.mdenc`, as Save As does.
 - **v1.0.0-rc3** *(prerelease)* — **The third 1.0 release candidate.** Markdown Midget
   now **follows Windows light and dark mode**: in dark mode the menus, toolbar, dialogs
   and title bar turn dark, and the document shows the theme you picked for that mode;

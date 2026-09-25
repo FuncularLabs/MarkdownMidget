@@ -866,10 +866,11 @@ copies the same text. Markdown Midget only looks: it never switches an add-on
 off itself. Cancel in Windows' dialog just closes it.
 
 The built-in picker has an address bar, shortcuts (Desktop, Documents,
-Downloads, drives, recent folders), a folder tree, a sortable file list,
-type-ahead, and New Folder plus overwrite confirmation when saving. It has no
-thumbnails, preview pane or right-click shell menus — those are the add-ons that
-crash, so leaving them out is what makes it safe.
+Downloads, drives, recent folders), a folder tree, a file list with folders
+first and then files by name, type-ahead, and New Folder plus overwrite
+confirmation when saving. It has no thumbnails, preview pane or right-click
+shell menus — those are the add-ons that crash, so leaving them out is what
+makes it safe.
 
 Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
 file picker**, and turn it off there to go back to Windows' dialog once the cause

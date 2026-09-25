@@ -11,7 +11,7 @@ not planned, and the deliberate limits, are in
 
 ---
 
-## 1.0 (cut as 1.0.0-beta1 on 2026-09-13, 1.0.0-rc1 on 2026-09-15, 1.0.0-rc2 on 2026-09-16 and 1.0.0-rc3 on 2026-09-24; 0.10.0 was promoted 2026-09-10)
+## 1.0 (cut as 1.0.0-beta1 on 2026-09-13, 1.0.0-rc1 on 2026-09-15, 1.0.0-rc2 on 2026-09-16, 1.0.0-rc3 on 2026-09-24 and 1.0.0-rc4 on 2026-09-25; 0.10.0 was promoted 2026-09-10)
 
 The 2026-09-10 readiness audit, planned in detail in
 [docs/plans/release-1.0.md](docs/plans/release-1.0.md). The verdict was "close on
@@ -70,8 +70,8 @@ the README's promise true as written.
 list (at the foot of this file until 2026-09-14), and a README opening paragraph that
 says what a trip through the formatted view does change. The beta was tagged
 `v1.0.0-beta1` and published as a GitHub prerelease on 2026-09-13, 1.0.0-rc1
-on 2026-09-15 and 1.0.0-rc2 on 2026-09-16; the 1.0.0-rc3 cut is dated 2026-09-24, and
-1.0.0 follows after dogfooding.
+on 2026-09-15, 1.0.0-rc2 on 2026-09-16 and 1.0.0-rc3 on 2026-09-24; the 1.0.0-rc4 cut
+is dated 2026-09-25, and 1.0.0 follows after dogfooding.
 
 ## Next
 
