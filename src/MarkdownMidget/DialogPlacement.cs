@@ -8,7 +8,8 @@ namespace MarkdownMidget;
 
 /// <summary>
 /// Keeps every dialog (a window with a WPF <see cref="Window.Owner"/>) on its owner's monitor:
-/// the whole title bar inside the work area, and never taller or wider than it. WPF's
+/// it opens with the whole title bar inside the work area and no bigger than it, and a size-to-content
+/// dialog stays capped there so it scrolls. WPF's
 /// CenterOwner does not do this for a maximised or minimised owner: it centres on the work
 /// area with no clamp, so a dialog taller than the work area opens with its title bar above
 /// the top of the screen. Attached to every window by <see cref="Chrome.ChromeWindows"/>.
@@ -74,8 +75,10 @@ internal static class DialogPlacement
         dialog.SetValue(PlacedProperty, true);
         // A SizeToContent window is centred again by WPF after this first layout; Manual stops that.
         dialog.WindowStartupLocation = WindowStartupLocation.Manual;
-        dialog.MaxWidth = max.Width;   // no dialog sets its own maximum, so this replaces nothing
-        dialog.MaxHeight = max.Height;
+        if (dialog.SizeToContent != SizeToContent.Manual)
+            (dialog.MaxWidth, dialog.MaxHeight) = (max.Width, max.Height);   // what makes it scroll; no dialog sets its own
+        else   // a size the user owns (the picker): shrunk to fit once, free to maximise, snap or grow on a bigger screen
+            (dialog.Width, dialog.Height) = (Math.Min(e.NewSize.Width, max.Width), Math.Min(e.NewSize.Height, max.Height));
         SetWindowPos(handle, IntPtr.Zero, (int)at.X, (int)at.Y, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
     }
 

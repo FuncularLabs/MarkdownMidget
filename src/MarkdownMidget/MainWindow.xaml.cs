@@ -819,8 +819,8 @@ public partial class MainWindow : Window
     /// <summary>The rectangle we're trying to restore to, until it sticks.</summary>
     private Rect? _restoreTarget;
 
-    /// <summary>A help viewer shouldn't land on top of the editor: it takes neither the saved rectangle nor maximised.</summary>
-    private bool RestoreMaximized => _savedMaximized && !_isHelpWindow;
+    /// <summary>The saved rectangle and maximised state this window may use (none for a help viewer).</summary>
+    private (Rect? Bounds, bool Maximized) Restorable => WindowPlacement.Restorable(_savedBounds, _savedMaximized, _isHelpWindow);
 
     /// <summary>
     /// Reapply the remembered size/position, having first checked it still lands on
@@ -839,11 +839,11 @@ public partial class MainWindow : Window
         try
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            Rect? fitted = RestoreMaximized || DialogPlacement.WorkAreaOf(hwnd) is not { } work ? null
+            Rect? fitted = Restorable.Maximized || DialogPlacement.WorkAreaOf(hwnd) is not { } work ? null
                 : DialogPlacement.FitDefault(new Size(Width, Height), new Size(MinWidth, MinHeight), work, System.Windows.Media.VisualTreeHelper.GetDpi(this));
-            _restoreTarget = WindowPlacement.Startup(_isHelpWindow ? null : _savedBounds, MonitorInfo.WorkAreas(), MinSaved, fitted);
-            if (_restoreTarget is { } b) NativeWindowPlacement.Apply(hwnd, b, RestoreMaximized);
-            else if (RestoreMaximized) WindowState = WindowState.Maximized;
+            _restoreTarget = WindowPlacement.Startup(Restorable.Bounds, MonitorInfo.WorkAreas(), MinSaved, fitted);
+            if (_restoreTarget is { } b) NativeWindowPlacement.Apply(hwnd, b, Restorable.Maximized);
+            else if (Restorable.Maximized) WindowState = WindowState.Maximized;
         }
         catch { /* the default placement is a fine outcome */ }
     }
@@ -877,7 +877,7 @@ public partial class MainWindow : Window
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             if (NativeWindowPlacement.TryGet(hwnd, out var now, out _) && NearlyEqual(now, b)) return;
-            NativeWindowPlacement.Apply(hwnd, b, RestoreMaximized);
+            NativeWindowPlacement.Apply(hwnd, b, Restorable.Maximized);
         }
         catch { /* where it landed is where it stays */ }
     }

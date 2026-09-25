@@ -86,6 +86,11 @@ internal static class WindowPlacement
     internal static Rect? Startup(Rect? saved, IReadOnlyList<Rect> screens, Size minSize, Rect? fittedDefault) =>
         Sanitize(saved, screens, minSize) ?? fittedDefault;
 
+    /// <summary>What a window may restore from the saved settings: all of it, or nothing for a help viewer, which
+    /// must not land on top of the editor or open maximised because the editor was.</summary>
+    internal static (Rect? Bounds, bool Maximized) Restorable(Rect? bounds, bool maximized, bool isHelpWindow) =>
+        isHelpWindow ? (null, false) : (bounds, maximized);
+
     /// <summary>Too big for its monitor: shrink to fit and pull fully inside.</summary>
     private static Rect Shrink(Rect r, Rect screen, Size minSize)
     {

@@ -2,6 +2,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace MarkdownMidget;
 
@@ -65,7 +66,13 @@ public partial class SettingsDialog : Window
         if (result is null) return;   // cancelled — say nothing rather than "0 imported"
         ImportResult.Text = result;
         ImportResult.Visibility = Visibility.Visible;
+        Reveal(ImportResult);
     }
+
+    // Once laid out, scroll a message into view: on a short screen the sections scroll, and a result or hint
+    // below or above the part in view would look like nothing happened.
+    private void Reveal(FrameworkElement message) =>
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new System.Action(message.BringIntoView));
 
     private void DigitsOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         => e.Handled = !e.Text.All(char.IsDigit);
@@ -80,6 +87,7 @@ public partial class SettingsDialog : Window
             RecentHint.SetResourceReference(TextBlock.ForegroundProperty, Chrome.ChromeKeys.DialogInvalidText);
             RecentLimitBox.Focus();
             RecentLimitBox.SelectAll();
+            Reveal(RecentHint);
             return;
         }
         RecentLimit = limit;

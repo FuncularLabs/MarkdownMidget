@@ -215,4 +215,13 @@ public class WindowPlacementTests
         Assert.Equal(fittedDefault, WindowPlacement.Startup(null, OneScreen, Min, fittedDefault));             // nothing saved
         Assert.Equal(fittedDefault, WindowPlacement.Startup(new Rect(0, 0, 10, 10), OneScreen, Min, fittedDefault));   // garbage
     }
+
+    [Theory]   // a help viewer must not land on top of the editor, nor open maximised because the editor was
+    [InlineData(false, true, true)] [InlineData(false, false, false)]
+    [InlineData(true, true, false)] [InlineData(true, false, false)]
+    public void AHelpWindowTakesNeitherTheSavedRectangleNorMaximised(bool isHelp, bool savedMaximized, bool maximized)
+    {
+        var saved = new Rect(100, 80, 1120, 720);
+        Assert.Equal((isHelp ? (Rect?)null : saved, maximized), WindowPlacement.Restorable(saved, savedMaximized, isHelp));
+    }
 }

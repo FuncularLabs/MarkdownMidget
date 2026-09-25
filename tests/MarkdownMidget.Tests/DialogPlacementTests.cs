@@ -2,8 +2,10 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MarkdownMidget.Chrome;
 using Xunit;
 
@@ -61,6 +63,7 @@ public class DialogPlacementTests
         Assert.Equal(new Rect(-800, 0, 520, 360), FirstLaunch(new Rect(-800, 0, 400, 300), 1));
 
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hwnd);   // on screen, unlike WPF's IsVisible during Show
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
     private const uint MoveOnly = 0x0001 | 0x0004 | 0x0010;   // SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
@@ -69,6 +72,9 @@ public class DialogPlacementTests
 
     private static Rect Bounds(Window w) =>
         GetWindowRect(Handle(w), out var r) ? new Rect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top) : Rect.Empty;
+
+    /// <summary>WindowStartupLocation as the placement left it at the dialog's first layout.</summary>
+    private static WindowStartupLocation? s_startupAfterPlacement;
 
     /// <summary>
     /// Shows the window <paramref name="make"/> builds, owned by a 600 x 400 window at (-20000, -20000), with
@@ -79,6 +85,7 @@ public class DialogPlacementTests
         ChromeWindows.Register();   // what App.OnStartup calls: attaches the placement to every window
         var original = DialogPlacement.WorkAreaOf;
         DialogPlacement.WorkAreaOf = _ => work;
+        s_startupAfterPlacement = null;
         var owner = new Window { Left = -20000, Top = -20000, Width = 600, Height = 400, ShowActivated = false, ShowInTaskbar = false };
         Window? dialog = null;
         try
@@ -87,9 +94,16 @@ public class DialogPlacementTests
             var d = dialog = make();
             (d.Owner, d.ShowActivated, d.ShowInTaskbar) = (owner, false, false);
             d.PreviewGotKeyboardFocus += (_, e) => e.Handled = true;   // refused before WPF calls SetFocus: e.g. Settings' Loaded
-            // A placement that misses the stand-in work area is moved further off screen before the window
-            // becomes visible, so even a broken build draws nothing a person could see; the assertions still fail.
-            d.SourceInitialized += (_, _) => { if (!work.Contains(Bounds(d))) SetWindowPos(Handle(d), IntPtr.Zero, -25000, -25000, 0, 0, MoveOnly); };
+            // Runs after the placement's class handler and, at the first layout, before the window is visible: a window
+            // outside the stand-in work area goes further off screen, and Manual stops WPF centring it on a real monitor
+            // afterwards, so a broken placement fails the assertions without showing a window a person could see.
+            d.SizeChanged += (_, _) =>
+            {
+                if (IsWindowVisible(Handle(d))) return;
+                s_startupAfterPlacement ??= d.WindowStartupLocation;
+                d.WindowStartupLocation = WindowStartupLocation.Manual;
+                if (!work.Contains(Bounds(d))) SetWindowPos(Handle(d), IntPtr.Zero, -25000, -25000, 0, 0, MoveOnly);
+            };
             d.Show();
             d.UpdateLayout();
             body(owner, d);
@@ -110,16 +124,29 @@ public class DialogPlacementTests
     [Theory]
     [InlineData("Settings")]
     [InlineData("Code-built")]
-    [InlineData("Picker-sized")]
     public void EveryDialogOpensInsideItsOwnersWorkAreaAndNoBiggerThanIt(string name)
     {
-        var work = new Rect(-20400, -20300, 1400, 420);   // shorter than Settings and the picker
+        var work = new Rect(-20400, -20300, 1400, 420);   // shorter than Settings
         WithDialog(work, () => Make(name), (_, dialog) =>
         {
             Assert.True(work.Contains(Bounds(dialog)), $"{name} at {Bounds(dialog)}, work area {work}");
+            Assert.Equal(WindowStartupLocation.Manual, s_startupAfterPlacement);   // or WPF would centre it again, uncapped
             var dpi = VisualTreeHelper.GetDpi(dialog);
             Assert.Equal(work.Width / dpi.DpiScaleX, dialog.MaxWidth, 3);
             Assert.Equal(work.Height / dpi.DpiScaleY, dialog.MaxHeight, 3);
+        });
+    }
+
+    [Fact]   // the picker: maximising, snapping or a bigger monitor may still make it larger
+    public void AResizableDialogOpensShrunkIntoTheWorkAreaWithNoMaximum()
+    {
+        var work = new Rect(-20400, -20300, 1400, 420);   // shorter than the picker's 520
+        WithDialog(work, () => Make("Picker-sized"), (_, dialog) =>
+        {
+            Assert.True(work.Contains(Bounds(dialog)), $"at {Bounds(dialog)}, work area {work}");
+            Assert.Equal((double.PositiveInfinity, double.PositiveInfinity), (dialog.MaxWidth, dialog.MaxHeight));
+            dialog.Height = 700; dialog.UpdateLayout();
+            Assert.Equal(700, dialog.ActualHeight, 1);
         });
     }
 
@@ -145,21 +172,44 @@ public class DialogPlacementTests
         });
 
     [Fact]
-    public void ADialogThatGrowsAfterItOpensIsPulledBackInside()
+    public void ADialogThatGrowsKeepsItsTopLeftWhileItFitsAndIsPulledBackInsideWhenNot()
     {
-        var work = new Rect(-20400, -20300, 1400, 600);
+        var work = new Rect(-20400, -20300, 1400, 900);
         StackPanel? panel = null;
         WithDialog(work, () => new Window { SizeToContent = SizeToContent.WidthAndHeight,
                                             Content = panel = new StackPanel { Width = 300, Children = { new Border { Height = 100 } } } }, (_, dialog) =>
         {
             var before = Bounds(dialog);
-            panel!.Children.Add(new Border { Height = 400 });   // as a longer message or an expander would
-            dialog.UpdateLayout();
+            panel!.Children.Add(new Border { Height = 100 }); dialog.UpdateLayout();   // as Find does when it shows Replace
+            Assert.Equal((before.X, before.Y), (Bounds(dialog).X, Bounds(dialog).Y));
+            Assert.True(Bounds(dialog).Height > before.Height, "it did not grow");
+            panel.Children.Add(new Border { Height = 400 }); dialog.UpdateLayout();    // now past the bottom of the work area
             var after = Bounds(dialog);
-            Assert.True(after.Height >= before.Height + 400, $"grew from {before} to {after}");
+            Assert.True(after.Height > before.Height + 400, $"grew from {before} to {after}");
             Assert.True(work.Contains(after), $"at {after}, work area {work}");
         });
     }
+
+    [Fact]   // scrolled to the bottom, Import adds its result below the view; a bad number changes a hint above it
+    public void SettingsBringsItsFeedbackIntoViewWhenItAppearsOrChanges() =>
+        WithDialog(new Rect(-20400, -20300, 1400, 420), () => new SettingsDialog(true, 10, true, importDictionary: _ => "12 words imported."), (_, window) =>
+        {
+            var dialog = (SettingsDialog)window;
+            bool InView(FrameworkElement e)
+            {
+                Dispatcher.CurrentDispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));   // run what was queued
+                var r = e.TransformToAncestor(dialog.Sections).TransformBounds(new Rect(e.RenderSize));
+                return new Rect(0, 0, dialog.Sections.ViewportWidth, dialog.Sections.ViewportHeight).Contains(r);
+            }
+            void ScrollToEnd() { dialog.Sections.ScrollToVerticalOffset(dialog.Sections.ScrollableHeight); dialog.UpdateLayout(); }   // a number, as the wheel leaves it
+            ScrollToEnd();
+            dialog.ImportDicBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.True(InView(dialog.ImportResult), "the import result is out of view");
+            ScrollToEnd();
+            dialog.RecentLimitBox.Text = "0";
+            dialog.OkBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.True(InView(dialog.RecentHint), "the Recent files hint is out of view");
+        });
 
     [Fact]
     public void AUserResizeAndAWindowWithoutAWpfOwnerAreLeftAlone() =>
@@ -173,8 +223,7 @@ public class DialogPlacementTests
                 anchor.Show();
                 Assert.Equal((-21000.0, -21000.0), (anchor.Left, anchor.Top));
                 SetWindowPos(Handle(dialog), IntPtr.Zero, -21000, -21000, 0, 0, MoveOnly);
-                dialog.Width = 320;   // a size the user dragged to, after it opened
-                dialog.UpdateLayout();
+                dialog.Width = 320; dialog.UpdateLayout();   // a size the user dragged to, after it opened
                 Assert.Equal((-21000.0, -21000.0), (Bounds(dialog).X, Bounds(dialog).Y));
             }
             finally { anchor.Close(); }
