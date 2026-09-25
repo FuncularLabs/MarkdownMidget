@@ -23,6 +23,9 @@ internal static class DialogPlacement
     /// Windows can't say. Replaced by tests.</summary>
     internal static Func<IntPtr, Rect?> WorkAreaOf = WorkAreaNative;
 
+    /// <summary>Whether the user is dragging or sizing the window now. Replaced by tests.</summary>
+    internal static Func<IntPtr, bool> UserMovingOrSizing = InMoveSizeNative;
+
     /// <summary>
     /// Where the dialog goes, in physical pixels, and its largest size in device-independent
     /// units: centred on <paramref name="owner"/> (on the work area when null, as for a minimised
@@ -52,7 +55,8 @@ internal static class DialogPlacement
 
     /// <summary>
     /// The first layout (handle made, not yet visible) places the dialog on its owner's monitor;
-    /// a later size change made by its content (SizeToContent) keeps it inside the monitor it is on.
+    /// a later size change made by its content (SizeToContent) keeps it inside the monitor it is on,
+    /// except while the user is dragging or sizing it.
     /// A size the user set, which turns SizeToContent off, is left alone.
     /// </summary>
     internal static void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -79,7 +83,17 @@ internal static class DialogPlacement
             (dialog.MaxWidth, dialog.MaxHeight) = (max.Width, max.Height);   // what makes it scroll; no dialog sets its own
         else   // a size the user owns (the picker): shrunk to fit once, free to maximise, snap or grow on a bigger screen
             (dialog.Width, dialog.Height) = (Math.Min(e.NewSize.Width, max.Width), Math.Min(e.NewSize.Height, max.Height));
+        // Mid-drag (Windows rescales a dialog dragged onto a monitor at another scale) the position is the user's:
+        // moving it would pull it from the pointer. The cap above still follows the monitor it is on.
+        if (placed && UserMovingOrSizing(handle)) return;
         SetWindowPos(handle, IntPtr.Zero, (int)at.X, (int)at.Y, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+    }
+
+    internal static bool InMoveSizeNative(IntPtr hwnd)
+    {
+        var info = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
+        return GetGUIThreadInfo(GetWindowThreadProcessId(hwnd, IntPtr.Zero), ref info)
+            && (info.flags & GuiInMoveSize) != 0 && info.hwndMoveSize == hwnd;
     }
 
     internal static Rect? WorkAreaNative(IntPtr hwnd)
@@ -97,6 +111,19 @@ internal static class DialogPlacement
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MONITORINFO { public int cbSize; public RECT rcMonitor, rcWork; public int dwFlags; }
+
+    private const int GuiInMoveSize = 0x0002;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GUITHREADINFO
+    {
+        public int cbSize, flags;
+        public IntPtr hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
+        public RECT rcCaret;
+    }
+
+    [DllImport("user32.dll")] private static extern bool GetGUIThreadInfo(uint thread, ref GUITHREADINFO info);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, IntPtr processId);
 
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);

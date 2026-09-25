@@ -83,7 +83,7 @@ public class DialogPlacementTests
     private static void WithDialog(Rect work, Func<Window> make, Action<Window, Window> body) => ChromePaletteTests.RunSta(() =>
     {
         ChromeWindows.Register();   // what App.OnStartup calls: attaches the placement to every window
-        var original = DialogPlacement.WorkAreaOf;
+        var (original, moving) = (DialogPlacement.WorkAreaOf, DialogPlacement.UserMovingOrSizing);
         DialogPlacement.WorkAreaOf = _ => work;
         s_startupAfterPlacement = null;
         var owner = new Window { Left = -20000, Top = -20000, Width = 600, Height = 400, ShowActivated = false, ShowInTaskbar = false };
@@ -108,7 +108,7 @@ public class DialogPlacementTests
             d.UpdateLayout();
             body(owner, d);
         }
-        finally { dialog?.Close(); owner.Close(); DialogPlacement.WorkAreaOf = original; }
+        finally { dialog?.Close(); owner.Close(); (DialogPlacement.WorkAreaOf, DialogPlacement.UserMovingOrSizing) = (original, moving); }
     });
 
     // Of the XAML dialogs only Settings can be built here: the rest name Icon="/Assets/…", looked up in the test host (About,
@@ -190,6 +190,22 @@ public class DialogPlacementTests
         });
     }
 
+    [Fact]   // dragged onto a monitor with another scale, Windows resizes it mid-drag: moving it then would pull it from the pointer
+    public void ASizeChangeWhileTheUserDragsTheDialogMovesNothingButUpdatesTheCap()
+    {
+        StackPanel? panel = null;
+        WithDialog(new Rect(-20400, -20300, 1400, 900), () => new Window { SizeToContent = SizeToContent.WidthAndHeight,
+                                                         Content = panel = new StackPanel { Width = 300, Children = { new Border { Height = 100 } } } }, (_, dialog) =>
+        {
+            var before = Bounds(dialog);
+            var other = new Rect(-20400, -20300, 1400, 300);   // the monitor it is being dragged onto: its bottom is above the dialog
+            (DialogPlacement.WorkAreaOf, DialogPlacement.UserMovingOrSizing) = (_ => other, _ => true);
+            panel!.Children.Add(new Border { Height = 100 }); dialog.UpdateLayout();
+            Assert.Equal((before.X, before.Y), (Bounds(dialog).X, Bounds(dialog).Y));
+            Assert.Equal(other.Height / VisualTreeHelper.GetDpi(dialog).DpiScaleY, dialog.MaxHeight, 3);
+        });
+    }
+
     [Fact]   // scrolled to the bottom, Import adds its result below the view; a bad number changes a hint above it
     public void SettingsBringsItsFeedbackIntoViewWhenItAppearsOrChanges() =>
         WithDialog(new Rect(-20400, -20300, 1400, 420), () => new SettingsDialog(true, 10, true, importDictionary: _ => "12 words imported."), (_, window) =>
@@ -230,10 +246,15 @@ public class DialogPlacementTests
         });
 
     [Fact]
-    public void TheRealWorkAreaLookupAnswersForAWindow() => ChromePaletteTests.RunSta(() =>
+    public void TheRealWorkAreaAndMoveSizeLookupsAnswerForAWindow() => ChromePaletteTests.RunSta(() =>
     {
         var window = new Window();   // a handle only: never shown
-        try { Assert.True(DialogPlacement.WorkAreaNative(new WindowInteropHelper(window).EnsureHandle()) is { Width: > 0, Height: > 0 }); }
+        try
+        {
+            var handle = new WindowInteropHelper(window).EnsureHandle();
+            Assert.True(DialogPlacement.WorkAreaNative(handle) is { Width: > 0, Height: > 0 });
+            Assert.False(DialogPlacement.InMoveSizeNative(handle));   // nobody is dragging it
+        }
         finally { window.Close(); }
     });
 }
