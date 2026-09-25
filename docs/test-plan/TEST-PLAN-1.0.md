@@ -810,6 +810,18 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** Record what happens. It's a FAIL if Save quietly writes to a temporary copy you can't find again.
 - **Type:** Human. Outlook and zip shell drops can't be simulated.
 
+#### OPN-10 File ▸ Open offers encrypted documents as their own type, in both dialogs
+- **Change:** Changed: "File ▸ Open now always offers encrypted documents as their own type" · **Documents:** `br-forms.md` in `%TEMP%\mdm-test-copies`, and `secret.mdenc`, made from it in step 1 · **Settings:** Always use the built-in file picker and Also list encrypted documents (`*.mdenc`) under Markdown, both cleared in step 1 and set in the steps; settings.json backed up in step 1 and restored in step 6
+1. Close every Markdown Midget window and back up your settings as in DLG-01 step 1. Open `br-forms.md` from `%TEMP%\mdm-test-copies`, and in **Edit ▸ Settings…** clear **Always use the built-in file picker** and **Also list encrypted documents (`*.mdenc`) under Markdown**, and click OK. Use **File ▸ Save As…**, pick the **Secure Markdown (\*.mdenc)** type, save as `secret.mdenc` in the same folder with a password you note down, then press Ctrl+W.
+2. Click **File ▸ Open…** (Windows' dialog) and go to `%TEMP%\mdm-test-copies` if it isn't there. Look at the type list and at the files listed on the type it starts on, then pick **Secure Markdown (\*.mdenc)**, then **All files (\*.\*)**. Cancel.
+3. In **Edit ▸ Settings…**, tick **Also list encrypted documents (`*.mdenc`) under Markdown**, read the text under it, and click OK. Do step 2 again.
+4. In **Edit ▸ Settings…**, tick **Always use the built-in file picker** and click OK. Do step 2 again in the built-in picker, then open **File ▸ Open…** once more, pick **Secure Markdown (\*.mdenc)**, open `secret.mdenc` and type the password.
+5. In **Edit ▸ Settings…**, clear **Also list encrypted documents (`*.mdenc`) under Markdown** and click OK. Do step 2 again in the built-in picker. Then use **File ▸ Save As…**, type `secret2` and save.
+6. Close every window and put your settings back as in DLG-01 step 4.
+- **Expected:** Every Open dialog in steps 2 to 5 lists four types in this order: Markdown, Secure Markdown (\*.mdenc), Text (\*.txt), All files (\*.\*), and starts on Markdown. With the setting cleared (steps 2 and 5) Markdown is "Markdown (\*.md;\*.markdown)" and doesn't list `secret.mdenc`; with it ticked (steps 3 and 4) Markdown is "Markdown (\*.md;\*.markdown;\*.mdenc)" and lists `secret.mdenc`. Secure Markdown always lists `secret.mdenc` and no other file, and All files lists every file in the folder. In step 3 the setting's name shows in full, not cut off, and the text under it says File ▸ Open always lists encrypted documents under their own type and under All files. In step 4 the password prompt appears and `secret.mdenc` opens. In step 5 Save As starts on Secure Markdown and saves `secret2.mdenc` in the same folder with no password prompt, and the title bar changes to `secret2.mdenc`.
+- **Control:** on build 1126 (1.0.0-rc3), step 2 shows three types, with no Secure Markdown.
+- **Type:** Both. Automated: `PickerParityTests.FileOpenOffersSaveAsEncryptedTypeSecondAndStillStartsOnMarkdown`, `PickerParityTests.EachSharedFilterOffersExactlyTheseTypes`, `PickerParityTests.TheBuiltInPickerOffersWindowsTypesInOrderWithTheSameDefault`, `PickerParityTests.TheListShowsMdencUnderTheTypesThatNameItAndUnderAllFiles`, `SecureUiTests.OnlyTheOpenFiltersMarkdownTypeIsOptIn`. Human: Windows' dialog, the built-in picker window, the password prompt and the Settings dialog, which need the app; no test can build the picker window, because its icon only loads inside the app.
+
 ### BIG — Large documents
 
 #### BIG-01 A document over 512 KB opens with line numbers and spell check off
@@ -1835,6 +1847,7 @@ Automated items only, run by Claude on 2026-09-24 in `C:\code\MarkdownMidget\.cl
 | OPN-07 | | | |
 | OPN-08 | | | |
 | OPN-09 | | | |
+| OPN-10 | | | |
 | BIG-01 | | | |
 | BIG-02 | | | |
 | BIG-03 | | | |

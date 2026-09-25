@@ -23,19 +23,22 @@ internal static class SecureUi
     public static string PlaintextPathFor(string path) =>
         Path.ChangeExtension(path, ".md");
 
+    /// <summary>The encrypted type, one spelling for Open and Save As.</summary>
+    private const string EncryptedType = "Secure Markdown (*.mdenc)|*.mdenc";
+
     /// <summary>
-    /// The Open dialog's filter. *.mdenc joins the Markdown group only when the
-    /// user opted in (Settings) — the default stays exactly what it always was.
-    /// Encrypted files remain openable regardless via "All files" or a typed name.
+    /// The Open dialog's filter: Markdown (the type it opens on), Secure Markdown,
+    /// Text, All files. Encrypted files always have their own type and show under
+    /// All files; the Settings opt-in only adds *.mdenc to the Markdown type too.
     /// </summary>
-    public static string OpenFilter(bool includeEncrypted) => includeEncrypted
-        ? "Markdown (*.md;*.markdown;*.mdenc)|*.md;*.markdown;*.mdenc|Text (*.txt)|*.txt|All files (*.*)|*.*"
-        : "Markdown (*.md;*.markdown)|*.md;*.markdown|Text (*.txt)|*.txt|All files (*.*)|*.*";
+    public static string OpenFilter(bool includeEncrypted) => (includeEncrypted
+        ? "Markdown (*.md;*.markdown;*.mdenc)|*.md;*.markdown;*.mdenc|"
+        : "Markdown (*.md;*.markdown)|*.md;*.markdown|") + EncryptedType + "|Text (*.txt)|*.txt|All files (*.*)|*.*";
 
     /// <summary>Save As always offers both — choosing Secure Markdown IS the second
     /// path to encryption, per the design.</summary>
     public const string SaveFilter =
-        "Markdown (*.md)|*.md|Secure Markdown (*.mdenc)|*.mdenc|Text (*.txt)|*.txt|All files (*.*)|*.*";
+        "Markdown (*.md)|*.md|" + EncryptedType + "|Text (*.txt)|*.txt|All files (*.*)|*.*";
 
     /// <summary>1-based index of the Secure Markdown entry in SaveFilter.</summary>
     public const int SaveFilterEncryptedIndex = 2;

@@ -25,11 +25,12 @@ public class SecureUiTests
     }
 
     [Fact]
-    public void TheOpenFilterIsOptIn()
+    public void OnlyTheOpenFiltersMarkdownTypeIsOptIn()
     {
-        // The default filter is EXACTLY what it always was — the opt-in only adds.
-        Assert.DoesNotContain("mdenc", SecureUi.OpenFilter(includeEncrypted: false));
-        Assert.Contains("*.mdenc", SecureUi.OpenFilter(includeEncrypted: true));
+        // The Markdown type is EXACTLY what it always was unless the user opts in;
+        // Secure Markdown is a type of its own either way (PickerParityTests).
+        Assert.Equal("*.md;*.markdown", SecureUi.OpenFilter(includeEncrypted: false).Split('|')[1]);
+        Assert.Equal("*.md;*.markdown;*.mdenc", SecureUi.OpenFilter(includeEncrypted: true).Split('|')[1]);
         // Both keep the escape hatch.
         Assert.Contains("All files (*.*)", SecureUi.OpenFilter(false));
         Assert.Contains("All files (*.*)", SecureUi.OpenFilter(true));

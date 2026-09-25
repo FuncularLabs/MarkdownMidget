@@ -4150,7 +4150,7 @@ public partial class MainWindow : Window
         public int RecentLimit { get; set; } = 10;   // entries kept in Open Recent
         public bool StartWithBlankDocument { get; set; } // else the no-document placeholder
         public bool KeepBackup { get; set; } = true;     // crash copy of unsaved work
-        public bool ShowEncryptedInOpen { get; set; }    // *.mdenc in the Open filter (opt-in)
+        public bool ShowEncryptedInOpen { get; set; }    // *.mdenc in Open's Markdown type too (opt-in)
         public bool UseBuiltInPicker { get; set; }       // skip the native dialog entirely
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.

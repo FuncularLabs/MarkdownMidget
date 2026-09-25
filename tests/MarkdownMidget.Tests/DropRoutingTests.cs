@@ -168,6 +168,7 @@ public class DropRoutingTests
             .SelectMany(p => p.Split(';'))
             .Where(p => p != "*.*")
             .Select(p => p.TrimStart('*'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)   // *.mdenc is in two types
             .ToList();
         Assert.NotEmpty(listed);
         foreach (var ext in listed)

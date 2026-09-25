@@ -62,6 +62,30 @@ public class PickerParityTests
     }
 
     [Theory]
+    [InlineData("Open, setting off")]
+    [InlineData("Open, setting on")]
+    public void FileOpenOffersSaveAsEncryptedTypeSecondAndStillStartsOnMarkdown(string site)
+    {
+        var request = Site(site);
+        var types = FilePickerModel.ParseFilter(request.Filter);
+        var saveAs = FilePickerModel.ParseFilter(SecureUi.SaveFilter)[SecureUi.SaveFilterEncryptedIndex - 1];
+        Assert.Equal(saveAs.Label, types[1].Label);
+        Assert.Equal(saveAs.Patterns, types[1].Patterns);
+        Assert.StartsWith("Markdown (", types[request.FilterIndex - 1].Label);
+    }
+
+    /// <summary>The whole list, in order, for the filters call sites share. The setting
+    /// changes only the Markdown type; Save As is exactly what it was.</summary>
+    [Theory]
+    [InlineData("Open, setting off", "Markdown (*.md;*.markdown)|*.md;*.markdown|Secure Markdown (*.mdenc)|*.mdenc|Text (*.txt)|*.txt|All files (*.*)|*.*")]
+    [InlineData("Open, setting on", "Markdown (*.md;*.markdown;*.mdenc)|*.md;*.markdown;*.mdenc|Secure Markdown (*.mdenc)|*.mdenc|Text (*.txt)|*.txt|All files (*.*)|*.*")]
+    [InlineData("Save As, plain", "Markdown (*.md)|*.md|Secure Markdown (*.mdenc)|*.mdenc|Text (*.txt)|*.txt|All files (*.*)|*.*")]
+    public void EachSharedFilterOffersExactlyTheseTypes(string site, string filter) =>
+        Assert.Equal(filter, Site(site).Filter);
+
+    [Theory]
+    [InlineData("Open, setting off", "Secure Markdown (*.mdenc)", "c.mdenc")]
+    [InlineData("Open, setting on", "Secure Markdown (*.mdenc)", "c.mdenc")]
     [InlineData("Open, setting off", "Markdown (*.md;*.markdown)", "a.md b.markdown")]
     [InlineData("Open, setting off", "All files (*.*)", "a.md b.markdown c.mdenc d.txt e.pdf")]
     [InlineData("Open, setting on", "Markdown (*.md;*.markdown;*.mdenc)", "a.md b.markdown c.mdenc")]
