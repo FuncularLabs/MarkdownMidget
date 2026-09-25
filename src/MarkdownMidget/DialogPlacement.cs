@@ -1,0 +1,93 @@
+using System;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
+
+namespace MarkdownMidget;
+
+/// <summary>
+/// Keeps every dialog (a window with a WPF <see cref="Window.Owner"/>) on its owner's monitor:
+/// the whole title bar inside the work area, and never taller or wider than it. WPF's
+/// CenterOwner does not do this for a maximised or minimised owner: it centres on the work
+/// area with no clamp, so a dialog taller than the work area opens with its title bar above
+/// the top of the screen. Attached to every window by <see cref="Chrome.ChromeWindows"/>.
+/// </summary>
+internal static class DialogPlacement
+{
+    private static readonly DependencyProperty PlacedProperty =
+        DependencyProperty.RegisterAttached("Placed", typeof(bool), typeof(DialogPlacement), new PropertyMetadata(false));
+
+    /// <summary>The work area of the monitor nearest a window, in physical pixels; null when
+    /// Windows can't say. Replaced by tests.</summary>
+    internal static Func<IntPtr, Rect?> WorkAreaOf = WorkAreaNative;
+
+    /// <summary>
+    /// Where the dialog goes, in physical pixels, and its largest size in device-independent
+    /// units: centred on <paramref name="owner"/> (on the work area when null, as for a minimised
+    /// owner), shifted inside <paramref name="work"/>, and the top-left corner wins when it can't
+    /// all fit. <paramref name="dialog"/> is in device-independent units; <paramref name="scale"/>
+    /// is the DPI scale of the monitor <paramref name="work"/> belongs to.
+    /// </summary>
+    internal static (Point Position, Size MaxSize) Fit(Rect? owner, Size dialog, Rect work, DpiScale scale)
+    {
+        var (w, h) = (dialog.Width * scale.DpiScaleX, dialog.Height * scale.DpiScaleY);
+        var around = owner ?? work;
+        // Min, then Max: a dialog too big to fit ends up at the left and top edges, never past them.
+        var x = Math.Max(Math.Min(around.X + (around.Width - w) / 2, work.Right - w), work.Left);
+        var y = Math.Max(Math.Min(around.Y + (around.Height - h) / 2, work.Bottom - h), work.Top);
+        return (new Point(Math.Floor(x), Math.Floor(y)), new Size(work.Width / scale.DpiScaleX, work.Height / scale.DpiScaleY));
+    }
+
+    /// <summary>
+    /// The first layout (handle made, not yet visible) places the dialog on its owner's monitor;
+    /// a later size change made by its content (SizeToContent) keeps it inside the monitor it is on.
+    /// A size the user set, which turns SizeToContent off, is left alone.
+    /// </summary>
+    internal static void OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is not Window { Owner: { } owner, WindowState: WindowState.Normal } dialog) return;
+        var placed = (bool)dialog.GetValue(PlacedProperty);
+        if (placed && dialog.SizeToContent == SizeToContent.Manual) return;
+        var handle = new WindowInteropHelper(dialog).Handle;
+        var near = placed ? handle : new WindowInteropHelper(owner).Handle;
+        if (handle == IntPtr.Zero || near == IntPtr.Zero || WorkAreaOf(near) is not { } work) return;
+
+        var scale = VisualTreeHelper.GetDpi(placed ? dialog : owner);
+        Rect? around = null;
+        if (GetWindowRect(near, out var r) && !IsIconic(near))
+            around = placed   // a grown dialog keeps its top-left corner unless it no longer fits
+                ? new Rect(r.Left, r.Top, e.NewSize.Width * scale.DpiScaleX, e.NewSize.Height * scale.DpiScaleY)
+                : new Rect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
+        var (at, max) = Fit(around, e.NewSize, work, scale);
+
+        dialog.SetValue(PlacedProperty, true);
+        // A SizeToContent window is centred again by WPF after this first layout; Manual stops that.
+        dialog.WindowStartupLocation = WindowStartupLocation.Manual;
+        dialog.MaxWidth = max.Width;   // no dialog sets its own maximum, so this replaces nothing
+        dialog.MaxHeight = max.Height;
+        SetWindowPos(handle, IntPtr.Zero, (int)at.X, (int)at.Y, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+    }
+
+    internal static Rect? WorkAreaNative(IntPtr hwnd)
+    {
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return null;
+        var w = info.rcWork;
+        return w.Right > w.Left && w.Bottom > w.Top ? new Rect(w.Left, w.Top, w.Right - w.Left, w.Bottom - w.Top) : null;
+    }
+
+    private const uint SwpNoSize = 0x0001, SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010, MonitorDefaultToNearest = 2;
+
+    [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO { public int cbSize; public RECT rcMonitor, rcWork; public int dwFlags; }
+
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+}

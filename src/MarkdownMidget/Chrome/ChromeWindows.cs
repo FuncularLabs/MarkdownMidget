@@ -33,6 +33,9 @@ internal static class ChromeWindows
         // window is visible (measured, for manual and size-to-content windows alike).
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.SizeChangedEvent,
             new SizeChangedEventHandler((sender, _) => Sync(sender)), handledEventsToo: true);
+        // The same moment places each dialog on its owner's monitor, and later size changes keep it there.
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.SizeChangedEvent,
+            new SizeChangedEventHandler(DialogPlacement.OnSizeChanged), handledEventsToo: true);
     }
 
     /// <summary>Record the mode and bring every open window's title bar to it.</summary>

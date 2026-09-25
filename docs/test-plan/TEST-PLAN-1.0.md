@@ -1010,6 +1010,17 @@ To see the crash notice without a real crash, start Markdown Midget from a Power
 - **Expected:** In step 1 Explorer opens on `%TEMP%\mdm-test-copies` in its own window, and Markdown Midget and the notice are unaffected; the letters open nothing. In step 2 the guide opens in your default browser from `%LocalAppData%\MarkdownMidget\file-dialog-crashes.html`: what a shell extension is, what we can and can't tell, how to read the clues, finding the culprit with ShellExView, program settings, updates, switching back and reporting; under Telling us it describes the log and Open the log. In step 3 the notice is dark with light text, the count line dimmer but readable, and a dark title bar; the guide is dark in a dark browser and light in a light one. In step 4 the notice shows the clues as in step 1, except that a count of other add-ons says Copy details names them; then "The log couldn't be saved (…). Copy details copies what it would have held.", and **Copy details** stands where **Open the log** was. The pasted text is what the log would have held: its first line is the crash's date and time, and the next starts "Markdown Midget 1.0.0-…: Windows' file dialog closed unexpectedly". Once the folder is back, the logs from DLG-02 and steps 1 and 3 are still in it. In every step, on a screen too short for the whole notice, the clues scroll and the log line and buttons stay visible; when it all fits there is no scroll bar.
 - **Type:** Both. Automated: `PickerCrashCluesTests.ExplorerIsGivenTheFolderQuoted`, `PickerCrashCluesTests.TheGuideShipsSelfContainedAndFollowsDarkMode`, `PickerCrashCluesTests.TheGuideIsWrittenOnceAndRewrittenOnlyWhenItChanges`, `PickerCrashCluesTests.AnUnwritableLogsFolderFallsBackToCopyDetailsWithAMessage`, `PickerCrashCluesTests.CopyDetailsCopiesExactlyWhatTheLogHolds`, `PickerCrashCluesTests.WithoutALogTheCountLineSendsYouToCopyDetails`, `PickerCrashCluesTests.ALockedClipboardIsANoteNotACrash`. Human: Explorer, the browser, the clipboard and how the notice looks, on a short screen too, which need the app.
 
+#### DLG-04 Settings opens fully on screen at every scale
+- **Change:** Fixed: "Settings and every other dialog now open fully on screen" · **Documents:** `br-forms.md` · **Settings:** a 1920×1080 screen; Windows Settings ▸ System ▸ Display ▸ Scale at 100%, 125% and 150%, changed only with every Markdown Midget window closed and put back in step 5; a second monitor above or to the left of the main one, if you have one
+1. Set Scale to 100%. Open `br-forms.md`, maximise the window and open **Edit ▸ Settings…**. Drag the dialog by its title bar and drop it. If its sections scroll, scroll to the bottom; then click **OK**.
+2. Close the window, set Scale to 125%, and repeat step 1. Then do the same at 150%.
+3. Still at 150%, with the window maximised, open **Edit ▸ Find…**, **Insert ▸ Table…** and **Help ▸ About Markdown Midget** one at a time, drag each by its title bar and close it.
+4. If you have a second monitor above or to the left of the main one, move the window onto it, maximise it there and repeat step 1. If not, write N/A for this step in the note.
+5. Close every window and set Scale back to what it was.
+- **Expected:** Every dialog opens with its whole title bar on the screen the window is on, below the top edge, and drags normally. At 100% Settings shows every section with no scroll bar, as in rc3. At 150%, and at any scale where it doesn't fit, it is as tall as the space above the taskbar: its sections scroll with the mouse wheel and the scroll bar, OK and Cancel stay in view below them, and OK closes it.
+- **Control:** on rc3 (build 1126), step 2 at 150% opens Settings with its title bar above the top of the screen. If it doesn't, this test can't fail; say so in the note.
+- **Type:** Both. Automated: `DialogPlacementTests.FitCentresOnTheOwnerShiftsInsideAndTheTopLeftWins`, `DialogPlacementTests.AMinimisedOwnerCentresTheDialogInTheWorkArea`, `DialogPlacementTests.EveryDialogOpensInsideItsOwnersWorkAreaAndNoBiggerThanIt`, `DialogPlacementTests.ADialogThatFitsIsCentredOnItsOwner`, `DialogPlacementTests.SettingsScrollsItsSectionsAndKeepsOkAndCancelInView`, `DialogPlacementTests.ADialogThatGrowsAfterItOpensIsPulledBackInside`, `DialogPlacementTests.AUserResizeAndAWindowWithoutAWpfOwnerAreLeftAlone`, `DialogPlacementTests.TheRealWorkAreaLookupAnswersForAWindow`. Human: real screens, display scaling and dragging a title bar, which need the app; the tests place windows in a stand-in work area off screen.
+
 ## 4. Run log
 
 For each build, copy the empty template below and paste it above the template. Fill in the heading, then record a result for every test. Automated and the automated half of Both are Claude's; developers record the rest. For a Both test, write both parts in the note, for example `auto PASS; human PASS`.
@@ -1889,6 +1900,7 @@ Automated items only, run by Claude on 2026-09-24 in `C:\code\MarkdownMidget\.cl
 | DLG-01 | | | |
 | DLG-02 | | | |
 | DLG-03 | | | |
+| DLG-04 | | | |
 
 ## 5. Known limitations not being fixed for 1.0
 

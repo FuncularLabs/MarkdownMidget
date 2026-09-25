@@ -12,7 +12,15 @@
             <Setter Property="Margin" Value="24,2,0,0" />
         </Style>
     </Window.Resources>
-    <StackPanel Margin="22,18,22,16" Width="420">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+    <!-- On a screen too short for every section (DialogPlacement caps the height at the work
+         area) the sections scroll and OK and Cancel stay in view below them. -->
+    <ScrollViewer x:Name="Sections" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="22,18,22,0" Width="420">
 
         <TextBlock Text="Startup" FontWeight="SemiBold" Margin="0,0,0,6" />
         <RadioButton x:Name="StartBlankRadio" GroupName="Startup"
@@ -68,10 +76,12 @@
                    Text="One-way copy from CUSTOM.DIC into Markdown Midget's own dictionary. Word's file is only read — never changed." />
         <TextBlock x:Name="ImportResult" Style="{StaticResource Caption}" Margin="0,4,0,0"
                    Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextAccent}}" Visibility="Collapsed" />
+    </StackPanel>
+    </ScrollViewer>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="22,18,22,16">
             <Button Content="Cancel" IsCancel="True" Padding="16,3" Margin="0,0,8,0" />
             <Button x:Name="OkBtn" Content="OK" IsDefault="True" Padding="20,3" Click="Ok_Click" />
         </StackPanel>
-    </StackPanel>
+    </Grid>
 </Window>
