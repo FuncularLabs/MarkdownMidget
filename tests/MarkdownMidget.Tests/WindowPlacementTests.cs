@@ -205,4 +205,14 @@ public class WindowPlacementTests
     public void NaNBounds_FallBackToTheDefault()
         => Assert.Null(WindowPlacement.Sanitize(
             new Rect(double.NaN, 0, 1120, 720), OneScreen, Min));
+
+    [Fact]
+    public void ASavedPlacementTakesTheUntouchedSanitizePath()
+    {
+        var fittedDefault = new Rect(120, 0, 1680, 1008);   // what the first launch would use
+        foreach (var saved in new Rect[] { new(100, 80, 1120, 720), new(0, 0, 3000, 2000), new(-1500, 100, 1120, 720) })
+            Assert.Equal(WindowPlacement.Sanitize(saved, OneScreen, Min), WindowPlacement.Startup(saved, OneScreen, Min, fittedDefault));
+        Assert.Equal(fittedDefault, WindowPlacement.Startup(null, OneScreen, Min, fittedDefault));             // nothing saved
+        Assert.Equal(fittedDefault, WindowPlacement.Startup(new Rect(0, 0, 10, 10), OneScreen, Min, fittedDefault));   // garbage
+    }
 }

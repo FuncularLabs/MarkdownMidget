@@ -39,6 +39,16 @@ internal static class DialogPlacement
         return (new Point(Math.Floor(x), Math.Floor(y)), new Size(work.Width / scale.DpiScaleX, work.Height / scale.DpiScaleY));
     }
 
+    /// <summary>A window opened with nothing saved (the main window's first launch, Help): its default
+    /// <paramref name="size"/> shrunk to <paramref name="work"/> but not below <paramref name="min"/> (both DIPs),
+    /// centred there by <see cref="Fit"/>; the top-left wins when even the minimum doesn't fit. Physical pixels.</summary>
+    internal static Rect FitDefault(Size size, Size min, Rect work, DpiScale scale)
+    {
+        var max = Fit(null, size, work, scale).MaxSize;
+        var fitted = new Size(Math.Max(Math.Min(size.Width, max.Width), min.Width), Math.Max(Math.Min(size.Height, max.Height), min.Height));
+        return new Rect(Fit(null, fitted, work, scale).Position, new Size(Math.Round(fitted.Width * scale.DpiScaleX), Math.Round(fitted.Height * scale.DpiScaleY)));
+    }
+
     /// <summary>
     /// The first layout (handle made, not yet visible) places the dialog on its owner's monitor;
     /// a later size change made by its content (SizeToContent) keeps it inside the monitor it is on.

@@ -10,10 +10,11 @@ using Xunit;
 namespace MarkdownMidget.Tests;
 
 /// <summary>
-/// Every dialog opens with its whole title bar in its owner's work area and no bigger than it.
-/// Fit is the arithmetic, in physical pixels. The rest shows Settings and stand-in windows, not
-/// activated, owned by a window far off screen, with the work area replaced by one that is off
-/// screen too, so nothing is drawn where a person could see it. Shows windows: WpfSta collection.
+/// Every dialog opens with its whole title bar in its owner's work area and no bigger than it, and the
+/// main window's first launch fits its default size. Fit and FitDefault are the arithmetic, in physical
+/// pixels. The rest shows Settings and stand-in windows owned by a window far off screen, against a
+/// stand-in work area that is off screen too: nothing is drawn where a person could see it, nothing is
+/// activated or put in the taskbar, and every window is closed. Shows windows: WpfSta collection.
 /// </summary>
 [Collection("WpfSta")]
 public class DialogPlacementTests
@@ -43,39 +44,61 @@ public class DialogPlacementTests
         Assert.Equal((new Point(760, 366), new Size(1920, 1032)),
             DialogPlacement.Fit(null, new Size(400, 300), new Rect(0, 0, 1920, 1032), new DpiScale(1, 1)));
 
+    /// <summary>MainWindow's default 1120 x 720 DIP and minimum 520 x 360, placed in <paramref name="work"/>.</summary>
+    private static Rect FirstLaunch(Rect work, double scale) =>
+        DialogPlacement.FitDefault(new Size(1120, 720), new Size(520, 360), work, new DpiScale(scale, scale));
+
+    [Fact]   // 1008 px above a 72 px taskbar is 672 DIP: the window becomes 1120 x 672 DIP, flush with the top
+    public void FirstLaunchOn1080pAt150PercentShrinksToFitWithTheTitleBarOnScreen() =>
+        Assert.Equal(new Rect(120, 0, 1680, 1008), FirstLaunch(new Rect(0, 0, 1920, 1008), 1.5));
+
+    [Fact]
+    public void FirstLaunchOnALargeWorkAreaKeepsThe1120By720DefaultCentred() =>
+        Assert.Equal(new Rect(2640, 336, 1120, 720), FirstLaunch(new Rect(1920, 0, 2560, 1392), 1));
+
+    [Fact]
+    public void FirstLaunchBelowTheMinimumSizeKeepsTheMinimumAndTheTopLeftWins() =>
+        Assert.Equal(new Rect(-800, 0, 520, 360), FirstLaunch(new Rect(-800, 0, 400, 300), 1));
+
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
+    private const uint MoveOnly = 0x0001 | 0x0004 | 0x0010;   // SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
 
-    private static Rect Bounds(Window w)
-    {
-        GetWindowRect(new WindowInteropHelper(w).Handle, out var r);
-        return new Rect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
-    }
+    private static IntPtr Handle(Window w) => new WindowInteropHelper(w).Handle;
 
-    /// <summary>The owner is 600 x 400 at (-20000, -20000); the work area is <paramref name="work"/>.</summary>
-    private static void WithOwner(Rect work, Action<Window> body) => ChromePaletteTests.RunSta(() =>
+    private static Rect Bounds(Window w) =>
+        GetWindowRect(Handle(w), out var r) ? new Rect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top) : Rect.Empty;
+
+    /// <summary>
+    /// Shows the window <paramref name="make"/> builds, owned by a 600 x 400 window at (-20000, -20000), with
+    /// <paramref name="work"/> standing in for the monitor's work area, then runs the body and closes both.
+    /// </summary>
+    private static void WithDialog(Rect work, Func<Window> make, Action<Window, Window> body) => ChromePaletteTests.RunSta(() =>
     {
         ChromeWindows.Register();   // what App.OnStartup calls: attaches the placement to every window
         var original = DialogPlacement.WorkAreaOf;
         DialogPlacement.WorkAreaOf = _ => work;
         var owner = new Window { Left = -20000, Top = -20000, Width = 600, Height = 400, ShowActivated = false, ShowInTaskbar = false };
-        try { owner.Show(); body(owner); }
-        finally { DialogPlacement.WorkAreaOf = original; owner.Close(); }
+        Window? dialog = null;
+        try
+        {
+            owner.Show();
+            var d = dialog = make();
+            (d.Owner, d.ShowActivated, d.ShowInTaskbar) = (owner, false, false);
+            d.PreviewGotKeyboardFocus += (_, e) => e.Handled = true;   // refused before WPF calls SetFocus: e.g. Settings' Loaded
+            // A placement that misses the stand-in work area is moved further off screen before the window
+            // becomes visible, so even a broken build draws nothing a person could see; the assertions still fail.
+            d.SourceInitialized += (_, _) => { if (!work.Contains(Bounds(d))) SetWindowPos(Handle(d), IntPtr.Zero, -25000, -25000, 0, 0, MoveOnly); };
+            d.Show();
+            d.UpdateLayout();
+            body(owner, d);
+        }
+        finally { dialog?.Close(); owner.Close(); DialogPlacement.WorkAreaOf = original; }
     });
 
-    private static Window Open(Window dialog, Window owner)
-    {
-        dialog.Owner = owner;
-        dialog.ShowActivated = false;
-        dialog.Show();
-        dialog.UpdateLayout();
-        return dialog;
-    }
-
-    // Only Settings of the XAML dialogs can be built here: the others name Icon="/Assets/…", which WPF looks up in
-    // the entry assembly (the test host) and won't let a test change; About, Register and Unregister also read the
-    // install folder, the registry or the network. The stand-ins are DefaultApp's notice and the picker's size.
+    // Of the XAML dialogs only Settings can be built here: the rest name Icon="/Assets/…", looked up in the test host (About,
+    // Register, Unregister also read the install folder, registry or network). Stand-ins: DefaultApp's notice, the picker's size.
     private static Window Make(string name) => name switch
     {
         "Settings" => new SettingsDialog(true, 10, true),
@@ -91,101 +114,76 @@ public class DialogPlacementTests
     public void EveryDialogOpensInsideItsOwnersWorkAreaAndNoBiggerThanIt(string name)
     {
         var work = new Rect(-20400, -20300, 1400, 420);   // shorter than Settings and the picker
-        WithOwner(work, owner =>
+        WithDialog(work, () => Make(name), (_, dialog) =>
         {
-            var dialog = Open(Make(name), owner);
-            try
-            {
-                Assert.True(work.Contains(Bounds(dialog)), $"{name} at {Bounds(dialog)}, work area {work}");
-                var dpi = VisualTreeHelper.GetDpi(dialog);
-                Assert.Equal(work.Width / dpi.DpiScaleX, dialog.MaxWidth, 3);
-                Assert.Equal(work.Height / dpi.DpiScaleY, dialog.MaxHeight, 3);
-            }
-            finally { dialog.Close(); }
+            Assert.True(work.Contains(Bounds(dialog)), $"{name} at {Bounds(dialog)}, work area {work}");
+            var dpi = VisualTreeHelper.GetDpi(dialog);
+            Assert.Equal(work.Width / dpi.DpiScaleX, dialog.MaxWidth, 3);
+            Assert.Equal(work.Height / dpi.DpiScaleY, dialog.MaxHeight, 3);
         });
     }
 
     [Fact]
-    public void ADialogThatFitsIsCentredOnItsOwner()
-    {
-        WithOwner(new Rect(-20400, -20400, 1600, 1300), owner =>   // its centre is not the owner's
+    public void ADialogThatFitsIsCentredOnItsOwner() =>
+        WithDialog(new Rect(-20400, -20400, 1600, 1300), () => Make("Settings"), (owner, dialog) =>   // work area centre is not the owner's
         {
-            var dialog = Open(Make("Settings"), owner);
-            try
-            {
-                var (d, o) = (Bounds(dialog), Bounds(owner));
-                Assert.InRange(d.X + d.Width / 2 - (o.X + o.Width / 2), -1, 1);
-                Assert.InRange(d.Y + d.Height / 2 - (o.Y + o.Height / 2), -1, 1);
-            }
-            finally { dialog.Close(); }
+            var (d, o) = (Bounds(dialog), Bounds(owner));
+            Assert.InRange(d.X + d.Width / 2 - (o.X + o.Width / 2), -1, 1);
+            Assert.InRange(d.Y + d.Height / 2 - (o.Y + o.Height / 2), -1, 1);
         });
-    }
 
     [Fact]
-    public void SettingsScrollsItsSectionsAndKeepsOkAndCancelInView()
-    {
-        WithOwner(new Rect(-20400, -20300, 1400, 420), owner =>
+    public void SettingsScrollsItsSectionsAndKeepsOkAndCancelInView() =>
+        WithDialog(new Rect(-20400, -20300, 1400, 420), () => Make("Settings"), (_, window) =>
         {
-            var dialog = (SettingsDialog)Open(Make("Settings"), owner);
-            try
-            {
-                Assert.True(dialog.Sections.ScrollableHeight > 0, "the sections should scroll in a short work area");
-                Assert.False(dialog.Sections.IsAncestorOf(dialog.OkBtn), "OK must stay outside the scrolling part");
-                var client = (FrameworkElement)dialog.Content;
-                var ok = dialog.OkBtn.TransformToAncestor(client).TransformBounds(new Rect(dialog.OkBtn.RenderSize));
-                Assert.True(new Rect(client.RenderSize).Contains(ok), $"OK at {ok} in {client.RenderSize}");
-            }
-            finally { dialog.Close(); }
+            var dialog = (SettingsDialog)window;
+            Assert.True(dialog.Sections.ScrollableHeight > 0, "the sections should scroll in a short work area");
+            Assert.False(dialog.Sections.IsAncestorOf(dialog.OkBtn), "OK must stay outside the scrolling part");
+            var client = (FrameworkElement)dialog.Content;
+            var ok = dialog.OkBtn.TransformToAncestor(client).TransformBounds(new Rect(dialog.OkBtn.RenderSize));
+            Assert.True(new Rect(client.RenderSize).Contains(ok), $"OK at {ok} in {client.RenderSize}");
         });
-    }
 
     [Fact]
     public void ADialogThatGrowsAfterItOpensIsPulledBackInside()
     {
         var work = new Rect(-20400, -20300, 1400, 600);
-        WithOwner(work, owner =>
+        StackPanel? panel = null;
+        WithDialog(work, () => new Window { SizeToContent = SizeToContent.WidthAndHeight,
+                                            Content = panel = new StackPanel { Width = 300, Children = { new Border { Height = 100 } } } }, (_, dialog) =>
         {
-            var panel = new StackPanel { Width = 300, Children = { new Border { Height = 100 } } };
-            var dialog = Open(new Window { SizeToContent = SizeToContent.WidthAndHeight, Content = panel }, owner);
-            try
-            {
-                var before = Bounds(dialog);
-                panel.Children.Add(new Border { Height = 400 });   // as a longer message or an expander would
-                dialog.UpdateLayout();
-                var after = Bounds(dialog);
-                Assert.True(after.Height >= before.Height + 400, $"grew from {before} to {after}");
-                Assert.True(work.Contains(after), $"at {after}, work area {work}");
-            }
-            finally { dialog.Close(); }
+            var before = Bounds(dialog);
+            panel!.Children.Add(new Border { Height = 400 });   // as a longer message or an expander would
+            dialog.UpdateLayout();
+            var after = Bounds(dialog);
+            Assert.True(after.Height >= before.Height + 400, $"grew from {before} to {after}");
+            Assert.True(work.Contains(after), $"at {after}, work area {work}");
         });
     }
 
     [Fact]
-    public void AUserResizeAndAWindowWithoutAWpfOwnerAreLeftAlone()
-    {
-        WithOwner(new Rect(-20400, -20300, 1400, 600), owner =>
+    public void AUserResizeAndAWindowWithoutAWpfOwnerAreLeftAlone() =>
+        WithDialog(new Rect(-20400, -20300, 1400, 600), () => new Window { Width = 300, Height = 200, ResizeMode = ResizeMode.CanResize }, (owner, dialog) =>
         {
             // The picker child's anchor is owned through its handle only, as MainWindow has no owner at all.
             var anchor = new Window { Left = -21000, Top = -21000, Width = 200, Height = 100, ShowActivated = false, ShowInTaskbar = false };
-            new WindowInteropHelper(anchor).Owner = new WindowInteropHelper(owner).Handle;
-            var dialog = Open(new Window { Width = 300, Height = 200, ResizeMode = ResizeMode.CanResize }, owner);
+            new WindowInteropHelper(anchor).Owner = Handle(owner);
             try
             {
                 anchor.Show();
                 Assert.Equal((-21000.0, -21000.0), (anchor.Left, anchor.Top));
-                SetWindowPos(new WindowInteropHelper(dialog).Handle, IntPtr.Zero, -21000, -21000, 0, 0, 0x0001 | 0x0004 | 0x0010);
+                SetWindowPos(Handle(dialog), IntPtr.Zero, -21000, -21000, 0, 0, MoveOnly);
                 dialog.Width = 320;   // a size the user dragged to, after it opened
                 dialog.UpdateLayout();
                 Assert.Equal((-21000.0, -21000.0), (Bounds(dialog).X, Bounds(dialog).Y));
             }
-            finally { anchor.Close(); dialog.Close(); }
+            finally { anchor.Close(); }
         });
-    }
 
     [Fact]
     public void TheRealWorkAreaLookupAnswersForAWindow() => ChromePaletteTests.RunSta(() =>
     {
-        var window = new Window();
+        var window = new Window();   // a handle only: never shown
         try { Assert.True(DialogPlacement.WorkAreaNative(new WindowInteropHelper(window).EnsureHandle()) is { Width: > 0, Height: > 0 }); }
         finally { window.Close(); }
     });

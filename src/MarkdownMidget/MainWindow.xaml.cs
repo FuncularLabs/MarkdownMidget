@@ -819,9 +819,14 @@ public partial class MainWindow : Window
     /// <summary>The rectangle we're trying to restore to, until it sticks.</summary>
     private Rect? _restoreTarget;
 
+    /// <summary>A help viewer shouldn't land on top of the editor: it takes neither the saved rectangle nor maximised.</summary>
+    private bool RestoreMaximized => _savedMaximized && !_isHelpWindow;
+
     /// <summary>
     /// Reapply the remembered size/position, having first checked it still lands on
-    /// a screen that exists — a monitor can be gone since last run.
+    /// a screen that exists — a monitor can be gone since last run. With nothing usable
+    /// saved, fit the default size to the screen WPF centred it on: CenterScreen doesn't
+    /// clamp, so 1120 x 720 put the title bar above the top of a short screen.
     ///
     /// Everything here is physical pixels: the saved rectangle, the monitor work
     /// areas, and the Win32 call that applies it. Mixing in WPF's device-independent
@@ -831,13 +836,14 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);   // the HWND exists from here on
-        if (_isHelpWindow) return;     // a help viewer shouldn't land on top of the editor
         try
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            _restoreTarget = WindowPlacement.Sanitize(_savedBounds, MonitorInfo.WorkAreas(), MinSaved);
-            if (_restoreTarget is { } b) NativeWindowPlacement.Apply(hwnd, b, _savedMaximized);
-            else if (_savedMaximized) WindowState = WindowState.Maximized;
+            Rect? fitted = RestoreMaximized || DialogPlacement.WorkAreaOf(hwnd) is not { } work ? null
+                : DialogPlacement.FitDefault(new Size(Width, Height), new Size(MinWidth, MinHeight), work, System.Windows.Media.VisualTreeHelper.GetDpi(this));
+            _restoreTarget = WindowPlacement.Startup(_isHelpWindow ? null : _savedBounds, MonitorInfo.WorkAreas(), MinSaved, fitted);
+            if (_restoreTarget is { } b) NativeWindowPlacement.Apply(hwnd, b, RestoreMaximized);
+            else if (RestoreMaximized) WindowState = WindowState.Maximized;
         }
         catch { /* the default placement is a fine outcome */ }
     }
@@ -871,7 +877,7 @@ public partial class MainWindow : Window
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             if (NativeWindowPlacement.TryGet(hwnd, out var now, out _) && NearlyEqual(now, b)) return;
-            NativeWindowPlacement.Apply(hwnd, b, _savedMaximized);
+            NativeWindowPlacement.Apply(hwnd, b, RestoreMaximized);
         }
         catch { /* where it landed is where it stays */ }
     }

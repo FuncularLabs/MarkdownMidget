@@ -81,6 +81,11 @@ internal static class WindowPlacement
         return Shrink(r, best, minSize);
     }
 
+    /// <summary>The main window's opening rectangle: a saved one exactly as <see cref="Sanitize"/> returns it,
+    /// else <paramref name="fittedDefault"/> (see DialogPlacement.FitDefault); null keeps WPF's placement.</summary>
+    internal static Rect? Startup(Rect? saved, IReadOnlyList<Rect> screens, Size minSize, Rect? fittedDefault) =>
+        Sanitize(saved, screens, minSize) ?? fittedDefault;
+
     /// <summary>Too big for its monitor: shrink to fit and pull fully inside.</summary>
     private static Rect Shrink(Rect r, Rect screen, Size minSize)
     {
