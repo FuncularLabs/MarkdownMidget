@@ -64,6 +64,10 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 ## Features
 
 - **WYSIWYG editing** with a one-key toggle to the raw **markdown source** (Ctrl+E).
+  Saving keeps untouched text as written (see above), YAML front matter included.
+- **Find & Replace** (Ctrl+F, Ctrl+H) in both views and four search modes, the
+  cursor's **line and column** in the status bar, **Go to Line** (Ctrl+G), and
+  **line numbers** in the margin (View ▸ Line Numbers).
 - Headings, **bold / italic / underline / strikethrough**, inline code, bulleted &
   numbered lists, block quotes, and horizontal rules.
 - **Tables** (GFM) — insert dialog plus a native right-click menu for
@@ -71,7 +75,8 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
   alternating rows.
 - **Pictures** embedded as data URIs (travel with the file), with an aspect-locked
   **Resize** dialog.
-- **Links** rendered like a browser, with the URL as a hover tooltip.
+- **Links** rendered like a browser, with the URL as a hover tooltip; Ctrl+click
+  opens a web link once you confirm, and right-click ▸ **Copy Link** copies it.
 - **Fenced code blocks** with syntax highlighting (C#, JavaScript, TypeScript,
   HTML, CSS).
 - **Formatting marks** toggle (¶ / ↵ / → / ·) and **spell check** (private dictionary,
@@ -80,21 +85,25 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
   by Joe Sparks (@joesparks on X), Dracula, GitHub Dark Dimmed, GitHub Light, Midget
   Solarized, Obsidiminutive, One Light, Solarized Light, and the original Default),
   plus your own: drop a CSS file in the themes folder and it appears in the menu.
-  Printing stays light whatever you pick.
+  Printing stays light whatever you pick. The app follows Windows **light and dark
+  mode** (or **View ▸ Mode**), with a theme for each and dark menus in dark mode.
 - **Document width** (Portrait / Landscape / Full, remembered between sessions) and
   a **zoom** indicator (Ctrl + mouse wheel).
 - **Recent files**, **drag-and-drop** (a dropped picture is inserted, a dropped
   markdown or text file opens, anything else is refused by name), **read-only**
-  mode, and a bundled Help
-  document and changelog (**Help ▸ What's New**, or click the mascot — it flags
-  unread entries with a small gold asterisk).
+  mode, and a bundled Help document and changelog (**Help ▸ What's New**, or click
+  the mascot — it flags unread entries with a small gold asterisk).
+- **A window per document**: a file opened while this window has one gets a new
+  window, a file already open elsewhere brings that window forward, and a document
+  over 512 KB opens with line numbers and spell check off, to stay quick.
 - **Secure Markdown** — password-protected encrypted documents (`.mdenc`,
   AES-256-GCM with an Argon2id-derived key) that edit exactly like any other;
   the decrypted text never touches disk, crash-protection copies included.
 - A **syntax-highlighted source view** that follows the theme — or runs a theme
   of its own (View ▸ Theme ▸ Same Theme for Both Views, off).
 - Windows' file dialogs run **in a separate process**, with a **built-in file
-  picker** standing by, so a faulty Explorer add-on can't take the editor down.
+  picker** standing by, so a faulty Explorer add-on can't take the editor down; if
+  one crashes, a notice says what it found and saves a log.
 - Ships as a **single `.exe`**.
 
 ## Requirements
