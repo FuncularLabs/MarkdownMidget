@@ -106,11 +106,10 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**1.0.0-rc4 — the fourth 1.0 release candidate; 0.10.0 is still the latest stable**, so
-the badge above and the entry marked **Latest** on the releases page both point at
-0.10.0 until 1.0.0. In daily use and signed on every release.
-Windows-only for now; the editor core is web-based, so a cross-platform shell
-(MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
+**Stable (1.0.x)**, in daily use and signed on every release: 1.0.0 is the latest
+release, and the badge above and the entry marked **Latest** on the releases page
+point at it. Windows-only for now; the editor core is web-based, so a cross-platform
+shell (MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
 deliberate limit written down in [HELP.md ▸ Known limits](HELP.md#known-limits);
 a real installer that registers in Add/Remove Programs is the headline of the
 release after it, and the portable exe will stay available either way.
@@ -187,9 +186,9 @@ the one it replaced:
 | Where | Looks like |
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0-rc4+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0-rc4+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.0-rc4+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.0+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -319,6 +318,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.0** — **The first stable 1.0 release**, rc4 with the prerelease flag dropped.
+  A save from the formatted view **keeps the text you didn't change**, Find has
+  **Replace**, the app **follows Windows light and dark mode** with four new dark
+  themes, and the status bar shows the **line and column**.
 - **v1.0.0-rc4** *(prerelease)* — **The fourth 1.0 release candidate.** **File ▸ Open**
   now always lists encrypted documents as their own type, *Secure Markdown*. If
   Windows' file dialog crashes, the notice now **saves what it found as a log**, and
