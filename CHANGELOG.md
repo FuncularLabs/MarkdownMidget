@@ -9,6 +9,87 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-02
+
+First stable 1.0 release — rc4's content with the prerelease flag dropped, after
+dogfooding. Everything new since 0.10.0:
+
+- **Saving from the formatted view now keeps the text you didn't change as you
+  wrote it.** A document saved with no edits comes back byte for byte. After an
+  edit, the blocks you changed are written in Markdown Midget's conventions (bullet
+  lists now take `-`, not `*`), as sometimes are blocks near them or, in a few cases,
+  the whole document; Help's *Markdown conventions* has the detail. A file's
+  line endings and UTF-8 byte-order mark are kept, and so are tight lists,
+  `snake_case_word`, YAML front matter and each table's layout.
+- **The Markdown source view (Ctrl+E) now shows the file as it is on disk**, so a
+  document edited and saved only there is written back as typed. Work recovered
+  after a crash comes back in the view you were writing in, and a file another
+  program rewrites with the same text no longer counts as changed.
+- **Find now has Replace**: **Edit ▸ Replace…** or Ctrl+H, in both views and all
+  four search modes. Find and Replace start with the text you selected on one line,
+  Replace All is one undo step, and only a selection over more than one line limits
+  it. A regular expression has to mean the same in both views, or Find refuses it.
+- **The status bar now shows the cursor's line and column**, **Edit ▸ Go to Line…**
+  (Ctrl+G) jumps to a line, and **View ▸ Line Numbers** numbers either view's
+  margin. A document over 512 KB opens with line numbers and spell check off, and
+  spell check, typing and opening are faster on long documents.
+- **File ▸ Open, Open Recent and a dropped markdown or text file now open in a new
+  window** when this window has a document, and a file already open in another
+  window brings that window forward instead of opening a second copy. File ▸ Open
+  now always offers encrypted documents as their own type, *Secure Markdown*.
+- **A picture now goes in however it arrives**: dropped on either view as a file, or
+  pasted into the source view, it is embedded as **Insert ▸ Picture…** embeds it,
+  up to 64 MB. A dropped file that isn't a picture, markdown or `.txt` is refused
+  by name, leaving your document alone; other text files open with **File ▸ Open**.
+- **Ctrl+click now opens a web link in your browser**, after a prompt that shows the
+  address, and a plain click does in a read-only window such as Help. A `#link`
+  jumps to its heading, and right-click ▸ **Copy Link** copies the address.
+- **Markdown Midget now follows Windows light and dark mode**: in dark mode its
+  menus, toolbar, dialogs and title bar turn dark, and the document shows the theme
+  you picked for that mode; **View ▸ Mode** can keep it light or dark instead. Until
+  you pick, light mode uses Midget Solarized and dark mode Obsidiminutive. The theme
+  you used before stays for the mode it suits; if that was Default, pick
+  **View ▸ Theme ▸ Default** to have it back.
+- **Four new dark themes**: **Obsidiminutive**, after the Obsidian style in
+  Notepad++; **Red Sparks** and **Red Sparks 2X**, a palette designed by Joe Sparks
+  (@joesparks on X) for reading at night, every colour it sets for the screen pure
+  red, 2X at twice the text size; and **Amber Phosphor**, a second palette for
+  reading at night from Joe Sparks (@joesparks on X). Dark themes now print dark
+  headings and links.
+- **Your own theme can now set the text size**: `--mdm-font-size` is the one size
+  the document's text derives from, on screen and on paper, and most diagrams follow
+  it; `--mdm-list-marker`, `--mdm-code-fg` and `--mdm-strong` colour list markers,
+  inline code and bold. All four are optional. A theme that scaled the page with
+  `html { font-size }` no longer changes the text size: set `--mdm-font-size`.
+- **Formatting marks (¶) now show in the Markdown source view too**: ¶ at the end of
+  each line, → for tabs, and · for the spaces that change what Markdown does.
+- **The toolbar now has a button for each view**, formatted and Markdown source, in
+  one faint box, and a greyed-out button's tooltip says when it's available.
+- **Updating or registering now leaves your `.md` default alone**, and
+  **File ▸ Windows Integration ▸ Make Markdown Midget the default…** opens Windows
+  Settings where you choose it. After an update, the installed copy tells you once
+  if Windows doesn't open `.md` files with it.
+- **Cancel in Windows' file dialog now just closes it.** Before, it was taken for a
+  crash and switched you to the built-in file picker for good; to go back, clear
+  **Edit ▸ Settings ▸ Always use the built-in file picker**. If the dialog really
+  crashes, the notice now says what it found and saves it as a log you can open.
+- **Settings and every other dialog, Help, and the main window on its first start
+  now open fully on screen**, even on a short screen at high display scaling.
+- **Help ▸ View Help now has a *Known limits* section**: what the app deliberately
+  doesn't do, and what to do instead.
+- **Fixed:** an inline `<br>` is now kept when a document opens, where 0.10.0
+  deleted it; a document ending in a list, table or code block is no longer marked
+  modified when you click in it; Alt+F4 closes a window with no document open;
+  **Save My Version As…** encrypts a file you name `.mdenc`; and toolbar tooltips
+  open below an enlarged mouse pointer.
+
+> **Updating from 0.10.0:** the update is done by 0.10.0's own updater, so it may
+> switch `.md` files to another app one last time. If it does, 1.0.0 says so once
+> and offers **Make it the default…**; Help, *If .md files stopped opening in
+> Markdown Midget after an update*, shows how.
+
+The full detail is in the notes for 1.0.0-beta1 to 1.0.0-rc4.
+
 ## [1.0.0-rc4] - 2026-09-25
 
 The fourth 1.0 release candidate: 1.0.0-rc3 plus the changes below. File ▸ Open now always offers encrypted documents as
@@ -1362,7 +1443,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.0-rc4...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0
 [1.0.0-rc4]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc4
 [1.0.0-rc3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc3
 [1.0.0-rc2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc2
