@@ -204,7 +204,8 @@
      in the theme's screen colour: Amber Phosphor's selectors did, at 1.61:1. GitHub's
      light palette, each at 4.5:1 or more on the block's #f6f8fa; keywords and properties
      take the darker red and green GitHub's palette now uses, as #d73a49 and #22863a
-     measured 4.30 and 4.35. theme-parity.test.mjs reads the kinds out of base.css. */
+     measured 4.30 and 4.35. theme-parity.test.mjs reads the kinds out of every layer of the
+     built bundle but this one, and checks that each kind base.css names is among them. */
   .mdm-prosemirror .token.comment,
   .mdm-prosemirror .token.prolog,
   .mdm-prosemirror .token.doctype,

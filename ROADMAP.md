@@ -467,13 +467,14 @@ the last of the usability gaps raised in the 0.6.x review.
 - ~~**Print should pin every code-token colour, so no dark theme's code prints in its
   screen colours.**~~ **Done 2026-10-08 (1.0.1-beta1)**: `print.css` gives every kind of
   token `base.css` colours from the theme a print colour, each at 4.5:1 or more on the
-  printed code block's #f6f8fa, and theme-parity reads the kinds out of `base.css`, so
-  a new one without a print colour fails. The keyword and property colours moved to
-  darker GitHub ones on the way, as #d73a49 and #22863a measured 4.30 and 4.35. Was:
-  twelve kinds (variable, regex, symbol, selector, url, important, inserted, deleted,
-  doctype, prolog, cdata, entity) kept the theme's colour; Amber Phosphor's CSS
-  selectors printed in #B0D400, 1.61:1 on the code block. Raised 2026-09-24 in the
-  1.0.0-rc3 review.
+  printed code block's #f6f8fa. theme-parity reads the kinds out of every layer of the
+  built bundle except print's, and checks that each kind `base.css` names is among them,
+  so a new one without a print colour fails, whichever layer colours it. The keyword
+  and property colours moved to darker GitHub ones on the way, as #d73a49 and #22863a
+  measured 4.30 and 4.35. Was: twelve kinds (variable, regex, symbol, selector, url,
+  important, inserted, deleted, doctype, prolog, cdata, entity) kept the theme's
+  colour; Amber Phosphor's CSS selectors printed in #B0D400, 1.61:1 on the code block.
+  Raised 2026-09-24 in the 1.0.0-rc3 review.
 
 - ~~**Toolbar tooltips should clear an enlarged mouse pointer.**~~ **Done 2026-09-16
   (1.0.0-rc3)**: when the pointer is larger than standard, every toolbar tooltip, the
