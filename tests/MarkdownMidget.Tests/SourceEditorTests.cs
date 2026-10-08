@@ -169,46 +169,66 @@ public class SourceEditorTests
 
     /// <summary>The left quarter of the character at <paramref name="offset"/>, in the
     /// editor's own coordinates, as Mouse.GetPosition(SourceBox) gives the spell menu a
-    /// pointer.</summary>
-    private static Point PointOver(SourceEditor ed, int offset)
+    /// pointer; at the control's <paramref name="y"/> instead, when one is given.</summary>
+    private static Point PointOver(SourceEditor ed, int offset, double? y = null)
     {
         var tv = ed.TextArea.TextView;
         var at = tv.GetVisualPosition(new TextViewPosition(ed.Document.GetLocation(offset)), VisualYPosition.LineMiddle) - tv.ScrollOffset;
-        return tv.TranslatePoint(new Point(at.X + tv.WideSpaceWidth / 4, at.Y), ed);
+        var point = tv.TranslatePoint(new Point(at.X + tv.WideSpaceWidth / 4, at.Y), ed);
+        return new Point(point.X, y ?? point.Y);
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(12)]   // MainWindow.xaml's SourceBox: the text view starts 12 in from the control's edges
-    public void HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint(double padding)
+    [InlineData(0, false, 14, null)]
+    [InlineData(12, false, 14, null)]   // MainWindow.xaml's SourceBox: the text view starts 12 in from the control's edges
+    [InlineData(12, true, 14, null)]    // View ▸ Line Numbers: the margin moves the text view further right
+    [InlineData(12, false, 3, 5.0)]     // in the top padding, above the "l": the first line is nearest, not the end
+    public void HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint(double padding, bool lineNumbers, int offset, double? y)
     {
-        // The left quarter of the "c" in "second", on the second line: offset 14, inside
-        // the line, so the snap to the end (23) or a neighbour (13, 15) fails it. The
-        // point is in control coordinates, as the spell menu passes it.
+        // The left quarter of a character inside a line, so the snap to the end (23) or a
+        // neighbour fails it: the "c" in "second" (14), or the "l" at 3 from the padding
+        // above it. The point is in control coordinates, as the spell menu passes it.
         var (inset, idx) = On(ed =>
         {
-            ed.Padding = new Thickness(padding);
+            (ed.Padding, ed.ShowLineNumbers) = (new Thickness(padding), lineNumbers);
             ed.UpdateLayout();
-            return (ed.TextArea.TextView.TranslatePoint(new Point(), ed), ed.GetCharacterIndexFromPoint(PointOver(ed, 14), snapToText: true));
+            return (ed.TextArea.TextView.TranslatePoint(new Point(), ed), ed.GetCharacterIndexFromPoint(PointOver(ed, offset, y), snapToText: true));
         }, "hello world\nsecond line", laidOut: true);
-        Assert.Equal(new Point(padding, padding), inset);   // the padding does move the text view
-        Assert.Equal(14, idx);
+        Assert.Equal(padding, inset.Y);   // the padding and the margin do move the text view
+        Assert.True(lineNumbers ? inset.X > padding : inset.X == padding, $"the text view is at {inset}");
+        Assert.Equal(offset, idx);
     }
 
-    [Fact]   // SourceBox_ContextMenuOpening's lookup: the pointer's index, then the engine's range there
-    public void ARightClickOnASquiggledWordInThePaddedSourceViewFindsThatWord()
+    [Theory]   // SourceBox_ContextMenuOpening's lookup: the pointer's index, then the engine's range there
+    [InlineData(10, null, 9, 3)]   // on the "e" of "teh": read without the padding, a line lower and 1.5 characters right, in "wrod"
+    [InlineData(1, 5.0, 0, 4)]     // in the top padding above "helo": not the snap to the end, where "wrod" ends
+    public void ARightClickOnASquiggledWordInThePaddedSourceViewFindsThatWord(int offset, double? y, int start, int length)
     {
-        // The pointer is on the "e" of "teh". Read without the padding, it lands about a
-        // line lower and a character and a half to the right, inside "wrod".
         var hit = On(ed =>
         {
             ed.Padding = new Thickness(12);   // MainWindow.xaml's SourceBox
             ed.UpdateLayout();
             var squiggles = new SquiggleRenderer(ed);
-            squiggles.SetRanges([(8, 3), (12, 3), (19, 4)]);   // "teh", "dgo" and "wrod", as the engine flags them
-            return SpellHitTest.RangeAt(squiggles.Ranges, ed.GetCharacterIndexFromPoint(PointOver(ed, 9), snapToText: true), ed.Text.Length);
-        }, "the cat\nteh dgo\nxx wrod", laidOut: true);
-        Assert.Equal((8, 3), hit);
+            squiggles.SetRanges([(0, 4), (9, 3), (13, 3), (20, 4)]);   // "helo", "teh", "dgo" and "wrod", as the engine flags them
+            return SpellHitTest.RangeAt(squiggles.Ranges, ed.GetCharacterIndexFromPoint(PointOver(ed, offset, y), snapToText: true), ed.Text.Length);
+        }, "helo cat\nteh dgo\nxx wrod", laidOut: true);
+        Assert.Equal((start, length), hit);
+    }
+
+    [Fact]   // scrolled: the padding above and below the text takes the nearest visible line, not line 0 or the end
+    public void APointInThePaddingOfAScrolledViewTakesTheNearestVisibleLine()
+    {
+        var (first, top, last, bottom) = On(ed =>
+        {
+            ed.Padding = new Thickness(12);
+            ed.UpdateLayout();
+            ed.ScrollToLine(150);
+            ed.UpdateLayout();
+            int LineAt(double y) => ed.GetLineIndexFromCharacterIndex(ed.GetCharacterIndexFromPoint(new Point(20, y), snapToText: true));
+            return (ed.GetFirstVisibleLineIndex(), LineAt(5), ed.GetLastVisibleLineIndex(), LineAt(ed.ActualHeight - 5));
+        }, string.Join("\n", System.Linq.Enumerable.Range(0, 300).Select(i => "word" + i)), laidOut: true);
+        Assert.True(first > 0, $"the view did not scroll: first visible line {first}");
+        Assert.Equal((first, last), (top, bottom));
     }
 
     // ===== 1.5 the TextBox property shims =====

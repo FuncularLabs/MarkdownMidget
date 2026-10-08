@@ -375,22 +375,25 @@ public class SourceEditor : TextEditor
     /// <summary>
     /// The character index nearest a point, in control coordinates.
     ///
-    /// TextBox with <paramref name="snapToText"/> true always returns an index; a
-    /// click in the empty area below the last line snaps to the end. AvalonEdit's
-    /// <see cref="TextEditor.GetPositionFromPoint"/> returns null there instead, and
-    /// the spell context menu relies on getting an index — so a null with snapping
-    /// requested falls back to the end offset. Without snapping, null passes through
-    /// as -1 (nothing was under the pointer).
+    /// TextBox with <paramref name="snapToText"/> true always returns an index, and the
+    /// spell context menu relies on getting one. So a point above or below the text
+    /// view, in the padding, moves onto its first or last visible line, and a point
+    /// below the document's last line, where AvalonEdit finds no line, snaps to the end.
+    /// Without snapping, a point where AvalonEdit finds no line returns -1 (nothing was
+    /// under the pointer).
     /// </summary>
     public int GetCharacterIndexFromPoint(Point point, bool snapToText)
     {
         var doc = Document;
         if (doc is null) return -1;
         // The text view sits inside the control, past its padding (12 in MainWindow), its
-        // border and any margin. GetPositionFromPoint translates the control's point into
-        // the text view's coordinates, then adds the scroll offset.
-        TextArea.TextView.EnsureVisualLines();
-        if (GetPositionFromPoint(point) is { } p) return doc.GetOffset(p.Location);
+        // border and any margin, such as the line numbers; the scroll offset then takes
+        // the point from the view into the document.
+        var tv = TextArea.TextView;
+        tv.EnsureVisualLines();
+        var at = TranslatePoint(point, tv);
+        if (snapToText) at.Y = Math.Clamp(at.Y, 0, Math.Max(0, tv.ActualHeight - 1));
+        if (tv.GetPosition(at + tv.ScrollOffset) is { } p) return doc.GetOffset(p.Location);
         return snapToText ? doc.TextLength : -1;
     }
 

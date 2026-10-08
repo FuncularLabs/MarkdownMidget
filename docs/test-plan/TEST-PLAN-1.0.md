@@ -567,8 +567,9 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Change:** Fixed: "Right-clicking a word in the Markdown source view now offers suggestions for that word" · **Documents:** `theme-tester.md` · **Settings:** View ▸ Spell Check on
 1. Press Ctrl+E. Right-click the middle of **recieve**, in the *143 kHz* section, then of **occassionally**, under *Handing Over*.
 2. Right-click the middle of **The** at the start of the line above **recieve**.
-- **Expected:** In step 1 each menu starts with suggestions for the word you clicked, such as *receive* and *occasionally*, then **Add to Dictionary** and **Ignore All**. In step 2 the menu has only **Cut**, **Copy**, **Paste** and **Select All**.
-- **Type:** Both. Automated: `SourceEditorTests.HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint` and `SourceEditorTests.ARightClickOnASquiggledWordInThePaddedSourceViewFindsThatWord`. Human: the real pointer and the WPF menu.
+3. Turn on **View ▸ Line Numbers ▸ Show Line Numbers** and repeat steps 1 and 2.
+- **Expected:** In step 1 each menu starts with suggestions for the word you clicked, such as *receive* and *occasionally*, then **Add to Dictionary** and **Ignore All**. In step 2 the menu has only **Cut**, **Copy**, **Paste** and **Select All**. Step 3 gives the same menus.
+- **Type:** Both. Automated: `SourceEditorTests.HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint`, `SourceEditorTests.ARightClickOnASquiggledWordInThePaddedSourceViewFindsThatWord` and `SourceEditorTests.APointInThePaddingOfAScrolledViewTakesTheNearestVisibleLine`. Human: the real pointer and the WPF menu.
 
 ### PERF — Opening performance
 

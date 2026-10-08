@@ -78,7 +78,7 @@ added to the test project (Rule 2); touched files target ≥85% line coverage.
 |---|---|---|---|
 | 1.1 | Line↔offset mapping is 0-based and round-trips at first line, last line, empty doc; out-of-range → -1 | `SourceEditorTests.LineAndOffsetRoundTrip`, `OutOfRangeMappingReturnsMinusOne` | Tests |
 | 1.2 | Visible-line indices are DOCUMENT lines, diverging from display rows under wrap | `SourceEditorTests.VisibleLineIndicesAreDocumentLines`, `WrapMakesOneLongLineSpanTheViewport` | Tests |
-| 1.3 | `GetCharacterIndexFromPoint` past the end of text returns the end offset with snap, -1 without | `SourceEditorTests.HitTestBelowTextFallsBackToEnd`, `HitTestOverTextReturnsAnOffsetInThatLine` | Tests |
+| 1.3 | `GetCharacterIndexFromPoint` past the end of text returns the end offset with snap, -1 without | `SourceEditorTests.HitTestBelowTextFallsBackToEnd`, `HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint` | Tests |
 | 1.4 | `CaretIndex`/`TextWrapping`/`CaretBrush` behave as the TextBox members they replace; `GetLineText`; `TextEdited` offsets | `SourceEditorTests.CaretIndexClampsAndRoundTrips`, `TextWrappingMapsToWordWrap`, `CaretBrushRoundTrips`, `GetLineTextReturnsTheLineWithoutTerminator`, `TextEditedReportsOffsetInsertionAndRemoval` | Tests |
 | 1.5 | Each `SourceFormat` op lands the caret where the old code did and is a single undo unit | `SourceFormatTests.*` | Tests |
 | 1.6 | Squiggle geometry: one underline per visible word-run, nothing off-screen, stale ranges clamped | `SquiggleRendererTests.*` | Tests |
