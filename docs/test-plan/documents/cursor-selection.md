@@ -20,4 +20,4 @@ const gpqy = "a string"; // a comment
 
 A picture to click:
 
-![a picture](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAAYCAIAAAC+8q7fAAAASUlEQVR4nO3QAQkAIADAMPNaxmpGsoXCHTzA2Zhr60Lj+cEngQbdCjToVqBBtwINuhVo0K1Ag24FGnQr0KBbgQbdCjToVqBBtzon4RZtGQaywwAAAABJRU5ErkJggg==)
+![a picture](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAAYCAIAAAC+8q7fAAAATklEQVR4nO3QQREAMAjAMPRPNS6yB42CXueFmN8BVzQaaTTSaKTRSKORRiONRhqNNBppNNJopNFIo5FGI41GGo00Gmk00mik0UijkUYjC87ZMo9jclSHAAAAAElFTkSuQmCC)

@@ -333,7 +333,8 @@ for each Document Width view** (Portrait / Landscape / Full):
 The print stylesheet automatically:
 
 - Uses a **white background and light code blocks** (paper-friendly).
-- Hides the page card shadow, formatting marks, and blockquote tint.
+- Hides the page card shadow, formatting marks, blockquote tint, and the outline
+  round a rule or picture you clicked.
 - Avoids page breaks inside tables, code blocks, and headings.
 - Prints **whatever view is current** — Markdown source prints as monospaced
   text; WYSIWYG prints the rendered document.
@@ -380,15 +381,15 @@ version*, under [Themes](#themes)), for the source view's own themes too.
 | Theme | |
 |---|---|
 | **Default** | Markdown Midget's original look |
-| **Amber Phosphor** | Dark, amber with no blue in any colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); the cursor, selected text and Find matches, and the outline round a clicked rule or picture are amber too, and only selected text in the Markdown source view stays blue |
+| **Amber Phosphor** | Dark, amber with no blue in any colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); the cursor, selected text and Find matches, and the outline round a clicked rule or picture are amber too; in the document only selected text in the Markdown source view stays blue, and the menus and dialogs follow Windows |
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
 | **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
 | **Obsidiminutive** | Dark — after Notepad++'s Obsidian, with bold you can read |
 | **One Light** | Light, cool and crisp |
-| **Red Sparks** | Dark, red only in every colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); the cursor, selected text and Find matches, and the outline round a clicked rule or picture are red too, and only selected text in the Markdown source view stays blue |
-| **Red Sparks 2X** | Red Sparks with the text twice the size; likewise only selected text in the Markdown source view stays blue |
+| **Red Sparks** | Dark, red only in every colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); the cursor, selected text and Find matches, and the outline round a clicked rule or picture are red too; in the document only selected text in the Markdown source view stays blue, and the menus and dialogs follow Windows |
+| **Red Sparks 2X** | Red Sparks with the text twice the size; likewise, in the document only selected text in the Markdown source view stays blue |
 | **Solarized Light** | Light, warm, low-glare |
 
 Switching is instant, applies to the source view as well as the formatted one, and

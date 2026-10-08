@@ -2,7 +2,7 @@
 
 For TEST-PLAN-1.0.md, area THM. Work on a copy.
 
-A paragraph with [a gappy, pygmy query link](https://example.com/gpqy) whose underline
+A paragraph with [a groggy, pygmy query link](https://example.com/gpqy) whose underline
 should pass under every tail.
 
 A [link with a mispeled word](https://example.com/spell) in it, and a mispeled word

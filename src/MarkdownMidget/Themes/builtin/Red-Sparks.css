@@ -8,7 +8,8 @@
  *  zero. Red is the least disruptive light to dark-adapted eyes and to your
  *  circadian rhythm, so this one is made for editing after dark, and that
  *  includes the cursor, the selection and a clicked picture's outline. Only
- *  selected text in the Markdown source view stays blue.
+ *  selected text in the Markdown source view stays blue in the document; the
+ *  menus and dialogs follow Windows.
  *
  *  It has the dimmest body text of any shipped palette, and does not clear WCAG
  *  AA for normal text: #DC0000 on the page is 3.96:1. (Solarized Light is the

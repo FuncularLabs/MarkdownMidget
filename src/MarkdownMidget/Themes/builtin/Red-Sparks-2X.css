@@ -14,7 +14,8 @@
  *
  *  Every colour it sets for the screen is #RR0000, the cursor, the selection
  *  and a clicked picture's outline included; only selected text in the
- *  Markdown source view stays blue.
+ *  Markdown source view stays blue in the document; the menus and dialogs
+ *  follow Windows.
  *
  *  This file is that one with --mdm-font-size at 32px instead of 16px, which is
  *  the whole of the difference between them — every other line is byte for byte

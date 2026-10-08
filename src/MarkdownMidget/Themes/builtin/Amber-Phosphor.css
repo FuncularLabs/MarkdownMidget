@@ -13,7 +13,8 @@
  *  is white, which on paper is no ink rather than a colour.
  *
  *  The cursor, the selection and a clicked picture's outline are amber too;
- *  only selected text in the Markdown source view stays blue.
+ *  only selected text in the Markdown source view stays blue in the document;
+ *  the menus and dialogs follow Windows.
  *
  *  Measured, WCAG contrast, on the grounds each colour can land on:
  *

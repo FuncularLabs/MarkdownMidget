@@ -195,9 +195,12 @@ body {
 }
 
 /* Never while ProseMirror hides the selection for a clicked node; the selection only when a
-   theme names both colours (theme-default.css says why). */
-.mdm-prosemirror:not(.ProseMirror-hideselection) {
-  caret-color: var(--mdm-caret);
+   theme names both colours, the cursor when it names one, so an inherited one still shows. */
+@container not style(--mdm-caret: auto) {
+  .mdm-prosemirror:not(.ProseMirror-hideselection),
+  .mdm-prosemirror:not(.ProseMirror-hideselection) * {
+    caret-color: var(--mdm-caret);
+  }
 }
 
 @container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) {

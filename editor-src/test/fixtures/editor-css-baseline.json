@@ -1230,6 +1230,18 @@
   "important": true
  },
  {
+  "where": "@media print > .mdm-prosemirror .ProseMirror-selectednode",
+  "prop": "outline",
+  "value": "none",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror li.ProseMirror-selectednode::after",
+  "prop": "display",
+  "value": "none",
+  "important": true
+ },
+ {
   "where": "@media print > .mdm-prosemirror [data-gap]::before, .mdm-prosemirror [data-line]::before",
   "prop": "display",
   "value": "none",
@@ -1512,7 +1524,7 @@
   "important": false
  },
  {
-  "where": ".mdm-prosemirror:not(.ProseMirror-hideselection)",
+  "where": "@container not style(--mdm-caret: auto) > .mdm-prosemirror:not(.ProseMirror-hideselection), .mdm-prosemirror:not(.ProseMirror-hideselection) *",
   "prop": "caret-color",
   "value": "auto",
   "important": false

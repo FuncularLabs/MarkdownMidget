@@ -1189,7 +1189,7 @@ test('the cursor, the selection and a clicked rule or picture take theme variabl
     return hits.map((d) => [d.where, d.prop, d.important]);
   };
   const guard = '.mdm-prosemirror:not(.ProseMirror-hideselection)';   // ProseMirror's hidden node selection stays hidden
-  assert.deepEqual(site('--mdm-caret'), [[guard, 'caret-color', false]]);
+  assert.deepEqual(site('--mdm-caret'), [[`@container not style(--mdm-caret: auto) > ${guard}, ${guard} *`, 'caret-color', false]]);
   const both = '@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none))';
   assert.deepEqual(site('--mdm-selection-bg'), [[`${both} > ${guard} ::selection`, 'background-color', false]]);
   assert.deepEqual(site('--mdm-selection-fg'), [[`${both} > ${guard} ::selection`, 'color', false]]);
@@ -1221,6 +1221,31 @@ test('the cursor, the selection and a clicked rule or picture take theme variabl
       assert.match(theme.get(v), /^#[0-9a-f]{6}$/, `${file} sets ${v}`);
       assert.equal(d.value, theme.get(v), `${file}: ${d.where} { ${d.prop} }`);
     }
+  }
+});
+
+test('a theme\'s own caret or selection rule still reaches the document until it names the variables', () => {
+  // A theme's `body { caret-color: red }` reached the text by inheritance before 1.0.1; our rules
+  // exist only under their style queries, evaluated here as the browser does, exactly.
+  const holds = (where, vars) => where.split(' > ').filter((p) => p.startsWith('@container')).every((at) => {
+    assert.equal(at.replace(/\(?(not )?style\(--[\w-]+: [^)]*\)\)?|\band\b/g, '').trim(), '@container', at);
+    return [...at.matchAll(/(not )?style\((--[\w-]+): ([^)]*)\)/g)].every(([, not, name, value]) => (vars.get(name) === value) !== !!not);
+  });
+  const ours = declarations(editorCss).filter((d) => !d.where.startsWith('@media print')
+    && (d.prop === 'caret-color' || d.where.includes('::selection')));
+  assert.equal(ours.length, 3);
+  const live = (theme) => ours.filter((d) => holds(d.where, themeVariables(theme))).map((d) => d.prop);
+  assert.deepEqual(live('body { caret-color: #ff0000 } ::selection { background: #ff0000 }'), []);
+  assert.deepEqual(live(':root { --mdm-selection-bg: #400000 }'), [], 'one selection colour alone');
+  assert.deepEqual(live(readTheme('Red-Sparks.css')).sort(), ['background-color', 'caret-color', 'color']);
+});
+
+test('a clicked rule or picture prints no frame, whatever the theme', () => {
+  // Before 1.0.1 its light blue outline printed; with a theme's colour it would print red or amber.
+  for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
+    const css = file ? readTheme(file) : '';
+    assert.equal(onPaper(css, 'outline', '.mdm-prosemirror .ProseMirror-selectednode'), 'none', file || 'Default');
+    assert.equal(onPaper(css, 'display', '.mdm-prosemirror li.ProseMirror-selectednode::after'), 'none', file || 'Default');
   }
 });
 

@@ -143,6 +143,15 @@
     display: none !important;
   }
 
+  /* A clicked rule or picture prints with no frame, in a theme's colour or the vendor's blue. */
+  .mdm-prosemirror .ProseMirror-selectednode {
+    outline: none !important;
+  }
+
+  .mdm-prosemirror li.ProseMirror-selectednode::after {
+    display: none !important;
+  }
+
   .mdm-prosemirror [data-line]::before,
   .mdm-prosemirror [data-gap]::before {
     display: none !important;

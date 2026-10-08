@@ -474,10 +474,10 @@ public class BuiltInThemeTests
             Blocks(Read(AmberPhosphor)));
     }
 
-    /// <summary>Every word in Amber Phosphor's values that is not a hex or rgb() colour, a
-    /// number or a string - each one a keyword the file really uses, and none of them a colour.
-    /// A name that is not here fails the test below rather than slipping past its blue check,
-    /// which reads hex and rgb() only: `blue`, `navy` or `hsl(220 ...)` would otherwise pass.</summary>
+    /// <summary>Every word in the night palettes' values that is not a hex or rgb() colour, a
+    /// number or a string - each one a keyword the files really use, and none of them a colour.
+    /// A name that is not here fails the tests below rather than slipping past their colour
+    /// checks, which read hex and rgb() only: `blue`, `navy` or `hsl(220 ...)` would otherwise pass.</summary>
     private static readonly string[] AmberKeywords = { "dark", "relative", "absolute", "multiply", "none" };
 
     [Fact]
@@ -487,11 +487,29 @@ public class BuiltInThemeTests
         // diagram overlay's included - multiplying by a colour with no blue takes the blue out
         // of whatever mermaid draws. The one exception is paper's: the printed row stripe is
         // white, which on paper is no ink rather than a colour. The selection, the cursor and a
-        // clicked picture's outline are its own since 1.0.1, so they are held to it too; the
-        // source view's selection is Windows' and not a theme's. Every declaration in the file is read, not just the variables,
-        // so a rule that grew a colour would be caught too - and every value has to be one this
-        // test can read, so a colour written some other way fails loudly instead of passing.
-        var bare = Regex.Replace(Read(AmberPhosphor), @"/\*.*?\*/", " ", RegexOptions.Singleline);
+        // clicked picture's outline are its own since 1.0.1, so they are held to it too.
+        Assert.Equal(Array.Empty<string>(), ScreenColours(AmberPhosphor)
+            .Where(c => Rgb(c.Value).B != 0).Select(c => $"{c.Name}: {c.Value}").ToArray());
+    }
+
+    [Theory]
+    [InlineData(RedSparks)]
+    [InlineData(RedSparks2X)]
+    public void TheRedSparksPairSetsNoColourButRed(string resource)
+    {
+        // The pair's promise, held the way Amber Phosphor's is: every colour either file sets for
+        // the screen is #RR0000, the overlay, the cursor, the selection and the outline included.
+        Assert.Equal(Array.Empty<string>(), ScreenColours(resource)
+            .Where(c => Rgb(c.Value) is not (_, 0, 0)).Select(c => $"{c.Name}: {c.Value}").ToArray());
+    }
+
+    /// <summary>Every colour a theme file states, in every declaration, rules included, except the
+    /// printed row stripe, which is white in a night palette (no ink rather than a colour). Every
+    /// value has to be one this can read, so a colour written some other way fails loudly.</summary>
+    private static (string Name, string Value)[] ScreenColours(string resource)
+    {
+        Assert.Equal("#ffffff", Variables(Read(resource))["--mdm-print-row-alt-bg"]);
+        var bare = Regex.Replace(Read(resource), @"/\*.*?\*/", " ", RegexOptions.Singleline);
         var declarations = Regex.Matches(bare, @"\{([^{}]*)\}")
             .SelectMany(block => block.Groups[1].Value.Split(';'))
             .Where(d => d.Contains(':'))
@@ -512,9 +530,7 @@ public class BuiltInThemeTests
             .ToArray();
         Assert.True(colours.Length >= 45, $"only {colours.Length} colours found: the premise failed");
         Assert.Contains(colours, c => c.Name == "background");     // the overlay's
-        Assert.Equal(Array.Empty<string>(),
-            colours.Where(c => Rgb(c.Value).B != 0).Select(c => $"{c.Name}: {c.Value}").ToArray());
-        Assert.Equal("#ffffff", Variables(Read(AmberPhosphor))["--mdm-print-row-alt-bg"]);
+        return colours;
     }
 
     // ===== Obsidiminutive, and bold with a colour of its own =====
