@@ -12,6 +12,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Navigation + address bar -->
@@ -44,15 +45,18 @@
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center"
                           VerticalAlignment="Stretch" Background="Transparent" />
 
+            <!-- Headers come from FilePickerModel.HeaderText. The widths fill the list at the default size. -->
             <ListView x:Name="FileList" Grid.Column="2"
+                      GridViewColumnHeader.Click="FileList_HeaderClick"
                       MouseDoubleClick="FileList_MouseDoubleClick"
                       SelectionChanged="FileList_SelectionChanged"
                       KeyDown="FileList_KeyDown" TextInput="FileList_TextInput">
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn Header="Name" Width="320" DisplayMemberBinding="{Binding Display}" />
-                        <GridViewColumn Header="Date modified" Width="140" DisplayMemberBinding="{Binding Modified}" />
-                        <GridViewColumn Header="Size" Width="90" DisplayMemberBinding="{Binding Size}" />
+                        <GridViewColumn x:Name="NameColumn" Width="250" DisplayMemberBinding="{Binding Display}" />
+                        <GridViewColumn x:Name="ModifiedColumn" Width="130" DisplayMemberBinding="{Binding Modified}" />
+                        <GridViewColumn x:Name="TypeColumn" Width="110" DisplayMemberBinding="{Binding Type}" />
+                        <GridViewColumn x:Name="SizeColumn" Width="70" DisplayMemberBinding="{Binding Size}" />
                     </GridView>
                 </ListView.View>
             </ListView>
@@ -90,5 +94,10 @@
                 <Button Content="Cancel" IsCancel="True" Width="86" />
             </StackPanel>
         </Grid>
+        <!-- Whose picker this is, and the way back: a setting changes only its own window, hence the restart.
+             Last, so a short window shrinks the list and then cuts this line, never the buttons. -->
+        <TextBlock Grid.Row="3" Margin="0,8,0,0" TextWrapping="Wrap"
+                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextSecondary}}"
+                   Text="Markdown Midget's own file picker. To use Windows' dialog again: Edit ▸ Settings ▸ File dialogs, then restart Markdown Midget." />
     </Grid>
 </Window>

@@ -875,15 +875,29 @@ copies the same text. Markdown Midget only looks: it never switches an add-on
 off itself. Cancel in Windows' dialog just closes it.
 
 The built-in picker has an address bar, shortcuts (Desktop, Documents,
-Downloads, drives, recent folders), a folder tree, a file list with folders
-first and then files by name, type-ahead, and New Folder plus overwrite
-confirmation when saving. It has no thumbnails, preview pane or right-click
-shell menus — those are the add-ons that crash, so leaving them out is what
-makes it safe.
+Downloads, drives, recent folders), a folder tree, a file list, type-ahead, and
+New Folder plus overwrite confirmation when saving. It has no thumbnails,
+preview pane or right-click shell menus — those are the add-ons that crash, so
+leaving them out is what makes it safe. A line under its buttons says it is
+Markdown Midget's own picker and how to switch back to Windows' dialog.
+
+The file list shows each item's name, date modified, type and size, and opens
+with folders first and then files by name. Click a column's header to sort by
+it, and click it again to reverse the order; an arrow on the header shows which
+column sorts and which way. **Date modified** starts with the newest. Folders
+stay above files whichever way you sort, and items that tie go by name.
+Type-ahead and the arrow keys follow the order on screen. The sort lasts until
+the picker closes. The type is *File folder* for a folder, and for a file the
+name Windows has registered for its extension, such as *Text Document*. Where
+Windows keeps that name inside a program file, which the picker doesn't load,
+or has none, the type is the extension in capitals, such as *MD File*; a file
+with no extension is *File*.
 
 Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
 file picker**, and turn it off there to go back to Windows' dialog once the cause
-is fixed.
+is fixed. The change applies to the window you make it in and to windows you
+open after it; a window that was already open keeps its picker until you close
+it, which is why the picker's own line says to restart Markdown Midget.
 
 **If something goes wrong:** unexpected errors are recorded in
 `%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll

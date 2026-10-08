@@ -22,8 +22,9 @@ namespace MarkdownMidget.Picker;
 ///
 /// The logic worth testing (filter parsing and matching, typed-path resolution,
 /// extension and retyping rules, sorting, type-ahead) lives in
-/// <see cref="FilePickerModel"/>; this class is the shell around it and the
-/// only part that touches the disk. The address bar is a plain editable path
+/// <see cref="FilePickerModel"/>, and the Type column's names in
+/// <see cref="FileTypeNames"/>; this class is the shell around them and the
+/// only part that touches the disk or the registry. The address bar is a plain editable path
 /// box — clickable breadcrumb segments were designed but not built.
 /// </summary>
 public partial class MidgetFilePicker : Window
@@ -35,12 +36,24 @@ public partial class MidgetFilePicker : Window
         public required string FullPath { get; init; }
         public required bool IsDirectory { get; init; }
         public string Display => IsDirectory ? "📁  " + Name : "📄  " + Name;
-        public string Modified { get; init; } = "";
-        public string Size { get; init; } = "";
+        public DateTime? ModifiedAt { get; init; }
+        public string Modified => ModifiedAt?.ToString("g") ?? "";
+        public long Bytes { get; init; } = -1;   // a folder, or a size that couldn't be read
+        public string Size => Bytes >= 0 ? FilePickerModel.FormatSize(Bytes) : "";
+        public string Type { get; init; } = "";
+        public PickerSortKey Key => new(IsDirectory, Name, ModifiedAt, Bytes, Type);
     }
 
     private readonly FilePickerRequest _request;
     private readonly IReadOnlyList<FilterGroup> _filters;
+    /// <summary>The Type column's names for this picker, from HKEY_CLASSES_ROOT, read only.</summary>
+    private readonly FileTypeNames _types = new((subKey, valueName) =>
+    {
+        using var key = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(subKey);
+        return key?.GetValue(valueName, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames);
+    });
+    private readonly GridViewColumn[] _sortColumns;   // in PickerColumn order
+    private PickerSort _sort = PickerSort.Default;     // this picker's only: the next one opens on names again
     private readonly List<string> _history = [];
     private int _historyIndex = -1;
     private string _currentDirectory = "";
@@ -71,6 +84,8 @@ public partial class MidgetFilePicker : Window
             _navigating = false;
         }
         FilterCombo.IsEnabled = FilterCombo.Items.Count > 1;
+        _sortColumns = [NameColumn, ModifiedColumn, TypeColumn, SizeColumn];
+        ShowSortHeaders();
 
         BuildPlaces();
         Loaded += (_, _) =>
@@ -230,7 +245,8 @@ public partial class MidgetFilePicker : Window
                     Name = Path.GetFileName(dir),
                     FullPath = dir,
                     IsDirectory = true,
-                    Modified = SafeWriteTime(dir),
+                    ModifiedAt = SafeWriteTime(dir),
+                    Type = FileTypeNames.Folder,
                 });
             }
             var filter = SelectedFilter;
@@ -245,8 +261,9 @@ public partial class MidgetFilePicker : Window
                     Name = name,
                     FullPath = file,
                     IsDirectory = false,
-                    Modified = SafeWriteTime(file),
-                    Size = length >= 0 ? FilePickerModel.FormatSize(length) : "",
+                    ModifiedAt = SafeWriteTime(file),
+                    Bytes = length,
+                    Type = _types.Of(name, isDirectory: false),
                 });
             }
         }
@@ -258,7 +275,7 @@ public partial class MidgetFilePicker : Window
             return false;
         }
 
-        entries.Sort((a, b) => FilePickerModel.CompareEntries(a.IsDirectory, a.Name, b.IsDirectory, b.Name));
+        entries.Sort((a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, _sort));
 
         _currentDirectory = target;   // committed only now, with a view to match
         // A successful listing clears the "nothing could be opened" verdict. That
@@ -285,9 +302,9 @@ public partial class MidgetFilePicker : Window
         return true;
     }
 
-    private static string SafeWriteTime(string path)
+    private static DateTime? SafeWriteTime(string path)
     {
-        try { return File.GetLastWriteTime(path).ToString("g"); } catch { return ""; }
+        try { return File.GetLastWriteTime(path); } catch { return null; }
     }
 
     private void UpdateNavButtons()
@@ -377,6 +394,31 @@ public partial class MidgetFilePicker : Window
     }
 
     // ===== list interaction =====
+
+    /// <summary>A header click sorts by that column, or turns it round. The list itself is
+    /// re-sorted, not a view over it, so type-ahead, the arrow keys, Enter and double-click
+    /// all go by the order on screen.</summary>
+    private void FileList_HeaderClick(object sender, RoutedEventArgs e)
+    {
+        var column = Array.IndexOf(_sortColumns, (e.OriginalSource as GridViewColumnHeader)?.Column);
+        if (column < 0) return;   // the blank header past the last column
+        _sort = _sort.Click((PickerColumn)column);
+        ShowSortHeaders();
+        if (FileList.ItemsSource is not List<Entry> entries) return;
+        var selected = FileList.SelectedItem;
+        entries.Sort((a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, _sort));
+        _navigating = true;       // the same row stays selected, and the name box keeps what was typed
+        FileList.Items.Refresh();
+        FileList.SelectedItem = selected;
+        _navigating = false;
+        if (selected is not null) FileList.ScrollIntoView(selected);
+    }
+
+    private void ShowSortHeaders()
+    {
+        for (var i = 0; i < _sortColumns.Length; i++)
+            _sortColumns[i].Header = FilePickerModel.HeaderText((PickerColumn)i, _sort);
+    }
 
     private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

@@ -23,6 +23,27 @@ internal sealed record FilterGroup(string Label, IReadOnlyList<string> Patterns)
     public override string ToString() => Label;
 }
 
+/// <summary>The file list's sortable columns, in the order the list shows them.</summary>
+internal enum PickerColumn { Name, Modified, Type, Size }
+
+/// <summary>How the file list is sorted: one column, one way. It lasts while one picker is
+/// open; nothing saves it, so the next picker opens on <see cref="Default"/>.</summary>
+internal readonly record struct PickerSort(PickerColumn Column, bool Descending)
+{
+    /// <summary>What every picker opens with: folders first, then names A to Z.</summary>
+    public static PickerSort Default => new(PickerColumn.Name, Descending: false);
+
+    /// <summary>A header click. The sorted column turns round; another column starts A to Z
+    /// or smallest first, except Date modified, which starts newest first: finding the file
+    /// just written is the usual reason to click it.</summary>
+    public PickerSort Click(PickerColumn column) =>
+        column == Column ? this with { Descending = !Descending } : new(column, column == PickerColumn.Modified);
+}
+
+/// <summary>What the file list sorts a row by. Modified is null when it couldn't be read;
+/// Bytes is -1 for a folder, and for a file whose size couldn't be read.</summary>
+internal readonly record struct PickerSortKey(bool IsDirectory, string Name, DateTime? Modified, long Bytes, string Type);
+
 /// <summary>
 /// The pure half of the built-in file picker: filter parsing and matching, path
 /// resolution, extension enforcement, sorting and size formatting. No file I/O
@@ -155,13 +176,32 @@ internal static class FilePickerModel
     }
 
     /// <summary>
-    /// Folders first, then names, both case-insensitive — Explorer's order, which
-    /// is what a user's eye expects to scan.
+    /// The list's order: folders before files whichever way it runs; then the sorted column,
+    /// sizes as numbers and dates as timestamps, never their displayed text; ties by name A to
+    /// Z ignoring case, then by exact spelling, so the order never depends on how the folder
+    /// listed them. <see cref="PickerSort.Default"/> is the order the picker always opened with.
     /// </summary>
-    public static int CompareEntries(bool aIsDirectory, string aName, bool bIsDirectory, string bName)
+    public static int CompareEntries(PickerSortKey a, PickerSortKey b, PickerSort sort)
     {
-        if (aIsDirectory != bIsDirectory) return aIsDirectory ? -1 : 1;
-        return string.Compare(aName, bName, StringComparison.OrdinalIgnoreCase);
+        if (a.IsDirectory != b.IsDirectory) return a.IsDirectory ? -1 : 1;
+        var byColumn = sort.Column switch
+        {
+            PickerColumn.Modified => Nullable.Compare(a.Modified, b.Modified),
+            PickerColumn.Size => a.Bytes.CompareTo(b.Bytes),
+            PickerColumn.Type => string.Compare(a.Type, b.Type, StringComparison.OrdinalIgnoreCase),
+            _ => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+        };
+        if (byColumn != 0) return sort.Descending ? -byColumn : byColumn;
+        var byName = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+        return byName != 0 ? byName : string.CompareOrdinal(a.Name, b.Name);
+    }
+
+    /// <summary>A column's header: its name, and on the sorted column ▲ (A to Z, oldest or
+    /// smallest first) or ▼. Text, so it takes the header's own colour in light and dark mode.</summary>
+    public static string HeaderText(PickerColumn column, PickerSort sort)
+    {
+        var name = column switch { PickerColumn.Modified => "Date modified", PickerColumn.Type => "Type", PickerColumn.Size => "Size", _ => "Name" };
+        return column != sort.Column ? name : name + (sort.Descending ? "  ▼" : "  ▲");
     }
 
     /// <summary>

@@ -164,9 +164,11 @@ public class FilePickerModelTests
     [Fact]
     public void SortsFoldersFirstThenByName()
     {
-        Assert.True(FilePickerModel.CompareEntries(true, "zeta", false, "alpha") < 0);
-        Assert.True(FilePickerModel.CompareEntries(false, "alpha", true, "zeta") > 0);
-        Assert.True(FilePickerModel.CompareEntries(false, "Apple", false, "banana") < 0);
+        static PickerSortKey Key(bool isDirectory, string name) => new(isDirectory, name, null, -1, "");
+        var sort = PickerSort.Default;
+        Assert.True(FilePickerModel.CompareEntries(Key(true, "zeta"), Key(false, "alpha"), sort) < 0);
+        Assert.True(FilePickerModel.CompareEntries(Key(false, "alpha"), Key(true, "zeta"), sort) > 0);
+        Assert.True(FilePickerModel.CompareEntries(Key(false, "Apple"), Key(false, "banana"), sort) < 0);
     }
 
     // ---- type-ahead ----
