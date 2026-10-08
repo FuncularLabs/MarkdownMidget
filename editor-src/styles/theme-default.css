@@ -114,6 +114,15 @@
   --mdm-mark: #c4c8d0;
   --mdm-cell-selected: rgba(86, 154, 212, 0.25);
   --mdm-resize-handle: #569ad4;
+
+  /* Cursor, selection (Find's match too) and clicked-node outline, formatted view only;
+     optional, each default what was always drawn. `none` is the browser's own highlight,
+     grey when inactive, which no ::selection value reproduces (Chromium, measured). */
+  --mdm-caret: auto;
+  --mdm-selection-bg: none;
+  --mdm-selection-fg: none;
+  --mdm-selected-outline: #88ccff;
+
   --mdm-mermaid-bg: #ffffff;
   --mdm-mermaid-border: #e2e4e8;
   --mdm-mermaid-error-bg: #fdf2f2;

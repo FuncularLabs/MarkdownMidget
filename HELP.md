@@ -380,15 +380,15 @@ version*, under [Themes](#themes)), for the source view's own themes too.
 | Theme | |
 |---|---|
 | **Default** | Markdown Midget's original look |
-| **Amber Phosphor** | Dark, amber with no blue in any colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); no theme variable reaches the highlight on selected text and Find matches or the outline round a clicked rule or picture, so they stay blue |
+| **Amber Phosphor** | Dark, amber with no blue in any colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); the cursor, selected text and Find matches, and the outline round a clicked rule or picture are amber too, and only selected text in the Markdown source view stays blue |
 | **Dracula** | Dark |
 | **GitHub Dark Dimmed** | Dark, deliberately lower-contrast than a true dark |
 | **GitHub Light** | Light — how a README looks on github.com |
 | **Midget Solarized** | Light, warm, higher-contrast — Solarized's hues, tuned for legibility |
 | **Obsidiminutive** | Dark — after Notepad++'s Obsidian, with bold you can read |
 | **One Light** | Light, cool and crisp |
-| **Red Sparks** | Dark, red only in every colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); no theme variable reaches the highlight on selected text and Find matches or the outline round a clicked rule or picture, so they stay blue |
-| **Red Sparks 2X** | Red Sparks with the text twice the size; the same highlight and outline stay blue |
+| **Red Sparks** | Dark, red only in every colour it sets for the screen — for reading at night, designed by Joe Sparks (@joesparks on X); the cursor, selected text and Find matches, and the outline round a clicked rule or picture are red too, and only selected text in the Markdown source view stays blue |
+| **Red Sparks 2X** | Red Sparks with the text twice the size; likewise only selected text in the Markdown source view stays blue |
 | **Solarized Light** | Light, warm, low-glare |
 
 Switching is instant, applies to the source view as well as the formatted one, and
@@ -460,7 +460,7 @@ Two folders, and the difference matters:
 - **`themes\custom\`** is yours. Nothing there is ever overwritten. A custom file
   with the same name as a built-in wins, and the menu marks it.
 
-A theme mostly just sets variables — `--mdm-page-bg`, `--mdm-text` and 49 more, all
+A theme mostly just sets variables — `--mdm-page-bg`, `--mdm-text` and 53 more, all
 listed in the sample. You can write ordinary CSS rules too, but you
 can't switch off the app's own furniture — spelling squiggles, formatting marks and
 the table resize handle survive whatever a theme says about them.
@@ -501,6 +501,15 @@ the page width, a small one stretched to fill it, so most grow less than the tex
 them: a drawing that gets wider with its text is scaled back down, and at double size a
 flowchart's labels come out about 1.4 times as large. Timelines, kanban boards and
 architecture diagrams keep their width, so theirs come out twice as large.
+
+**The cursor and the selection.** In the formatted view `--mdm-caret` colours the text
+cursor, `--mdm-selection-bg` and `--mdm-selection-fg` colour selected text and Find's
+current match, and `--mdm-selected-outline` colours the outline round a rule or picture
+you click. Leave them out and you get what the editor always drew: a cursor the colour of
+the text it sits in, the browser's blue selection (grey while the window is inactive) and
+a light blue outline. A selection colour you name shows whether the window is active or
+not. Name both selection colours or neither: with only one, the selection stays the
+browser's. The Markdown source view keeps its own cursor and selection.
 
 **Diagrams.** No colour variable of ours reaches inside a mermaid diagram: mermaid draws
 its own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,

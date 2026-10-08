@@ -288,6 +288,9 @@ test('each site reads its own variable, not a twin that matches today', () => {
     // Default, so swapping them is invisible to every resolved-value check here.
     ['li::marker', 'color', '--mdm-list-marker'],
     ['.mdm-prosemirror code {', 'color', '--mdm-code-fg'],
+    // The selection pair are both `none` in Default, so only these say which is the text.
+    ['::selection {', 'background-color', '--mdm-selection-bg'],
+    ['::selection {', 'color', '--mdm-selection-fg'],
   ];
 
   for (const [marker, prop, expected] of wiring) {
@@ -1163,6 +1166,61 @@ test('a link\'s underline sits a quarter of the link\'s size below the text, on 
     .map((d) => [d.where, d.value, d.important]), [['.mdm-prosemirror a', '0.25em', false]]);
   assert.equal(declarations(read('styles', 'structure.css'))
     .filter((d) => d.prop === 'text-underline-offset').length, 1, 'not in structure.css');
+});
+
+test('the cursor, the selection and a clicked rule or picture take theme variables whose defaults draw what the editor drew', () => {
+  // Defaults: `auto` is the browser's own caret, the text's colour; the outline is the vendor's
+  // own, read out of the bundle. The selection has no CSS value that draws the browser's own
+  // highlight - any ::selection rule, even an unset one, replaced it (unset: no highlight at
+  // all) and lost its grey in an inactive window, measured in Chromium - so the rule exists only
+  // when a theme names both colours, neither of them Default's `none`.
+  const vars = rootVariables(defaultTheme);
+  const bundle = readFileSync(join(here, '..', '..', 'src', 'MarkdownMidget', 'wwwroot', 'editor.bundle.css'), 'utf8');
+  const vendor = bundle.match(/\.ProseMirror-selectednode\{outline:2px solid (#[0-9a-f]{3})\}/i)?.[1];
+  assert.ok(vendor, 'the vendor no longer outlines a selected node in a colour this test can read');
+  assert.deepEqual(['--mdm-caret', '--mdm-selection-bg', '--mdm-selection-fg', '--mdm-selected-outline'].map((v) => vars.get(v)),
+    ['auto', 'none', 'none', declarations(`a { color: ${vendor} }`)[0].value]);
+
+  const base = declarations(read('styles', 'base.css'));
+  const site = (variable) => {
+    const hits = base.filter((d) => d.value === `var(${variable})`);
+    assert.equal(hits.length, variable === '--mdm-selected-outline' ? 2 : 1, variable);
+    return hits.map((d) => [d.where, d.prop, d.important]);
+  };
+  const guard = '.mdm-prosemirror:not(.ProseMirror-hideselection)';   // ProseMirror's hidden node selection stays hidden
+  assert.deepEqual(site('--mdm-caret'), [[guard, 'caret-color', false]]);
+  const both = '@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none))';
+  assert.deepEqual(site('--mdm-selection-bg'), [[`${both} > ${guard} ::selection`, 'background-color', false]]);
+  assert.deepEqual(site('--mdm-selection-fg'), [[`${both} > ${guard} ::selection`, 'color', false]]);
+  assert.deepEqual(site('--mdm-selected-outline'), [
+    ['.mdm-prosemirror .ProseMirror-selectednode:not(li)', 'outline-color', false],
+    ['.mdm-prosemirror li.ProseMirror-selectednode::after', 'border-color', false]]);
+
+  // What each reaches, in the editor's DOM: the document and everything in it, never while
+  // ProseMirror hides the selection; a clicked rule's outline, and a list item's frame.
+  const doc = new JSDOM(DOCUMENT.replace('</div></div>', '<hr id="rule" class="ProseMirror-selectednode"><ul><li id="picked" class="ProseMirror-selectednode"></li></ul></div></div>')).window.document;
+  const editor = doc.querySelector('.mdm-prosemirror');
+  editor.id = 'editor';
+  assert.deepEqual(reaches(doc, guard), ['editor']);
+  assert.ok(reaches(doc, `${guard} *`).includes('keyword'));
+  assert.deepEqual(reaches(doc, '.mdm-prosemirror .ProseMirror-selectednode:not(li)'), ['rule']);
+  assert.deepEqual(reaches(doc, '.mdm-prosemirror li.ProseMirror-selectednode'), ['picked']);
+  editor.classList.add('ProseMirror-hideselection');
+  assert.deepEqual(reaches(doc, `${guard}, ${guard} *`), []);
+
+  // A theme that sets them wins: the condition holds for any value but `none`, and every site
+  // resolves to the theme's own colour.
+  for (const file of ['Red-Sparks.css', 'Amber-Phosphor.css']) {
+    const theme = themeVariables(readTheme(file));
+    const resolved = declarations(read('styles', 'base.css'), theme);
+    const sites = base.map((d, i) => [d.value.match(/^var\((--mdm-(caret|selection-bg|selection-fg|selected-outline))\)$/)?.[1], resolved[i]])
+      .filter(([v]) => v);
+    assert.equal(sites.length, 5);
+    for (const [v, d] of sites) {
+      assert.match(theme.get(v), /^#[0-9a-f]{6}$/, `${file} sets ${v}`);
+      assert.equal(d.value, theme.get(v), `${file}: ${d.where} { ${d.prop} }`);
+    }
+  }
 });
 
 test('paper takes the document\'s text size from the theme, and keeps its own for the source view', () => {

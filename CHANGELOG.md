@@ -9,6 +9,11 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Added
+
+- **A theme can now colour the text cursor, selected text and the outline round a clicked rule or picture**: four new variables for the formatted view. `--mdm-caret` colours the cursor, `--mdm-selection-bg` and `--mdm-selection-fg` colour selected text and Find's current match, and `--mdm-selected-outline` colours the outline round a rule or picture you click. A theme that leaves them out looks exactly as before: a cursor the colour of the text it sits in, the browser's blue selection (grey while the window is inactive) and a light blue outline. A selection colour a theme names shows whether the window is active or not. Name both selection colours or neither: with only one, the selection stays the browser's. The Markdown source view keeps its own cursor and selection. This version's `sample.css` documents all four, but Markdown Midget writes the sample only into an empty `custom\` themes folder, so a copy you already have stays as it was. Before, no theme variable reached any of them.
+- **Red Sparks, Red Sparks 2X and Amber Phosphor now draw the cursor, the selection and a clicked picture's outline in their own colours**: selected text and Find's current match are reversed, as on a terminal, with the page's own near-black on bright red (5.14:1) or on amber (10.82:1), and the cursor and the outline are that red or amber too. The only blue left with these themes is selected text in the Markdown source view. Before, the selection and the outline were blue in them, as in every theme.
+
 ### Fixed
 
 - **Right-clicking a word in the Markdown source view now offers suggestions for that word**: the spelling items at the top of the menu, such as the suggestions, **Add to Dictionary** and **Ignore All**, are for the word under the pointer. Before, the source view read the pointer as if it were about a line lower and a character or two to the right (further with line numbers on), so a right-click on a squiggled word often showed no suggestions, and a right-click on the line above one could show that word's suggestions instead.

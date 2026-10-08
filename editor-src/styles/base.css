@@ -193,3 +193,24 @@ body {
 .mdm-prosemirror .token.variable {
   color: var(--mdm-token-regex);
 }
+
+/* Never while ProseMirror hides the selection for a clicked node; the selection only when a
+   theme names both colours (theme-default.css says why). */
+.mdm-prosemirror:not(.ProseMirror-hideselection) {
+  caret-color: var(--mdm-caret);
+}
+
+@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) {
+  .mdm-prosemirror:not(.ProseMirror-hideselection) ::selection {
+    background-color: var(--mdm-selection-bg);
+    color: var(--mdm-selection-fg);
+  }
+}
+
+.mdm-prosemirror .ProseMirror-selectednode:not(li) {
+  outline-color: var(--mdm-selected-outline);
+}
+
+.mdm-prosemirror li.ProseMirror-selectednode::after {
+  border-color: var(--mdm-selected-outline);
+}

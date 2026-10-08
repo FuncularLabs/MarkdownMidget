@@ -192,6 +192,15 @@
   --mdm-cell-selected: rgba(86, 154, 212, 0.25);
   --mdm-resize-handle: #569ad4;
 
+  /* The cursor, selected text and Find's match, and a clicked rule or picture's
+     outline, in the formatted view; the source view keeps its own. These are the
+     defaults: `none` is the browser's blue highlight, grey while the window is
+     inactive. Name both selection colours or neither; they show active or not. */
+  --mdm-caret: auto;
+  --mdm-selection-bg: none;
+  --mdm-selection-fg: none;
+  --mdm-selected-outline: #88ccff;
+
   --mdm-mermaid-bg: #ffffff;
   --mdm-mermaid-border: #e2e4e8;
   --mdm-mermaid-error-bg: #fdf2f2;

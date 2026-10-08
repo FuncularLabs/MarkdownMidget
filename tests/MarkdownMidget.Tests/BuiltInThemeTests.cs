@@ -230,6 +230,14 @@ public class BuiltInThemeTests
         // The size .mdm-prosemirror has always been. Not a colour, and the one entry here
         // that is a metric: structure.css derives the document's text from it.
         ["--mdm-font-size"] = "16px",
+        // The cursor, the text's own colour; the outline a clicked rule or picture already had,
+        // the vendor's #8cf. The selection pair has no value that draws the browser's own
+        // highlight, so `none` switches base.css's ::selection rule off altogether: Chromium
+        // drew no highlight at all for an unset one, and no inactive grey for a set one.
+        ["--mdm-caret"] = "auto",
+        ["--mdm-selection-bg"] = "none",
+        ["--mdm-selection-fg"] = "none",
+        ["--mdm-selected-outline"] = "#88ccff",
     };
 
     private static HashSet<string> OptionalVariables => new(InertDefaults.Keys, StringComparer.Ordinal);
@@ -250,9 +258,14 @@ public class BuiltInThemeTests
             InertDefaults.Keys.Where(k => !DefaultVars.ContainsKey(k)).OrderBy(k => k).ToArray());
     }
 
-    /// <summary>The three variables the size and marker work added to the contract.</summary>
+    /// <summary>The four the cursor and selection work added to the contract (1.0.1). Declared
+    /// first: a static initializer below reads it, and they run in the order written.</summary>
+    private static readonly string[] CursorAndSelection =
+        { "--mdm-caret", "--mdm-selection-bg", "--mdm-selection-fg", "--mdm-selected-outline" };
+
+    /// <summary>The three variables the size and marker work added to the contract, and those four.</summary>
     private static readonly string[] NewestVariables =
-        { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" };
+        ["--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size", .. CursorAndSelection];
 
     /// <summary>
     /// Which of the three each palette sets, by EXACT resource name; absent means none.
@@ -267,14 +280,16 @@ public class BuiltInThemeTests
     /// </summary>
     private static readonly Dictionary<string, string[]> NewestVariablesSet = new(StringComparer.Ordinal)
     {
-        // The size is the whole point of the pair, so all three.
-        [RedSparks] = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" },
-        [RedSparks2X] = new[] { "--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size" },
+        // The size is the whole point of the pair, so all three; and the cursor and selection
+        // four, which take the last blue off their screen.
+        [RedSparks] = ["--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size", .. CursorAndSelection],
+        [RedSparks2X] = ["--mdm-code-fg", "--mdm-list-marker", "--mdm-font-size", .. CursorAndSelection],
         // Colours only: 16px is the size this theme has always rendered at.
         [Obsidiminutive] = new[] { "--mdm-code-fg", "--mdm-list-marker" },
         // Colours only, as it arrived: its custom version carried a ::marker rule and an
-        // inline-code rule, and these two lines are what replaced them.
-        [AmberPhosphor] = new[] { "--mdm-code-fg", "--mdm-list-marker" },
+        // inline-code rule, and these two lines are what replaced them. The cursor and
+        // selection four for the same reason as Red Sparks: its promise is no blue.
+        [AmberPhosphor] = ["--mdm-code-fg", "--mdm-list-marker", .. CursorAndSelection],
     };
 
     [Theory]
@@ -471,9 +486,9 @@ public class BuiltInThemeTests
         // The palette's one promise: every colour it sets for the screen is #RRGG00, the
         // diagram overlay's included - multiplying by a colour with no blue takes the blue out
         // of whatever mermaid draws. The one exception is paper's: the printed row stripe is
-        // white, which on paper is no ink rather than a colour. What it can't promise is the
-        // screen: the selection highlight and a clicked picture's outline are not a theme's to
-        // colour, and stay blue. Every declaration in the file is read, not just the variables,
+        // white, which on paper is no ink rather than a colour. The selection, the cursor and a
+        // clicked picture's outline are its own since 1.0.1, so they are held to it too; the
+        // source view's selection is Windows' and not a theme's. Every declaration in the file is read, not just the variables,
         // so a rule that grew a colour would be caught too - and every value has to be one this
         // test can read, so a colour written some other way fails loudly instead of passing.
         var bare = Regex.Replace(Read(AmberPhosphor), @"/\*.*?\*/", " ", RegexOptions.Singleline);
@@ -591,7 +606,7 @@ public class BuiltInThemeTests
     /// <summary>Shared by the pair, which differ only in --mdm-font-size.</summary>
     private static readonly Dictionary<string, double> RedSparksDimPairs = new(StringComparer.Ordinal)
     {
-        // 18 of 54, floor 3.9. Grouped as they read: the hover is the largest cluster,
+        // 18 of 55, floor 3.9. Grouped as they read: the hover is the largest cluster,
         // because a hover that can only go dimmer than #FF0000 is dim on every surface.
         ["--mdm-mermaid-empty on --mdm-mermaid-bg"] = 2.44,
         ["--mdm-token-comment on --mdm-pre-bg"] = 2.55,
@@ -666,7 +681,7 @@ public class BuiltInThemeTests
         },
         [RedSparks] = RedSparksDimPairs,
         [RedSparks2X] = RedSparksDimPairs,     // the same palette, so the same numbers
-        [AmberPhosphor] = new()   // 2 of 54, floor 4.5
+        [AmberPhosphor] = new()   // 2 of 55, floor 4.5
         {
             // The two recessive tiers, both chosen dim by its designer: the placeholder in an
             // empty diagram frame, and code comments on the code block. Everything a reader
@@ -767,6 +782,8 @@ public class BuiltInThemeTests
         ["--mdm-squiggle"] = "non-text, 3:1 above", ["--mdm-resize-handle"] = "non-text, 3:1 above",
         ["--mdm-mark"] = "formatting marks, faint on purpose (1.5:1 above)",
         ["--mdm-cell-selected"] = "a translucent tint over a cell",
+        ["--mdm-caret"] = "the text cursor: non-text, 3:1 above",
+        ["--mdm-selected-outline"] = "an outline: non-text, 3:1 above",
         ["--mdm-print-row-alt-bg"] = "paper stripe under print's #000 text, 12:1 above",
     };
 
@@ -832,6 +849,10 @@ public class BuiltInThemeTests
             ("--mdm-pre-bg", tokens.Append("--mdm-pre-fg")),
             ("--mdm-mermaid-bg", new[] { "--mdm-mermaid-empty" }),
             ("--mdm-mermaid-error-bg", new[] { "--mdm-mermaid-error-text" }),
+            // Selected text, in a theme that colours the selection: every selected character
+            // is drawn in the one foreground on the one background, whatever colour it had.
+            // Unset, it is the browser's own highlight, which is not the theme's to measure.
+            ("--mdm-selection-bg", vars.ContainsKey("--mdm-selection-bg") ? new[] { "--mdm-selection-fg" } : []),
         };
         return surfaces.SelectMany(s => s.Fg.Select(fg => (fg, s.Bg)));
     }
@@ -958,6 +979,10 @@ public class BuiltInThemeTests
         var vars = Variables(Read(resource));
         AssertContrast(vars, "--mdm-squiggle", 3.0, resource);
         AssertContrast(vars, "--mdm-resize-handle", 3.0, resource);
+        // The same bar for the cursor, the clicked-node outline and the selection's own
+        // ground, where a theme sets them: each is something you have to be able to find.
+        foreach (var name in new[] { "--mdm-caret", "--mdm-selected-outline", "--mdm-selection-bg" })
+            if (vars.ContainsKey(name)) AssertContrast(vars, name, 3.0, resource);
     }
 
     [Theory]

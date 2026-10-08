@@ -6,10 +6,9 @@
  *
  *  Every colour this theme sets for the screen is #RR0000: green and blue are
  *  zero. Red is the least disruptive light to dark-adapted eyes and to your
- *  circadian rhythm, so this one is made for editing after dark. Two things on
- *  screen stay blue, because no theme variable reaches them: the highlight
- *  behind selected text and Find matches, and the light blue outline (#88ccff)
- *  round a rule or picture you click.
+ *  circadian rhythm, so this one is made for editing after dark, and that
+ *  includes the cursor, the selection and a clicked picture's outline. Only
+ *  selected text in the Markdown source view stays blue.
  *
  *  It has the dimmest body text of any shipped palette, and does not clear WCAG
  *  AA for normal text: #DC0000 on the page is 3.96:1. (Solarized Light is the
@@ -140,6 +139,12 @@
   --mdm-mark: #900000;          /* pilcrows, spaces, tabs */
   --mdm-cell-selected: rgba(255, 0, 0, 0.22);
   --mdm-resize-handle: #FF0000; /* small target, so: brightest */
+
+  /* The cursor, the outline and a reversed selection: page on red, 5.14:1. */
+  --mdm-caret: #FF0000;
+  --mdm-selection-bg: #FF0000;
+  --mdm-selection-fg: #100000;
+  --mdm-selected-outline: #FF0000;
 
   --mdm-mermaid-bg: #100000;
   --mdm-mermaid-border: #5A0000;

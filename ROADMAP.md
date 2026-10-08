@@ -135,14 +135,24 @@ under 1.0.0-rc3.
 
 ### Cursor and selection colours — theme variables
 
-- **A theme should be able to colour the text cursor.** No variable reaches it, so in
+**Done 2026-10-08 (1.0.1)**, both items: `--mdm-caret`, `--mdm-selection-bg`,
+`--mdm-selection-fg` and `--mdm-selected-outline`, in the formatted view only; the source
+view keeps its own cursor and selection, which settles the open question below. Defaults
+draw exactly what was drawn before: `auto`, the vendor's `#88ccff`, and `none` for the selection
+pair, which switches base.css's `::selection` rule off through a style query. No CSS value
+reproduces the browser's own highlight: measured in headless Chromium, any `::selection`
+rule replaced it, an unset one with no highlight at all and a coloured one with no
+inactive-window grey. Red Sparks, Red Sparks 2X and Amber Phosphor set all four, a
+reversed selection (5.14:1 and 10.82:1). Kept below as the record.
+
+- ~~**A theme should be able to colour the text cursor.**~~ No variable reaches it, so in
   every theme it is the colour of the text it sits in. All three community themes from
   Joe Sparks (@joesparks on X) set `caret-color` with a rule instead, each to its
   accent; in Code Breaker the cursor is the only thing showing where you are in text
   you can't read. A `--mdm-caret` whose default is the text colour would change nothing
   for a theme that leaves it out. Open: whether the source view's cursor follows it too.
   Raised 2026-09-24 with [community-themes](community-themes/README.md).
-- **A theme should be able to colour the selection.** Selected text and Find matches
+- ~~**A theme should be able to colour the selection.**~~ Selected text and Find matches
   are drawn in the browser's own blue highlight behind white text, and a clicked rule
   or picture gets the editor's light blue outline (#88ccff), in every theme. So Red
   Sparks and Amber Phosphor, whose promise is no blue, still show blue there, and

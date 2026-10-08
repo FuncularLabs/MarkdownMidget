@@ -195,7 +195,12 @@
   ".mdm-prosemirror .token.entity, .mdm-prosemirror .token.operator, .mdm-prosemirror .token.url { color }",
   ".mdm-prosemirror .token.atrule, .mdm-prosemirror .token.attr-value, .mdm-prosemirror .token.keyword { color }",
   ".mdm-prosemirror .token.class-name, .mdm-prosemirror .token.function { color }",
-  ".mdm-prosemirror .token.important, .mdm-prosemirror .token.regex, .mdm-prosemirror .token.variable { color }"
+  ".mdm-prosemirror .token.important, .mdm-prosemirror .token.regex, .mdm-prosemirror .token.variable { color }",
+  ".mdm-prosemirror:not(.ProseMirror-hideselection) { caret-color }",
+  "@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) > .mdm-prosemirror:not(.ProseMirror-hideselection) ::selection { background-color }",
+  "@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) > .mdm-prosemirror:not(.ProseMirror-hideselection) ::selection { color }",
+  ".mdm-prosemirror .ProseMirror-selectednode:not(li) { outline-color }",
+  ".mdm-prosemirror li.ProseMirror-selectednode::after { border-color }"
  ],
  "print": [
   "@media print > .mdm-prosemirror pre[data-language=\"mermaid\"] { display }",
