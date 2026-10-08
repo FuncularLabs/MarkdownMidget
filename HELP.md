@@ -875,7 +875,8 @@ copies the same text. Markdown Midget only looks: it never switches an add-on
 off itself. Cancel in Windows' dialog just closes it.
 
 The built-in picker has an address bar, shortcuts (Desktop, Documents,
-Downloads, drives, recent folders), a folder tree, a file list, type-ahead, and
+Downloads, your Quick access folders, recent folders, drives), a folder tree, a
+file list, type-ahead, and
 New Folder plus overwrite confirmation when saving. It has no thumbnails,
 preview pane or right-click shell menus — those are the add-ons that crash, so
 leaving them out is what makes it safe. A line under its buttons says it is
@@ -900,6 +901,15 @@ to 300 folders, the one used least recently forgotten first. A folder that no
 longer exists on a local drive is forgotten in the background; one on a network
 share, or on a drive that is unplugged or not ready, is never checked. Delete
 the file to start again from folders first and names A to Z.
+
+Under **Quick access** the picker lists the folders you pinned to Quick access
+in File Explorer, in Explorer's order; point at one to see its full path. The
+picker reads Explorer's own list of them, without the shell, so no add-on is
+loaded. Only pinned folders are listed, not Home, Gallery, This PC, libraries,
+pinned files or recent items. Nothing is checked when the picker opens, so a
+pinned folder that has been deleted, or one on a share that is offline, is still
+listed and only fails to open when you click it. If Explorer's list can't be
+read, the section is left out.
 
 Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
 file picker**, and turn it off there to go back to Windows' dialog once the cause

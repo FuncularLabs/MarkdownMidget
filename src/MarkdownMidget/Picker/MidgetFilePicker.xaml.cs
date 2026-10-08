@@ -153,10 +153,12 @@ public partial class MidgetFilePicker : Window
 
     private void BuildPlaces()
     {
-        void AddSection(string header, IEnumerable<string> paths)
+        // Quick access is shown unchecked, its full paths in tooltips: a pinned folder that has
+        // gone fails when clicked, as any other, and a network one isn't touched before that.
+        void AddSection(string header, IEnumerable<string> paths, bool quickAccess = false)
         {
             var any = false;
-            foreach (var path in paths.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var path in paths.Where(p => quickAccess || Directory.Exists(p)).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (!any)
                 {
@@ -169,7 +171,9 @@ public partial class MidgetFilePicker : Window
                     });
                     any = true;
                 }
-                PlacesTree.Items.Add(MakeNode(path, Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } n ? n : path));
+                var node = MakeNode(path, Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } n ? n : path);
+                if (quickAccess) node.ToolTip = path;
+                PlacesTree.Items.Add(node);
             }
         }
 
@@ -179,10 +183,19 @@ public partial class MidgetFilePicker : Window
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
         });
+        AddSection("Quick access", PinnedFolders(), quickAccess: true);
         AddSection("Recent folders", _request.RecentFolders.Take(5));
         AddSection("Drives", DriveInfo.GetDrives()
             .Where(d => d.IsReady)
             .Select(d => d.RootDirectory.FullName));
+    }
+
+    /// <summary>Explorer's pinned folders (#12, item 5), given half a second: a redirected
+    /// AppData can sit on a slow share, and the picker must open regardless.</summary>
+    private static IReadOnlyList<string> PinnedFolders()
+    {
+        var read = Task.Run(() => QuickAccess.PinnedFolders(QuickAccess.JumpListPath));
+        return read.Wait(TimeSpan.FromMilliseconds(500)) ? read.Result : [];
     }
 
     /// <summary>A tree node with a placeholder child, so the arrow shows without
