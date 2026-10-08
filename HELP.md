@@ -890,9 +890,10 @@ column sorts and which way. **Date modified** starts with the newest. Folders
 stay above files whichever way you sort, and items that tie go by name.
 Type-ahead and the arrow keys follow the order on screen. The type is *File
 folder* for a folder, and for a file the name Windows has registered for its
-extension, such as *JPEG Image*. Where Windows keeps that name inside a
-program file, which the picker doesn't load, or has none, the type is the
-extension in capitals, such as *MD File*; a file with no extension is *File*.
+extension, such as *JPEG Image*. Where the only name Windows has for it is
+kept inside a program file, which the picker doesn't load, or it has none, the
+type is the extension in capitals, such as *MD File*; a file with no extension
+is *File*.
 
 The picker remembers how you sort the list and how wide you make its columns,
 by dragging a header's edge or double-clicking it to fit.
@@ -900,10 +901,12 @@ The first time you change either, in any folder, that becomes how every folder
 opens. After that, a change you make in a folder is kept for that folder only.
 The views are kept in `%LocalAppData%\MarkdownMidget\picker-views.json` for up
 to 300 folders, the one used least recently forgotten first. A folder that no
-longer exists on a local drive is forgotten in the background. A folder on a
-network share, behind a link, junction or mount point, on a drive that is
-unplugged or not ready, or in a folder you can't open is never forgotten that
-way, only by the limit. Delete
+longer exists on a local drive is forgotten in the background, once Windows
+reports that it, or a folder on the way to it, isn't there. A folder on a
+network share, behind a link, junction or mount point, or on a drive that is
+unplugged or not ready is never forgotten that way, only by the limit, and
+neither is one Windows won't report on, such as a folder you aren't allowed to
+look at: it is kept while it can't be checked. Delete
 the file to start again from folders first and names A to Z.
 
 Under **Quick access** the picker lists the folders you pinned to Quick access

@@ -116,7 +116,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 ## Status
 
 **Stable (1.0.x)**, in daily use and signed on every release: 1.0.0 is the latest
-release, and the badge above and the entry marked **Latest** on the releases page
+stable release, and the badge above and the entry marked **Latest** on the releases page
 point at it until 1.0.1. **1.0.1-beta1**, the first 1.0.1 prerelease, sits above it on
 that page for anyone who wants the built-in file picker's new columns and Quick access
 early. Windows-only for now; the editor core is web-based, so a cross-platform

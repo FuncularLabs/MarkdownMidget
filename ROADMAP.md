@@ -28,11 +28,16 @@ before 1.0.1, which follows after dogfooding. Done in 1.0.1-beta1:
 - [Cursor and selection colours](#cursor-and-selection-colours--theme-variables) and
   the link underline and printed code-token [Nits](#nits), below.
 
-Still open, for 1.0.1 or later: [Diagram width](#diagram-width--needs-a-decision),
+What is still open, for 1.0.1 or later, includes
+[Diagram width](#diagram-width--needs-a-decision),
 [Easier JSON editing](#easier-json-editing--needs-definition), #13 (a theme needs a
 specificity hack to override the app's `!important` rules), #14 (the contrast sweep
 over the six older palettes), a change in **Edit ▸ Settings** reaching only the
-window it was made in and windows opened after it, and the known limits parked in
+window it was made in and windows opened after it, the three items still open under
+[Updating while several windows are open](#updating-while-several-windows-are-open),
+everything under [Someday / Big](#someday--big), where the
+[real installer](#real-installer--uninstaller) is 1.1's headline, and the known limits
+parked in
 [docs/parked-ideas.md](docs/parked-ideas.md#wont-unless-asked-known-limits-parked-deliberately).
 
 ## 1.0 (cut as 1.0.0-beta1 on 2026-09-13, 1.0.0-rc1 on 2026-09-15, 1.0.0-rc2 on 2026-09-16, 1.0.0-rc3 on 2026-09-24 and 1.0.0-rc4 on 2026-09-25; 1.0.0 was promoted 2026-10-02, and 0.10.0 on 2026-09-10)
