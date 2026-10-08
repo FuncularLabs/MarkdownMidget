@@ -195,7 +195,8 @@
   /* The cursor, selected text and Find's match, and a clicked rule or picture's
      outline, in the formatted view; the source view keeps its own. These are the
      defaults: `none` is the browser's blue highlight, grey while the window is
-     inactive. Name both selection colours or neither; they show active or not. */
+     inactive. Name both selection colours or neither, here in :root; they show
+     whether the window is active or not. */
   --mdm-caret: auto;
   --mdm-selection-bg: none;
   --mdm-selection-fg: none;

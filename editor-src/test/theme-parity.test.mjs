@@ -1246,6 +1246,25 @@ test('a theme\'s own caret or selection rule still reaches the document until it
   assert.deepEqual(reaches(doc, caret).filter((id) => reaches(doc, '.mdm-prosemirror code, .mdm-prosemirror code *').includes(id)), []);
 });
 
+test('the selection pair declared on :root turns the selection on, and both files a theme author reads say :root', () => {
+  // The selection rule is the editor's own and its query reads the pair as the editor's parent
+  // sees it, which a value on :root always reaches; that is where the sample puts it and HELP
+  // tells authors to. (In Chromium 152 a pair on .mdm-prosemirror measured the same, but only
+  // :root is documented, so only :root is pinned.)
+  const [rule] = declarations(editorCss).filter((d) => d.where.endsWith('::selection'));
+  const query = rule.where.split(' > ')[0];
+  const conditions = [...query.matchAll(/not style\((--[\w-]+): ([^)]*)\)/g)];
+  assert.deepEqual(conditions.map(([, name]) => name).sort(), ['--mdm-selection-bg', '--mdm-selection-fg']);
+  for (const [css, on] of [['', false], [':root { --mdm-selection-bg: #400000; --mdm-selection-fg: #ff4040; }', true]]) {
+    const vars = themeVariables(css);
+    assert.equal(conditions.every(([, name, value]) => vars.get(name) !== value), on, css || 'Default');
+  }
+  for (const [name, text] of [['sample.css', sampleCss], ['HELP.md', helpMd]]) {
+    const at = text.indexOf(name === 'HELP.md' ? 'Declare the two selection colours' : '--mdm-selection-bg:');
+    assert.ok(at >= 0 && text.slice(Math.max(0, at - 300), at + 300).includes(':root'), `${name} no longer puts the selection pair in :root`);
+  }
+});
+
 test('a clicked rule or picture prints no frame, whatever the theme', () => {
   // Before 1.0.1 its light blue outline printed; with a theme's colour it would print red or amber.
   for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {

@@ -510,7 +510,9 @@ you click. Leave them out and you get what the editor always drew: a cursor the 
 the text it sits in, the browser's blue selection (grey while the window is inactive) and
 a light blue outline. A selection colour you name shows whether the window is active or
 not. Name both selection colours or neither: with only one, the selection stays the
-browser's. The Markdown source view keeps its own cursor and selection.
+browser's. Declare the two selection colours in `:root`, as the sample does; the cursor's
+works there or on `.mdm-prosemirror`. The Markdown source view keeps its own cursor and
+selection.
 
 **Diagrams.** No colour variable of ours reaches inside a mermaid diagram: mermaid draws
 its own SVG in its own palette, and `--mdm-mermaid-theme` — one of `default`, `dark`,
