@@ -50,7 +50,8 @@ internal static class PickerViews
         {
             Column = view.Sort.Column.ToString(), Descending = view.Sort.Descending, Widths = [.. view.Widths], Used = now,
         };
-        if (file.Default is null) { file.Default = entry; return; }
+        // Folder views with no default (one dropped as unreadable) still mean the first change was made.
+        if (file.Default is null && file.Folders.Count == 0) { file.Default = entry; return; }
         entry.Folder = OpenGuard.Normalize(folder);
         file.Folders.RemoveAll(e => string.Equals(e.Folder, entry.Folder, StringComparison.OrdinalIgnoreCase));
         file.Folders.Add(entry);
@@ -87,17 +88,27 @@ internal static class PickerViews
 
     /// <summary>
     /// Whether cleanup may forget a folder's view: only when its drive is a local one that is
-    /// there and ready, and the folder is not. A UNC path is never probed, nor a mapped
-    /// network drive's folder, because a dead share can block for a long time: the cap
-    /// retires those. A drive that is unplugged or not ready, or a probe that fails, keeps it.
+    /// there and ready, and walking down from the root finds a step missing. A UNC path, or a
+    /// mapped network drive's, is never probed: a dead share can block for a long time. A drive
+    /// that is unplugged or not ready, a step that is a link, junction or mount point (what is
+    /// behind it may be away for a while), and a step that can't be looked at (access denied is
+    /// not gone) all keep it, for the cap to retire. <paramref name="attributes"/> is null for a
+    /// path that doesn't exist and throws for one it can't tell.
     /// </summary>
-    public static bool Gone(string folder, Func<string, DriveType> driveType, Func<string, bool> isReady, Func<string, bool> exists)
+    public static bool Gone(string folder, Func<string, DriveType> driveType, Func<string, bool> isReady, Func<string, FileAttributes?> attributes)
     {
         try
         {
-            if (folder.StartsWith(@"\\", StringComparison.Ordinal) || Path.GetPathRoot(folder) is not { Length: > 0 } root) return false;
-            return driveType(root) is DriveType.Fixed or DriveType.Removable or DriveType.CDRom or DriveType.Ram
-                && isReady(root) && !exists(folder);
+            if (folder.StartsWith(@"\\", StringComparison.Ordinal) || Path.GetPathRoot(folder) is not { Length: > 0 } root
+                || driveType(root) is not (DriveType.Fixed or DriveType.Removable or DriveType.CDRom or DriveType.Ram) || !isReady(root))
+                return false;
+            var step = root;
+            foreach (var name in folder[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (attributes(step = Path.Combine(step, name)) is not { } found) return true;
+                if (found.HasFlag(FileAttributes.ReparsePoint)) return false;
+            }
+            return false;
         }
         catch (Exception) { return false; }
     }
@@ -149,14 +160,17 @@ internal sealed class PickerViewStore
 
     /// <summary>Applies <paramref name="change"/> to the file as it is now. False when nothing
     /// was written: the lock or the file couldn't be had, or the write failed.</summary>
-    public bool Update(Action<PickerViewsFile> change)
+    public bool Update(Action<PickerViewsFile> change) => Update(change, out _);
+
+    private bool Update(Action<PickerViewsFile> change, out PickerViewsFile file)
     {
         var tmp = $"{_path}.{Environment.ProcessId}.tmp";
+        file = new();
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
             using var gate = Gate();
-            if (gate is null || !TryRead(out var file)) return false;
+            if (gate is null || !TryRead(out file)) return false;
             change(file);
             File.WriteAllText(tmp, PickerViews.Serialize(file));
             MainWindow.ReplaceFile(tmp, _path, () => _wait(25));
@@ -166,10 +180,13 @@ internal sealed class PickerViewStore
         finally { try { File.Delete(tmp); } catch { /* left for the next write to replace */ } }
     }
 
-    /// <summary><see cref="Update"/> off the UI thread, after every change queued before it.</summary>
-    public Task UpdateLater(Action<PickerViewsFile> change)
+    /// <summary><see cref="Update"/> off the UI thread, after every change queued before it.
+    /// <paramref name="written"/> gets the file as written, so a window's copy can follow
+    /// decisions taken against the file on disk (whether there was a default yet).</summary>
+    public Task UpdateLater(Action<PickerViewsFile> change, Action<PickerViewsFile>? written = null)
     {
-        lock (_queueLock) return _queue = _queue.ContinueWith(_ => Update(change), TaskScheduler.Default);
+        lock (_queueLock)
+            return _queue = _queue.ContinueWith(_ => { if (Update(change, out var file)) written?.Invoke(file); }, TaskScheduler.Default);
     }
 
     /// <summary>
@@ -215,7 +232,9 @@ internal sealed class PickerViewStore
                 using var stream = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                 using var reader = new StreamReader(stream);
                 file = PickerViews.Parse(reader.ReadToEnd());
-                return true;
+                if (file.Version <= 1) return true;
+                file = new();
+                return false;   // a newer version's file: not read, so never overwritten
             }
             catch (FileNotFoundException) { return true; }
             catch (Exception ex) when (attempt < 4 && ex is IOException or UnauthorizedAccessException) { _wait(25); }

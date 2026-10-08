@@ -899,8 +899,10 @@ The first time you change either, in any folder, that becomes how every folder
 opens. After that, a change you make in a folder is kept for that folder only.
 The views are kept in `%LocalAppData%\MarkdownMidget\picker-views.json` for up
 to 300 folders, the one used least recently forgotten first. A folder that no
-longer exists on a local drive is forgotten in the background; one on a network
-share, or on a drive that is unplugged or not ready, is never checked. Delete
+longer exists on a local drive is forgotten in the background. A folder on a
+network share, behind a link, junction or mount point, on a drive that is
+unplugged or not ready, or in a folder you can't open is never forgotten that
+way, only by the limit. Delete
 the file to start again from folders first and names A to Z.
 
 Under **Quick access** the picker lists the folders you pinned to Quick access

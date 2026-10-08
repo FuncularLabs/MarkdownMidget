@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace MarkdownMidget.Picker;
@@ -13,6 +14,15 @@ internal static class PickerRows
     public static object? DoubleClickedItem(ItemsControl list, MouseButton button, object? source) =>
         button == MouseButton.Left && source is DependencyObject element
             && ItemsControl.ContainerFromElement(list, element) is ListViewItem row ? row.Content : null;
+
+    /// <summary>Calls <paramref name="resized"/> when a column header's edge is dropped after a drag.
+    /// The header marks that event handled, so it is heard with handledEventsToo; a click on the edge
+    /// (no change), Esc during the drag, and the list's scroll-bar thumbs don't count.</summary>
+    public static void OnColumnResized(ListView list, Action resized) =>
+        list.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, e) =>
+        {
+            if (!e.Canceled && e.HorizontalChange != 0 && e.OriginalSource is Thumb { TemplatedParent: GridViewColumnHeader }) resized();
+        }), handledEventsToo: true);
 
     /// <summary>Re-sorts the list the view shows, in place. A refresh keeps the selected row selected
     /// (rebinding would not) but makes new rows, so the keyboard, if it was in the list, goes back to

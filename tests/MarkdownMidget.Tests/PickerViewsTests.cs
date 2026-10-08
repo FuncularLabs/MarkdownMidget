@@ -242,28 +242,88 @@ public sealed class PickerViewsTests : IDisposable
 
     // ---- cleanup ----
 
-    [Theory]
-    [InlineData(@"\\server\share\Beta", DriveType.Fixed, true, false, false, "")]
-    [InlineData(@"Z:\Work", DriveType.Network, true, false, false, "type")]
-    [InlineData(@"E:\Stick", DriveType.NoRootDirectory, true, false, false, "type")]
-    [InlineData(@"E:\Stick", DriveType.Removable, false, false, false, "type ready")]
-    [InlineData(@"C:\Kept", DriveType.Fixed, true, true, false, "type ready exists")]
-    [InlineData(@"C:\Gone", DriveType.Fixed, true, false, true, "type ready exists")]
-    [InlineData(@"E:\Gone", DriveType.Removable, true, false, true, "type ready exists")]
-    public void CleanupForgetsOnlyAMissingFolderOnAReadyLocalDrive(string folder, DriveType type, bool ready, bool exists, bool forget, string probes)
-    {
-        var asked = new List<string>();
-        var gone = PickerViews.Gone(folder,
+    /// <summary>A stand-in file system: the paths that exist, with their attributes; a path in
+    /// <paramref name="denied"/> can't be looked at. Logs each probe.</summary>
+    private static bool Gone(string folder, DriveType type, bool ready, List<string> asked, string denied = "", params (string Path, FileAttributes Attributes)[] existing) =>
+        PickerViews.Gone(folder,
             root => { asked.Add("type"); return type; },
             root => { asked.Add("ready"); return ready; },
-            path => { asked.Add("exists"); return exists; });
-        Assert.Equal(forget, gone);
+            path =>
+            {
+                asked.Add(path);
+                if (path == denied) throw new UnauthorizedAccessException("Access to the path is denied.");
+                return existing.FirstOrDefault(e => e.Path == path) is { Path: not null } hit ? hit.Attributes : null;
+            });
+
+    [Theory]
+    [InlineData(@"\\server\share\Beta", DriveType.Fixed, true, false, "")]
+    [InlineData(@"Z:\Work", DriveType.Network, true, false, "type")]
+    [InlineData(@"E:\Stick", DriveType.NoRootDirectory, true, false, "type")]
+    [InlineData(@"E:\Stick", DriveType.Removable, false, false, "type ready")]
+    [InlineData(@"C:\Kept", DriveType.Fixed, true, false, @"type ready C:\Kept")]
+    [InlineData(@"C:\Gone", DriveType.Fixed, true, true, @"type ready C:\Gone")]
+    [InlineData(@"E:\Gone", DriveType.Removable, true, true, @"type ready E:\Gone")]
+    public void CleanupForgetsOnlyAMissingFolderOnAReadyLocalDrive(string folder, DriveType type, bool ready, bool forget, string probes)
+    {
+        var asked = new List<string>();
+        Assert.Equal(forget, Gone(folder, type, ready, asked, "", (@"C:\Kept", FileAttributes.Directory)));
         Assert.Equal(probes, string.Join(" ", asked));   // a UNC path is never probed at all
     }
 
     [Fact]
+    public void CleanupWalksDownToTheFolderAndKeepsItBehindALinkOrAFolderItCannotRead()
+    {
+        var asked = new List<string>();
+        var link = (@"C:\Link", FileAttributes.Directory | FileAttributes.ReparsePoint);
+        Assert.False(Gone(@"C:\Link\Gone", DriveType.Fixed, true, asked, "", link));          // a junction, symlink or mount
+        Assert.False(Gone(@"C:\Denied\Inner", DriveType.Fixed, true, asked, @"C:\Denied"));   // access denied is not gone
+        Assert.DoesNotContain(@"C:\Link\Gone", asked);
+        asked.Clear();
+        Assert.True(Gone(@"C:\Parent\Gone", DriveType.Fixed, true, asked));                   // missing from the first step down
+        Assert.Equal(["type", "ready", @"C:\Parent"], asked);
+    }
+
+    [Fact]
     public void AProbeThatFailsKeepsTheEntry() =>
-        Assert.False(PickerViews.Gone(@"C:\Odd", _ => DriveType.Fixed, _ => true, _ => throw new IOException("device not ready")));
+        Assert.False(PickerViews.Gone(@"C:\Odd", _ => DriveType.Fixed, _ => true, _ => throw new IOException("The device is not ready.")));
+
+    [Fact]
+    public void ANewerVersionsFileIsNeitherReadNorOverwritten()
+    {
+        Directory.CreateDirectory(_dir);
+        const string newer = """{"Version":2,"Default":{"Column":"Size","Widths":[250,130,110,70]},"Folders":[]}""";
+        File.WriteAllText(ViewsPath, newer);
+        var store = new PickerViewStore(_dir, _ => { });
+        Assert.Null(store.Load().Default);
+        Assert.False(store.Update(f => PickerViews.Apply(f, @"C:\Alpha", View(PickerColumn.Type), T0)));
+        Assert.Equal(newer, File.ReadAllText(ViewsPath));
+    }
+
+    [Fact]
+    public void FolderViewsWithoutADefaultMeanTheFirstChangeWasMadeAndAChangeStillBelongsToItsFolder()
+    {
+        // A default dropped as unreadable, its folders kept: the next change is not a new default.
+        var file = PickerViews.Parse("""{"Default":{"Column":"Bogus"},"Folders":[{"Folder":"C:\\Alpha","Column":"Size","Widths":[250,130,110,70]}]}""");
+        PickerViews.Apply(file, @"C:\Beta", View(PickerColumn.Type), T0);
+        Assert.Null(file.Default);
+        Same(View(PickerColumn.Type), PickerViews.Resolve(file, @"C:\Beta"));
+        Assert.Null(PickerViews.Resolve(file, @"C:\Gamma"));   // the built-in view
+    }
+
+    [Fact]
+    public async Task TheWindowsCopyBecomesTheFileAsWrittenWhereTheDefaultWasDecided()
+    {
+        // The window's copy had no default; another window set one meanwhile. On disk the change
+        // belongs to its folder, and the written file comes back for the window to take.
+        new PickerViewStore(_dir).Update(f => PickerViews.Apply(f, @"C:\Other", View(PickerColumn.Size), T0));
+        PickerViewsFile? written = null;
+        await new PickerViewStore(_dir).UpdateLater(f => PickerViews.Apply(f, @"C:\Alpha", View(PickerColumn.Type), T0), f => written = f);
+        Same(View(PickerColumn.Size), PickerViews.Resolve(written!, @"C:\Elsewhere"));   // the other window's default
+        Same(View(PickerColumn.Type), PickerViews.Resolve(written, @"C:\Alpha"));
+        var failed = false;
+        await new PickerViewStore(Path.Combine(_dir, "\0bad"), _ => { }).UpdateLater(_ => { }, _ => failed = true);
+        Assert.False(failed);   // nothing written, nothing handed back
+    }
 
     [Fact]
     public async Task CleanupRunsOnceAndKeepsAnEntryAnotherWindowChangedMeanwhile()

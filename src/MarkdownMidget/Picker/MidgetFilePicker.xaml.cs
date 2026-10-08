@@ -59,7 +59,7 @@ public partial class MidgetFilePicker : Window
     /// <summary>Remembered views (#12, item 4), one store for every picker in this process,
     /// so their writes queue in order; and this picker's copy, changed as it saves.</summary>
     private static readonly PickerViewStore s_views = new(PickerViewStore.DefaultDirectory);
-    private readonly PickerViewsFile _views = s_views.Load();
+    private PickerViewsFile _views = s_views.Load();
     private readonly List<string> _history = [];
     private int _historyIndex = -1;
     private string _currentDirectory = "";
@@ -94,14 +94,14 @@ public partial class MidgetFilePicker : Window
         _sortColumns = [NameColumn, ModifiedColumn, TypeColumn, SizeColumn];
         _builtInWidths = [.. _sortColumns.Select(c => c.Width)];
         ShowSortHeaders();
-        FileList.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(FileList_ColumnResized));
+        PickerRows.OnColumnResized(FileList, RememberView);
 
         BuildPlaces();
         Loaded += (_, _) =>
         {
-            // Off the UI thread, once per process. DriveInfo and Directory.Exists are the probes.
-            _ = s_views.CleanOnce(folder => PickerViews.Gone(folder,
-                root => new DriveInfo(root).DriveType, root => new DriveInfo(root).IsReady, Directory.Exists));
+            // Off the UI thread, once per process. Directory.Exists can't be the probe: it says no to a folder it may not read.
+            _ = s_views.CleanOnce(folder => PickerViews.Gone(folder, root => new DriveInfo(root).DriveType, root => new DriveInfo(root).IsReady,
+                path => { try { return File.GetAttributes(path); } catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return null; } }));
             OpenFirstListableDirectory();
             NameBox.Focus();
             NameBox.SelectAll();
@@ -453,22 +453,16 @@ public partial class MidgetFilePicker : Window
         ShowSortHeaders();
     }
 
-    /// <summary>A header's edge dropped after a drag. The list's own scroll bars have thumbs
-    /// too; only a header's counts.</summary>
-    private void FileList_ColumnResized(object sender, DragCompletedEventArgs e)
-    {
-        if (e.OriginalSource is Thumb { TemplatedParent: GridViewColumnHeader }) RememberView();
-    }
-
     /// <summary>Saves the list's look for the folder on show (PickerViews.Apply says whether as
-    /// the default or the folder's own): in this picker's copy now, in the file in the background.</summary>
+    /// the default or the folder's own): in this picker's copy now, in the file in the background.
+    /// The file decides whether there was a default yet, and the copy then becomes the file as written.</summary>
     private void RememberView()
     {
         if (_currentDirectory.Length == 0) return;
         var (folder, now) = (_currentDirectory, DateTime.UtcNow);
         var view = new PickerView(_sort, [.. _sortColumns.Select(c => c.ActualWidth)]);
         PickerViews.Apply(_views, folder, view, now);
-        _ = s_views.UpdateLater(f => PickerViews.Apply(f, folder, view, now));
+        _ = s_views.UpdateLater(f => PickerViews.Apply(f, folder, view, now), written => Dispatcher.InvokeAsync(() => _views = written));
     }
 
     private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)

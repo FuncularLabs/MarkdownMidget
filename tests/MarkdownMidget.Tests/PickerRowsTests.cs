@@ -59,6 +59,40 @@ public class PickerRowsTests
     });
 
     [Fact]
+    public void AColumnEdgeDroppedAfterADragIsAChangeAndAClickOrAnEscapeIsNot()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                // Measured and arranged with no window, as the review did: the header row exists.
+                var view = new GridView();
+                view.Columns.Add(new GridViewColumn { Header = "Name", Width = 120 });
+                var list = new ListView { View = view, ItemsSource = Enumerable.Range(0, 50).ToList() };
+                ScrollViewer.SetVerticalScrollBarVisibility(list, ScrollBarVisibility.Visible);
+                list.Measure(new Size(300, 100));
+                list.Arrange(new Rect(0, 0, 300, 100));
+                list.UpdateLayout();
+                var resized = 0;
+                PickerRows.OnColumnResized(list, () => resized++);
+                void Drop(DependencyObject thumb, double change, bool canceled) =>
+                    ((UIElement)thumb).RaiseEvent(new DragCompletedEventArgs(change, 0, canceled) { RoutedEvent = Thumb.DragCompletedEvent });
+                var edge = Find<Thumb>(Find<GridViewColumnHeader>(list, h => h.Column is not null)!)!;
+                Drop(edge, 30, canceled: false);   // the header marks this handled: only handledEventsToo hears it
+                Drop(edge, 0, canceled: false);    // a click on the edge, no drag
+                Drop(edge, 30, canceled: true);    // Esc during the drag
+                Drop(Find<Thumb>(list, t => t.TemplatedParent is ScrollBar)!, 30, canceled: false);   // the list's own scroll bar
+                Assert.Equal(1, resized);
+            }
+            catch (Exception ex) { error = ex; }
+        }) { IsBackground = true };
+        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "the list harness timed out");
+        if (error is not null) throw error;
+    }
+
+    [Fact]
     public void AReSortKeepsTheSelectedRow() => OnList((list, items) =>
     {
         list.SelectedItem = "a";
