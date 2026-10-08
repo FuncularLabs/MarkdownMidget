@@ -199,10 +199,36 @@ public class DialogPlacementTests
         {
             var before = Bounds(dialog);
             var other = new Rect(-20400, -20300, 1400, 300);   // the monitor it is being dragged onto: its bottom is above the dialog
-            (DialogPlacement.WorkAreaOf, DialogPlacement.UserMovingOrSizing) = (_ => other, _ => true);
+            (DialogPlacement.WorkAreaOf, DialogPlacement.UserMovingOrSizing) = (_ => other, h => DialogPlacement.InMoveSize(GuiInMoveSize, Handle(dialog), h));
             panel!.Children.Add(new Border { Height = 100 }); dialog.UpdateLayout();
             Assert.Equal((before.X, before.Y), (Bounds(dialog).X, Bounds(dialog).Y));
             Assert.Equal(other.Height / VisualTreeHelper.GetDpi(dialog).DpiScaleY, dialog.MaxHeight, 3);
+        });
+    }
+
+    private const int GuiInMoveSize = 0x0002;   // GUITHREADINFO.flags GUI_INMOVESIZE: the thread is in a move or size loop
+
+    [Theory]   // GetGUIThreadInfo's flags and hwndMoveSize, then the window asked about: 1 is the dialog, 2 its owner
+    [InlineData("the dialog is dragged", GuiInMoveSize, 1, 1, true)]
+    [InlineData("the dialog is dragged, its caret blinking", GuiInMoveSize | 0x0001, 1, 1, true)]
+    [InlineData("the owner is dragged while the dialog grows", GuiInMoveSize, 2, 1, false)]
+    [InlineData("a move or size loop naming no window", GuiInMoveSize, 0, 1, false)]
+    [InlineData("no move or size loop", 0, 1, 1, false)]
+    [InlineData("caret, menu and popup flags, no move or size loop", 0x001D, 1, 1, false)]
+    public void OnlyTheWindowInTheMoveOrSizeLoopCountsAsDragged(string name, int flags, int moveSize, int window, bool expected) =>
+        Assert.True(expected == DialogPlacement.InMoveSize(flags, moveSize, window), name);
+
+    [Fact]   // the same thread is in a move or size loop, for the owner: the dialog is placed as at any other time
+    public void ADialogThatGrowsWhileItsOwnerIsDraggedIsStillPulledBackInside()
+    {
+        var work = new Rect(-20400, -20300, 1400, 900);
+        StackPanel? panel = null;
+        WithDialog(work, () => new Window { SizeToContent = SizeToContent.WidthAndHeight,
+                                            Content = panel = new StackPanel { Width = 300, Children = { new Border { Height = 100 } } } }, (owner, dialog) =>
+        {
+            DialogPlacement.UserMovingOrSizing = h => DialogPlacement.InMoveSize(GuiInMoveSize, Handle(owner), h);
+            panel!.Children.Add(new Border { Height = 400 }); dialog.UpdateLayout();   // now past the bottom of the work area
+            Assert.True(work.Contains(Bounds(dialog)), $"at {Bounds(dialog)}, work area {work}");
         });
     }
 

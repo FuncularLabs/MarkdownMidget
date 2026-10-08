@@ -7,6 +7,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Rendering;
 using MarkdownMidget.Source;
 using Xunit;
 
@@ -165,11 +167,18 @@ public class SourceEditorTests
     }
 
     [Fact]
-    public void HitTestOverTextReturnsAnOffsetInThatLine()
+    public void HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint()
     {
-        var idx = On(ed => ed.GetCharacterIndexFromPoint(new Point(6, 4), snapToText: true),
-            "hello world", laidOut: true);
-        Assert.True(idx is >= 0 and <= 11, $"offset {idx} should land within the single line");
+        // The left quarter of the "c" in "second", on the second line: offset 14, inside
+        // the line, so the snap to the end (23) or a neighbour (13, 15) fails it. The
+        // point is in control coordinates, as the spell menu passes it.
+        var idx = On(ed =>
+        {
+            var tv = ed.TextArea.TextView;
+            var at = tv.GetVisualPosition(new TextViewPosition(ed.Document.GetLocation(14)), VisualYPosition.LineMiddle) - tv.ScrollOffset;
+            return ed.GetCharacterIndexFromPoint(tv.TranslatePoint(new Point(at.X + tv.WideSpaceWidth / 4, at.Y), ed), snapToText: true);
+        }, "hello world\nsecond line", laidOut: true);
+        Assert.Equal(14, idx);
     }
 
     // ===== 1.5 the TextBox property shims =====

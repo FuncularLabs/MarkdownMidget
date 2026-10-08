@@ -93,8 +93,14 @@ internal static class DialogPlacement
     {
         var info = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
         return GetGUIThreadInfo(GetWindowThreadProcessId(hwnd, IntPtr.Zero), ref info)
-            && (info.flags & GuiInMoveSize) != 0 && info.hwndMoveSize == hwnd;
+            && InMoveSize(info.flags, info.hwndMoveSize, hwnd);
     }
+
+    /// <summary>Whether <paramref name="hwnd"/> is the window in its thread's move or size loop, from
+    /// GetGUIThreadInfo's <paramref name="flags"/> and <paramref name="moveSize"/> (hwndMoveSize).
+    /// A dialog that grows while its owner is being dragged is not.</summary>
+    internal static bool InMoveSize(int flags, IntPtr moveSize, IntPtr hwnd) =>
+        (flags & GuiInMoveSize) != 0 && moveSize == hwnd;
 
     internal static Rect? WorkAreaNative(IntPtr hwnd)
     {

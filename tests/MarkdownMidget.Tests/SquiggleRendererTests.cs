@@ -105,17 +105,25 @@ public class SquiggleRendererTests
     }
 
     [Fact]
-    public void RangesPastTheDocumentEndAreClampedNotThrown()
+    public void ARangePastTheDocumentEndUnderlinesOnlyTheTextThatIsLeft()
     {
-        // A stale range extending past the current text must not throw and must not
-        // draw beyond the document.
-        var spans = On(ed =>
+        // A stale range, checked against longer text, must not throw or draw beyond the
+        // document: one running past the end draws what the same range cut at the end
+        // draws, and one starting at or past the end draws nothing, not a stub after the
+        // last character. AvalonEdit's GetRectsForSegment clamps both ends into the
+        // document itself, so this holds without WaveSpans' own end clamp too; when that
+        // clamp is gone, a range starting at the end reaches AvalonEdit as an empty
+        // segment, drawn as a 1-DIP caret (TextView.EmptyLineSelectionWidth) that the
+        // hairline filter drops. No input makes the end clamp the only guard, so this
+        // test pins the outcome, not that clamp.
+        var (past, cut, after) = On(ed =>
         {
             var r = new SquiggleRenderer(ed);
-            r.SetRanges(new[] { (2, 999) });
-            return r.WaveSpans(ed.TextArea.TextView).ToList();
+            List<(double, double, double)> Spans((int, int)[] ranges) { r.SetRanges(ranges); return r.WaveSpans(ed.TextArea.TextView).ToList(); }
+            return (Spans([(2, 999)]), Spans([(2, 3)]), Spans([(5, 3), (7, 4)]));
         }, "short");
-        // "short" from offset 2 is "ort" — one visible run, no exception.
-        Assert.Single(spans);
+        Assert.Single(past);          // "ort", from offset 2
+        Assert.Equal(cut, past);
+        Assert.Empty(after);
     }
 }
