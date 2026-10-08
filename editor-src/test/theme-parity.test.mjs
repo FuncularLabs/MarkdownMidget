@@ -1189,10 +1189,12 @@ test('the cursor, the selection and a clicked rule or picture take theme variabl
     return hits.map((d) => [d.where, d.prop, d.important]);
   };
   const guard = '.mdm-prosemirror:not(.ProseMirror-hideselection)';   // ProseMirror's hidden node selection stays hidden
-  assert.deepEqual(site('--mdm-caret'), [[`@container not style(--mdm-caret: auto) > ${guard}, ${guard} *`, 'caret-color', false]]);
+  // Neither may match every element: the selection rule did once, and layout of 60k elements
+  // took half again as long. The selection is the editor's own (descendants inherit a highlight).
+  assert.deepEqual(site('--mdm-caret'), [[`@container not style(--mdm-caret: auto) > ${guard}, ${guard} > *`, 'caret-color', false]]);
   const both = '@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none))';
-  assert.deepEqual(site('--mdm-selection-bg'), [[`${both} > ${guard} ::selection`, 'background-color', false]]);
-  assert.deepEqual(site('--mdm-selection-fg'), [[`${both} > ${guard} ::selection`, 'color', false]]);
+  assert.deepEqual(site('--mdm-selection-bg'), [[`${both} > ${guard}::selection`, 'background-color', false]]);
+  assert.deepEqual(site('--mdm-selection-fg'), [[`${both} > ${guard}::selection`, 'color', false]]);
   assert.deepEqual(site('--mdm-selected-outline'), [
     ['.mdm-prosemirror .ProseMirror-selectednode:not(li)', 'outline-color', false],
     ['.mdm-prosemirror li.ProseMirror-selectednode::after', 'border-color', false]]);
@@ -1203,7 +1205,6 @@ test('the cursor, the selection and a clicked rule or picture take theme variabl
   const editor = doc.querySelector('.mdm-prosemirror');
   editor.id = 'editor';
   assert.deepEqual(reaches(doc, guard), ['editor']);
-  assert.ok(reaches(doc, `${guard} *`).includes('keyword'));
   assert.deepEqual(reaches(doc, '.mdm-prosemirror .ProseMirror-selectednode:not(li)'), ['rule']);
   assert.deepEqual(reaches(doc, '.mdm-prosemirror li.ProseMirror-selectednode'), ['picked']);
   editor.classList.add('ProseMirror-hideselection');
@@ -1238,6 +1239,11 @@ test('a theme\'s own caret or selection rule still reaches the document until it
   assert.deepEqual(live('body { caret-color: #ff0000 } ::selection { background: #ff0000 }'), []);
   assert.deepEqual(live(':root { --mdm-selection-bg: #400000 }'), [], 'one selection colour alone');
   assert.deepEqual(live(readTheme('Red-Sparks.css')).sort(), ['background-color', 'caret-color', 'color']);
+  // And once it applies, it stops at the editor's blocks, so a theme's own rule on an element with
+  // children (`.mdm-prosemirror code { caret-color }`) still reaches the code's tokens.
+  const doc = editorDom();
+  const caret = ours.find((d) => d.prop === 'caret-color').where.replace(/^@container .*?\) > /, '');
+  assert.deepEqual(reaches(doc, caret).filter((id) => reaches(doc, '.mdm-prosemirror code, .mdm-prosemirror code *').includes(id)), []);
 });
 
 test('a clicked rule or picture prints no frame, whatever the theme', () => {

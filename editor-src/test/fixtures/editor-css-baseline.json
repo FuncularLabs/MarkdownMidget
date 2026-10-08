@@ -1524,19 +1524,19 @@
   "important": false
  },
  {
-  "where": "@container not style(--mdm-caret: auto) > .mdm-prosemirror:not(.ProseMirror-hideselection), .mdm-prosemirror:not(.ProseMirror-hideselection) *",
+  "where": "@container not style(--mdm-caret: auto) > .mdm-prosemirror:not(.ProseMirror-hideselection), .mdm-prosemirror:not(.ProseMirror-hideselection) > *",
   "prop": "caret-color",
   "value": "auto",
   "important": false
  },
  {
-  "where": "@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) > .mdm-prosemirror:not(.ProseMirror-hideselection) ::selection",
+  "where": "@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) > .mdm-prosemirror:not(.ProseMirror-hideselection)::selection",
   "prop": "background-color",
   "value": "none",
   "important": false
  },
  {
-  "where": "@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) > .mdm-prosemirror:not(.ProseMirror-hideselection) ::selection",
+  "where": "@container (not style(--mdm-selection-bg: none)) and (not style(--mdm-selection-fg: none)) > .mdm-prosemirror:not(.ProseMirror-hideselection)::selection",
   "prop": "color",
   "value": "none",
   "important": false
