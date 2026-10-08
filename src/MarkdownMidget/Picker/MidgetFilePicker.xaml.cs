@@ -266,7 +266,7 @@ public partial class MidgetFilePicker : Window
     /// failure is expected and the next candidate is the answer.</summary>
     private bool Navigate(string path, bool addToHistory, bool quiet = false, bool sayIfMissing = false)
     {
-        if (!Directory.Exists(path)) { if (sayIfMissing) MessageBox.Show(this, "That folder doesn't exist.", "Markdown Midget"); return false; }
+        if (!Directory.Exists(path)) { if (sayIfMissing) MessageBox.Show(this, "That folder doesn't exist.", "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information); return false; }
         var target = Path.GetFullPath(path);
 
         var entries = new List<Entry>();
