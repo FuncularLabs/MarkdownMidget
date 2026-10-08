@@ -191,12 +191,19 @@ public partial class MidgetFilePicker : Window
             .Select(d => d.RootDirectory.FullName));
     }
 
-    /// <summary>Explorer's pinned folders (#12, item 5), given half a second: a redirected
-    /// AppData can sit on a slow share, and the picker must open regardless.</summary>
+    private static Task<IReadOnlyList<string>>? s_pinnedRead;   // pickers open on the UI thread, one at a time
+
+    /// <summary>Explorer's pinned folders (#12, item 5), given half a second: a redirected AppData can
+    /// sit on a slow share, and the picker must open regardless. The read stops itself at that
+    /// deadline, and while one is still running a new picker waits on it rather than start another.</summary>
     private static IReadOnlyList<string> PinnedFolders()
     {
-        var read = Task.Run(() => QuickAccess.PinnedFolders(QuickAccess.JumpListPath));
-        return read.Wait(TimeSpan.FromMilliseconds(500)) ? read.Result : [];
+        if (s_pinnedRead is not { IsCompleted: false })
+        {
+            var deadline = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+            s_pinnedRead = Task.Run(() => { using (deadline) return QuickAccess.PinnedFolders(QuickAccess.JumpListPath, deadline.Token); });
+        }
+        return s_pinnedRead.Wait(TimeSpan.FromMilliseconds(500)) ? s_pinnedRead.Result : [];
     }
 
     /// <summary>A tree node with a placeholder child, so the arrow shows without
@@ -219,8 +226,12 @@ public partial class MidgetFilePicker : Window
 
     private void PlacesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (_navigating) return;
-        if (e.NewValue is TreeViewItem { Tag: string path }) Navigate(path, addToHistory: true);
+        if (_navigating || e.NewValue is not TreeViewItem { Tag: string path } node || Navigate(path, addToHistory: true)) return;
+        // A place that isn't there now (a pinned folder deleted since): say so, and let go of the
+        // node so a second click tries again.
+        if (!Directory.Exists(path))
+            MessageBox.Show(this, "That folder doesn't exist.", "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+        Dispatcher.InvokeAsync(() => { _navigating = true; node.IsSelected = false; _navigating = false; });
     }
 
     // ===== listing =====

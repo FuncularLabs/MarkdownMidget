@@ -12,20 +12,22 @@ namespace MarkdownMidget.Picker;
 /// (<see cref="CompoundFile"/>). Its DestList stream lists the entries, each pinned one with
 /// its place in the pin order, and the stream named by an entry's number in hex is that
 /// entry's shell link (<see cref="ShellLink"/>). Only DestList versions 3 and 4 (Windows 10
-/// and 11) are read. Nothing is checked on disk: a pinned folder that has gone is reported
-/// when it is clicked, and a network folder isn't touched until then.
+/// and 11) are read. Nothing is checked on disk: a pinned folder that has gone says so when it
+/// is clicked, and a network folder isn't touched until then. The work is bounded: an 8 MB
+/// file, 100 pinned entries, links of 64 KB, and a deadline checked as it goes.
 /// </summary>
 internal static class QuickAccess
 {
     public const string JumpListName = "f01b4d95cf55d32a.automaticDestinations-ms";
-    private const int MaxFileBytes = 8 << 20;
+    private const int MaxFileBytes = 8 << 20, MaxPinned = 100, MaxLinkBytes = 64 << 10;
 
     public static string JumpListPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Microsoft", "Windows", "Recent", "AutomaticDestinations", JumpListName);
 
     /// <summary>The pinned folders' paths, in pin order. Empty when the file is missing, can't
-    /// be read, is another version or isn't as expected anywhere. Never throws.</summary>
-    public static IReadOnlyList<string> PinnedFolders(string jumpListPath)
+    /// be read, is another version, isn't as expected, or <paramref name="stop"/> comes first.
+    /// Never throws.</summary>
+    public static IReadOnlyList<string> PinnedFolders(string jumpListPath, CancellationToken stop = default)
     {
         try
         {
@@ -34,31 +36,44 @@ internal static class QuickAccess
             if (stream.Length > MaxFileBytes) return [];
             var bytes = new byte[stream.Length];
             stream.ReadExactly(bytes);
-            return PinnedFolders(bytes);
+            return PinnedFolders(bytes, stop);
         }
         catch (Exception) { return []; }
     }
 
-    internal static IReadOnlyList<string> PinnedFolders(byte[] jumpList)
+    internal static IReadOnlyList<string> PinnedFolders(byte[] jumpList, CancellationToken stop = default)
     {
         try
         {
-            var file = new CompoundFile(jumpList);
-            var list = file.Read("DestList");
+            var file = new CompoundFile(jumpList, stop);
+            var list = file.Read("DestList", int.MaxValue);
             if (list is null || I32(list, 0) is not (3 or 4)) return [];
-            // A 32-byte header, then entries of 130 bytes plus the path: the entry number at
-            // 88, the pin order at 104 (-1 when not pinned), the path's length in characters at 124.
-            var pinned = new List<(int Order, int Entry)>();
+            // libyal dtformats "Jump lists format" (DestList entry, version 2 or later) and EricZimmerman's
+            // JumpList: a 32-byte header; then per entry the entry number at 88, the pin status at 108 (-1 when
+            // not pinned, else the pin order), the path's length in characters at 128, the path at 130, then a
+            // property store's size (4 bytes) and the store.
+            var pinned = new Dictionary<int, int>();   // entry number to pin order, each entry once
             var at = 32;
             for (var count = I32(list, 4); count > 0; count--)
             {
-                if (I32(list, at + 104) is var order and >= 0) pinned.Add((order, I32(list, at + 88)));
-                at += 130 + 2 * BinaryPrimitives.ReadUInt16LittleEndian(list.AsSpan(at + 124, 2));
+                stop.ThrowIfCancellationRequested();
+                var pathEnd = at + 130 + 2 * BinaryPrimitives.ReadUInt16LittleEndian(list.AsSpan(at + 128, 2));
+                if (I32(list, at + 108) is var order and >= 0) pinned.TryAdd(I32(list, at + 88), order);
+                at = checked(pathEnd + 4 + (I32(list, pathEnd) is var store and >= 0 ? store : throw new InvalidDataException("a negative store")));
                 if (at > list.Length) throw new InvalidDataException("DestList ends inside an entry");
             }
-            return pinned.OrderBy(p => p.Order)
-                .Select(p => file.Read(p.Entry.ToString("x")) is { } link ? ShellLink.FolderPath(link) : null)
-                .OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var folders = new List<string>();
+            foreach (var entry in pinned.OrderBy(p => p.Value).Take(MaxPinned).Select(p => p.Key))
+            {
+                stop.ThrowIfCancellationRequested();
+                try   // a bad link leaves out its own entry only
+                {
+                    if (file.Read(entry.ToString("x"), MaxLinkBytes) is { } link && ShellLink.FolderPath(link) is { } path
+                        && !folders.Contains(path, StringComparer.OrdinalIgnoreCase)) folders.Add(path);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException) { }
+            }
+            return folders;
         }
         catch (Exception) { return []; }
     }
@@ -70,10 +85,11 @@ internal static class QuickAccess
 /// A minimal read-only reader for an OLE compound file ([MS-CFB]), enough to take a stream
 /// out by name: versions 3 and 4 (512- and 4096-byte sectors), the FAT, and the mini stream
 /// that holds streams under the cutoff. A file whose FAT needs a DIFAT chain (a version 3
-/// file over about 7 MB) is refused. It trusts nothing it reads: a chain that loops or
-/// leaves the file, or a size larger than the file, throws, and the caller treats any
-/// exception as no data. The directory is read as a flat list; its red-black tree only
-/// orders the names, and nothing here needs that order.
+/// file over about 7 MB) is refused. It trusts nothing it reads: a FAT sector listed twice, a
+/// chain that comes back to a sector or leaves its table, and a size beyond its chain all
+/// throw, so no chain reads more than its source holds; and it stops when told to. The caller
+/// treats any exception as no data. The directory is read as a flat list; its red-black tree
+/// only orders the names, and nothing here needs that order.
 /// </summary>
 internal sealed class CompoundFile
 {
@@ -86,17 +102,18 @@ internal sealed class CompoundFile
     private readonly uint[] _fat, _miniFat = [];
     private readonly byte[] _miniStream = [];
     private readonly Dictionary<string, (uint Start, long Size)> _streams = new(StringComparer.OrdinalIgnoreCase);
+    private readonly CancellationToken _stop;
 
-    public CompoundFile(byte[] file)
+    public CompoundFile(byte[] file, CancellationToken stop = default)
     {
-        _file = file;
+        (_file, _stop) = (file, stop);
         if (file.Length < 512 || U64(file, 0) != 0xE11AB1A1E011CFD0 || U16(file, 0x1C) != 0xFFFE
             || U16(file, 0x1E) is not (9 or 12) || U16(file, 0x20) != 6 || U32(file, 0x48) != 0)
             throw new InvalidDataException("not a compound file this reader takes");
         _sectorSize = 1 << U16(file, 0x1E);
         _cutoff = U32(file, 0x38);
         var fatSectors = Enumerable.Range(0, 109).Select(i => U32(file, 0x4C + 4 * i)).TakeWhile(s => s != NoSector).ToList();
-        if (fatSectors.Count > file.Length / _sectorSize) throw new InvalidDataException("more FAT than file");
+        if (fatSectors.Distinct().Count() != fatSectors.Count) throw new InvalidDataException("a FAT sector listed twice");
         _fat = fatSectors.SelectMany(s => ToUInts(file.AsSpan(checked((int)((s + 1L) * _sectorSize)), _sectorSize))).ToArray();
 
         var directory = Follow(_file, _sectorSize, _sectorSize, _fat, U32(file, 0x30), -1);
@@ -114,21 +131,25 @@ internal sealed class CompoundFile
             _miniFat = ToUInts(Follow(_file, _sectorSize, _sectorSize, _fat, U32(file, 0x3C), (long)miniFatSectors * _sectorSize));
     }
 
-    /// <summary>The stream called <paramref name="name"/>, or null when there is none.</summary>
-    public byte[]? Read(string name) =>
-        !_streams.TryGetValue(name, out var s) ? null
+    /// <summary>The stream called <paramref name="name"/>, or null when there is none or it is
+    /// longer than <paramref name="maxBytes"/>.</summary>
+    public byte[]? Read(string name, int maxBytes) =>
+        !_streams.TryGetValue(name, out var s) || s.Size > maxBytes ? null
         : s.Size < _cutoff ? Follow(_miniStream, 0, MiniSectorSize, _miniFat, s.Start, s.Size)
         : Follow(_file, _sectorSize, _sectorSize, _fat, s.Start, s.Size);
 
     /// <summary>The chain from <paramref name="start"/> through <paramref name="table"/>, in
     /// sectors of <paramref name="size"/> bytes counted from <paramref name="origin"/>: its first
-    /// <paramref name="length"/> bytes, or every sector of it when that is -1.</summary>
-    private static byte[] Follow(byte[] source, long origin, int size, uint[] table, uint start, long length)
+    /// <paramref name="length"/> bytes, or every sector of it when that is -1. Each sector once:
+    /// so never more than <paramref name="source"/> holds.</summary>
+    private byte[] Follow(byte[] source, long origin, int size, uint[] table, uint start, long length)
     {
         using var buffer = new MemoryStream();
-        for (uint sector = start, steps = 0; sector != EndOfChain && (length < 0 || buffer.Length < length); sector = table[sector])
+        var seen = new HashSet<uint>();
+        for (var sector = start; sector != EndOfChain && (length < 0 || buffer.Length < length); sector = table[sector])
         {
-            if (sector >= table.Length || ++steps > table.Length) throw new InvalidDataException("a broken chain");
+            _stop.ThrowIfCancellationRequested();
+            if (sector >= table.Length || !seen.Add(sector)) throw new InvalidDataException("a broken chain");
             buffer.Write(source, checked((int)(origin + (long)sector * size)), length < 0 ? size : (int)Math.Min(size, length - buffer.Length));
         }
         if (length >= 0 && buffer.Length != length) throw new InvalidDataException("a chain shorter than its stream");
@@ -152,7 +173,7 @@ internal sealed class CompoundFile
 internal static class ShellLink
 {
     /// <summary>The system's ANSI code page, which a link's non-Unicode strings are in.</summary>
-    private static readonly Encoding Ansi = CodePagesEncodingProvider.Instance.GetEncoding(0) ?? Encoding.Latin1;
+    private static readonly Encoding Ansi = CodePagesEncodingProvider.Instance.GetEncoding(0) ?? Encoding.UTF8;   // null when it is UTF-8 (65001)
 
     public static string? FolderPath(byte[] link)
     {

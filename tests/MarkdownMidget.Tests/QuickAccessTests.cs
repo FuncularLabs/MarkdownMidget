@@ -68,8 +68,9 @@ public sealed class QuickAccessTests : IDisposable
         [
             ("DestList", JumpListWriter.DestList(4,
                 [(1, 0, "knownfolder:{home}"), (2, 1, @"C:\Docs\a.txt"), (3, 2, @"C:\Projects\Alpha"), (4, 3, "::{library}"), (5, 4, @"c:\projects\alpha"),
-                 (6, 5, "Projects")])),
+                 (6, 5, "Projects"), (7, 6, @"C:\NoFlag")])),
             ("6", JumpListWriter.Link(local: "Projects")),                            // not a full path
+            ("7", JumpListWriter.Link(local: @"C:\NoFlag", infoFlag: false)),        // LinkInfo's bytes, but its flag says none
             ("1", JumpListWriter.Link(local: null)),                                  // ID list only: a virtual item
             ("2", JumpListWriter.Link(local: @"C:\Docs\a.txt", folder: false)),
             ("3", Alpha),
@@ -101,8 +102,10 @@ public sealed class QuickAccessTests : IDisposable
     [InlineData("not a compound file")]
     [InlineData("header signature")]
     [InlineData("1024-byte sectors")]
+    [InlineData("mini sector shift")]
     [InlineData("DIFAT sectors")]
     [InlineData("truncated DestList")]
+    [InlineData("a property store past the end")]
     [InlineData("no DestList")]
     [InlineData("a chain that loops")]
     [InlineData("a stream longer than the file")]
@@ -120,6 +123,8 @@ public sealed class QuickAccessTests : IDisposable
             "no DestList" => JumpListWriter.CompoundFile([("1", Alpha)]),
             "a link cut short" => JumpListWriter.CompoundFile([("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha")])), ("1", Alpha[..90])]),
             "1024-byte sectors" => Usual(sectorShift: 10),   // well formed, but not a size [MS-CFB] allows
+            "a property store past the end" => JumpListWriter.CompoundFile(   // the second entry's store runs 10 bytes past the stream
+                [("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha"), (2, 1, @"C:\B")], store: e => e == 2 ? 20 : 0)[..^10]), ("1", Alpha)]),
             "a negative size" => Usual(sectorShift: 12),
             _ => Usual(),
         };
@@ -128,6 +133,7 @@ public sealed class QuickAccessTests : IDisposable
         switch (broken)
         {
             case "header signature": file[3] ^= 0xFF; break;
+            case "mini sector shift": file[0x20] = 7; break;   // the reader's mini sectors are 64 bytes, shift 6
             case "DIFAT sectors": file[0x48] = 1; break;
             case "a stream longer than its chain":   // still a mini stream, but past its last mini sector
                 BinaryPrimitives.WriteInt32LittleEndian(DestListSize(512), BinaryPrimitives.ReadInt32LittleEndian(DestListSize(512)) + 200);
@@ -144,6 +150,87 @@ public sealed class QuickAccessTests : IDisposable
                 break;
         }
         Assert.Empty(QuickAccess.PinnedFolders(file));
+    }
+
+    [Fact]
+    public void OnlyPinnedEntriesShowInPinOrderAndAPropertyStoreIsSteppedOver()
+    {
+        // Each entry's modification time sits just before its pin status, its high half above zero:
+        // read four bytes early, every entry would look pinned.
+        var three = JumpListWriter.CompoundFile(
+        [
+            ("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Alpha"), (2, -1, @"C:\Beta"), (3, 1, @"C:\Gamma")], store: e => e == 2 ? 20 : 0)),
+            ("1", JumpListWriter.Link(local: @"C:\Alpha")), ("2", JumpListWriter.Link(local: @"C:\Beta")), ("3", JumpListWriter.Link(local: @"C:\Gamma")),
+        ]);
+        Assert.Equal([@"C:\Alpha", @"C:\Gamma"], QuickAccess.PinnedFolders(three));
+        var recentOnly = JumpListWriter.CompoundFile([("DestList", JumpListWriter.DestList(3, [(1, -1, @"C:\Beta")])), ("1", JumpListWriter.Link(local: @"C:\Beta"))]);
+        Assert.Empty(QuickAccess.PinnedFolders(recentOnly));
+    }
+
+    [Fact]
+    public void OneBrokenLinkLeavesOutOnlyItsEntry() => Assert.Equal([@"C:\Projects\Alpha"], QuickAccess.PinnedFolders(JumpListWriter.CompoundFile(
+        [("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha"), (2, 1, @"C:\Cut")])), ("1", Alpha), ("2", JumpListWriter.Link(local: @"C:\Cut")[..90])])));
+
+    [Fact]
+    public void AHundredPinnedFoldersAreReadEachEntryOnceAndAnOversizedLinkIsSkipped()
+    {
+        List<(string, byte[])> streams = [.. Enumerable.Range(1, 150).Select(i => (i.ToString("x"), JumpListWriter.Link(local: $@"C:\P{i}")))];
+        streams.Add(("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\P1"), (1, 1, @"C:\P1"), .. Enumerable.Range(2, 149).Select(i => ((uint)i, i, $@"C:\P{i}"))])));
+        streams[2] = ("3", [.. JumpListWriter.Link(local: @"C:\P3"), .. new byte[70_000]]);   // over 64 KB: no link is that long
+        var folders = QuickAccess.PinnedFolders(JumpListWriter.CompoundFile(streams));
+        Assert.Equal(99, folders.Count);   // 100 pinned entries read, P1 once, P3 too long
+        Assert.Equal([@"C:\P1", @"C:\P2", @"C:\P4"], folders.Take(3));
+    }
+
+    [Fact]
+    public void AChainThatLoopsOrARepeatedFatSectorIsRefusedAtOnce()
+    {
+        var loops = Usual();
+        var dir = BinaryPrimitives.ReadInt32LittleEndian(loops.AsSpan(0x30));
+        BinaryPrimitives.WriteInt32LittleEndian(loops.AsSpan(512 + 4 * dir), dir);   // the directory's sector points at itself
+        var repeated = Usual();
+        BinaryPrimitives.WriteInt32LittleEndian(repeated.AsSpan(0x4C + 4), BinaryPrimitives.ReadInt32LittleEndian(repeated.AsSpan(0x4C)));
+        BinaryPrimitives.WriteInt32LittleEndian(repeated.AsSpan(0x2C), 2);
+        foreach (var file in new[] { loops, repeated })
+        {
+            var (before, clock) = (GC.GetAllocatedBytesForCurrentThread(), System.Diagnostics.Stopwatch.StartNew());
+            Assert.Empty(QuickAccess.PinnedFolders(file));
+            Assert.InRange(GC.GetAllocatedBytesForCurrentThread() - before, 0, 4 << 20);
+            Assert.InRange(clock.ElapsedMilliseconds, 0, 1000);
+        }
+    }
+
+    [Fact]
+    public void AReadPastItsDeadlineStops()
+    {
+        var late = new CancellationToken(canceled: true);
+        Assert.Throws<OperationCanceledException>(() => new CompoundFile(Usual(), late));
+        Assert.Empty(QuickAccess.PinnedFolders(Usual(), late));
+    }
+
+    [Fact]
+    public void AShareWithAUnicodeNameKeepsIt()
+    {
+        var link = JumpListWriter.Link(share: @"\\server\Teilen-Ä", suffix: "Beta", unicode: true);
+        Assert.Equal([@"\\server\Teilen-Ä\Beta"], QuickAccess.PinnedFolders(JumpListWriter.CompoundFile([("DestList", JumpListWriter.DestList(4, [(1, 0, "x")])), ("1", link)])));
+    }
+
+    [Fact]
+    public void AStreamOfExactlyTheCutoffIsReadFromTheBigSectors()
+    {
+        // 32 + (134 + 2 × 17) + 3896: the DestList is exactly 4096 bytes, so not a mini stream.
+        var list = JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha")], store: _ => 3896);
+        Assert.Equal(4096, list.Length);
+        Assert.Equal([@"C:\Projects\Alpha"], QuickAccess.PinnedFolders(JumpListWriter.CompoundFile([("DestList", list), ("1", Alpha)])));
+    }
+
+    [Fact]
+    public void AFileOverEightMegabytesIsNotRead()
+    {
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, QuickAccess.JumpListName);
+        File.WriteAllBytes(path, [.. Usual(), .. new byte[(8 << 20) + 1 - Usual().Length]]);
+        Assert.Empty(QuickAccess.PinnedFolders(path));
     }
 
     [Fact]
@@ -233,27 +320,44 @@ internal static class JumpListWriter
         w.Write(start); w.Write(size);
     }
 
-    public static byte[] DestList(int version, IReadOnlyList<(uint Entry, int Pin, string Path)> entries)
+    /// <summary>
+    /// A DestList stream, field by field from the published tables, not from the reader: libyal
+    /// dtformats, "Jump lists format", DestList header and "DestList entry - version 2 or later";
+    /// and EricZimmerman/JumpList, DestList.cs, for the property store after the path (a 4-byte
+    /// size, then that many bytes). <paramref name="store"/> gives an entry's store size.
+    /// </summary>
+    public static byte[] DestList(int version, IReadOnlyList<(uint Entry, int Pin, string Path)> entries, Func<uint, int>? store = null)
     {
         var w = new BinaryWriter(new MemoryStream());
-        w.Write(version); w.Write(entries.Count); w.Write(entries.Count(e => e.Pin >= 0)); w.Write(0f);
-        w.Write(entries.Count == 0 ? 0 : entries.Max(e => e.Entry)); w.Write(0); w.Write(1L);
+        void At(long start, int offset) => Assert.Equal(offset, w.BaseStream.Position - start);   // the table's offset, checked
+        w.Write(version); w.Write(entries.Count); w.Write(entries.Count(e => e.Pin >= 0)); w.Write(0f);   // 0, 4, 8, 12
+        w.Write(entries.Count == 0 ? 0 : entries.Max(e => e.Entry)); w.Write(0); w.Write(1); w.Write(0);   // 16, 20, 24, 28
+        var fileTime = new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc).ToFileTimeUtc();   // its high half is positive
         foreach (var (entry, pin, path) in entries)
         {
-            w.Write(new byte[88]); w.Write(entry); w.Write(0); w.Write(0L); w.Write(pin); w.Write(-1); w.Write(1); w.Write(0L);
-            w.Write((ushort)path.Length); w.Write(Encoding.Unicode.GetBytes(path)); w.Write(0);
+            var start = w.BaseStream.Position;
+            w.Write(0x1234L); w.Write(new byte[64]); w.Write(new byte[16]);   // checksum; four object identifiers; NetBIOS name
+            At(start, 88); w.Write(entry); w.Write(0); w.Write(1.5f);           // entry number; unknown; a float
+            At(start, 100); w.Write(fileTime);                                  // last modification time
+            At(start, 108); w.Write(pin);                                       // pin status: -1 not pinned, else the order
+            w.Write(0); w.Write(3); w.Write(0L);                                // unknown; access count; unknown
+            At(start, 128); w.Write((ushort)path.Length);                       // path size, in characters
+            At(start, 130); w.Write(Encoding.Unicode.GetBytes(path));
+            var size = store?.Invoke(entry) ?? 0;
+            w.Write(size); w.Write(Enumerable.Repeat((byte)0xAB, size).ToArray());   // property store size, then the store
         }
         return ((MemoryStream)w.BaseStream).ToArray();
     }
 
     /// <summary>A link to <paramref name="local"/> or to <paramref name="share"/> plus
     /// <paramref name="suffix"/>; with neither, a link with no LinkInfo (a virtual item).</summary>
-    public static byte[] Link(string? local = null, string? share = null, string suffix = "", bool folder = true, bool unicode = false, bool idList = true)
+    public static byte[] Link(string? local = null, string? share = null, string suffix = "", bool folder = true, bool unicode = false, bool idList = true,
+        bool infoFlag = true)
     {
         var w = new BinaryWriter(new MemoryStream());
         var hasInfo = local is not null || share is not null;
         w.Write(0x4C); w.Write(new Guid("00021401-0000-0000-C000-000000000046").ToByteArray());
-        w.Write((idList ? 1 : 0) | (hasInfo ? 2 : 0) | 0x80); w.Write(folder ? 0x10 : 0x20); w.Write(new byte[0x4C - 0x1C]);
+        w.Write((idList ? 1 : 0) | (hasInfo && infoFlag ? 2 : 0) | 0x80); w.Write(folder ? 0x10 : 0x20); w.Write(new byte[0x4C - 0x1C]);
         if (idList) { w.Write((ushort)2); w.Write((ushort)0); }
         if (hasInfo)
         {
@@ -270,13 +374,17 @@ internal static class JumpListWriter
             }
             else
             {
-                var name = Z(share!, ansi);
-                var link = new byte[0x14 + name.Length];
+                // CommonNetworkRelativeLink: with Unicode, NetNameOffset > 0x14 and NetNameOffsetUnicode at 0x14.
+                var (name, wide) = (Z(unicode ? "?" : share!, ansi), unicode ? Z(share!, Encoding.Unicode) : []);
+                var head = unicode ? 0x1C : 0x14;
+                var link = new byte[head + name.Length + wide.Length];
                 BinaryPrimitives.WriteInt32LittleEndian(link, link.Length);
                 BinaryPrimitives.WriteInt32LittleEndian(link.AsSpan(4), 2);
-                BinaryPrimitives.WriteInt32LittleEndian(link.AsSpan(8), 0x14);
+                BinaryPrimitives.WriteInt32LittleEndian(link.AsSpan(8), head);
                 BinaryPrimitives.WriteInt32LittleEndian(link.AsSpan(16), 0x20000);
-                name.CopyTo(link, 0x14);
+                if (unicode) BinaryPrimitives.WriteInt32LittleEndian(link.AsSpan(0x14), head + name.Length);
+                name.CopyTo(link, head);
+                wide.CopyTo(link, head + name.Length);
                 network = Put(link);
             }
             var suffixAt = Put(Z(suffix, ansi));

@@ -911,8 +911,9 @@ picker reads Explorer's own list of them, without the shell, so no add-on is
 loaded. Only pinned folders are listed, not Home, Gallery, This PC, libraries,
 pinned files or recent items. Nothing is checked when the picker opens, so a
 pinned folder that has been deleted, or one on a share that is offline, is still
-listed and only fails to open when you click it. If Explorer's list can't be
-read, the section is left out.
+listed; a deleted one says "That folder doesn't exist." when you click it. A
+pinned item the picker can't make sense of is left out, and if Explorer's list
+can't be read within half a second, so is the section.
 
 Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
 file picker**, and turn it off there to go back to Windows' dialog once the cause
