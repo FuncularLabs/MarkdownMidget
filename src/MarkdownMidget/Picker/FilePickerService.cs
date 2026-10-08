@@ -74,11 +74,8 @@ internal static class FilePickerService
     {
         // Every file dialog comes through here, so the offer covers Open, Save As, Export to PDF,
         // Insert Picture and the dictionary import alike. A failing offer is no answer.
-        UseBuiltIn = BuiltInAfterOffer(UseBuiltIn, () =>
-        {
-            try { return OfferWindowsDialog?.Invoke(owner) == true; }
-            catch (Exception ex) { CrashLog.Write("PickerOffer", ex); return false; }
-        });
+        UseBuiltIn = BuiltInAfterOffer(UseBuiltIn,
+            () => OfferAnswer(() => OfferWindowsDialog?.Invoke(owner) == true, ex => CrashLog.Write("PickerOffer", ex)));
         if (UseBuiltIn) return ShowBuiltIn(owner, request);
 
         switch (TryNativeOutOfProcess(owner, request))
@@ -95,7 +92,7 @@ internal static class FilePickerService
                 // The isolation worked: only the child died. Switch permanently,
                 // say so once, with the clues, and finish the job the user asked for.
                 UseBuiltIn = true;
-                var switched = PickerOffer.Record(PickerOffer.Crash, PickerOffer.AppVersion, DateTime.UtcNow);
+                var switched = CrashSwitch(DateTime.UtcNow);
                 try { AutoSwitchedToBuiltIn?.Invoke(switched); } catch { /* never let the notice break the pick */ }
                 try { PickerCrashDialog.ShowFor(owner, request, r.ExitCode, r.ProcessId, switched); }
                 catch (Exception ex)
@@ -118,6 +115,12 @@ internal static class FilePickerService
     /// <summary>Whether the built-in picker shows this time: <paramref name="offer"/>, the one-time
     /// question, is put only while it is on, and true from it means Windows' dialog instead.</summary>
     internal static bool BuiltInAfterOffer(bool builtInOn, Func<bool> offer) => builtInOn && !offer();
+
+    /// <summary>The offer's answer; an offer that throws is logged and is no answer.</summary>
+    internal static bool OfferAnswer(Func<bool> offer, Action<Exception> log) { try { return offer(); } catch (Exception ex) { log(ex); return false; } }
+
+    /// <summary>The record a crash's switch to the built-in picker saves and its log shows.</summary>
+    internal static PickerSwitch CrashSwitch(DateTime utc) => PickerOffer.Record(PickerOffer.Crash, PickerOffer.AppVersion, utc);
 
     private static string? ShowBuiltIn(Window owner, FilePickerRequest request)
     {

@@ -943,7 +943,7 @@ public partial class MainWindow : Window
         _pickerOfferAsked = true;
         var (useWindows, now) = (Picker.PickerOfferDialog.Ask(owner), DateTime.UtcNow);
         SavePersistentField(x => Picker.PickerOffer.Answer(x, useWindows, Picker.PickerOffer.AppVersion, now));
-        if (useWindows) _useBuiltInPicker = false;
+        _useBuiltInPicker = !useWindows;
         return useWindows;
     }
 
@@ -970,8 +970,9 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
+        var shownPicker = _useBuiltInPicker;   // Import can reach the offer or a crash while the dialog is open
         var dlg = new SettingsDialog(_startWithBlankDocument, _recentLimit, _backupEnabled,
-                                     _showEncryptedInOpen, _useBuiltInPicker, ImportCustomDic) { Owner = this };
+                                     _showEncryptedInOpen, shownPicker, ImportCustomDic) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         _startWithBlankDocument = dlg.StartWithBlankDocument;
         if (dlg.KeepBackup != _backupEnabled)
@@ -984,10 +985,11 @@ public partial class MainWindow : Window
             else EndBackup();
         }
         _showEncryptedInOpen = dlg.ShowEncryptedInOpen;
-        if (dlg.UseBuiltInPicker != _useBuiltInPicker)   // saved on its own, with why, before SaveSettings carries it from disk
-            SavePersistentField(s => Picker.PickerOffer.Switch(s, dlg.UseBuiltInPicker, Picker.PickerOffer.User, Picker.PickerOffer.AppVersion, DateTime.UtcNow));
-        _useBuiltInPicker = dlg.UseBuiltInPicker;
-        Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
+        var (savePicker, picker) = Picker.PickerOffer.AfterSettings(shownPicker, dlg.UseBuiltInPicker, _useBuiltInPicker);
+        if (savePicker)   // saved on its own, with why, before SaveSettings carries it from disk
+            SavePersistentField(s => Picker.PickerOffer.Switch(s, picker, Picker.PickerOffer.User, Picker.PickerOffer.AppVersion, DateTime.UtcNow));
+        _useBuiltInPicker = picker;
+        Picker.FilePickerService.UseBuiltIn = picker;
         if (dlg.RecentLimit != _recentLimit)
         {
             // Only the menu length changes. Lowering the limit must not delete

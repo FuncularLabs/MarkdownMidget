@@ -880,7 +880,8 @@ file list, type-ahead, and
 New Folder plus overwrite confirmation when saving. It has no thumbnails,
 preview pane or right-click shell menus — those are the add-ons that crash, so
 leaving them out is what makes it safe. A line under its buttons says it is
-Markdown Midget's own picker and how to switch back to Windows' dialog.
+Markdown Midget's own picker and, while **Always use the built-in file picker**
+is on, how to switch back to Windows' dialog.
 
 The file list shows each item's name, date modified, type and size, at first
 with folders first and then files by name. Click a column's header to sort by
@@ -925,8 +926,10 @@ dialog first asks: "Markdown Midget is using its own file picker. An older
 version could switch to it by mistake when you pressed Cancel. Try Windows'
 dialog again?" **Use Windows' dialog** turns the setting off and opens Windows'
 dialog; **Keep the built-in picker**, or Esc, keeps it. Either answer is
-remembered and the question isn't asked again, unless a version older than this
-one saves your settings, which drops the record. When Windows' dialog crashes,
+recorded as your own choice, and the question isn't asked again. If that record
+is lost, the question comes back while the setting is on: a version older than
+this one saves your settings without it, along with its own value of the setting
+from when it started, and a settings file that can't be read is set aside. When Windows' dialog crashes,
 the crash log also says that the built-in picker was switched on, by which
 version and when.
 

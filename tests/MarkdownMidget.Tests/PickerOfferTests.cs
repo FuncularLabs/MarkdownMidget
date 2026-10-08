@@ -44,11 +44,36 @@ public class PickerOfferTests
     }
 
     [Fact]
-    public void KeepingTheBuiltInPickerRecordsOnlyTheAnswer()
+    public void KeepingTheBuiltInPickerRecordsItAsTheUsersChoice()
     {
-        var s = new MainWindow.AppSettings { UseBuiltInPicker = true };
+        // The last answer wins: a Keep in one window after a Use in another brings the built-in picker back.
+        var s = new MainWindow.AppSettings { UseBuiltInPicker = false };
         PickerOffer.Answer(s, useWindows: false, "1.0.1", When);
-        Assert.Equal((true, true, null), (s.UseBuiltInPicker, s.BuiltInPickerOfferAnswered, s.BuiltInPickerSwitch));
+        Assert.Equal((true, true, "user", When), (s.UseBuiltInPicker, s.BuiltInPickerOfferAnswered, s.BuiltInPickerSwitch?.Reason, s.BuiltInPickerSwitch?.Utc));
+    }
+
+    [Theory]
+    [InlineData(true, true, false, false, false)]   // the offer, from Import in the dialog, chose Windows': OK keeps that
+    [InlineData(false, false, true, false, true)]   // Windows' dialog crashed during Import: OK keeps the switch
+    [InlineData(true, true, true, false, true)]     // nothing changed
+    [InlineData(true, false, true, true, false)]    // the box cleared
+    [InlineData(false, true, false, true, true)]    // the box ticked
+    [InlineData(true, false, false, true, false)]   // cleared after the offer cleared it too: saved as the user's
+    public void OkInSettingsChangesTheSettingOnlyWhenTheBoxWasChanged(bool shown, bool chosen, bool now, bool save, bool after) =>
+        Assert.Equal((save, after), PickerOffer.AfterSettings(shown, chosen, now));
+
+    [Fact]
+    public void ACrashSwitchesWithTheReasonCrash() =>
+        Assert.Equal((PickerOffer.Crash, PickerOffer.AppVersion, When),
+            (FilePickerService.CrashSwitch(When).Reason, FilePickerService.CrashSwitch(When).Version, FilePickerService.CrashSwitch(When).Utc));
+
+    [Fact]
+    public void AnOfferThatFailsIsLoggedAndCountsAsNoAnswer()
+    {
+        Exception? logged = null;
+        Assert.False(FilePickerService.OfferAnswer(() => throw new InvalidOperationException("no window"), ex => logged = ex));
+        Assert.IsType<InvalidOperationException>(logged);
+        Assert.True(FilePickerService.OfferAnswer(() => true, _ => throw new InvalidOperationException("not logged")));
     }
 
     [Fact]

@@ -50,6 +50,7 @@ public class PickerRowsTests
     {
         var row = Find<TextBlock>((DependencyObject)list.ItemContainerGenerator.ContainerFromItem("a"))!;
         var header = Find<GridViewColumnHeader>(list, h => h.Column is not null)!;   // not the padding header
+        list.SelectedItem = "c";   // the bug opened the selected row wherever the double-click landed
         Assert.Equal("a", PickerRows.DoubleClickedItem(list, MouseButton.Left, row));
         Assert.Null(PickerRows.DoubleClickedItem(list, MouseButton.Right, row));
         Assert.Null(PickerRows.DoubleClickedItem(list, MouseButton.Left, Find<TextBlock>(header)!));   // a header's label

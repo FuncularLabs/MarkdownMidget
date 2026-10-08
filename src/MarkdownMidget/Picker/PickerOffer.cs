@@ -44,13 +44,17 @@ internal static class PickerOffer
         s.BuiltInPickerSwitch = Record(reason, version, utc);
     }
 
-    /// <summary>The offer answered, either way, so it is never asked again; Windows' dialog also
-    /// turns the setting off, as the user's own choice.</summary>
+    /// <summary>The offer answered, so it is never asked again, and the answer recorded as the
+    /// user's own choice: the last answer wins, in whichever window it was given.</summary>
     public static void Answer(MainWindow.AppSettings s, bool useWindows, string version, DateTime utc)
     {
         s.BuiltInPickerOfferAnswered = true;
-        if (useWindows) Switch(s, false, User, version, utc);
+        Switch(s, !useWindows, User, version, utc);
     }
+
+    /// <summary>OK in Settings saves the setting only if the box was changed from how it was <paramref name="shown"/>;
+    /// else <paramref name="now"/> stands, which Import may have changed by reaching the offer or a crash.</summary>
+    public static (bool Save, bool Value) AfterSettings(bool shown, bool chosen, bool now) => chosen != shown ? (true, chosen) : (false, now);
 
     /// <summary>The crash log's line for the switch the crash made.</summary>
     public static string LogLine(PickerSwitch s) =>
