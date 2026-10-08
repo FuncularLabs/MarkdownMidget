@@ -564,7 +564,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Type:** Both. Automated: `SpellChunkTests.Chunks_BreakAtALineBreak_PreferringABlankLine`, `SpellChunkTests.Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk`, and `SpellChunkTests.CheckInChunks_GivesTheRangesOfOneWholeTextCall`. Human: the Windows spell checker and squiggle placement.
 
 #### SPL-02 Right-clicking a word in the source view offers suggestions for that word
-- **Change:** Fixed: "Right-clicking a word in the Markdown source view now offers suggestions for that word" · **Documents:** `theme-tester.md` · **Settings:** View ▸ Spell Check on
+- **Change:** Fixed: "Right-clicking a word in the Markdown source view now offers suggestions for that word" · **Documents:** `theme-tester.md` · **Settings:** View ▸ Spell Check on, Show Line Numbers off
 1. Press Ctrl+E. Right-click the middle of **recieve**, in the *143 kHz* section, then of **occassionally**, under *Handing Over*.
 2. Right-click the middle of **The** at the start of the line above **recieve**.
 3. Turn on **View ▸ Line Numbers ▸ Show Line Numbers** and repeat steps 1 and 2.

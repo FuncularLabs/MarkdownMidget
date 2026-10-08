@@ -231,6 +231,30 @@ public class SourceEditorTests
         Assert.Equal((first, last), (top, bottom));
     }
 
+    [Fact]   // scrolled sideways, word wrap off: the horizontal scroll offset counts as the vertical one does
+    public void HitTestInAViewScrolledSidewaysReturnsTheOffsetUnderThePoint()
+    {
+        var (scrolled, idx) = On(ed =>
+        {
+            (ed.Padding, ed.WordWrap) = (new Thickness(12), false);
+            ed.UpdateLayout();
+            ed.ScrollToHorizontalOffset(500);
+            ed.UpdateLayout();
+            return (ed.TextArea.TextView.ScrollOffset.X, ed.GetCharacterIndexFromPoint(PointOver(ed, 80), snapToText: true));
+        }, new string('x', 200), laidOut: true);   // 80 is in view: about 65 to 98 show
+        Assert.Equal(500, scrolled);
+        Assert.Equal(80, idx);
+    }
+
+    [Fact]   // the doc comment's promise: without snapping, a point with no line under it is -1
+    public void WithoutSnappingAPointInThePaddingFindsNothing() =>
+        Assert.Equal(-1, On(ed =>
+        {
+            ed.Padding = new Thickness(12);
+            ed.UpdateLayout();
+            return ed.GetCharacterIndexFromPoint(new Point(40, 5), snapToText: false);   // in the top padding
+        }, "hello world\nsecond line", laidOut: true));
+
     // ===== 1.5 the TextBox property shims =====
 
     [Fact]
