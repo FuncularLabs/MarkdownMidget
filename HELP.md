@@ -917,6 +917,19 @@ is fixed. The change applies to the window you make it in and to windows you
 open after it; a window that was already open keeps its picker until you close
 it, which is why the picker's own line says to restart Markdown Midget.
 
+Markdown Midget records why the built-in picker is on: switched on after a
+crash, or by you in **Edit ▸ Settings**, with the version and the time. Before
+1.0.0-rc3, pressing Cancel in Windows' dialog could switch it on by mistake, and
+nothing was recorded. So when it is on with no reason recorded, the next file
+dialog first asks: "Markdown Midget is using its own file picker. An older
+version could switch to it by mistake when you pressed Cancel. Try Windows'
+dialog again?" **Use Windows' dialog** turns the setting off and opens Windows'
+dialog; **Keep the built-in picker**, or Esc, keeps it. Either answer is
+remembered and the question isn't asked again, unless a version older than this
+one saves your settings, which drops the record. When Windows' dialog crashes,
+the crash log also says that the built-in picker was switched on, by which
+version and when.
+
 **If something goes wrong:** unexpected errors are recorded in
 `%LocalAppData%\MarkdownMidget\crash.log`, and most won't close the app — you'll
 get a dialog pointing at that file instead. When reporting a problem, that file is

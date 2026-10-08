@@ -350,13 +350,14 @@ internal static class PickerCrashClues
         $"{e.Path} ({string.Join(", ", e.Kinds)}; {e.Company ?? "no vendor named"})";
 
     /// <summary>All of it as plain text, for a bug report.</summary>
-    public static string Details(PickerCrashFindings f, string appVersion, string osVersion)
+    public static string Details(PickerCrashFindings f, string appVersion, string osVersion, PickerSwitch? switched = null)
     {
         var text = new StringBuilder()
             .AppendLine($"Markdown Midget {appVersion}: Windows' file dialog closed unexpectedly")
             .AppendLine($"Windows: {osVersion}")
-            .AppendLine($"The helper's exit code: 0x{f.ExitCode:X8}")
-            .AppendLine()
+            .AppendLine($"The helper's exit code: 0x{f.ExitCode:X8}");
+        if (switched is not null) text.AppendLine(PickerOffer.LogLine(switched));   // settings.json keeps it too; logs are pruned
+        text.AppendLine()
             .AppendLine("What Windows recorded:")
             .AppendLine("  " + FaultSentence(f));
         if (f.Fault is { } fault)

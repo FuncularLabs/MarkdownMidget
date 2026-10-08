@@ -188,6 +188,7 @@ public partial class MainWindow : Window
         // settings file at launch and re-read by each new window.
         Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
         Picker.FilePickerService.AutoSwitchedToBuiltIn = OnPickerAutoSwitched;
+        Picker.FilePickerService.OfferWindowsDialog = OfferWindowsDialog;
 
         var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
         for (var i = 0; i < args.Length; i++)
@@ -916,14 +917,34 @@ public partial class MainWindow : Window
     /// one ended up (windows already open are separate processes and keep their
     /// own setting until they restart); the service has already told the user.
     /// </summary>
-    private void OnPickerAutoSwitched()
+    private void OnPickerAutoSwitched(Picker.PickerSwitch switched)
     {
         _useBuiltInPicker = true;
         // SavePersistentField, not SaveSettings: this fires from a background
         // event while other WINDOWS (separate processes) may have written their
         // own preferences since we launched, and SaveSettings would republish
-        // this instance's launch-time snapshot over them.
-        SavePersistentField(s => s.UseBuiltInPicker = true);
+        // this instance's launch-time snapshot over them. The record is the one
+        // the crash log shows, saying why the setting is on (#12, item 6).
+        SavePersistentField(s => (s.UseBuiltInPicker, s.BuiltInPickerSwitch) = (true, switched));
+    }
+
+    private bool _pickerOfferAsked;   // this window asks once, even if the answer can't be saved
+
+    /// <summary>
+    /// The one-time offer of Windows' dialog (Picker.PickerOffer), before a file dialog. Whether
+    /// to ask is read from settings.json, not this window's launch-time copy, so an answer given
+    /// or a reason recorded in another window counts. True when the user chose Windows' dialog.
+    /// </summary>
+    private bool OfferWindowsDialog(Window owner)
+    {
+        if (_pickerOfferAsked || _settingsUnknown || !TryReadSettings(out var s)
+            || !Picker.PickerOffer.ShouldAsk(Picker.FilePickerService.UseBuiltIn, s?.BuiltInPickerSwitch, s?.BuiltInPickerOfferAnswered == true))
+            return false;
+        _pickerOfferAsked = true;
+        var (useWindows, now) = (Picker.PickerOfferDialog.Ask(owner), DateTime.UtcNow);
+        SavePersistentField(x => Picker.PickerOffer.Answer(x, useWindows, Picker.PickerOffer.AppVersion, now));
+        if (useWindows) _useBuiltInPicker = false;
+        return useWindows;
     }
 
     /// <summary>Folders worth offering in the built-in picker's rail: where the
@@ -963,8 +984,8 @@ public partial class MainWindow : Window
             else EndBackup();
         }
         _showEncryptedInOpen = dlg.ShowEncryptedInOpen;
-        if (dlg.UseBuiltInPicker != _useBuiltInPicker)   // saved on its own, before SaveSettings carries it from disk
-            SavePersistentField(s => s.UseBuiltInPicker = dlg.UseBuiltInPicker);
+        if (dlg.UseBuiltInPicker != _useBuiltInPicker)   // saved on its own, with why, before SaveSettings carries it from disk
+            SavePersistentField(s => Picker.PickerOffer.Switch(s, dlg.UseBuiltInPicker, Picker.PickerOffer.User, Picker.PickerOffer.AppVersion, DateTime.UtcNow));
         _useBuiltInPicker = dlg.UseBuiltInPicker;
         Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
         if (dlg.RecentLimit != _recentLimit)
@@ -4139,6 +4160,10 @@ public partial class MainWindow : Window
         public bool KeepBackup { get; set; } = true;     // crash copy of unsaved work
         public bool ShowEncryptedInOpen { get; set; }    // *.mdenc in Open's Markdown type too (opt-in)
         public bool UseBuiltInPicker { get; set; }       // skip the native dialog entirely
+        // Why UseBuiltInPicker last changed, and whether the one-time offer of Windows' dialog was
+        // answered (#12, item 6). Written only through SavePersistentField; CarryFromDisk keeps them.
+        public Picker.PickerSwitch? BuiltInPickerSwitch { get; set; }
+        public bool BuiltInPickerOfferAnswered { get; set; }
         // The theme's FILENAME, not its position in the menu — the list changes when
         // a file is added or removed, and an index would then select a different one.
         // One per mode, light and dark, since 1.0.0-rc3 (ThemeLight/ThemeDark, null = never
@@ -4402,6 +4427,7 @@ public partial class MainWindow : Window
         // Written by Settings and the crash switch, each through SavePersistentField: a window
         // launched before either would otherwise put its launch-time value back.
         s.UseBuiltInPicker = existing?.UseBuiltInPicker ?? s.UseBuiltInPicker;
+        (s.BuiltInPickerSwitch, s.BuiltInPickerOfferAnswered) = (existing?.BuiltInPickerSwitch, existing?.BuiltInPickerOfferAnswered == true);
         (s.MdOpensWithUs, s.LastRunVersion, s.DefaultNoticeOff) = (existing?.MdOpensWithUs, existing?.LastRunVersion, existing?.DefaultNoticeOff == true);
     }
 

@@ -40,8 +40,14 @@ internal static class FilePickerService
     /// Raised when a native-dialog crash flips <see cref="UseBuiltIn"/> on. The
     /// host persists the setting; this class knows nothing about settings files.
     /// Telling the user is <see cref="PickerCrashDialog"/>'s job, shown from here.
+    /// The host saves the record it is given, the one the crash log shows.
     /// </summary>
-    public static Action? AutoSwitchedToBuiltIn { get; set; }
+    public static Action<PickerSwitch>? AutoSwitchedToBuiltIn { get; set; }
+
+    /// <summary>The one-time offer of Windows' dialog (<see cref="PickerOffer"/>), put by the host
+    /// before any file dialog while <see cref="UseBuiltIn"/> is on: true means the user chose it.
+    /// The host decides whether to ask, and records the answer.</summary>
+    public static Func<Window, bool>? OfferWindowsDialog { get; set; }
 
     /// <summary>Child-process exit code meaning "the user cancelled" — distinct
     /// from every failure code so a cancel is never mistaken for a crash.</summary>
@@ -66,6 +72,13 @@ internal static class FilePickerService
     /// </summary>
     public static string? Show(Window owner, FilePickerRequest request)
     {
+        // Every file dialog comes through here, so the offer covers Open, Save As, Export to PDF,
+        // Insert Picture and the dictionary import alike. A failing offer is no answer.
+        UseBuiltIn = BuiltInAfterOffer(UseBuiltIn, () =>
+        {
+            try { return OfferWindowsDialog?.Invoke(owner) == true; }
+            catch (Exception ex) { CrashLog.Write("PickerOffer", ex); return false; }
+        });
         if (UseBuiltIn) return ShowBuiltIn(owner, request);
 
         switch (TryNativeOutOfProcess(owner, request))
@@ -82,8 +95,9 @@ internal static class FilePickerService
                 // The isolation worked: only the child died. Switch permanently,
                 // say so once, with the clues, and finish the job the user asked for.
                 UseBuiltIn = true;
-                try { AutoSwitchedToBuiltIn?.Invoke(); } catch { /* never let the notice break the pick */ }
-                try { PickerCrashDialog.ShowFor(owner, request, r.ExitCode, r.ProcessId); }
+                var switched = PickerOffer.Record(PickerOffer.Crash, PickerOffer.AppVersion, DateTime.UtcNow);
+                try { AutoSwitchedToBuiltIn?.Invoke(switched); } catch { /* never let the notice break the pick */ }
+                try { PickerCrashDialog.ShowFor(owner, request, r.ExitCode, r.ProcessId, switched); }
                 catch (Exception ex)
                 {
                     CrashLog.Write("PickerCrashDialog", ex);
@@ -100,6 +114,10 @@ internal static class FilePickerService
                 return ShowNativeInProcess(owner, request);
         }
     }
+
+    /// <summary>Whether the built-in picker shows this time: <paramref name="offer"/>, the one-time
+    /// question, is put only while it is on, and true from it means Windows' dialog instead.</summary>
+    internal static bool BuiltInAfterOffer(bool builtInOn, Func<bool> offer) => builtInOn && !offer();
 
     private static string? ShowBuiltIn(Window owner, FilePickerRequest request)
     {

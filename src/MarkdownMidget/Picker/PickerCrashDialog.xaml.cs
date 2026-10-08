@@ -16,6 +16,7 @@ public partial class PickerCrashDialog : Window
 {
     private readonly string _folder;
     private string? _details, _log;
+    private PickerSwitch? _switched;   // the crash's switch to the built-in picker, for the log
 
     private PickerCrashDialog(string folder)
     {
@@ -26,12 +27,12 @@ public partial class PickerCrashDialog : Window
     }
 
     /// <summary>Show the notice, modal to <paramref name="owner"/>, for a helper that died.</summary>
-    internal static void ShowFor(Window owner, FilePickerRequest request, int exitCode, int processId)
+    internal static void ShowFor(Window owner, FilePickerRequest request, int exitCode, int processId, PickerSwitch? switched = null)
     {
         var crashed = DateTimeOffset.Now;   // the helper has only just died; the clues take seconds more
         var folder = PickerCrashClues.FolderToShow(request, Directory.Exists,
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-        var dialog = new PickerCrashDialog(folder) { Owner = owner };
+        var dialog = new PickerCrashDialog(folder) { Owner = owner, _switched = switched };
         dialog.Loaded += async (_, _) =>
         {
             PickerCrashFindings findings;
@@ -58,7 +59,7 @@ public partial class PickerCrashDialog : Window
         OthersText.Text = PickerCrashClues.OthersLine(findings);
         var version = typeof(PickerCrashDialog).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
-        _details = PickerCrashClues.LogText(PickerCrashClues.Details(findings, version, Environment.OSVersion.VersionString), crashed);
+        _details = PickerCrashClues.LogText(PickerCrashClues.Details(findings, version, Environment.OSVersion.VersionString, _switched), crashed);
     }
 
     /// <summary>Where the log was saved, or why it wasn't; without one, Copy details takes Open the log's place.</summary>
