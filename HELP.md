@@ -881,17 +881,25 @@ preview pane or right-click shell menus — those are the add-ons that crash, so
 leaving them out is what makes it safe. A line under its buttons says it is
 Markdown Midget's own picker and how to switch back to Windows' dialog.
 
-The file list shows each item's name, date modified, type and size, and opens
+The file list shows each item's name, date modified, type and size, at first
 with folders first and then files by name. Click a column's header to sort by
 it, and click it again to reverse the order; an arrow on the header shows which
 column sorts and which way. **Date modified** starts with the newest. Folders
 stay above files whichever way you sort, and items that tie go by name.
-Type-ahead and the arrow keys follow the order on screen. The sort lasts until
-the picker closes. The type is *File folder* for a folder, and for a file the
-name Windows has registered for its extension, such as *Text Document*. Where
-Windows keeps that name inside a program file, which the picker doesn't load,
-or has none, the type is the extension in capitals, such as *MD File*; a file
-with no extension is *File*.
+Type-ahead and the arrow keys follow the order on screen. The type is *File
+folder* for a folder, and for a file the name Windows has registered for its
+extension, such as *Text Document*. Where Windows keeps that name inside a
+program file, which the picker doesn't load, or has none, the type is the
+extension in capitals, such as *MD File*; a file with no extension is *File*.
+
+The picker remembers how you sort the list and how wide you drag its columns.
+The first time you change either, in any folder, that becomes how every folder
+opens. After that, a change you make in a folder is kept for that folder only.
+The views are kept in `%LocalAppData%\MarkdownMidget\picker-views.json` for up
+to 300 folders, the one used least recently forgotten first. A folder that no
+longer exists on a local drive is forgotten in the background; one on a network
+share, or on a drive that is unplugged or not ready, is never checked. Delete
+the file to start again from folders first and names A to Z.
 
 Turn it on yourself any time with **Edit ▸ Settings ▸ Always use the built-in
 file picker**, and turn it off there to go back to Windows' dialog once the cause

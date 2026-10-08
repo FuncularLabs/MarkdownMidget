@@ -39,7 +39,7 @@ public class PickerSortTests
     private static string Names(PickerSort sort, List<PickerSortKey>? keys = null) => string.Join(" ", Sort(sort, keys).Select(k => k.Name));
 
     [Fact]
-    public void EveryPickerOpensFoldersFirstThenNamesAToZIgnoringCase()
+    public void WithNothingRememberedAPickerOpensFoldersFirstThenNamesAToZ()
     {
         Assert.Equal(new PickerSort(PickerColumn.Name, Descending: false), PickerSort.Default);
         Assert.Equal("alpha Zeta a.pdf B.txt c.md", Names(PickerSort.Default));

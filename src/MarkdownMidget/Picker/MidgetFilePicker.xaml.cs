@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace MarkdownMidget.Picker;
@@ -53,7 +54,12 @@ public partial class MidgetFilePicker : Window
         return key?.GetValue(valueName, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames);
     });
     private readonly GridViewColumn[] _sortColumns;   // in PickerColumn order
-    private PickerSort _sort = PickerSort.Default;     // this picker's only: the next one opens on names again
+    private readonly double[] _builtInWidths;         // the XAML's, for a folder with no view remembered
+    private PickerSort _sort = PickerSort.Default;     // the shown folder's, from ShowView
+    /// <summary>Remembered views (#12, item 4), one store for every picker in this process,
+    /// so their writes queue in order; and this picker's copy, changed as it saves.</summary>
+    private static readonly PickerViewStore s_views = new(PickerViewStore.DefaultDirectory);
+    private readonly PickerViewsFile _views = s_views.Load();
     private readonly List<string> _history = [];
     private int _historyIndex = -1;
     private string _currentDirectory = "";
@@ -85,11 +91,16 @@ public partial class MidgetFilePicker : Window
         }
         FilterCombo.IsEnabled = FilterCombo.Items.Count > 1;
         _sortColumns = [NameColumn, ModifiedColumn, TypeColumn, SizeColumn];
+        _builtInWidths = [.. _sortColumns.Select(c => c.Width)];
         ShowSortHeaders();
+        FileList.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(FileList_ColumnResized));
 
         BuildPlaces();
         Loaded += (_, _) =>
         {
+            // Off the UI thread, once per process. DriveInfo and Directory.Exists are the probes.
+            _ = s_views.CleanOnce(folder => PickerViews.Gone(folder,
+                root => new DriveInfo(root).DriveType, root => new DriveInfo(root).IsReady, Directory.Exists));
             OpenFirstListableDirectory();
             NameBox.Focus();
             NameBox.SelectAll();
@@ -275,9 +286,13 @@ public partial class MidgetFilePicker : Window
             return false;
         }
 
-        entries.Sort((a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, _sort));
+        var view = PickerViews.Resolve(_views, target) ?? new PickerView(PickerSort.Default, _builtInWidths);
+        entries.Sort((a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, view.Sort));
 
         _currentDirectory = target;   // committed only now, with a view to match
+        ShowView(view);
+        var now = DateTime.UtcNow;
+        if (PickerViews.Touch(_views, target, now)) _ = s_views.UpdateLater(f => PickerViews.Touch(f, target, now));
         // A successful listing clears the "nothing could be opened" verdict. That
         // state is environmental (a downed share holding Documents, no ready
         // drive), so leaving the buttons dead after the user navigated somewhere
@@ -404,6 +419,7 @@ public partial class MidgetFilePicker : Window
         if (column < 0) return;   // the blank header past the last column
         _sort = _sort.Click((PickerColumn)column);
         ShowSortHeaders();
+        RememberView();
         if (FileList.ItemsSource is not List<Entry> entries) return;
         var selected = FileList.SelectedItem;
         entries.Sort((a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, _sort));
@@ -418,6 +434,31 @@ public partial class MidgetFilePicker : Window
     {
         for (var i = 0; i < _sortColumns.Length; i++)
             _sortColumns[i].Header = FilePickerModel.HeaderText((PickerColumn)i, _sort);
+    }
+
+    private void ShowView(PickerView view)
+    {
+        _sort = view.Sort;
+        for (var i = 0; i < _sortColumns.Length; i++) _sortColumns[i].Width = view.Widths[i];
+        ShowSortHeaders();
+    }
+
+    /// <summary>A header's edge dropped after a drag. The list's own scroll bars have thumbs
+    /// too; only a header's counts.</summary>
+    private void FileList_ColumnResized(object sender, DragCompletedEventArgs e)
+    {
+        if (e.OriginalSource is Thumb { TemplatedParent: GridViewColumnHeader }) RememberView();
+    }
+
+    /// <summary>Saves the list's look for the folder on show (PickerViews.Apply says whether as
+    /// the default or the folder's own): in this picker's copy now, in the file in the background.</summary>
+    private void RememberView()
+    {
+        if (_currentDirectory.Length == 0) return;
+        var (folder, now) = (_currentDirectory, DateTime.UtcNow);
+        var view = new PickerView(_sort, [.. _sortColumns.Select(c => c.ActualWidth)]);
+        PickerViews.Apply(_views, folder, view, now);
+        _ = s_views.UpdateLater(f => PickerViews.Apply(f, folder, view, now));
     }
 
     private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)

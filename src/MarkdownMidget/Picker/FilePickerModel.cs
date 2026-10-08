@@ -26,11 +26,11 @@ internal sealed record FilterGroup(string Label, IReadOnlyList<string> Patterns)
 /// <summary>The file list's sortable columns, in the order the list shows them.</summary>
 internal enum PickerColumn { Name, Modified, Type, Size }
 
-/// <summary>How the file list is sorted: one column, one way. It lasts while one picker is
-/// open; nothing saves it, so the next picker opens on <see cref="Default"/>.</summary>
+/// <summary>How the file list is sorted: one column, one way. <see cref="PickerViews"/>
+/// remembers it, with the column widths, by folder.</summary>
 internal readonly record struct PickerSort(PickerColumn Column, bool Descending)
 {
-    /// <summary>What every picker opens with: folders first, then names A to Z.</summary>
+    /// <summary>The built-in sort, until a view is remembered: folders first, then names A to Z.</summary>
     public static PickerSort Default => new(PickerColumn.Name, Descending: false);
 
     /// <summary>A header click. The sorted column turns round; another column starts A to Z
