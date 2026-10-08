@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MarkdownMidget.Picker;
 using Xunit;
 
@@ -58,17 +59,17 @@ public class PickerRowsTests
         Assert.Null(PickerRows.DoubleClickedItem(list, MouseButton.Left, null));
     });
 
-    [Fact]
-    public void AColumnEdgeDroppedAfterADragIsAChangeAndAClickOrAnEscapeIsNot()
+    /// <summary>A ListView measured and arranged with no window, as the review did: the header row
+    /// exists. <c>body</c> gets the list, its header's edge, and a count of the changes it reports.</summary>
+    private static void OnMeasuredList(Action<ListView, Thumb, Func<int>> body)
     {
         Exception? error = null;
         var thread = new Thread(() =>
         {
             try
             {
-                // Measured and arranged with no window, as the review did: the header row exists.
                 var view = new GridView();
-                view.Columns.Add(new GridViewColumn { Header = "Name", Width = 120 });
+                view.Columns.Add(new GridViewColumn { Header = "Name", Width = 120, DisplayMemberBinding = new System.Windows.Data.Binding() });
                 var list = new ListView { View = view, ItemsSource = Enumerable.Range(0, 50).ToList() };
                 ScrollViewer.SetVerticalScrollBarVisibility(list, ScrollBarVisibility.Visible);
                 list.Measure(new Size(300, 100));
@@ -76,14 +77,7 @@ public class PickerRowsTests
                 list.UpdateLayout();
                 var resized = 0;
                 PickerRows.OnColumnResized(list, () => resized++);
-                void Drop(DependencyObject thumb, double change, bool canceled) =>
-                    ((UIElement)thumb).RaiseEvent(new DragCompletedEventArgs(change, 0, canceled) { RoutedEvent = Thumb.DragCompletedEvent });
-                var edge = Find<Thumb>(Find<GridViewColumnHeader>(list, h => h.Column is not null)!)!;
-                Drop(edge, 30, canceled: false);   // the header marks this handled: only handledEventsToo hears it
-                Drop(edge, 0, canceled: false);    // a click on the edge, no drag
-                Drop(edge, 30, canceled: true);    // Esc during the drag
-                Drop(Find<Thumb>(list, t => t.TemplatedParent is ScrollBar)!, 30, canceled: false);   // the list's own scroll bar
-                Assert.Equal(1, resized);
+                body(list, Find<Thumb>(Find<GridViewColumnHeader>(list, h => h.Column is not null)!)!, () => resized);
             }
             catch (Exception ex) { error = ex; }
         }) { IsBackground = true };
@@ -91,6 +85,33 @@ public class PickerRowsTests
         Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "the list harness timed out");
         if (error is not null) throw error;
     }
+
+    [Fact]
+    public void AColumnEdgeDroppedAfterADragIsAChangeAndAClickOrAnEscapeIsNot() => OnMeasuredList((list, edge, resized) =>
+    {
+        void Drop(DependencyObject thumb, double change, bool canceled) =>
+            ((UIElement)thumb).RaiseEvent(new DragCompletedEventArgs(change, 0, canceled) { RoutedEvent = Thumb.DragCompletedEvent });
+        Drop(edge, 30, canceled: false);   // the header marks this handled: only handledEventsToo hears it
+        Drop(edge, 0, canceled: false);    // a click on the edge, no drag
+        Drop(edge, 30, canceled: true);    // Esc during the drag
+        Drop(Find<Thumb>(list, t => t.TemplatedParent is ScrollBar)!, 30, canceled: false);   // the list's own scroll bar
+        Assert.Equal(1, resized());
+    });
+
+    [Fact]
+    public void ADoubleClickOnAHeaderEdgeIsAChangeOnceLayoutHasFittedTheColumn() => OnMeasuredList((list, edge, resized) =>
+    {
+        var column = ((GridView)list.View).Columns[0];
+        // WPF's own fit: the header handles its edge's double-click by setting the width to auto.
+        edge.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Control.MouseDoubleClickEvent });
+        Assert.True(double.IsNaN(column.Width));
+        Assert.Equal(0, resized());   // not yet: the width is layout's to give
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+        Assert.Equal(1, resized());
+        column.Width = 200;           // a width set in code, as a remembered view is shown, is not a change
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+        Assert.Equal(1, resized());
+    });
 
     [Fact]
     public void AReSortKeepsTheSelectedRow() => OnList((list, items) =>

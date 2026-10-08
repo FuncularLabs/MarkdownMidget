@@ -41,7 +41,7 @@ internal static class QuickAccess
         catch (Exception) { return []; }
     }
 
-    internal static IReadOnlyList<string> PinnedFolders(byte[] jumpList, CancellationToken stop = default)
+    internal static IReadOnlyList<string> PinnedFolders(byte[] jumpList, CancellationToken stop = default, Action<string>? step = null)
     {
         try
         {
@@ -56,6 +56,7 @@ internal static class QuickAccess
             var at = 32;
             for (var count = I32(list, 4); count > 0; count--)
             {
+                step?.Invoke("entry");   // tests watch where a deadline stops the work
                 stop.ThrowIfCancellationRequested();
                 var pathEnd = at + 130 + 2 * BinaryPrimitives.ReadUInt16LittleEndian(list.AsSpan(at + 128, 2));
                 if (I32(list, at + 108) is var order and >= 0) pinned.TryAdd(I32(list, at + 88), order);
@@ -65,6 +66,7 @@ internal static class QuickAccess
             var folders = new List<string>();
             foreach (var entry in pinned.OrderBy(p => p.Value).Take(MaxPinned).Select(p => p.Key))
             {
+                step?.Invoke("link");
                 stop.ThrowIfCancellationRequested();
                 try   // a bad link leaves out its own entry only
                 {

@@ -226,11 +226,9 @@ public partial class MidgetFilePicker : Window
 
     private void PlacesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (_navigating || e.NewValue is not TreeViewItem { Tag: string path } node || Navigate(path, addToHistory: true)) return;
-        // A place that isn't there now (a pinned folder deleted since): say so, and let go of the
-        // node so a second click tries again.
-        if (!Directory.Exists(path))
-            MessageBox.Show(this, "That folder doesn't exist.", "Markdown Midget", MessageBoxButton.OK, MessageBoxImage.Information);
+        // A place not there now (deleted, or on an offline share: telling them apart would wait twice)
+        // says so; then the node is let go, so a second click tries again.
+        if (_navigating || e.NewValue is not TreeViewItem { Tag: string path } node || Navigate(path, addToHistory: true, sayIfMissing: true)) return;
         Dispatcher.InvokeAsync(() => { _navigating = true; node.IsSelected = false; _navigating = false; });
     }
 
@@ -266,9 +264,9 @@ public partial class MidgetFilePicker : Window
     /// Save would then land somewhere the user never saw. <paramref name="quiet"/>
     /// suppresses the error box while walking candidate start folders, where a
     /// failure is expected and the next candidate is the answer.</summary>
-    private bool Navigate(string path, bool addToHistory, bool quiet = false)
+    private bool Navigate(string path, bool addToHistory, bool quiet = false, bool sayIfMissing = false)
     {
-        if (!Directory.Exists(path)) return false;
+        if (!Directory.Exists(path)) { if (sayIfMissing) MessageBox.Show(this, "That folder doesn't exist.", "Markdown Midget"); return false; }
         var target = Path.GetFullPath(path);
 
         var entries = new List<Entry>();

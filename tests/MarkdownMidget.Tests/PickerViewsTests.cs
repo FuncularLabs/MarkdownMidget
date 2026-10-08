@@ -299,6 +299,30 @@ public sealed class PickerViewsTests : IDisposable
         Assert.Equal(newer, File.ReadAllText(ViewsPath));
     }
 
+    [Theory]
+    [InlineData("""{"Version":2,"Default":{"Column":"Size","Widths":{"Name":250}}}""")]   // shapes version 1 can't parse
+    [InlineData("""{"Version":2,"Folders":{"C:\\A":{"Column":"Size"}}}""")]
+    [InlineData("""{"Version":"2.0","Folders":[]}""")]
+    [InlineData("""{"Version":1.5,"Folders":[]}""")]
+    [InlineData("""{"Folders":[]}""")]   // every file this code writes says "Version":1, so this one is someone else's
+    public void AFileThatIsNotVersion1IsRefusedBeforeItIsReadWhateverItsShape(string text)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(ViewsPath, text);
+        var store = new PickerViewStore(_dir, _ => { });
+        Assert.Null(store.Load().Default);
+        Assert.False(store.Update(f => PickerViews.Apply(f, @"C:\Alpha", View(PickerColumn.Type), T0)));
+        Assert.Equal(text, File.ReadAllText(ViewsPath));
+    }
+
+    [Fact]
+    public void AnEmptyFileIsStartedAgain()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(ViewsPath, "");
+        Assert.True(new PickerViewStore(_dir).Update(f => PickerViews.Apply(f, @"C:\Alpha", View(PickerColumn.Type), T0)));
+    }
+
     [Fact]
     public void FolderViewsWithoutADefaultMeanTheFirstChangeWasMadeAndAChangeStillBelongsToItsFolder()
     {

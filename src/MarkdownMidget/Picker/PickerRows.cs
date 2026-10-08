@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -17,12 +18,18 @@ internal static class PickerRows
 
     /// <summary>Calls <paramref name="resized"/> when a column header's edge is dropped after a drag.
     /// The header marks that event handled, so it is heard with handledEventsToo; a click on the edge
-    /// (no change), Esc during the drag, and the list's scroll-bar thumbs don't count.</summary>
-    public static void OnColumnResized(ListView list, Action resized) =>
+    /// (no change), Esc during the drag, and the list's scroll-bar thumbs don't count. A double-click on the edge
+    /// fits the column by setting its width to auto, which only the column reports; layout then gives the width.</summary>
+    public static void OnColumnResized(ListView list, Action resized)
+    {
         list.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, e) =>
         {
             if (!e.Canceled && e.HorizontalChange != 0 && e.OriginalSource is Thumb { TemplatedParent: GridViewColumnHeader }) resized();
         }), handledEventsToo: true);
+        foreach (var column in (list.View as GridView)?.Columns ?? [])
+            ((INotifyPropertyChanged)column).PropertyChanged += (_, e) => { if (e.PropertyName == nameof(GridViewColumn.Width) && double.IsNaN(column.Width))
+                list.Dispatcher.InvokeAsync(resized, System.Windows.Threading.DispatcherPriority.Background); };
+    }
 
     /// <summary>Re-sorts the list the view shows, in place. A refresh keeps the selected row selected
     /// (rebinding would not) but makes new rows, so the keyboard, if it was in the list, goes back to

@@ -894,7 +894,8 @@ extension, such as *JPEG Image*. Where Windows keeps that name inside a
 program file, which the picker doesn't load, or has none, the type is the
 extension in capitals, such as *MD File*; a file with no extension is *File*.
 
-The picker remembers how you sort the list and how wide you drag its columns.
+The picker remembers how you sort the list and how wide you make its columns,
+by dragging a header's edge or double-clicking it to fit.
 The first time you change either, in any folder, that becomes how every folder
 opens. After that, a change you make in a folder is kept for that folder only.
 The views are kept in `%LocalAppData%\MarkdownMidget\picker-views.json` for up
@@ -911,7 +912,8 @@ picker reads Explorer's own list of them, without the shell, so no add-on is
 loaded. Only pinned folders are listed, not Home, Gallery, This PC, libraries,
 pinned files or recent items. Nothing is checked when the picker opens, so a
 pinned folder that has been deleted, or one on a share that is offline, is still
-listed; a deleted one says "That folder doesn't exist." when you click it. A
+listed, and clicking it says "That folder doesn't exist.": the picker can't tell
+a deleted folder from an unreachable one without waiting twice. A
 pinned item the picker can't make sense of is left out, and if Explorer's list
 can't be read within half a second, so is the section.
 

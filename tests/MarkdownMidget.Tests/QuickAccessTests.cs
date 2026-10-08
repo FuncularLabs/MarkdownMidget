@@ -106,6 +106,7 @@ public sealed class QuickAccessTests : IDisposable
     [InlineData("DIFAT sectors")]
     [InlineData("truncated DestList")]
     [InlineData("a property store past the end")]
+    [InlineData("a negative property store")]
     [InlineData("no DestList")]
     [InlineData("a chain that loops")]
     [InlineData("a stream longer than the file")]
@@ -123,6 +124,8 @@ public sealed class QuickAccessTests : IDisposable
             "no DestList" => JumpListWriter.CompoundFile([("1", Alpha)]),
             "a link cut short" => JumpListWriter.CompoundFile([("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha")])), ("1", Alpha[..90])]),
             "1024-byte sectors" => Usual(sectorShift: 10),   // well formed, but not a size [MS-CFB] allows
+            "a negative property store" => JumpListWriter.CompoundFile(   // -8 would step back into its own path
+                [("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha")], store: _ => -8)), ("1", Alpha)]),
             "a property store past the end" => JumpListWriter.CompoundFile(   // the second entry's store runs 10 bytes past the stream
                 [("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\Projects\Alpha"), (2, 1, @"C:\B")], store: e => e == 2 ? 20 : 0)[..^10]), ("1", Alpha)]),
             "a negative size" => Usual(sectorShift: 12),
@@ -201,6 +204,24 @@ public sealed class QuickAccessTests : IDisposable
     }
 
     [Fact]
+    public void TheDeadlineIsCheckedInBothLoopsNotOnlyInsideAChain()
+    {
+        // No link streams: the second loop reads no chain, so only its own check can stop it.
+        var file = JumpListWriter.CompoundFile([("DestList", JumpListWriter.DestList(4, [(1, 0, @"C:\A"), (2, 1, @"C:\B"), (3, 2, @"C:\C")]))]);
+        foreach (var stopAt in new[] { "entry", "link" })
+        {
+            using var deadline = new CancellationTokenSource();
+            var steps = new List<string>();
+            Assert.Empty(QuickAccess.PinnedFolders(file, deadline.Token, step => { steps.Add(step); if (step == stopAt) deadline.Cancel(); }));
+            Assert.Single(steps, s => s == stopAt);   // stopped at that loop's next check
+        }
+    }
+
+    [Fact]
+    public void ARepeatedEntryNumberKeepsItsFirstPin() => Assert.Equal([@"C:\B", @"C:\A"], QuickAccess.PinnedFolders(JumpListWriter.CompoundFile(
+        [("DestList", JumpListWriter.DestList(4, [(1, 5, @"C:\A"), (1, 0, @"C:\A"), (2, 1, @"C:\B")])), ("1", JumpListWriter.Link(local: @"C:\A")), ("2", JumpListWriter.Link(local: @"C:\B"))])));
+
+    [Fact]
     public void AReadPastItsDeadlineStops()
     {
         var late = new CancellationToken(canceled: true);
@@ -250,8 +271,8 @@ public sealed class QuickAccessTests : IDisposable
 /// <summary>
 /// Writes the three formats Quick access is read from, from made-up paths: an OLE compound
 /// file ([MS-CFB]) with streams under 4096 bytes in the mini stream, as Windows writes them;
-/// a DestList stream (format versions 3 and 4: a 32-byte header, then entries of 130 bytes
-/// plus the path); and a shell link ([MS-SHLLINK]) with a LinkInfo.
+/// a DestList stream (format versions 3 and 4: a 32-byte header, then entries of 134 + 2n +
+/// store bytes, n the path's characters); and a shell link ([MS-SHLLINK]) with a LinkInfo.
 /// </summary>
 internal static class JumpListWriter
 {
@@ -344,7 +365,7 @@ internal static class JumpListWriter
             At(start, 128); w.Write((ushort)path.Length);                       // path size, in characters
             At(start, 130); w.Write(Encoding.Unicode.GetBytes(path));
             var size = store?.Invoke(entry) ?? 0;
-            w.Write(size); w.Write(Enumerable.Repeat((byte)0xAB, size).ToArray());   // property store size, then the store
+            w.Write(size); w.Write(Enumerable.Repeat((byte)0xAB, Math.Max(size, 0)).ToArray());   // property store size, then the store
         }
         return ((MemoryStream)w.BaseStream).ToArray();
     }

@@ -86,6 +86,19 @@ internal static class PickerViews
 
     public static string Serialize(PickerViewsFile file) => JsonSerializer.Serialize(file);
 
+    /// <summary>Whether this may read and rewrite <paramref name="text"/>, from its Version alone: a JSON object without "Version":1,
+    /// which all this code writes, is newer or foreign, whatever its shape. Empty text or not a JSON object is damaged: rebuilt.</summary>
+    public static bool Ours(string text)
+    {
+        try
+        {
+            using var json = JsonDocument.Parse(string.IsNullOrWhiteSpace(text) ? "null" : text);
+            return json.RootElement.ValueKind != JsonValueKind.Object
+                || json.RootElement.TryGetProperty(nameof(PickerViewsFile.Version), out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) && n == 1;
+        }
+        catch (JsonException) { return true; }
+    }
+
     /// <summary>
     /// Whether cleanup may forget a folder's view: only when its drive is a local one that is
     /// there and ready, and walking down from the root finds a step missing. A UNC path, or a
@@ -133,7 +146,7 @@ internal static class PickerViews
 /// deleted on close, so a crashed window can't leave it held), re-reads the file, applies
 /// only its own change and replaces the file through a temp copy: the last writer wins an
 /// entry and no other entry is lost. A file that doesn't parse is rebuilt; one that can't be
-/// read at all is left as it is and the change is dropped. Nothing here throws.
+/// read, or isn't Version 1, is left as it is and the change dropped. Nothing here throws.
 /// </summary>
 internal sealed class PickerViewStore
 {
@@ -231,10 +244,10 @@ internal sealed class PickerViewStore
                 if (!File.Exists(_path)) return true;
                 using var stream = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                 using var reader = new StreamReader(stream);
-                file = PickerViews.Parse(reader.ReadToEnd());
-                if (file.Version <= 1) return true;
-                file = new();
-                return false;   // a newer version's file: not read, so never overwritten
+                var text = reader.ReadToEnd();
+                if (!PickerViews.Ours(text)) return false;   // a newer version's file: not read, so never overwritten
+                file = PickerViews.Parse(text);
+                return true;
             }
             catch (FileNotFoundException) { return true; }
             catch (Exception ex) when (attempt < 4 && ex is IOException or UnauthorizedAccessException) { _wait(25); }
