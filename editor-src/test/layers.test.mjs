@@ -190,6 +190,14 @@ test('the line numbers are drawn against the editor, and a theme\'s position can
   assert.ok(EXPECTED.indexOf('mdm-structure') < EXPECTED.indexOf('mdm-theme'));
 });
 
+test('the link underline offset ships in mdm-structure, normal, so a theme\'s own offset wins', () => {
+  // A later layer's normal declaration beats an earlier one's at any specificity; !important here,
+  // or the rule in an earlier layer, would take that away. The vendor sets no offset of its own.
+  const hits = [...bundle.matchAll(/text-underline-offset:([^;}]*)/g)];
+  assert.deepEqual(hits.map((m) => [layerAt(bundle, m.index), m[1]]), [['mdm-structure', '.25em']]);
+  assert.ok(EXPECTED.indexOf('mdm-structure') < EXPECTED.indexOf('mdm-theme'));
+});
+
 test('print is the earliest layer, so nothing a theme writes reaches paper', () => {
   assert.equal(EXPECTED[0], 'mdm-print');
   const at = bundle.indexOf('@media print');

@@ -221,9 +221,16 @@ body {
   font-size: 1em;
 }
 
+/* The underline's distance from the text is a measurement of the app's type, so it is
+   here and not a theme variable, and in em so it scales with the link. Chromium puts the
+   line that far below the baseline. Calibri's g, p, q and y reach 0.178em below it and its
+   descent is 0.25em, so at 0.25em the line clears them: in a printed PDF, no skip-ink cut
+   at 16px or at Red Sparks 2X's 32px, in Segoe UI too. 0.125em (and the browser's own)
+   still crossed them at both. On paper as well; a theme's own offset wins, a later layer. */
 .mdm-prosemirror a {
   font-weight: 600;
   cursor: pointer;
+  text-underline-offset: 0.25em;
 }
 
 .mdm-prosemirror blockquote {

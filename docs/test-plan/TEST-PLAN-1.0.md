@@ -401,6 +401,27 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** In steps 2 and 3, with Background graphics unticked or ticked, the page and its margins are white, body text is black, every heading (the one in the quote too) is near-black, and the paragraph, quote and cell links are dark blue and underlined. The table's header row keeps its theme's look (Default's grey for Print Dark), and its link is in the header's text colour and readable. The PDF looks like the unticked preview. In step 4 everything prints as it did before this build: headings and links in the theme's colours, which the preview may darken where they are very light while Background graphics is unticked. Ticked, Solarized Light's page is cream and Print Light's pale headings and link are hard to read, as before. After each preview closes, the page on screen is unchanged.
 - **Type:** Both. Automated: `theme-parity.test.mjs` "every built-in is sorted into dark or light by what it declares", "a dark built-in prints every heading and its links dark enough for paper, with Background graphics on or off", "paper pins a dark theme's heading and link variables, not their colours", "Default and every light built-in print headings and links in their own colours, as before", "a custom theme prints dark headings and links by declaring --mdm-color-scheme: dark, and only then"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't evaluate the style query that tells print a theme is dark, nor the print dialog's Background graphics option, so only the real print preview shows WebView2 applying them.
 
+#### PRN-02 Printed code uses print's own colours for every kind of highlighted token, whatever the theme
+- **Change:** Fixed: "Printed code now uses print colours for every kind of highlighted token" · **Documents:** `print-code.md` · **Settings:** formatted view; **File ▸ Print ▸ Color code blocks** ticked in steps 2 and 3, unticked in step 4; the print preview's **More settings ▸ Background graphics**, unticked then ticked in steps 2 and 3; settings.json backed up in step 1 and restored in step 5
+1. Close every Markdown Midget window. View ▸ Theme and Color code blocks are both saved, so back up your settings first. In PowerShell:
+
+   ```powershell
+   $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
+   if (-not (Test-Path "$p.prn2-backup")) { Copy-Item $p "$p.prn2-backup" }
+   ```
+
+2. Open `print-code.md` and make sure **File ▸ Print ▸ Color code blocks** is ticked. Choose **View ▸ Theme ▸ Amber Phosphor** and look at the code blocks on screen. Press **Ctrl+P**. With **More settings ▸ Background graphics** unticked, look at each code block; tick **Background graphics** and look again. Close the preview.
+3. Repeat step 2 with **Dracula** and **Default**. With Dracula, also use **File ▸ Print ▸ Export to PDF…** and open the PDF.
+4. Untick **File ▸ Print ▸ Color code blocks**, choose **View ▸ Theme ▸ Amber Phosphor** and press **Ctrl+P**. Close the preview.
+5. Close every Markdown Midget window and put your settings back. If you stop PRN-02 before this step, close every window and run this line when you stop:
+
+   ```powershell
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.prn2-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   ```
+
+- **Expected:** On screen the code blocks look as they always have in each theme. On paper in steps 2 and 3, unticked or ticked, the code blocks are white or light grey and every coloured word is dark enough to read easily, in the same colours whichever theme is picked: the CSS selector `a.link > p:hover` and the SCSS `a` purple, `!important` dark red, `paper.png` dark navy, `$accent` dark orange both times, the regular expression dark navy, `:ready` and `&amp;` blue, the removed diff line dark red and the added one green, and the XML declaration, `<!DOCTYPE note>` and the CDATA section grey italic. Nothing in a code block is yellow, amber, pink or pale; before this build Amber Phosphor's selectors printed yellow-green. The PDF looks like the unticked preview. In step 4 all the code prints in one dark colour, none of it italic. After each preview closes, the page on screen is unchanged.
+- **Type:** Both. Automated: `theme-parity.test.mjs` "paper prints every kind of highlighted token in a colour of its own, readable on the code block, whatever the theme", "with Color code blocks off, paper still prints every token in the code block's own colour", "print and chrome became authoritative, and nothing else changed importance"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't cascade layers or print, so only the real print preview and PDF show WebView2 printing these colours.
+
 ### MRK — Formatting marks
 
 #### MRK-01 Formatting marks show in the Markdown source view too
@@ -2030,6 +2051,7 @@ Automated items only, run by Claude on 2026-09-25 in `C:\code\MarkdownMidget\.cl
 | THM-04 | | | |
 | THM-05 | | | |
 | PRN-01 | | | |
+| PRN-02 | | | |
 | MRK-01 | | | |
 | MRK-02 | | | |
 | INST-01 | | | |

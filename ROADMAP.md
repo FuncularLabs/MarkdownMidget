@@ -417,24 +417,28 @@ the last of the usability gaps raised in the 0.6.x review.
 
 ### Nits
 
-- **A link's underline should sit further from the text at large sizes.** The editor
-  underlines links at the browser's default offset, which is fine at 16px and can
-  strike the descenders of g, p, q and y once a theme sets `--mdm-font-size` high —
-  Red Sparks 2X doubles it to 32px. An offset that scales with the text
-  (`text-underline-offset: 0.125em`, say) would hold at every size. App-wide, not
-  per theme: an offset is a measurement of the app's type, not a colour a palette
-  gets to hold, which is why the Red Sparks pair dropped the
-  `text-underline-offset: 2px` its custom version carried rather than shipping it in
-  one theme. Raised by Joe Sparks (@joesparks on X), whose own draft had it.
+- ~~**A link's underline should sit further from the text at large sizes.**~~ **Done
+  2026-10-08 (1.0.1)**: `structure.css` gives every link in the formatted view
+  `text-underline-offset: 0.25em`, on screen and on paper, and a theme's own offset
+  still wins (it is a later layer). 0.25em rather than the 0.125em suggested here:
+  measured in a PDF printed by Chromium, 0.125em still crossed Calibri's g, p, q and y at 16px and
+  32px, and 0.25em, Calibri's own descent, clears them at both, in Segoe UI too.
+  Was: links underlined at the browser's default offset, which struck those
+  descenders, worst once a theme sets `--mdm-font-size` high (Red Sparks 2X's 32px).
+  App-wide, not per theme, which is why the Red Sparks pair dropped the
+  `text-underline-offset: 2px` its custom version carried. Raised by Joe Sparks
+  (@joesparks on X), whose own draft had it.
 
-- **Print should pin every code-token colour, so no dark theme's code prints in its
-  screen colours.** `print.css` states its own colour for seventeen kinds of
-  highlighted token, but twelve more (variable, regex, symbol, selector, url,
-  important, inserted, deleted, doctype, prolog, cdata, entity) keep the colour
-  `base.css` gives them from the theme. Amber Phosphor's CSS selectors, for one, print
-  in #B0D400: 1.71:1 on white, 1.61:1 on the printed code block's #f6f8fa. Pinning
-  them changes printed code in every theme, so it wants its own change and review.
-  Raised 2026-09-24 in the 1.0.0-rc3 review.
+- ~~**Print should pin every code-token colour, so no dark theme's code prints in its
+  screen colours.**~~ **Done 2026-10-08 (1.0.1)**: `print.css` gives every kind of
+  token `base.css` colours from the theme a print colour, each at 4.5:1 or more on the
+  printed code block's #f6f8fa, and theme-parity reads the kinds out of `base.css`, so
+  a new one without a print colour fails. The keyword and property colours moved to
+  darker GitHub ones on the way, as #d73a49 and #22863a measured 4.30 and 4.35. Was:
+  twelve kinds (variable, regex, symbol, selector, url, important, inserted, deleted,
+  doctype, prolog, cdata, entity) kept the theme's colour; Amber Phosphor's CSS
+  selectors printed in #B0D400, 1.61:1 on the code block. Raised 2026-09-24 in the
+  1.0.0-rc3 review.
 
 - ~~**Toolbar tooltips should clear an enlarged mouse pointer.**~~ **Done 2026-09-16
   (1.0.0-rc3)**: when the pointer is larger than standard, every toolbar tooltip, the

@@ -431,12 +431,9 @@ pick, because a dark page on paper is unreadable and empties a toner cartridge.
 Your **tables** are the exception: the header row, the alternating row shading and the
 borders print the way they look on screen (dark themes print a light row shade so the
 text stays readable; their header row keeps its dark look), and horizontal rules keep
-the theme's colour too. So does some **code**: with **Color code blocks** on, code
-blocks print in print's own colours except twelve kinds of highlighted token, which
-keep the theme's — variables, regular expressions, symbols, selectors, URLs, what a
-language marks as important (such as CSS's `!important`), lines a diff adds or
-removes, doctypes, prologs, CDATA sections and entities. In a dark theme those can
-print pale. **Headings and links** keep
+the theme's colour too. **Code** doesn't: with **Color code blocks** on, every kind of
+highlighted token prints in print's own colours, which read on white paper whatever
+the theme, and with it off code prints in one dark colour. **Headings and links** keep
 a light theme's colours. A dark theme's can be too pale for white paper, so with a
 dark theme headings print near-black and links dark blue (a link in a table's header
 row prints in the header's text colour), and the page stays white even with

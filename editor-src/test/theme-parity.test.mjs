@@ -1116,6 +1116,55 @@ test('paper colours inline code itself, so --mdm-code-fg cannot reach it', () =>
     [['background', '#f6f8fa', true], ['color', '#24292e', true]]);
 });
 
+test('paper prints every kind of highlighted token in a colour of its own, readable on the code block, whatever the theme', () => {
+  // The kinds are read out of base.css, so a kind added there without a pin here fails: twelve of
+  // them once printed in the theme's screen colours (Amber Phosphor's selectors 1.61:1). Read twice,
+  // parsed and scanned, so a filter that stopped seeing tokens can't pass with nothing to check.
+  const base = read('styles', 'base.css');
+  const kinds = new Set(declarations(base).filter((d) => d.prop === 'color' && d.value.startsWith('var(--mdm-token-'))
+    .flatMap((d) => d.where.split(', ').map((s) => s.match(/^\.mdm-prosemirror \.token\.([\w-]+)$/)?.[1])));
+  assert.equal(kinds.has(undefined), false, 'base.css colours a token through a selector of another shape');
+  assert.deepEqual([...kinds].sort(), [...new Set([...base.matchAll(/\.token\.([\w-]+)/g)].map((m) => m[1]))].sort());
+
+  // White with Background graphics unticked, the block's own grey ticked. Read, not assumed.
+  const block = onPaper('', 'background', '.mdm-prosemirror pre');
+  for (const file of ['', ...readdirSync(builtinDir).filter((f) => f.endsWith('.css'))]) {
+    for (const kind of kinds) {
+      const colour = onPaper(file ? readTheme(file) : '', 'color', `.mdm-prosemirror .token.${kind}`);
+      assert.ok(colour, `${file || 'Default'}: .token.${kind} prints in the theme's screen colour`);
+      for (const ground of ['#ffffff', block]) {
+        assert.ok(contrast(colour, ground) >= 4.5, `.token.${kind} prints ${colour} on ${ground}`);
+      }
+    }
+  }
+});
+
+test('with Color code blocks off, paper still prints every token in the code block\'s own colour', () => {
+  // The per-kind pins are (0,3,0) and this rule is (0,3,1), after them in the same layer, so it
+  // wins on specificity and on order. A pin of another shape could out-rank it.
+  const print = declarations(read('styles', 'print.css'));
+  const mono = print.findIndex((d) => d.prop === 'color'
+    && d.where === '@media print > body.mdm-print-mono-code .mdm-prosemirror .token');
+  assert.notEqual(mono, -1, 'the mono-code rule is gone');
+  assert.equal(print[mono].value, onPaper('', 'color', '.mdm-prosemirror pre code'));
+  print.forEach((d, i) => {
+    if (i === mono || d.prop !== 'color' || !d.where.includes('.token')) return;
+    for (const s of d.where.split(' > ').at(-1).split(', ')) assert.match(s, /^\.mdm-prosemirror \.token\.[\w-]+$/);
+    assert.ok(i < mono, `${d.where} comes after the mono-code rule`);
+  });
+});
+
+test('a link\'s underline sits a quarter of the link\'s size below the text, on screen and on paper, where a theme can move it', () => {
+  // An em, so 4px at 16px and 8px at Red Sparks 2X's 32px: below Calibri's descenders, where
+  // the browser's own offset, and 0.125em, crossed g, p, q and y (structure.css has the numbers).
+  // Outside any @media, so paper has it too; in structure.css, and normal, so a theme's own
+  // offset (the later layer) wins. layers.test.mjs checks the built bundle agrees.
+  assert.deepEqual(declarations(editorCss).filter((d) => d.prop === 'text-underline-offset')
+    .map((d) => [d.where, d.value, d.important]), [['.mdm-prosemirror a', '0.25em', false]]);
+  assert.equal(declarations(read('styles', 'structure.css'))
+    .filter((d) => d.prop === 'text-underline-offset').length, 1, 'not in structure.css');
+});
+
 test('paper takes the document\'s text size from the theme, and keeps its own for the source view', () => {
   // The deliberate asymmetry, stated in print.css's header: colour is pinned on paper
   // because a dark page is unreadable there, and size is not, because large type is what

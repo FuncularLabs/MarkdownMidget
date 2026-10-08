@@ -456,6 +456,12 @@
   "important": false
  },
  {
+  "where": ".mdm-prosemirror a",
+  "prop": "text-underline-offset",
+  "value": "0.25em",
+  "important": false
+ },
+ {
   "where": ".mdm-prosemirror a:hover",
   "prop": "color",
   "value": "#2f5f87",
@@ -1314,13 +1320,13 @@
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.comment",
+  "where": "@media print > .mdm-prosemirror .token.cdata, .mdm-prosemirror .token.comment, .mdm-prosemirror .token.doctype, .mdm-prosemirror .token.prolog",
   "prop": "color",
   "value": "#6a737d",
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.comment",
+  "where": "@media print > .mdm-prosemirror .token.cdata, .mdm-prosemirror .token.comment, .mdm-prosemirror .token.doctype, .mdm-prosemirror .token.prolog",
   "prop": "font-style",
   "value": "italic",
   "important": false
@@ -1332,33 +1338,39 @@
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.atrule, .mdm-prosemirror .token.attr-value, .mdm-prosemirror .token.keyword, .mdm-prosemirror .token.tag",
+  "where": "@media print > .mdm-prosemirror .token.atrule, .mdm-prosemirror .token.attr-value, .mdm-prosemirror .token.deleted, .mdm-prosemirror .token.important, .mdm-prosemirror .token.keyword, .mdm-prosemirror .token.tag",
   "prop": "color",
-  "value": "#d73a49",
+  "value": "#cf222e",
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.attr-name, .mdm-prosemirror .token.builtin, .mdm-prosemirror .token.char, .mdm-prosemirror .token.string",
+  "where": "@media print > .mdm-prosemirror .token.attr-name, .mdm-prosemirror .token.builtin, .mdm-prosemirror .token.char, .mdm-prosemirror .token.regex, .mdm-prosemirror .token.string, .mdm-prosemirror .token.url",
   "prop": "color",
   "value": "#032f62",
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.boolean, .mdm-prosemirror .token.constant, .mdm-prosemirror .token.number",
+  "where": "@media print > .mdm-prosemirror .token.boolean, .mdm-prosemirror .token.constant, .mdm-prosemirror .token.entity, .mdm-prosemirror .token.number, .mdm-prosemirror .token.symbol",
   "prop": "color",
   "value": "#005cc5",
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.class-name, .mdm-prosemirror .token.function",
+  "where": "@media print > .mdm-prosemirror .token.class-name, .mdm-prosemirror .token.function, .mdm-prosemirror .token.selector",
   "prop": "color",
   "value": "#6f42c1",
   "important": true
  },
  {
-  "where": "@media print > .mdm-prosemirror .token.property",
+  "where": "@media print > .mdm-prosemirror .token.inserted, .mdm-prosemirror .token.property",
   "prop": "color",
-  "value": "#22863a",
+  "value": "#1a7f37",
+  "important": true
+ },
+ {
+  "where": "@media print > .mdm-prosemirror .token.variable",
+  "prop": "color",
+  "value": "#953800",
   "important": true
  },
  {
