@@ -117,7 +117,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 **Stable (1.0.x)**, in daily use and signed on every release: 1.0.0 is the latest
 release, and the badge above and the entry marked **Latest** on the releases page
-point at it. Windows-only for now; the editor core is web-based, so a cross-platform
+point at it until 1.0.1. **1.0.1-beta1**, the first 1.0.1 prerelease, sits above it on
+that page for anyone who wants the built-in file picker's new columns and Quick access
+early. Windows-only for now; the editor core is web-based, so a cross-platform
 shell (MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
 deliberate limit written down in [HELP.md ▸ Known limits](HELP.md#known-limits);
 a real installer that registers in Add/Remove Programs is the headline of the
@@ -194,10 +196,10 @@ the one it replaced:
 
 | Where | Looks like |
 | --- | --- |
-| Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.0.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.0+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.0+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.0+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.1.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.1-beta1+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.1-beta1+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.1-beta1+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -327,6 +329,14 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.1-beta1** *(prerelease)* — The built-in file picker now **sorts by any
+  column**, shows each file's **type**, **remembers** how you sort and size its
+  columns, and lists your **Quick access** folders. It says it is Markdown Midget's
+  own and how to get Windows' dialog back, and if it may be on by mistake, a file
+  dialog **offers Windows' dialog** once. A theme can now colour the **cursor and the
+  selection**, and Red Sparks and Amber Phosphor do. A **right-click in the source
+  view** finds the word under the pointer, printed code keeps print's colours in every
+  theme, and link underlines clear the tails of g, p, q and y.
 - **v1.0.0** — **The first stable 1.0 release**, rc4 with the prerelease flag dropped.
   A save from the formatted view **keeps the text you didn't change**, Find has
   **Replace**, the app **follows Windows light and dark mode** with four new dark

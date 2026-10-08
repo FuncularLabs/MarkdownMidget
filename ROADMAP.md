@@ -11,6 +11,30 @@ not planned, and the deliberate limits, are in
 
 ---
 
+## 1.0.1 (cut as 1.0.1-beta1 on 2026-10-08)
+
+The first 1.0.1 prerelease, cut so the built-in file picker's changes get real use
+before 1.0.1, which follows after dogfooding. Done in 1.0.1-beta1:
+
+- ~~**The built-in picker needs a Type column, sorting, Quick access, remembered column
+  settings, and a way back to Windows' dialog (#12, items 2 to 6).**~~ **Done
+  2026-10-08 (1.0.1-beta1)**: every column sorts both ways, folders first; a Type
+  column read from the registry's plain values; the sort and column widths remembered
+  in `picker-views.json`, the first change for every folder and later ones per folder;
+  Explorer's pinned folders under Quick access, read from its jump list without the
+  shell; a line saying whose picker it is and, while the setting is on, the way back;
+  and a one-time offer of Windows' dialog when the setting is on with no reason
+  recorded. Item 1, Cancel taken for a crash, was fixed in 1.0.0-rc3.
+- [Cursor and selection colours](#cursor-and-selection-colours--theme-variables) and
+  the link underline and printed code-token [Nits](#nits), below.
+
+Still open, for 1.0.1 or later: [Diagram width](#diagram-width--needs-a-decision),
+[Easier JSON editing](#easier-json-editing--needs-definition), #13 (a theme needs a
+specificity hack to override the app's `!important` rules), #14 (the contrast sweep
+over the six older palettes), a change in **Edit ▸ Settings** reaching only the
+window it was made in and windows opened after it, and the known limits parked in
+[docs/parked-ideas.md](docs/parked-ideas.md#wont-unless-asked-known-limits-parked-deliberately).
+
 ## 1.0 (cut as 1.0.0-beta1 on 2026-09-13, 1.0.0-rc1 on 2026-09-15, 1.0.0-rc2 on 2026-09-16, 1.0.0-rc3 on 2026-09-24 and 1.0.0-rc4 on 2026-09-25; 1.0.0 was promoted 2026-10-02, and 0.10.0 on 2026-09-10)
 
 The 2026-09-10 readiness audit, planned in detail in
@@ -135,7 +159,7 @@ under 1.0.0-rc3.
 
 ### Cursor and selection colours — theme variables
 
-**Done 2026-10-08 (1.0.1)**, both items: `--mdm-caret`, `--mdm-selection-bg`,
+**Done 2026-10-08 (1.0.1-beta1)**, both items: `--mdm-caret`, `--mdm-selection-bg`,
 `--mdm-selection-fg` and `--mdm-selected-outline`, in the formatted view only; the source
 view keeps its own cursor and selection, which settles the open question below. Defaults
 draw exactly what was drawn before: `auto`, the vendor's `#88ccff`, and `none` for the selection
@@ -428,7 +452,7 @@ the last of the usability gaps raised in the 0.6.x review.
 ### Nits
 
 - ~~**A link's underline should sit further from the text at large sizes.**~~ **Done
-  2026-10-08 (1.0.1)**: `structure.css` gives every link in the formatted view
+  2026-10-08 (1.0.1-beta1)**: `structure.css` gives every link in the formatted view
   `text-underline-offset: 0.25em`, on screen and on paper. A theme's own offset on the
   link itself still wins (a later layer); one left for links to inherit from
   `.mdm-prosemirror` or `:root` no longer does. 0.25em rather than the 0.125em suggested here:
@@ -441,7 +465,7 @@ the last of the usability gaps raised in the 0.6.x review.
   (@joesparks on X), whose own draft had it.
 
 - ~~**Print should pin every code-token colour, so no dark theme's code prints in its
-  screen colours.**~~ **Done 2026-10-08 (1.0.1)**: `print.css` gives every kind of
+  screen colours.**~~ **Done 2026-10-08 (1.0.1-beta1)**: `print.css` gives every kind of
   token `base.css` colours from the theme a print colour, each at 4.5:1 or more on the
   printed code block's #f6f8fa, and theme-parity reads the kinds out of `base.css`, so
   a new one without a print colour fails. The keyword and property colours moved to
