@@ -1120,14 +1120,15 @@ test('paper colours inline code itself, so --mdm-code-fg cannot reach it', () =>
 });
 
 test('paper prints every kind of highlighted token in a colour of its own, readable on the code block, whatever the theme', () => {
-  // The kinds are read out of base.css, so a kind added there without a pin here fails: twelve of
-  // them once printed in the theme's screen colours (Amber Phosphor's selectors 1.61:1). Read twice,
-  // parsed and scanned, so a filter that stopped seeing tokens can't pass with nothing to check.
-  const base = read('styles', 'base.css');
-  const kinds = new Set(declarations(base).filter((d) => d.prop === 'color' && d.value.startsWith('var(--mdm-token-'))
-    .flatMap((d) => d.where.split(', ').map((s) => s.match(/^\.mdm-prosemirror \.token\.([\w-]+)$/)?.[1])));
-  assert.equal(kinds.has(undefined), false, 'base.css colours a token through a selector of another shape');
-  assert.deepEqual([...kinds].sort(), [...new Set([...base.matchAll(/\.token\.([\w-]+)/g)].map((m) => m[1]))].sort());
+  // The kinds are read out of every layer of the BUILT bundle but print - base.css today, and
+  // structure.css or the vendor if either ever colours one - so a kind coloured on screen without a
+  // pin here fails: twelve once printed in the theme's screen colours (Amber Phosphor's selectors
+  // 1.61:1). base.css is scanned on its own as well, so a parse that stopped seeing tokens can't
+  // pass with nothing to check.
+  const built = readFileSync(join(here, '..', '..', 'src', 'MarkdownMidget', 'wwwroot', 'editor.bundle.css'), 'utf8');
+  const kinds = new Set(declarations(built).filter((d) => d.prop === 'color' && !d.where.startsWith('@layer mdm-print'))
+    .flatMap((d) => [...d.where.matchAll(/\.token\.([\w-]+)/g)].map((m) => m[1])));
+  assert.deepEqual([...read('styles', 'base.css').matchAll(/\.token\.([\w-]+)/g)].map((m) => m[1]).filter((k) => !kinds.has(k)), []);
 
   // White with Background graphics unticked, the block's own grey ticked. Read, not assumed.
   const block = onPaper('', 'background', '.mdm-prosemirror pre');

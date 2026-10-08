@@ -226,7 +226,8 @@ body {
    line that far below the baseline. Calibri's g, p, q and y reach 0.178em below it and its
    descent is 0.25em, so at 0.25em the line clears them: in a printed PDF, no skip-ink cut
    at 16px or at Red Sparks 2X's 32px, in Segoe UI too. 0.125em (and the browser's own)
-   still crossed them at both. On paper as well; a theme's own offset wins, a later layer. */
+   still crossed them at both. On paper as well. A theme's rule on the link wins, a later
+   layer; an offset it sets higher up for links to inherit loses to this one. */
 .mdm-prosemirror a {
   font-weight: 600;
   cursor: pointer;

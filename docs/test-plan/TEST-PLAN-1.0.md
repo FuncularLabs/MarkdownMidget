@@ -393,6 +393,31 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** In Default everything looks as in earlier builds: the cursor is the colour of the text it sits in, the selection is blue with white text while the window is active and grey while it is inactive (Find's current match too, which is grey while the Find dialog has the focus), and the picture and the rule get a light blue outline. In Red Sparks the cursor is bright red, and the selection and Find's current match are bright red with the page's near-black text, active or inactive, over the link, the code, the table and the list alike; the outlines are bright red. Amber Phosphor is the same in its heading amber. Selected text is easy to read in all three. In the Markdown source view the selection is blue in all three, as before. Nothing else on the page changes.
 - **Type:** Both. Automated: `theme-parity.test.mjs` "the cursor, the selection and a clicked rule or picture take theme variables whose defaults draw what the editor drew", "each site reads its own variable, not a twin that matches today"; `BuiltInThemeTests.OptionalVariablesReallyAreInertInDefault`, `EveryShippedPaletteSetsExactlyTheNewestVariablesItIsNamedFor`, `EveryThemeClearsItsOwnFloorOnEveryTextPairItDefines`, `TheSquiggleAndTheResizeHandleClearTheNonTextFloor`, `AmberPhosphorSetsNoColourWithBlueInIt`, `TheOnlyDifferenceBetweenRedSparksAndItsTwoXIsTheSize`. Human: jsdom draws no selection and has no inactive window, and a headless Chromium check is not WebView2 in the app.
 
+#### THM-07 Link underlines sit clear of g, p, q and y at every size, on screen and on paper; a theme's own offset on links still wins
+- **Change:** Fixed: "Link underlines now sit clear of the text at every size" · **Documents:** `link-underlines.md` · **Settings:** formatted view; spell check on; settings.json backed up and a custom theme created in step 1, both undone in step 5
+1. Close every Markdown Midget window. Back up your settings and create a custom theme that sets its own underline offset on links:
+
+   ```powershell
+   $p = "$env:LOCALAPPDATA\MarkdownMidget\settings.json"
+   if (-not (Test-Path "$p.thm7-backup")) { Copy-Item $p "$p.thm7-backup" }
+   $c = "$env:LOCALAPPDATA\MarkdownMidget\themes\custom"
+   New-Item -ItemType Directory -Force $c | Out-Null
+   [IO.File]::WriteAllText("$c\Underline-2px.css", ".mdm-prosemirror a { text-underline-offset: 2px; }")
+   ```
+
+2. Open `link-underlines.md` and pick **View ▸ Theme ▸ Default**. Look at each link's underline where it passes under g, p, q and y, and at the squiggles under the two misspelled words. Press **Ctrl+P**, look at the same links in the preview, and close it.
+3. Repeat step 2 with **Red Sparks 2X**.
+4. Pick **Underline 2px** and look at the links again.
+5. Close every Markdown Midget window, then delete the theme and put your settings back. If you stop THM-07 before this step, close every window and run these lines when you stop:
+
+   ```powershell
+   Remove-Item "$env:LOCALAPPDATA\MarkdownMidget\themes\custom\Underline-2px.css"
+   Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.thm7-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
+   ```
+
+- **Expected:** In steps 2 and 3 every link's underline is one unbroken line below the tails of g, p, q and y, on screen and in the preview, in the paragraph, the heading and the quote alike; at Red Sparks 2X's double size the gap under the letters is twice as large. On screen the squiggle under the misspelled word in a link sits lower than the one under the misspelled word outside it, down with the link's underline, and both are easy to see. In step 4 the links' underlines sit close under the text again and break around the tails, as in 1.0.0: the theme's own offset wins.
+- **Type:** Both. Automated: `theme-parity.test.mjs` "a link's underline sits a quarter of the link's size below the text, on screen and on paper, where a theme can move it"; `layers.test.mjs` "the link underline offset ships in mdm-structure, normal, so a theme's own offset wins". Human: jsdom has no layout, so only the real view and print preview show the line clearing the letters.
+
 ### PRN — Printing with a theme
 
 #### PRN-01 Dark themes print dark headings and links on a white page; light themes print as before
@@ -440,7 +465,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
    Move-Item "$env:LOCALAPPDATA\MarkdownMidget\settings.json.prn2-backup" "$env:LOCALAPPDATA\MarkdownMidget\settings.json" -Force
    ```
 
-- **Expected:** On screen the code blocks look as they always have in each theme. On paper in steps 2 and 3, unticked or ticked, the code blocks are white or light grey and every coloured word is dark enough to read easily, in the same colours whichever theme is picked: the CSS selector `a.link > p:hover` and the SCSS `a` purple, `!important` dark red, `paper.png` dark navy, `$accent` dark orange both times, the regular expression dark navy, `:ready` and `&amp;` blue, the removed diff line dark red and the added one green, and the XML declaration, `<!DOCTYPE note>` and the CDATA section grey italic. Nothing in a code block is yellow, amber, pink or pale; before this build Amber Phosphor's selectors printed yellow-green. The PDF looks like the unticked preview. In step 4 all the code prints in one dark colour, none of it italic. After each preview closes, the page on screen is unchanged.
+- **Expected:** On screen the code blocks look as they always have in each theme. On paper in steps 2 and 3, unticked or ticked, the code blocks are white or light grey and every coloured word is dark enough to read easily, in the same colours whichever theme is picked: the CSS selector `a.link > p:hover` and the SCSS `a` purple, `!important` dark red, `paper.png` dark navy, `$accent` dark orange both times, the regular expression dark navy, `:ready` and `&amp;` blue, the removed diff line dark red and the added one green, and the XML declaration, the words `DOCTYPE note` and the CDATA section grey italic. Nothing in a code block is yellow, amber, pink or pale; before this build Amber Phosphor's selectors printed yellow-green. The PDF looks like the unticked preview. In step 4 all the code prints in one dark colour, none of it italic. After each preview closes, the page on screen is unchanged.
 - **Type:** Both. Automated: `theme-parity.test.mjs` "paper prints every kind of highlighted token in a colour of its own, readable on the code block, whatever the theme", "with Color code blocks off, paper still prints every token in the code block's own colour", "print and chrome became authoritative, and nothing else changed importance"; `layers.test.mjs` "print is the earliest layer, so nothing a theme writes reaches paper". Human: jsdom can't cascade layers or print, so only the real print preview and PDF show WebView2 printing these colours.
 
 ### MRK — Formatting marks
@@ -2072,6 +2097,7 @@ Automated items only, run by Claude on 2026-09-25 in `C:\code\MarkdownMidget\.cl
 | THM-04 | | | |
 | THM-05 | | | |
 | THM-06 | | | |
+| THM-07 | | | |
 | PRN-01 | | | |
 | PRN-02 | | | |
 | MRK-01 | | | |

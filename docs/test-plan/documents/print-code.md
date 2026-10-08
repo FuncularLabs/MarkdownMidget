@@ -17,7 +17,7 @@ a { color: $accent; }
 ```
 
 ```javascript
-const words = /g[pq]+y/gi;
+const words = /gpqy/gi;
 ```
 
 ```ruby

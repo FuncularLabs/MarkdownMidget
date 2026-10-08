@@ -429,8 +429,9 @@ the last of the usability gaps raised in the 0.6.x review.
 
 - ~~**A link's underline should sit further from the text at large sizes.**~~ **Done
   2026-10-08 (1.0.1)**: `structure.css` gives every link in the formatted view
-  `text-underline-offset: 0.25em`, on screen and on paper, and a theme's own offset
-  still wins (it is a later layer). 0.25em rather than the 0.125em suggested here:
+  `text-underline-offset: 0.25em`, on screen and on paper. A theme's own offset on the
+  link itself still wins (a later layer); one left for links to inherit from
+  `.mdm-prosemirror` or `:root` no longer does. 0.25em rather than the 0.125em suggested here:
   measured in a PDF printed by Chromium, 0.125em still crossed Calibri's g, p, q and y at 16px and
   32px, and 0.25em, Calibri's own descent, clears them at both, in Segoe UI too.
   Was: links underlined at the browser's default offset, which struck those
