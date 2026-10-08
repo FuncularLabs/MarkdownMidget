@@ -386,13 +386,11 @@ public class SourceEditor : TextEditor
     {
         var doc = Document;
         if (doc is null) return -1;
-        // GetPositionFromPoint expects a point relative to the text view, which sits
-        // inside the control at the scroll offset.
-        var tv = TextArea.TextView;
-        tv.EnsureVisualLines();
-        var docPoint = new Point(point.X + tv.HorizontalOffset, point.Y + tv.VerticalOffset);
-        var pos = TextArea.TextView.GetPosition(docPoint);
-        if (pos is { } p) return doc.GetOffset(p.Location);
+        // The text view sits inside the control, past its padding (12 in MainWindow), its
+        // border and any margin. GetPositionFromPoint translates the control's point into
+        // the text view's coordinates, then adds the scroll offset.
+        TextArea.TextView.EnsureVisualLines();
+        if (GetPositionFromPoint(point) is { } p) return doc.GetOffset(p.Location);
         return snapToText ? doc.TextLength : -1;
     }
 

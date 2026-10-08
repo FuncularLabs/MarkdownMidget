@@ -91,7 +91,7 @@ For the WEB tests, a **link replay** takes each link's address as the editor sto
 
 ## 3. Tests
 
-Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [MRK](#mrk--formatting-marks) formatting marks · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check-on-large-documents) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update · [DLG](#dlg--file-dialog-crashes) file dialog crashes
+Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers · [VIEW](#view--view-pair-and-opening-card) view pair · [FND](#fnd--find-and-replace-shortcuts) Find and Replace · [TIP](#tip--toolbar-tooltips) toolbar tooltips · [THM](#thm--light-and-dark-mode-themes) themes · [PRN](#prn--printing-with-a-theme) printing · [MRK](#mrk--formatting-marks) formatting marks · [ANC](#anc--heading-links) heading links · [LNK](#lnk--copy-link) Copy Link · [WEB](#web--opening-web-links) web links · [MENU](#menu--submenu-arrows) submenus · [SPL](#spl--spell-check) spell check · [PERF](#perf--opening-performance) performance · [SWT](#swt--switching-back-to-the-formatted-view) view switch · [FM](#fm--front-matter) front matter · [TBL](#tbl--tables) tables · [BR](#br--inline-line-breaks) line breaks · [LST](#lst--lists-11) lists · [OPN](#opn--opening-in-a-new-window) opening files · [BIG](#big--large-documents) large documents · [SRC](#src--block-level-source-preservation) source preservation · [INST](#inst--install-and-update) install and update · [DLG](#dlg--file-dialog-crashes) file dialog crashes
 
 ### LIN — Line numbers, Go to Line and the status bar (#10)
 
@@ -554,7 +554,7 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 - **Expected:** Right opens the submenu with the first item you can choose highlighted (in View ▸ Theme, **Default**, under the greyed *For Windows … mode* line). Left closes it and leaves you on the parent item. Neither key jumps to the next top-level menu.
 - **Type:** Both. Automated: `MenuAccessKeysTests.OnlyAMenusOwnOpeningIsItsOwn` and `MenuAccessKeysTests.ANestedSubmenuOpeningReachesTheParentButIsNotItsOwn`. Human: WPF keyboard navigation.
 
-### SPL — Spell check on large documents
+### SPL — Spell check
 
 #### SPL-01 Underlines sit on the right words across chunk boundaries
 - **Change:** commit 8c82f9e, large documents are checked in chunks · **Documents:** `large-600kb.md` · **Settings:** turn on **View ▸ Spell Check** after opening, because a document this size opens with it off
@@ -562,6 +562,13 @@ Areas: [LIN](#lin--line-numbers-go-to-line-and-the-status-bar-10) line numbers �
 2. Scroll to the top, the middle and the end. At each place, check several paragraphs.
 - **Expected:** Every `Qwzxvy` and `qwzxvy` is underlined, and nothing else is. No underline is shifted onto a neighbouring word, including on paragraphs about 16 KB apart.
 - **Type:** Both. Automated: `SpellChunkTests.Chunks_BreakAtALineBreak_PreferringABlankLine`, `SpellChunkTests.Chunks_KeepALongLineWhole_UseAbout16KB_AndLeaveNoEmptyChunk`, and `SpellChunkTests.CheckInChunks_GivesTheRangesOfOneWholeTextCall`. Human: the Windows spell checker and squiggle placement.
+
+#### SPL-02 Right-clicking a word in the source view offers suggestions for that word
+- **Change:** Fixed: "Right-clicking a word in the Markdown source view now offers suggestions for that word" · **Documents:** `theme-tester.md` · **Settings:** View ▸ Spell Check on
+1. Press Ctrl+E. Right-click the middle of **recieve**, in the *143 kHz* section, then of **occassionally**, under *Handing Over*.
+2. Right-click the middle of **The** at the start of the line above **recieve**.
+- **Expected:** In step 1 each menu starts with suggestions for the word you clicked, such as *receive* and *occasionally*, then **Add to Dictionary** and **Ignore All**. In step 2 the menu has only **Cut**, **Copy**, **Paste** and **Select All**.
+- **Type:** Both. Automated: `SourceEditorTests.HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint` and `SourceEditorTests.ARightClickOnASquiggledWordInThePaddedSourceViewFindsThatWord`. Human: the real pointer and the WPF menu.
 
 ### PERF — Opening performance
 
@@ -1955,6 +1962,7 @@ Automated items only, run by Claude on 2026-09-25 in `C:\code\MarkdownMidget\.cl
 | WEB-06 | | | |
 | MENU-01 | | | |
 | SPL-01 | | | |
+| SPL-02 | | | |
 | PERF-01 | | | |
 | PERF-02 | | | |
 | SWT-01 | | | |

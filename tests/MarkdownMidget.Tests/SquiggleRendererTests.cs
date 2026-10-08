@@ -126,4 +126,19 @@ public class SquiggleRendererTests
         Assert.Equal(cut, past);
         Assert.Empty(after);
     }
+
+    [Fact]
+    public void ARangeHoldingOnlyALineBreakDrawsNoHairlineStub()
+    {
+        // AvalonEdit gives "\n" back as two empty segments, one after "ab" and one before
+        // "cd", each drawn as a 1-DIP caret (TextView.EmptyLineSelectionWidth). The
+        // hairline filter is what keeps those stubs off the page.
+        var spans = On(ed =>
+        {
+            var r = new SquiggleRenderer(ed);
+            r.SetRanges([(2, 1)]);
+            return r.WaveSpans(ed.TextArea.TextView).ToList();
+        }, "ab\ncd");
+        Assert.Empty(spans);
+    }
 }

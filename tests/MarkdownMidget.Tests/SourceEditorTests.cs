@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Rendering;
 using MarkdownMidget.Source;
+using MarkdownMidget.Spelling;
 using Xunit;
 
 namespace MarkdownMidget.Tests;
@@ -166,19 +167,48 @@ public class SourceEditorTests
         Assert.Equal(-1, unsnapped);
     }
 
-    [Fact]
-    public void HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint()
+    /// <summary>The left quarter of the character at <paramref name="offset"/>, in the
+    /// editor's own coordinates, as Mouse.GetPosition(SourceBox) gives the spell menu a
+    /// pointer.</summary>
+    private static Point PointOver(SourceEditor ed, int offset)
+    {
+        var tv = ed.TextArea.TextView;
+        var at = tv.GetVisualPosition(new TextViewPosition(ed.Document.GetLocation(offset)), VisualYPosition.LineMiddle) - tv.ScrollOffset;
+        return tv.TranslatePoint(new Point(at.X + tv.WideSpaceWidth / 4, at.Y), ed);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(12)]   // MainWindow.xaml's SourceBox: the text view starts 12 in from the control's edges
+    public void HitTestOverTextReturnsTheOffsetOfTheCharacterUnderThePoint(double padding)
     {
         // The left quarter of the "c" in "second", on the second line: offset 14, inside
         // the line, so the snap to the end (23) or a neighbour (13, 15) fails it. The
         // point is in control coordinates, as the spell menu passes it.
-        var idx = On(ed =>
+        var (inset, idx) = On(ed =>
         {
-            var tv = ed.TextArea.TextView;
-            var at = tv.GetVisualPosition(new TextViewPosition(ed.Document.GetLocation(14)), VisualYPosition.LineMiddle) - tv.ScrollOffset;
-            return ed.GetCharacterIndexFromPoint(tv.TranslatePoint(new Point(at.X + tv.WideSpaceWidth / 4, at.Y), ed), snapToText: true);
+            ed.Padding = new Thickness(padding);
+            ed.UpdateLayout();
+            return (ed.TextArea.TextView.TranslatePoint(new Point(), ed), ed.GetCharacterIndexFromPoint(PointOver(ed, 14), snapToText: true));
         }, "hello world\nsecond line", laidOut: true);
+        Assert.Equal(new Point(padding, padding), inset);   // the padding does move the text view
         Assert.Equal(14, idx);
+    }
+
+    [Fact]   // SourceBox_ContextMenuOpening's lookup: the pointer's index, then the engine's range there
+    public void ARightClickOnASquiggledWordInThePaddedSourceViewFindsThatWord()
+    {
+        // The pointer is on the "e" of "teh". Read without the padding, it lands about a
+        // line lower and a character and a half to the right, inside "wrod".
+        var hit = On(ed =>
+        {
+            ed.Padding = new Thickness(12);   // MainWindow.xaml's SourceBox
+            ed.UpdateLayout();
+            var squiggles = new SquiggleRenderer(ed);
+            squiggles.SetRanges([(8, 3), (12, 3), (19, 4)]);   // "teh", "dgo" and "wrod", as the engine flags them
+            return SpellHitTest.RangeAt(squiggles.Ranges, ed.GetCharacterIndexFromPoint(PointOver(ed, 9), snapToText: true), ed.Text.Length);
+        }, "the cat\nteh dgo\nxx wrod", laidOut: true);
+        Assert.Equal((8, 3), hit);
     }
 
     // ===== 1.5 the TextBox property shims =====

@@ -9,6 +9,10 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Right-clicking a word in the Markdown source view now offers suggestions for that word**: the spelling items at the top of the menu, such as the suggestions, **Add to Dictionary** and **Ignore All**, are for the word under the pointer. Before, the source view read the pointer as if it were about a line lower and a character or two to the right, so a right-click on a squiggled word often showed no suggestions, and a right-click on the line above one could show that word's suggestions instead.
+
 ## [1.0.0] - 2026-10-02
 
 First stable 1.0 release — rc4's content with the prerelease flag dropped, after
