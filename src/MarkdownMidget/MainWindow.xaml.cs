@@ -963,6 +963,8 @@ public partial class MainWindow : Window
             else EndBackup();
         }
         _showEncryptedInOpen = dlg.ShowEncryptedInOpen;
+        if (dlg.UseBuiltInPicker != _useBuiltInPicker)   // saved on its own, before SaveSettings carries it from disk
+            SavePersistentField(s => s.UseBuiltInPicker = dlg.UseBuiltInPicker);
         _useBuiltInPicker = dlg.UseBuiltInPicker;
         Picker.FilePickerService.UseBuiltIn = _useBuiltInPicker;
         if (dlg.RecentLimit != _recentLimit)
@@ -4397,6 +4399,9 @@ public partial class MainWindow : Window
         s.SourceLineNumbers = existing?.SourceLineNumbers ?? s.SourceLineNumbers;
         s.LinkLineNumbers = existing?.LinkLineNumbers ?? s.LinkLineNumbers;
         s.LastSeenChangelogVersion = existing?.LastSeenChangelogVersion ?? s.LastSeenChangelogVersion;
+        // Written by Settings and the crash switch, each through SavePersistentField: a window
+        // launched before either would otherwise put its launch-time value back.
+        s.UseBuiltInPicker = existing?.UseBuiltInPicker ?? s.UseBuiltInPicker;
         (s.MdOpensWithUs, s.LastRunVersion, s.DefaultNoticeOff) = (existing?.MdOpensWithUs, existing?.LastRunVersion, existing?.DefaultNoticeOff == true);
     }
 

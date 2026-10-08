@@ -889,7 +889,7 @@ column sorts and which way. **Date modified** starts with the newest. Folders
 stay above files whichever way you sort, and items that tie go by name.
 Type-ahead and the arrow keys follow the order on screen. The type is *File
 folder* for a folder, and for a file the name Windows has registered for its
-extension, such as *Text Document*. Where Windows keeps that name inside a
+extension, such as *JPEG Image*. Where Windows keeps that name inside a
 program file, which the picker doesn't load, or has none, the type is the
 extension in capitals, such as *MD File*; a file with no extension is *File*.
 

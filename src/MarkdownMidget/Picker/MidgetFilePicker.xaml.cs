@@ -38,7 +38,7 @@ public partial class MidgetFilePicker : Window
         public required bool IsDirectory { get; init; }
         public string Display => IsDirectory ? "📁  " + Name : "📄  " + Name;
         public DateTime? ModifiedAt { get; init; }
-        public string Modified => ModifiedAt?.ToString("g") ?? "";
+        public string Modified => ModifiedAt?.ToLocalTime().ToString("g") ?? "";   // UTC, so the clock going back can't reorder
         public long Bytes { get; init; } = -1;   // a folder, or a size that couldn't be read
         public string Size => Bytes >= 0 ? FilePickerModel.FormatSize(Bytes) : "";
         public string Type { get; init; } = "";
@@ -80,6 +80,7 @@ public partial class MidgetFilePicker : Window
         AcceptButton.Content = request.Save ? "_Save" : "_Open";
         NewFolderButton.Visibility = request.Save ? Visibility.Visible : Visibility.Collapsed;
         NameBox.Text = request.FileName ?? "";
+        PickerNote.Text = FilePickerModel.NoteText(FilePickerService.UseBuiltIn);
 
         foreach (var group in _filters) FilterCombo.Items.Add(group);
         if (FilterCombo.Items.Count > 0)
@@ -332,7 +333,7 @@ public partial class MidgetFilePicker : Window
 
     private static DateTime? SafeWriteTime(string path)
     {
-        try { return File.GetLastWriteTime(path); } catch { return null; }
+        try { return File.GetLastWriteTimeUtc(path); } catch { return null; }
     }
 
     private void UpdateNavButtons()
@@ -434,13 +435,9 @@ public partial class MidgetFilePicker : Window
         ShowSortHeaders();
         RememberView();
         if (FileList.ItemsSource is not List<Entry> entries) return;
-        var selected = FileList.SelectedItem;
-        entries.Sort((a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, _sort));
         _navigating = true;       // the same row stays selected, and the name box keeps what was typed
-        FileList.Items.Refresh();
-        FileList.SelectedItem = selected;
+        PickerRows.Resort(FileList, entries, (a, b) => FilePickerModel.CompareEntries(a.Key, b.Key, _sort));
         _navigating = false;
-        if (selected is not null) FileList.ScrollIntoView(selected);
     }
 
     private void ShowSortHeaders()
@@ -484,7 +481,7 @@ public partial class MidgetFilePicker : Window
 
     private void FileList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (FileList.SelectedItem is Entry entry) Activate(entry);
+        if (PickerRows.DoubleClickedItem(FileList, e.ChangedButton, e.OriginalSource) is Entry entry) Activate(entry);
     }
 
     private void FileList_KeyDown(object sender, KeyEventArgs e)

@@ -40,7 +40,7 @@ internal readonly record struct PickerSort(PickerColumn Column, bool Descending)
         column == Column ? this with { Descending = !Descending } : new(column, column == PickerColumn.Modified);
 }
 
-/// <summary>What the file list sorts a row by. Modified is null when it couldn't be read;
+/// <summary>What the file list sorts a row by. Modified, in UTC, is null when it couldn't be read;
 /// Bytes is -1 for a folder, and for a file whose size couldn't be read.</summary>
 internal readonly record struct PickerSortKey(bool IsDirectory, string Name, DateTime? Modified, long Bytes, string Type);
 
@@ -195,6 +195,11 @@ internal static class FilePickerModel
         var byName = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         return byName != 0 ? byName : string.CompareOrdinal(a.Name, b.Name);
     }
+
+    /// <summary>The line under the picker's buttons: whose picker it is and, while "Always use
+    /// the built-in file picker" is on, the way back. After a one-off fallback it is off already.</summary>
+    public static string NoteText(bool settingOn) => "Markdown Midget's own file picker."
+        + (settingOn ? " To use Windows' dialog again: Edit ▸ Settings ▸ File dialogs, then restart Markdown Midget." : "");
 
     /// <summary>A column's header: its name, and on the sorted column ▲ (A to Z, oldest or
     /// smallest first) or ▼. Text, so it takes the header's own colour in light and dark mode.</summary>

@@ -125,9 +125,18 @@ public class PickerSortTests
         Assert.Equal(expected, string.Join("|", Enum.GetValues<PickerColumn>().Select(c => FilePickerModel.HeaderText(c, By(column, descending)))));
 
     [Fact]
-    public void TypeAheadWalksTheListInTheOrderItIsShown()
+    public void NamesAndTypesCompareByCharacterCodeIgnoringCase()
     {
-        // The window sorts the list it shows, so type-ahead's index is the row on screen.
+        // Case folded, then by code: "_" after the letters and "Ä" after "B" (a culture's order puts
+        // "_x" first), and "alpha" before "Beta" (a case-sensitive one puts the capital first).
+        List<PickerSortKey> keys = [File("Birne", 1, Day, "Beta Type"), File("_x", 1, Day, "Beta Type"), File("Äpfel", 1, Day, "Beta Type"), File("apple", 1, Day, "alpha Type")];
+        Assert.Equal("apple Birne _x Äpfel", Names(By("Name", false), keys));
+        Assert.Equal("apple Birne _x Äpfel", Names(By("Type", false), keys));
+    }
+
+    [Fact]
+    public void FindByPrefixCountsRowsInTheOrderItIsGiven()
+    {
         var names = Sort(By("Size", true)).Select(k => k.Name).ToList();   // alpha Zeta a.pdf c.md B.txt
         var first = FilePickerModel.FindByPrefix(names, "a", -1);
         Assert.Equal("alpha", names[first]);
@@ -180,13 +189,17 @@ public class FileTypeNamesTests
     }
 
     [Theory]
-    [InlineData(@"@%SystemRoot%\system32\notepad.exe,-469")]
+    [InlineData(@"@%SystemRoot%\System32\shell32.dll,-30595")]   // as Windows 11 registers .jpeg
     [InlineData("  ")]
     public void AnIndirectOrBlankFriendlyTypeNameFallsBackToTheProgIdsDefaultValue(string friendlyTypeName)
     {
-        var registry = Holding((".txt|", "txtfile"), ("txtfile|FriendlyTypeName", friendlyTypeName), ("txtfile|", "Text Document"));
-        Assert.Equal("Text Document", new FileTypeNames(registry.Read).Of("a.txt", isDirectory: false));
+        var registry = Holding((".jpeg|", "jpegfile"), ("jpegfile|FriendlyTypeName", friendlyTypeName), ("jpegfile|", "JPEG Image"));
+        Assert.Equal("JPEG Image", new FileTypeNames(registry.Read).Of("photo.jpeg", isDirectory: false));
     }
+
+    [Fact]
+    public void OnWindows11ATextFileIsTxtFile() =>   // .txt names txtfilelegacy there, a ProgID with no values
+        Assert.Equal("TXT File", new FileTypeNames(Holding((".txt|", "txtfilelegacy")).Read).Of("notes.txt", isDirectory: false));
 
     [Theory]
     [InlineData("both names indirect")]

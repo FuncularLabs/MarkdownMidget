@@ -96,8 +96,7 @@
         </Grid>
         <!-- Whose picker this is, and the way back: a setting changes only its own window, hence the restart.
              Last, so a short window shrinks the list and then cuts this line, never the buttons. -->
-        <TextBlock Grid.Row="3" Margin="0,8,0,0" TextWrapping="Wrap"
-                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextSecondary}}"
-                   Text="Markdown Midget's own file picker. To use Windows' dialog again: Edit ▸ Settings ▸ File dialogs, then restart Markdown Midget." />
+        <TextBlock x:Name="PickerNote" Grid.Row="3" Margin="0,8,0,0" TextWrapping="Wrap"
+                   Foreground="{DynamicResource {x:Static chrome:ChromeKeys.TextSecondary}}" />
     </Grid>
 </Window>
