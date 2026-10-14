@@ -147,6 +147,8 @@
     <SolidColorBrush x:Key="Chrome.Chip.ArrowText" Color="#FF9AA0A8" />
     <SolidColorBrush x:Key="Chrome.Chip.CaptionText" Color="#FFAEB4BA" />
     <SolidColorBrush x:Key="Chrome.Chip.RemovedText" Color="#FFFF8A8A" />
+    <SolidColorBrush x:Key="Chrome.Picker.Section.Background" Color="#FF282828" />
+    <SolidColorBrush x:Key="Chrome.Picker.Section.Border" Color="#FF4A4A4A" />
     <BitmapImage x:Key="Chrome.Icon.NumberedList" UriSource="pack://application:,,,/MarkdownMidget;component/Assets/numbered-list-64-dark.png" />
     <BitmapImage x:Key="Chrome.Icon.SpellCheck" UriSource="pack://application:,,,/MarkdownMidget;component/Assets/spellcheck-64-dark.png" />
 </ResourceDictionary>

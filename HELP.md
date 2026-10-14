@@ -874,10 +874,17 @@ If the log can't be saved, the notice says so, and **Copy details** in its place
 copies the same text. Markdown Midget only looks: it never switches an add-on
 off itself. Cancel in Windows' dialog just closes it.
 
-The built-in picker has an address bar, shortcuts (Desktop, Documents,
-Downloads, your Quick access folders, recent folders, drives), a folder tree, a
-file list, type-ahead, and
-New Folder plus overwrite confirmation when saving. It has no thumbnails,
+The built-in picker has an address bar, a left pane of shortcuts, a file list,
+type-ahead, and New Folder plus overwrite confirmation when saving. The left pane
+has four sections, each on its own card: **Places** (Home, which is your user
+folder such as `C:\Users\you`, then Desktop, Documents and Downloads), **Quick
+access**, **Recent folders** and **Drives**. A section with nothing in it is left
+out. Click a folder to open it, or click its arrow to see the folders inside it.
+Click a section's header, or select it and press Enter or Space, to collapse or
+expand the section; Left collapses it and Right expands it. The picker remembers
+which sections you collapsed, the next time it opens and after a restart, in
+`%LocalAppData%\MarkdownMidget\picker-views.json`. With a contrast theme on,
+the cards take the theme's own colours. It has no thumbnails,
 preview pane or right-click shell menus — those are the add-ons that crash, so
 leaving them out is what makes it safe. A line under its buttons says it is
 Markdown Midget's own picker and, while **Always use the built-in file picker**
@@ -912,8 +919,8 @@ the file to start again from folders first and names A to Z.
 Under **Quick access** the picker lists the folders you pinned to Quick access
 in File Explorer, in Explorer's order; point at one to see its full path. The
 picker reads Explorer's own list of them, without the shell, so no add-on is
-loaded. Only pinned folders are listed, not Home, Gallery, This PC, libraries,
-pinned files or recent items. Nothing is checked when the picker opens, so a
+loaded. Only pinned folders are listed, not Explorer's own Home page, Gallery,
+This PC, libraries, pinned files or recent items. Nothing is checked when the picker opens, so a
 pinned folder that has been deleted, or one on a share that is offline, is still
 listed, and clicking it says "That folder doesn't exist.": the picker can't tell
 a deleted folder from an unreachable one without waiting twice. A

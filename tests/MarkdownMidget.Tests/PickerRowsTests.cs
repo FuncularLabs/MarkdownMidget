@@ -36,7 +36,7 @@ public class PickerRowsTests
         if (error is not null) throw error;
     }
 
-    private static T? Find<T>(DependencyObject root, Func<T, bool>? match = null) where T : DependencyObject
+    internal static T? Find<T>(DependencyObject root, Func<T, bool>? match = null) where T : DependencyObject
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
         {

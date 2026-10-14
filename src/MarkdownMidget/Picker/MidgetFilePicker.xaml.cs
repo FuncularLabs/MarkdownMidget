@@ -150,45 +150,15 @@ public partial class MidgetFilePicker : Window
         }
     }
 
-    // ===== places tree =====
+    // ===== places pane =====
 
+    /// <summary>The left pane (PlacesPane): a place chosen there opens here, saying so if it has gone.</summary>
     private void BuildPlaces()
     {
-        // Quick access is shown unchecked, its full paths in tooltips: a pinned folder that has
-        // gone fails when clicked, as any other, and a network one isn't touched before that.
-        void AddSection(string header, IEnumerable<string> paths, bool quickAccess = false)
-        {
-            var any = false;
-            foreach (var path in paths.Where(p => quickAccess || Directory.Exists(p)).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                if (!any)
-                {
-                    PlacesTree.Items.Add(new TreeViewItem
-                    {
-                        Header = header,
-                        IsEnabled = false,
-                        FontWeight = FontWeights.SemiBold,
-                        Focusable = false,
-                    });
-                    any = true;
-                }
-                var node = MakeNode(path, Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } n ? n : path);
-                if (quickAccess) node.ToolTip = path;
-                PlacesTree.Items.Add(node);
-            }
-        }
-
-        AddSection("Places", new[]
-        {
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
-        });
-        AddSection("Quick access", PinnedFolders(), quickAccess: true);
-        AddSection("Recent folders", _request.RecentFolders.Take(5));
-        AddSection("Drives", DriveInfo.GetDrives()
-            .Where(d => d.IsReady)
-            .Select(d => d.RootDirectory.FullName));
+        Places.Open = path => Navigate(path, addToHistory: true, sayIfMissing: true);
+        Places.Subfolders = SafeDirectories;
+        Places.Show(PlacesPane.Sections(Environment.GetFolderPath, Directory.Exists, PinnedFolders(), _request.RecentFolders,
+            DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => d.RootDirectory.FullName)), _views.Collapsed, s_views);
     }
 
     private static Task<IReadOnlyList<string>>? s_pinnedRead;   // pickers open on the UI thread, one at a time
@@ -204,32 +174,6 @@ public partial class MidgetFilePicker : Window
             s_pinnedRead = Task.Run(() => { using (deadline) return QuickAccess.PinnedFolders(QuickAccess.JumpListPath, deadline.Token); });
         }
         return s_pinnedRead.Wait(TimeSpan.FromMilliseconds(500)) ? s_pinnedRead.Result : [];
-    }
-
-    /// <summary>A tree node with a placeholder child, so the arrow shows without
-    /// walking the whole disk up front. Real children arrive on expand.</summary>
-    private static TreeViewItem MakeNode(string path, string label)
-    {
-        var node = new TreeViewItem { Header = label, Tag = path };
-        node.Items.Add("…");   // placeholder: replaced on first expand
-        return node;
-    }
-
-    private void PlacesTree_Expanded(object sender, RoutedEventArgs e)
-    {
-        if (e.OriginalSource is not TreeViewItem node || node.Tag is not string path) return;
-        if (node.Items.Count != 1 || node.Items[0] is not string) return;   // already populated
-        node.Items.Clear();
-        foreach (var dir in SafeDirectories(path))
-            node.Items.Add(MakeNode(dir, Path.GetFileName(dir)));
-    }
-
-    private void PlacesTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-    {
-        // A place not there now (deleted, or on an offline share: telling them apart would wait twice)
-        // says so; then the node is let go, so a second click tries again.
-        if (_navigating || e.NewValue is not TreeViewItem { Tag: string path } node || Navigate(path, addToHistory: true, sayIfMissing: true)) return;
-        Dispatcher.InvokeAsync(() => { _navigating = true; node.IsSelected = false; _navigating = false; });
     }
 
     // ===== listing =====

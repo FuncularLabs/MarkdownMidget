@@ -20,13 +20,16 @@ internal sealed class PickerViewEntry
     public DateTime Used { get; set; }
 }
 
-/// <summary>picker-views.json: the default view, which the first change anywhere sets, and
-/// a view for each folder changed after that.</summary>
+/// <summary>picker-views.json: the default view, which the first change anywhere sets, a view
+/// for each folder changed after that, and the left pane's collapsed sections.</summary>
 internal sealed class PickerViewsFile
 {
     public int Version { get; set; } = 1;
     public PickerViewEntry? Default { get; set; }
     public List<PickerViewEntry> Folders { get; set; } = [];
+    /// <summary>The left pane's collapsed sections, by PlaceSection.Id. Optional, so still Version 1:
+    /// 1.0.1 reads a file that has it and leaves it out when it writes.</summary>
+    public List<string> Collapsed { get; set; } = [];
 }
 
 /// <summary>
@@ -67,6 +70,14 @@ internal static class PickerViews
         return true;
     }
 
+    /// <summary>Records one section of the left pane shut or open, and no other: written to the file as it
+    /// is on disk, a window's change can't put back another's.</summary>
+    public static void SetCollapsed(PickerViewsFile file, string section, bool collapsed)
+    {
+        file.Collapsed.Remove(section);
+        if (collapsed) file.Collapsed.Add(section);
+    }
+
     /// <summary>Never throws: text that isn't a views file reads as an empty one, and an entry
     /// that makes no sense (an unknown column, the wrong number of widths) is dropped.</summary>
     public static PickerViewsFile Parse(string? text)
@@ -81,6 +92,7 @@ internal static class PickerViews
             .GroupBy(e => e.Folder!, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.MaxBy(e => e.Used)!)
             .ToList();
+        file.Collapsed = [.. (file.Collapsed ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)];
         return file;
     }
 
