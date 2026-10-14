@@ -1,6 +1,6 @@
 # Markdown Midget 1.0 test plan
 
-This plan covers every user-facing change going into 1.0.0 and 1.0.1: everything in `CHANGELOG.md` since `1.0.0-beta1`, a few commits since then with no CHANGELOG bullet (the view pair and the opening card), and block-level source preservation, which applies from the first build that includes it.
+This plan covers every user-facing change going into 1.0.0, 1.0.1 and 1.0.2: everything in `CHANGELOG.md` since `1.0.0-beta1`, a few commits since then with no CHANGELOG bullet (the view pair and the opening card), and block-level source preservation, which applies from the first build that includes it.
 
 Results are tracked by build number in the [run log](#4-run-log). Claude runs and checks off every test marked **Automated (Claude)** and the automated part of every **Both** test. Developers then run the **Human** tests and the human part of **Both** tests.
 

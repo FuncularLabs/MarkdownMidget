@@ -16,7 +16,8 @@ not planned, and the deliberate limits, are in
 A fix release, made straight from master with no prerelease: the built-in file
 picker's Quick access section now appears on current Windows 11. Windows 11 writes a
 newer version of Explorer's list of pinned folders, which the picker used to refuse.
-Nothing else changed.
+A folder pinned by its path also keeps the characters in its name that the system
+code page lacks, where each could show as "?". Nothing outside Quick access changed.
 
 ## 1.0.1 (cut as 1.0.1-beta1 on 2026-10-08; 1.0.1 was promoted 2026-10-13)
 
