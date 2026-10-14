@@ -11,8 +11,10 @@ namespace MarkdownMidget.Picker;
 /// Windows' own dialog. The file is Quick Access's jump list, a compound file
 /// (<see cref="CompoundFile"/>). Its DestList stream lists the entries, each pinned one with
 /// its place in the pin order, and the stream named by an entry's number in hex is that
-/// entry's shell link (<see cref="ShellLink"/>). Only DestList versions 3 and 4 (Windows 10
-/// and 11) are read. Nothing is checked on disk: a pinned folder that has gone says so when it
+/// entry's shell link (<see cref="ShellLink"/>). DestList versions from 3 on (Windows 10 and
+/// 11, which now writes 6) are read by the one entry layout they share, checked as it is read.
+/// A folder's name is the DestList's UTF-16 path when that is a full path, else the link's.
+/// Nothing is checked on disk: a pinned folder that has gone says so when it
 /// is clicked, and a network folder isn't touched until then. The work is bounded: an 8 MB
 /// file, 100 pinned entries, links of 64 KB, and a deadline checked as it goes.
 /// </summary>
@@ -25,7 +27,7 @@ internal static class QuickAccess
         "Microsoft", "Windows", "Recent", "AutomaticDestinations", JumpListName);
 
     /// <summary>The pinned folders' paths, in pin order. Empty when the file is missing, can't
-    /// be read, is another version, isn't as expected, or <paramref name="stop"/> comes first.
+    /// be read, is a version before 3, isn't as expected, or <paramref name="stop"/> comes first.
     /// Never throws.</summary>
     public static IReadOnlyList<string> PinnedFolders(string jumpListPath, CancellationToken stop = default)
     {
@@ -47,30 +49,40 @@ internal static class QuickAccess
         {
             var file = new CompoundFile(jumpList, stop);
             var list = file.Read("DestList", int.MaxValue);
-            if (list is null || I32(list, 0) is not (3 or 4)) return [];
+            if (list is null || I32(list, 0) < 3) return [];   // 1 and 2 (Windows 7 and 8) lay their entries out otherwise
             // libyal dtformats "Jump lists format" (DestList entry, version 2 or later) and EricZimmerman's
-            // JumpList: a 32-byte header; then per entry the entry number at 88, the pin status at 108 (-1 when
-            // not pinned, else the pin order), the path's length in characters at 128, the path at 130, then a
-            // property store's size (4 bytes) and the store.
-            var pinned = new Dictionary<int, int>();   // entry number to pin order, each entry once
-            var at = 32;
+            // JumpList: a 32-byte header, its count of pinned entries at 8; then per entry the entry number at
+            // 88, the pin status at 108 (-1 when not pinned, else the pin order), the path's length in characters
+            // at 128, the path in UTF-16 at 130, then a property store's size (4 bytes) and the store.
+            var pinned = new Dictionary<int, (int Order, string Path)>();   // entry number to pin order and path, each entry once
+            var (at, pins) = (32, 0);
             for (var count = I32(list, 4); count > 0; count--)
             {
                 step?.Invoke("entry");   // tests watch where a deadline stops the work
                 stop.ThrowIfCancellationRequested();
                 var pathEnd = at + 130 + 2 * BinaryPrimitives.ReadUInt16LittleEndian(list.AsSpan(at + 128, 2));
-                if (I32(list, at + 108) is var order and >= 0) pinned.TryAdd(I32(list, at + 88), order);
+                if (I32(list, at + 108) is var order and >= 0)
+                {
+                    pins++;   // every pinned entry, a repeated one too: the header counts them all
+                    pinned.TryAdd(I32(list, at + 88), (order, new string(MemoryMarshal.Cast<byte, char>(list.AsSpan((at + 130)..pathEnd)))));
+                }
                 at = checked(pathEnd + 4 + (I32(list, pathEnd) is var store and >= 0 ? store : throw new InvalidDataException("a negative store")));
                 if (at > list.Length) throw new InvalidDataException("DestList ends inside an entry");
             }
+            // A later version is read by version 4's layout, so check that layout held. A wrong pin count is
+            // the list's fault, not one entry's: it puts in doubt which entries show and in what order.
+            if (at != list.Length || pins != I32(list, 8)) return [];
             var folders = new List<string>();
-            foreach (var entry in pinned.OrderBy(p => p.Value).Take(MaxPinned).Select(p => p.Key))
+            foreach (var (entry, (_, listPath)) in pinned.OrderBy(p => p.Value.Order).Take(MaxPinned))
             {
                 step?.Invoke("link");
                 stop.ThrowIfCancellationRequested();
                 try   // a bad link leaves out its own entry only
                 {
-                    if (file.Read(entry.ToString("x"), MaxLinkBytes) is { } link && ShellLink.FolderPath(link) is { } path
+                    // The link says whether it is a folder. Its LinkInfo may hold only the ANSI path, "?" for what
+                    // the code page lacks, so a full path in the DestList names it; a knownfolder:{…} doesn't.
+                    if (file.Read(entry.ToString("x"), MaxLinkBytes) is { } link && ShellLink.FolderPath(link) is { } linkPath
+                        && (Path.IsPathFullyQualified(listPath) ? listPath : linkPath) is var path
                         && !folders.Contains(path, StringComparer.OrdinalIgnoreCase)) folders.Add(path);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException) { }

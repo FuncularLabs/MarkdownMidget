@@ -9,6 +9,10 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The built-in file picker now shows Quick access on current Windows 11**: Windows 11 now writes a newer version of the list of folders you pinned to Quick access, which the picker refused, so the section never appeared. The picker now reads any version from Windows 10's on, as long as the list is laid out the way it expects; one that isn't still shows no Quick access. A pinned folder whose name has characters that Windows' **Language for non-Unicode programs** doesn't cover, such as Cyrillic letters on a Western European system, now keeps its name, where each such character could show as "?".
+
 ## [1.0.1] - 2026-10-13
 
 1.0.1-beta1's content with the prerelease flag dropped, after dogfooding. Everything
