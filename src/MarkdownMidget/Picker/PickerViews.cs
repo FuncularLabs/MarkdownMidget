@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using MarkdownMidget.Instances;
 
@@ -29,7 +30,31 @@ internal sealed class PickerViewsFile
     public List<PickerViewEntry> Folders { get; set; } = [];
     /// <summary>The left pane's collapsed sections, by PlaceSection.Id. Optional, so still Version 1:
     /// 1.0.1 reads a file that has it and leaves it out when it writes.</summary>
+    [JsonConverter(typeof(StringsOnly))]
     public List<string> Collapsed { get; set; } = [];
+}
+
+/// <summary>Reads <see cref="PickerViewsFile.Collapsed"/> whatever its shape: only its string items are kept, and a value
+/// that isn't a list reads as none. One odd field must not make the whole file read as empty, which the next write
+/// would then make true for every view in it.</summary>
+internal sealed class StringsOnly : JsonConverter<List<string>>
+{
+    public override List<string> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var list = new List<string>();
+        if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); return list; }
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+            if (reader.TokenType == JsonTokenType.String) list.Add(reader.GetString()!);
+            else reader.Skip();   // a number, an object, a list: stepped over whole
+        return list;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<string> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var item in value) writer.WriteStringValue(item);
+        writer.WriteEndArray();
+    }
 }
 
 /// <summary>

@@ -18,7 +18,6 @@ internal sealed record PlaceSection(string Id, string Header, IReadOnlyList<Plac
 public partial class PlacesPane : UserControl
 {
     private PickerViewStore? _store;
-    private bool _lettingGo;
 
     public PlacesPane() => InitializeComponent();
 
@@ -90,16 +89,19 @@ public partial class PlacesPane : UserControl
     private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         // A place not there now (deleted, or on an offline share: telling them apart would wait twice)
-        // says so in Open; then the node is let go, so a second click tries again.
-        if (_lettingGo || e.NewValue is not TreeViewItem { Tag: string path } node || Open(path)) return;
-        Dispatcher.InvokeAsync(() => { _lettingGo = true; node.IsSelected = false; _lettingGo = false; });
+        // says so in Open; then the node is let go, so a second click tries again. Letting go selects nothing.
+        if (e.NewValue is not TreeViewItem { Tag: string path } node || Open(path)) return;
+        Dispatcher.InvokeAsync(() => node.IsSelected = false);
     }
 
     /// <summary>Enter and Space toggle a section, and Left shuts an open one and Right opens a shut one, as the tree's own
-    /// keys would: all of a header's keys in one place. Every other key, and these on an entry, are the tree's.</summary>
+    /// keys would: all of a header's keys in one place. Every other key, and these on an entry or with Ctrl, Shift or
+    /// Alt, are the tree's, except numpad *: the tree's would open out the selected item's whole subtree, reading every
+    /// folder under it, every drive's included, on the UI thread.</summary>
     private void Tree_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.OriginalSource is not TreeViewItem { Tag: PlaceSection } item || Keyboard.Modifiers != ModifierKeys.None) return;
+        if (e.Key == Key.Multiply) { e.Handled = true; return; }
+        if (e.OriginalSource is not TreeViewItem { Tag: PlaceSection } item || e.KeyboardDevice.Modifiers != ModifierKeys.None) return;
         bool? open = e.Key switch
         {
             Key.Enter or Key.Space => !item.IsExpanded,
@@ -115,8 +117,9 @@ public partial class PlacesPane : UserControl
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (((FrameworkElement)sender).TemplatedParent is not TreeViewItem item) return;
+        e.Handled = true;               // or the tree's own double-click would toggle it back
+        if (e.ClickCount > 1) return;   // a double-click is one gesture: one toggle, one write
         item.IsExpanded = !item.IsExpanded;
         item.Focus();   // the keyboard carries on from the header clicked
-        e.Handled = true;
     }
 }

@@ -914,7 +914,8 @@ network share, behind a link, junction or mount point, or on a drive that is
 unplugged or not ready is never forgotten that way, only by the limit, and
 neither is one Windows won't report on, such as a folder you aren't allowed to
 look at: it is kept while it can't be checked. Delete
-the file to start again from folders first and names A to Z.
+the file to start again from folders first and names A to Z; that also expands
+every section of the left pane you collapsed.
 
 Under **Quick access** the picker lists the folders you pinned to Quick access
 in File Explorer, in Explorer's order; point at one to see its full path. The

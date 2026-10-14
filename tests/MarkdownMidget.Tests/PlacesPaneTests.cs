@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -52,17 +53,35 @@ public sealed class PlacesPaneTests : IDisposable
     private static T Part<T>(TreeViewItem item, string name) where T : class => (T)item.Template.FindName(name, item);
     private static TextBlock Label(TreeViewItem item) =>   // a section's header text, or an entry's
         PickerRowsTests.Find<TextBlock>(Part<DependencyObject>(item, "PART_Header"), t => t.Text == (string)item.Header)!;
-    private static void Click(TreeViewItem section) => Part<UIElement>(section, "PART_Header").RaiseEvent(
-        new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent });
+    private static bool Click(TreeViewItem section, int clicks = 1) => LeftDown(Part<UIElement>(section, "PART_Header"), clicks);
     private static IExpandCollapseProvider Automation(PlacesPane pane, int section) => (IExpandCollapseProvider)
         UIElementAutomationPeer.CreatePeerForElement(pane.Tree).GetChildren()[section].GetPattern(PatternInterface.ExpandCollapse);
     private static void Written(PickerViewStore store) => store.UpdateLater(_ => { }).Wait();   // after the pane's queued writes
 
-    private static bool Press(TreeViewItem item, Key key)   // as when it has the focus; true when the pane took the key
+    /// <summary>A left press as Windows delivers it: MouseDown, which WPF raises again as MouseLeftButtonDown along its route.</summary>
+    private static bool LeftDown(UIElement target, int clicks)
     {
-        var args = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(item), 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
-        item.RaiseEvent(args);
+        var args = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.MouseDownEvent };
+        typeof(MouseButtonEventArgs).GetProperty(nameof(args.ClickCount))!.SetValue(args, clicks);   // its setter is internal
+        target.RaiseEvent(args);
         return args.Handled;
+    }
+
+    /// <summary>A key pressed on <paramref name="item"/>, as when it has the focus: PreviewKeyDown, and then KeyDown if
+    /// <paramref name="down"/> and nothing took it. True when the pane took it.</summary>
+    private static bool Press(TreeViewItem item, Key key, KeyboardDevice? keyboard = null, bool down = false)
+    {
+        var args = new KeyEventArgs(keyboard ?? Keyboard.PrimaryDevice, PresentationSource.FromVisual(item), 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+        item.RaiseEvent(args);
+        var taken = args.Handled;
+        if (down && !taken) { args.RoutedEvent = Keyboard.KeyDownEvent; item.RaiseEvent(args); }
+        return taken;
+    }
+
+    /// <summary>A keyboard with Ctrl held, for the key events a test raises; the real keyboard is never read.</summary>
+    private sealed class CtrlHeld() : KeyboardDevice(InputManager.Current)
+    {
+        protected override KeyStates GetKeyStatesFromSystem(Key key) => key == Key.LeftCtrl ? KeyStates.Down : KeyStates.None;
     }
 
     [Fact]
@@ -134,6 +153,67 @@ public sealed class PlacesPaneTests : IDisposable
     });
 
     [Fact]
+    public void WithCtrlHeldAHeadersKeysAreLeftToTheTree() => OnPane((pane, _) =>
+    {
+        var (places, ctrl) = (Section(pane, "Places"), new CtrlHeld());
+        Assert.False(Press(places, Key.Enter, ctrl) || Press(places, Key.Space, ctrl) || Press(places, Key.Left, ctrl));
+        Assert.True(places.IsExpanded);
+    });
+
+    [Fact]
+    public void ADoubleClickOnAHeaderTogglesItOnceAndTheTreeNeverSeesIt() => OnPane((pane, store) =>
+    {
+        var drives = Section(pane, "Drives");
+        Assert.True(Click(drives, 1) && Click(drives, 2));   // taken, so the tree's own double-click doesn't toggle it back
+        Written(store);
+        Assert.False(drives.IsExpanded);
+        Assert.Equal(["Drives"], store.Load().Collapsed);
+    });
+
+    [Fact]
+    public void AClickOrDoubleClickOnACardsBlankSpaceDoesNothing() => OnPane((pane, store) =>
+    {
+        var (places, home) = (Section(pane, "Places"), Entry(Section(pane, "Places"), 0));
+        home.IsSelected = true;
+        var (card, row) = (places.TranslatePoint(default, pane), home.TranslatePoint(new Point(0, home.ActualHeight / 2), pane).Y);
+        // Right of Home's label, in the gutter left of it, and in the card's bottom padding, hit as the mouse hits.
+        foreach (var point in new Point[] { new(card.X + places.ActualWidth - 6, row), new(card.X + 8, row), new(card.X + 40, card.Y + places.ActualHeight - 2) })
+            foreach (var clicks in new[] { 1, 2 })
+                LeftDown(Assert.IsAssignableFrom<UIElement>(pane.InputHitTest(point)), clicks);
+        Written(store);
+        Assert.Equal((true, true, false), (places.IsExpanded, home.IsSelected, places.IsSelected));
+        Assert.Empty(store.Load().Collapsed);
+    });
+
+    [Fact]
+    public void NumpadStarOpensNothingOutUnderAHeaderOrAnEntry() => OnPane((pane, _) =>
+    {
+        var asked = new List<string>();
+        pane.Subfolders = path => { asked.Add(path); return path.Length < 60 ? [path + @"\Deeper"] : []; };   // a deep stand-in
+        var taken = new List<bool>();
+        foreach (var item in new[] { Section(pane, "Places"), Entry(Section(pane, "Places"), 2) })
+        {
+            item.IsSelected = true;   // as focus leaves it: the tree's own star opens out the selected item
+            taken.Add(Press(item, Key.Multiply, down: true));
+        }
+        Assert.Empty(asked);   // WPF's star would read every folder under them on the UI thread
+        Assert.Equal([true, true], taken);
+    });
+
+    [Fact]
+    public void ASelectedHeaderIsHighlightedAsTheKeyboardsPlace() => OnPane((pane, _) =>
+    {
+        var places = Section(pane, "Places");
+        Color Head() => ((SolidColorBrush)Part<Border>(places, "PART_Header").Background).Color;
+        Assert.Equal(Colors.Transparent, Head());
+        places.IsSelected = true;   // the tree without the keyboard focus
+        Assert.Equal(SystemColors.InactiveSelectionHighlightBrush.Color, Head());
+        var active = typeof(System.Windows.Controls.Primitives.Selector).GetField("IsSelectionActivePropertyKey", BindingFlags.NonPublic | BindingFlags.Static)!;
+        pane.Tree.SetValue((DependencyPropertyKey)active.GetValue(null)!, true);   // as the tree has while it holds the focus
+        Assert.Equal((SystemColors.HighlightColor, SystemColors.HighlightTextColor), (Head(), ((SolidColorBrush)Label(places).Foreground).Color));
+    });
+
+    [Fact]
     public void AutomationReadsEachHeadersNameAndWhetherItIsExpanded() => OnPane((pane, _) =>
     {
         var items = UIElementAutomationPeer.CreatePeerForElement(pane.Tree).GetChildren();
@@ -183,6 +263,26 @@ public sealed class PlacesPaneTests : IDisposable
         Assert.False(store.Update(f => PickerViews.SetCollapsed(f, "Recent", false)));
         Assert.Equal(newer, File.ReadAllText(path));
         Assert.Equal(["Drives"], PickerViews.Parse("""{"Version":1,"Collapsed":[null,"Drives","Drives"," "]}""").Collapsed);
+        Assert.Equal(["Drives", "Recent"], PickerViews.Parse("""{"Version":1,"Collapsed":[1,"Drives",{"a":[2]},["x"],"Recent"]}""").Collapsed);
+    }
+
+    [Theory]
+    [InlineData("\"Drives\"")]
+    [InlineData("[1]")]
+    [InlineData("{\"Drives\":true}")]
+    public void ACollapsedListOfTheWrongShapeReadsAsNoneAndTheViewsSurviveTheNextWrite(string collapsed)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, PickerViewStore.FileName), $$"""
+            {"Version":1,"Default":{"Column":"Size","Widths":[250,130,110,70]},
+             "Folders":[{"Folder":"C:\\Alpha","Column":"Type","Widths":[250,130,110,70]}],"Collapsed":{{collapsed}}}
+            """);
+        var store = new PickerViewStore(_dir, _ => { });
+        Assert.Empty(store.Load().Collapsed);
+        Assert.True(store.Update(f => PickerViews.Apply(f, @"C:\Beta", new PickerView(new PickerSort(PickerColumn.Name, true), [250, 130, 110, 70]), DateTime.UtcNow)));
+        var file = store.Load();
+        Assert.Equal("Size", file.Default?.Column);
+        Assert.Equal([@"C:\Alpha", @"C:\Beta"], file.Folders.Select(f => f.Folder));
     }
 
     [Fact]
