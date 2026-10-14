@@ -11,10 +11,11 @@ not planned, and the deliberate limits, are in
 
 ---
 
-## 1.0.1 (cut as 1.0.1-beta1 on 2026-10-08)
+## 1.0.1 (cut as 1.0.1-beta1 on 2026-10-08; 1.0.1 was promoted 2026-10-13)
 
-The first 1.0.1 prerelease, cut so the built-in file picker's changes get real use
-before 1.0.1, which follows after dogfooding. Done in 1.0.1-beta1:
+The first 1.0.1 prerelease was cut so the built-in file picker's changes got real use
+before 1.0.1. After dogfooding, 1.0.1 was promoted on 2026-10-13: 1.0.1-beta1's content
+with the prerelease flag dropped. Done in 1.0.1-beta1:
 
 - ~~**The built-in picker needs a Type column, sorting, Quick access, remembered column
   settings, and a way back to Windows' dialog (#12, items 2 to 6).**~~ **Done
@@ -28,7 +29,7 @@ before 1.0.1, which follows after dogfooding. Done in 1.0.1-beta1:
 - [Cursor and selection colours](#cursor-and-selection-colours--theme-variables) and
   the link underline and printed code-token [Nits](#nits), below.
 
-What is still open, for 1.0.1 or later, includes
+What is still open, for a later release, includes
 [Diagram width](#diagram-width--needs-a-decision),
 [Easier JSON editing](#easier-json-editing--needs-definition), #13 (a theme needs a
 specificity hack to override the app's `!important` rules), #14 (the contrast sweep

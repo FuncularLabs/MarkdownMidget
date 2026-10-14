@@ -86,7 +86,8 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
   Solarized, Obsidiminutive, One Light, Solarized Light, and the original Default),
   plus your own: drop a CSS file in the themes folder and it appears in the menu.
   Printing stays light whatever you pick. The app follows Windows **light and dark
-  mode** (or **View ▸ Mode**), with a theme for each and dark menus in dark mode.
+  mode** (or **View ▸ Mode**), with a theme for each and dark menus in dark mode. A
+  theme can also colour the **cursor and the selection**.
 - **Document width** (Portrait / Landscape / Full, remembered between sessions) and
   a **zoom** indicator (Ctrl + mouse wheel).
 - **Recent files**, **drag-and-drop** (a dropped picture is inserted, a dropped
@@ -103,7 +104,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
   of its own (View ▸ Theme ▸ Same Theme for Both Views, off).
 - Windows' file dialogs run **in a separate process**, with a **built-in file
   picker** standing by, so a faulty Explorer add-on can't take the editor down; if
-  one crashes, a notice says what it found and saves a log.
+  one crashes, a notice says what it found and saves a log. The built-in picker sorts
+  by any column, shows each file's type, remembers how you sort and size its columns,
+  and lists your **Quick access** folders.
 - Ships as a **single `.exe`**.
 
 ## Requirements
@@ -115,11 +118,9 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**Stable (1.0.x)**, in daily use and signed on every release: 1.0.0 is the latest
+**Stable (1.0.x)**, in daily use and signed on every release: 1.0.1 is the latest
 stable release, and the badge above and the entry marked **Latest** on the releases page
-point at it until 1.0.1. **1.0.1-beta1**, the first 1.0.1 prerelease, sits above it on
-that page for anyone who wants the built-in file picker's new columns and Quick access
-early. Windows-only for now; the editor core is web-based, so a cross-platform
+point at it. Windows-only for now; the editor core is web-based, so a cross-platform
 shell (MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
 deliberate limit written down in [HELP.md ▸ Known limits](HELP.md#known-limits);
 a real installer that registers in Add/Remove Programs is the headline of the
@@ -197,9 +198,9 @@ the one it replaced:
 | Where | Looks like |
 | --- | --- |
 | Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.1.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.1-beta1+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.1-beta1+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.1-beta1+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.1+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.1+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.1+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -329,6 +330,10 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.1** — **1.0.1-beta1 with the prerelease flag dropped.** The built-in file
+  picker **sorts by any column**, shows each file's **type**, **remembers** how you
+  sort and size its columns, and lists your **Quick access** folders, and a theme can
+  now colour the **cursor and the selection**.
 - **v1.0.1-beta1** *(prerelease)* — The built-in file picker now **sorts by any
   column**, shows each file's **type**, **remembers** how you sort and size its
   columns, and lists your **Quick access** folders. It says it is Markdown Midget's
