@@ -9,6 +9,61 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-13
+
+1.0.1-beta1's content with the prerelease flag dropped, after dogfooding. Everything
+new since 1.0.0:
+
+- **The built-in file picker now sorts by any column and shows each file's type.**
+  Click **Name**, **Date modified**, **Type** or **Size** at the top of the list to
+  sort by it, and click it again to reverse the order; an arrow on the header shows
+  which column sorts and which way. Folders stay above files, items that tie go by
+  name, and **Date modified** starts with the newest. The new **Type** column shows
+  the name Windows has registered for a file's extension, such as *JPEG Image*. Where
+  the only name Windows has for it is kept inside a program file, or it has none, the
+  column shows the extension in capitals, such as *MD File*. The Name column starts
+  narrower to make room.
+- **The built-in file picker now remembers how you sort its list and how wide you make
+  its columns.** The first change, in any folder, becomes how every folder opens;
+  after that, a change you make in a folder is kept for that folder only. Drag a
+  header's edge to resize a column, or double-click the edge to fit the column to its
+  contents. Up to 300 folders are kept, in
+  `%LocalAppData%\MarkdownMidget\picker-views.json`, the one used least recently
+  forgotten first, and a folder Windows reports gone from a local drive is forgotten
+  too.
+- **The built-in file picker now lists your Quick access folders**: the folders you
+  pinned to Quick access in File Explorer show under **Quick access** in the picker's
+  Places, above Recent folders, in Explorer's order. The picker reads Explorer's list
+  itself, so no Explorer add-on is loaded. Clicking a folder in the left pane that has
+  gone now says "That folder doesn't exist.", and clicking it again tries again.
+- **The built-in file picker now says it is Markdown Midget's own** and, while
+  **Always use the built-in file picker** is on, how to get Windows' dialog back:
+  **Edit ▸ Settings ▸ File dialogs**, then restart Markdown Midget. Markdown Midget
+  now records why that setting is on. When it is on with no reason recorded, as
+  versions before 1.0.0-rc3 could leave it when Cancel in Windows' dialog was taken
+  for a crash, the next file dialog offers once to bring Windows' dialog back. A
+  change to the setting in one window is no longer undone when another window that
+  was already open saves a different setting.
+- **A theme can now colour the text cursor, selected text and the outline round a
+  clicked rule or picture**, in the formatted view: `--mdm-caret`,
+  `--mdm-selection-bg` and `--mdm-selection-fg` (name both or neither), and
+  `--mdm-selected-outline`. That outline no longer prints, and a theme that leaves
+  them out looks as before. This version's `sample.css` documents all four, but a copy
+  you already have stays as it was. **Red Sparks**, **Red Sparks 2X** and **Amber
+  Phosphor** now use them: selected text is reversed, the page's near-black on red or
+  amber, and the cursor and the outline are red or amber too.
+- **Fixed:** a right-click on a word in the Markdown source view now offers that
+  word's suggestions, where 1.0.0 read the pointer as if it were about a line lower;
+  printed code now uses print's colours for every kind of highlighted token, whatever
+  the theme, where twelve kinds printed in the theme's screen colours; link underlines
+  now sit clear of the tails of g, p, q and y at every size, on screen and on paper,
+  and a theme's own `text-underline-offset` still wins where its rule matches the link
+  itself; and a double-click in the built-in file picker opens only the row it lands
+  on, where one on a header, a scroll bar or the space below the rows opened the
+  selected file.
+
+The full detail is in the notes for 1.0.1-beta1.
+
 ## [1.0.1-beta1] - 2026-10-08
 
 The first 1.0.1 prerelease: 1.0.0 plus the changes below. The built-in file picker
@@ -1477,7 +1532,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.1-beta1...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.1
 [1.0.1-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.1-beta1
 [1.0.0]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0
 [1.0.0-rc4]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.0-rc4
