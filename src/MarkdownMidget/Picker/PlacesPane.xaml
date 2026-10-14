@@ -17,10 +17,15 @@
                             <Border x:Name="Card" CornerRadius="4" BorderThickness="1" IsHitTestVisible="False"
                                     Background="{DynamicResource {x:Static chrome:ChromeKeys.PickerSectionBackground}}"
                                     BorderBrush="{DynamicResource {x:Static chrome:ChromeKeys.PickerSectionBorder}}"
-                                    Tag="{DynamicResource {x:Static SystemParameters.HighContrastKey}}" />
+                                    Tag="{DynamicResource {x:Static SystemParameters.HighContrastKey}}">
+                                <!-- The header's shaded band: the card's full width, the header's height, inside its rounded top corners. -->
+                                <Border x:Name="Strip" VerticalAlignment="Top" CornerRadius="3,3,0,0" Height="{Binding ActualHeight, ElementName=PART_Header}"
+                                        Background="{DynamicResource {x:Static chrome:ChromeKeys.PickerSectionHeader}}" />
+                            </Border>
                             <StackPanel Margin="1,1,1,4">
-                                <Border x:Name="PART_Header" Background="Transparent" CornerRadius="3" Padding="4,4,8,4"
-                                        MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                                <!-- The 1px edge shows only on a selected header while the tree hasn't the focus, whose fill is as pale as the band. -->
+                                <Border x:Name="PART_Header" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3"
+                                        Padding="3,3,7,3" MouseLeftButtonDown="Header_MouseLeftButtonDown">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock x:Name="Chevron" Text="&#xE70D;" Width="16" FontSize="10" VerticalAlignment="Center"
                                                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" />
@@ -47,13 +52,15 @@
                                 </MultiTrigger.Conditions>
                                 <Setter TargetName="PART_Header" Property="Background" Value="{DynamicResource {x:Static SystemColors.InactiveSelectionHighlightBrushKey}}" />
                                 <Setter TargetName="PART_Header" Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}}" />
+                                <Setter TargetName="PART_Header" Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" />
                             </MultiTrigger>
-                            <!-- High contrast takes the light palette, whose shading would sit under the system's text
-                                 colours: there the card is the system's window colour with a window-text edge. -->
+                            <!-- High contrast takes the light palette, whose shading would sit under the system's text colours:
+                                 there the card is the system's window colour with a window-text edge, and the band its control colour. -->
                             <Trigger SourceName="Card" Property="Tag">
                                 <Trigger.Value><sys:Boolean>True</sys:Boolean></Trigger.Value>
                                 <Setter TargetName="Card" Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
                                 <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
+                                <Setter TargetName="Strip" Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

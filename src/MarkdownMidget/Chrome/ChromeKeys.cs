@@ -29,9 +29,10 @@ public static class ChromeKeys
     public const string ChipRemovedText = "Chrome.Chip.RemovedText";
     public const string IconNumberedList = "Chrome.Icon.NumberedList";
     public const string IconSpellCheck = "Chrome.Icon.SpellCheck";
-    /// <summary>The built-in file picker's left pane: each section's card, and its 1px edge.</summary>
+    /// <summary>The built-in file picker's left pane: each section's card, its 1px edge, and the band its header sits on.</summary>
     public const string PickerSectionBackground = "Chrome.Picker.Section.Background";
     public const string PickerSectionBorder = "Chrome.Picker.Section.Border";
+    public const string PickerSectionHeader = "Chrome.Picker.Section.Header";
     /// <summary>A style, not a brush: the built-in file picker's glyph buttons.</summary>
     public const string PickerNavButton = "Chrome.Picker.NavButton";
 }

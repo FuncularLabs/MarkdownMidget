@@ -205,12 +205,14 @@ public sealed class PlacesPaneTests : IDisposable
     {
         var places = Section(pane, "Places");
         Color Head() => ((SolidColorBrush)Part<Border>(places, "PART_Header").Background).Color;
-        Assert.Equal(Colors.Transparent, Head());
-        places.IsSelected = true;   // the tree without the keyboard focus
-        Assert.Equal(SystemColors.InactiveSelectionHighlightBrush.Color, Head());
+        Color Edge() => ((SolidColorBrush)Part<Border>(places, "PART_Header").BorderBrush).Color;
+        Assert.Equal((Colors.Transparent, Colors.Transparent), (Head(), Edge()));
+        places.IsSelected = true;   // the tree without the keyboard focus: a fill as pale as the strip, so an edge too
+        Assert.Equal((SystemColors.InactiveSelectionHighlightBrush.Color, SystemColors.ControlDarkColor), (Head(), Edge()));
         var active = typeof(System.Windows.Controls.Primitives.Selector).GetField("IsSelectionActivePropertyKey", BindingFlags.NonPublic | BindingFlags.Static)!;
         pane.Tree.SetValue((DependencyPropertyKey)active.GetValue(null)!, true);   // as the tree has while it holds the focus
-        Assert.Equal((SystemColors.HighlightColor, SystemColors.HighlightTextColor), (Head(), ((SolidColorBrush)Label(places).Foreground).Color));
+        Assert.Equal((SystemColors.HighlightColor, SystemColors.HighlightTextColor, Colors.Transparent),
+            (Head(), ((SolidColorBrush)Label(places).Foreground).Color, Edge()));
     });
 
     [Fact]
@@ -288,30 +290,41 @@ public sealed class PlacesPaneTests : IDisposable
     [Fact]
     public void TheCardBrushesAreInBothPalettesAndReadAgainstTheirSurfaces() => ChromePaletteTests.RunSta(() =>
     {
-        // Floors under the ratios measured: header text on the card, the card's edge and its shading on the pane.
-        foreach (var (palette, text, edge, shade) in new (ResourceDictionary, double, double, double)[]
-                 { (new ChromeLightPalette(), 19.5, 1.6, 1.05), (new ChromeDarkPalette(), 11.5, 1.8, 1.1) })
+        // Floors under the ratios measured, light then dark: header text on its strip 17.86, 10.12; the strip on the pane
+        // 1.18, 1.29; the edge on the pane 1.92, 2.19; a selected header on the strip 3.83, 2.18, and an inactive one's edge
+        // 2.22, 1.83; a selected entry on the card's body 4.50, 2.54, and an inactive one 1.14, 1.36.
+        foreach (var (palette, text, strip) in new (ResourceDictionary, double, double)[] { (new ChromeLightPalette(), 17.5, 1.15), (new ChromeDarkPalette(), 10, 1.25) })
         {
-            Color C(string key) => ((SolidColorBrush)palette[key]).Color;
-            var (card, window) = (C(ChromeKeys.PickerSectionBackground), C("Chrome.Window.Background"));
-            Assert.InRange(SourcePalette.ContrastRatio(C("Chrome.Text"), card), text, 21);
-            Assert.InRange(SourcePalette.ContrastRatio(C(ChromeKeys.PickerSectionBorder), window), edge, 3);
-            Assert.InRange(SourcePalette.ContrastRatio(card, window), shade, 1.3);
+            void AtLeast(double floor, string fore, string back)
+            {
+                var ratio = SourcePalette.ContrastRatio(((SolidColorBrush)palette[fore]).Color, ((SolidColorBrush)palette[back]).Color);
+                Assert.True(ratio >= floor, $"{palette.GetType().Name}: {fore} on {back} is {ratio:0.00}, under {floor}");
+            }
+            var (head, body, pane) = (ChromeKeys.PickerSectionHeader, ChromeKeys.PickerSectionBackground, "Chrome.Window.Background");
+            AtLeast(text, "Chrome.Text", head); AtLeast(strip, head, pane); AtLeast(1.8, ChromeKeys.PickerSectionBorder, pane);
+            AtLeast(2, "Chrome.Selection.Background", head); AtLeast(1.8, "Chrome.Control.Dark", head);   // the inactive one's edge
+            AtLeast(2.5, "Chrome.Selection.Background", body); AtLeast(1.1, "Chrome.Selection.Inactive.Background", body);
         }
     });
 
     [Fact]
     public void TheCardsDrawWithThePaletteAndWithSystemColoursInHighContrast()
     {
-        static Border Card(PlacesPane pane) => Part<Border>(Section(pane, "Places"), "Card");
-        static (Color, Color) Colours(Border card) => (((SolidColorBrush)card.Background).Color, ((SolidColorBrush)card.BorderBrush).Color);
+        static Border Card(PlacesPane pane, string part = "Card") => Part<Border>(Section(pane, "Places"), part);
+        static (Color, Color, Color) Colours(PlacesPane pane) => (((SolidColorBrush)Card(pane).Background).Color,
+            ((SolidColorBrush)Card(pane).BorderBrush).Color, ((SolidColorBrush)Card(pane, "Strip").Background).Color);
         static Color Light(string key) => ((SolidColorBrush)new ChromeLightPalette()[key]).Color;
         OnPane((pane, _) =>
         {
-            Assert.Equal((Light(ChromeKeys.PickerSectionBackground), Light(ChromeKeys.PickerSectionBorder)), Colours(Card(pane)));
-            Assert.True(Card(pane).CornerRadius.TopLeft > 0 && Card(pane).BorderThickness.Left == 1);
+            Assert.Equal((Light(ChromeKeys.PickerSectionBackground), Light(ChromeKeys.PickerSectionBorder), Light(ChromeKeys.PickerSectionHeader)), Colours(pane));
+            var (card, strip) = (Card(pane), Card(pane, "Strip"));
+            Assert.True(card.CornerRadius.TopLeft > 0 && card.BorderThickness.Left == 1);
+            // The header's strip: the card's full width inside its edge, the header's height, rounded at the top only.
+            Assert.Equal(card.ActualWidth - 2, strip.ActualWidth, 1);
+            Assert.Equal(Card(pane, "PART_Header").ActualHeight, strip.ActualHeight, 1);
+            Assert.True(strip.CornerRadius.TopLeft > 0 && strip.CornerRadius.TopRight > 0 && strip.CornerRadius.BottomLeft == 0);
         });
-        OnPane((pane, _) => Assert.Equal((SystemColors.WindowColor, SystemColors.WindowTextColor), Colours(Card(pane))),
+        OnPane((pane, _) => Assert.Equal((SystemColors.WindowColor, SystemColors.WindowTextColor, SystemColors.ControlColor), Colours(pane)),
             setUp: window => window.Resources[SystemParameters.HighContrastKey] = true);
     }
 

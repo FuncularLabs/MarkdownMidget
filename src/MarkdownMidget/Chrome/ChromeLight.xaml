@@ -158,9 +158,11 @@
     <SolidColorBrush x:Key="Chrome.Chip.ArrowText" Color="#FF8A9099" />
     <SolidColorBrush x:Key="Chrome.Chip.CaptionText" Color="#FF5B6168" />
     <SolidColorBrush x:Key="Chrome.Chip.RemovedText" Color="#FFB23A3A" />
-    <!-- New, not from older XAML: the built-in picker's left-pane section cards, a shade off the pane with a 1px edge. -->
-    <SolidColorBrush x:Key="Chrome.Picker.Section.Background" Color="#FFF7F8FA" />
-    <SolidColorBrush x:Key="Chrome.Picker.Section.Border" Color="#FFC4CAD1" />
+    <!-- New, not from older XAML: the built-in picker's left-pane section cards, a 1px edge round a white body (where a
+         selected folder's pale inactive highlight shows best) and a shaded band under each header. -->
+    <SolidColorBrush x:Key="Chrome.Picker.Section.Background" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Chrome.Picker.Section.Border" Color="#FFB4BCC6" />
+    <SolidColorBrush x:Key="Chrome.Picker.Section.Header" Color="#FFE9EDF2" />
     <!-- Toolbar pictures drawn in near-black: a light copy replaces each in dark mode. -->
     <BitmapImage x:Key="Chrome.Icon.NumberedList" UriSource="pack://application:,,,/MarkdownMidget;component/Assets/numbered-list-64.png" />
     <BitmapImage x:Key="Chrome.Icon.SpellCheck" UriSource="pack://application:,,,/MarkdownMidget;component/Assets/spellcheck-64.png" />

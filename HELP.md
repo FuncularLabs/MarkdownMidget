@@ -876,7 +876,8 @@ off itself. Cancel in Windows' dialog just closes it.
 
 The built-in picker has an address bar, a left pane of shortcuts, a file list,
 type-ahead, and New Folder plus overwrite confirmation when saving. The left pane
-has four sections, each on its own card: **Places** (Home, which is your user
+has four sections, each on its own card with its header on a shaded band:
+**Places** (Home, which is your user
 folder such as `C:\Users\you`, then Desktop, Documents and Downloads), **Quick
 access**, **Recent folders** and **Drives**. A section with nothing in it is left
 out. Click a folder to open it, or click its arrow to see the folders inside it.
