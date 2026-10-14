@@ -255,7 +255,7 @@ public sealed class PlacesPaneTests : IDisposable
     {
         Directory.CreateDirectory(_dir);
         var (path, store) = (Path.Combine(_dir, PickerViewStore.FileName), new PickerViewStore(_dir, _ => { }));
-        File.WriteAllText(path, """{"Version":1,"Default":null,"Folders":[]}""");   // as 1.0.1 writes it
+        File.WriteAllText(path, """{"Version":1,"Default":null,"Folders":[]}""");   // as 1.0.1 and 1.0.2 write it
         Assert.Empty(store.Load().Collapsed);
         Assert.True(store.Update(f => PickerViews.SetCollapsed(f, "Recent", true)) && PickerViews.Ours(File.ReadAllText(path)));
         Assert.Equal(["Recent"], store.Load().Collapsed);

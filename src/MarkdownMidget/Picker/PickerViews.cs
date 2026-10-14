@@ -29,7 +29,7 @@ internal sealed class PickerViewsFile
     public PickerViewEntry? Default { get; set; }
     public List<PickerViewEntry> Folders { get; set; } = [];
     /// <summary>The left pane's collapsed sections, by PlaceSection.Id. Optional, so still Version 1:
-    /// 1.0.1 reads a file that has it and leaves it out when it writes.</summary>
+    /// 1.0.1 and 1.0.2, the versions before it, read a file that has it and leave it out whenever they write.</summary>
     [JsonConverter(typeof(StringsOnly))]
     public List<string> Collapsed { get; set; } = [];
 }
