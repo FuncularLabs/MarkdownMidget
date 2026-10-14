@@ -30,7 +30,7 @@ new since 1.0.0:
   contents. Up to 300 folders are kept, in
   `%LocalAppData%\MarkdownMidget\picker-views.json`, the one used least recently
   forgotten first, and a folder Windows reports gone from a local drive is forgotten
-  too.
+  too, unless it is behind a link, junction or mount point.
 - **The built-in file picker now lists your Quick access folders**: the folders you
   pinned to Quick access in File Explorer show under **Quick access** in the picker's
   Places, above Recent folders, in Explorer's order. The picker reads Explorer's list
@@ -60,7 +60,7 @@ new since 1.0.0:
   and a theme's own `text-underline-offset` still wins where its rule matches the link
   itself; and a double-click in the built-in file picker opens only the row it lands
   on, where one on a header, a scroll bar or the space below the rows opened the
-  selected file.
+  selected file or folder, or in Save As asked whether to replace the selected file.
 
 The full detail is in the notes for 1.0.1-beta1.
 
