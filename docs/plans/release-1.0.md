@@ -70,7 +70,9 @@ while the work is in progress), and ships together as 1.0.0-beta1, then rc1, the
 are in, and the 0.11 line became 1.0.0-beta1. **1.0.0 promoted 2026-10-02**
 (v1.0.0), from 1.0.0-rc4 after dogfooding: same shape as the 0.10.0 promote, nothing
 new. **1.0.1 promoted 2026-10-13** (v1.0.1), from 1.0.1-beta1 after dogfooding; its
-changes are not stages of this plan (see ROADMAP's 1.0.1 section). The stage numbers
+changes are not stages of this plan (see ROADMAP's 1.0.1 section). **1.0.2 released
+2026-10-14** (v1.0.2), a fix release straight from master with no prerelease; its fix
+is not a stage of this plan either (see ROADMAP's 1.0.2 section). The stage numbers
 that follow are WORK ORDER, kept so the issues' "Release" lines still map; they are
 not release numbers.
 The order is the one the risk deserves, except the already-open guard, pulled to

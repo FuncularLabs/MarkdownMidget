@@ -11,6 +11,13 @@ not planned, and the deliberate limits, are in
 
 ---
 
+## 1.0.2 (released 2026-10-14)
+
+A fix release, made straight from master with no prerelease: the built-in file
+picker's Quick access section now appears on current Windows 11. Windows 11 writes a
+newer version of Explorer's list of pinned folders, which the picker used to refuse.
+Nothing else changed.
+
 ## 1.0.1 (cut as 1.0.1-beta1 on 2026-10-08; 1.0.1 was promoted 2026-10-13)
 
 The first 1.0.1 prerelease was cut so the built-in file picker's changes got real use
