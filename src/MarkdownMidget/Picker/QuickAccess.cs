@@ -49,7 +49,8 @@ internal static class QuickAccess
         {
             var file = new CompoundFile(jumpList, stop);
             var list = file.Read("DestList", int.MaxValue);
-            if (list is null || I32(list, 0) < 3) return [];   // 1 and 2 (Windows 7 and 8) lay their entries out otherwise
+            // Version 1 (Windows 7 and 8) lays its entries out otherwise; 2 isn't known from a released Windows.
+            if (list is null || I32(list, 0) < 3) return [];
             // libyal dtformats "Jump lists format" (DestList entry, version 2 or later) and EricZimmerman's
             // JumpList: a 32-byte header, its count of pinned entries at 8; then per entry the entry number at
             // 88, the pin status at 108 (-1 when not pinned, else the pin order), the path's length in characters

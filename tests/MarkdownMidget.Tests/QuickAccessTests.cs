@@ -40,10 +40,11 @@ public sealed class QuickAccessTests : IDisposable
     public void PinnedFoldersComeInPinOrderLocalAndOnAShare(int version) =>
         Assert.Equal([@"\\server\share\Beta", @"C:\Projects\Alpha"], QuickAccess.PinnedFolders(Usual(version)));
 
-    /// <summary>Versions 1 and 2 (Windows 7 and 8) lay their entries out another way. From 3 on (Windows 10's
-    /// 3, then 4, and Windows 11's 6 today) the entries are the same, so a version is taken by its layout, not
-    /// its number: the entries must end exactly where the stream does. Read by version 4's layout, a list
-    /// whose entries are each 8 bytes longer, as one more field would make them, ends short of it.</summary>
+    /// <summary>Version 1 (Windows 7 and 8) lays its entries out another way, and 2 isn't known from a
+    /// released Windows: both are refused. From 3 on (Windows 10's 3, then 4, and Windows 11's 6 today) the
+    /// entries are the same, so a version is taken by its layout, not its number: the entries must end exactly
+    /// where the stream does. Read by version 4's layout, a list whose entries are each 8 bytes longer, as one
+    /// more field would make them, ends short of it, and one 2 bytes longer is refused as surely.</summary>
     [Theory]
     [InlineData(1, 0, false)]
     [InlineData(2, 0, false)]
@@ -52,6 +53,7 @@ public sealed class QuickAccessTests : IDisposable
     [InlineData(5, 0, true)]
     [InlineData(6, 0, true)]
     [InlineData(6, 8, false)]
+    [InlineData(6, 2, false)]   // exactly the end: not "near enough"
     [InlineData(4, 8, false)]   // the end is checked whatever the version
     public void ADestListIsReadByItsLayoutFromVersion3On(int version, int longer, bool read)
     {
