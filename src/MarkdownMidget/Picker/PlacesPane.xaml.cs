@@ -118,7 +118,7 @@ public partial class PlacesPane : UserControl
     {
         if (((FrameworkElement)sender).TemplatedParent is not TreeViewItem item) return;
         e.Handled = true;               // or the tree's own double-click would toggle it back
-        if (e.ClickCount > 1) return;   // a double-click is one gesture: one toggle, one write
+        if (e.ClickCount % 2 == 0) return;   // a double-click's second half: one toggle, one write; fast clicks count on, odd ones toggle
         item.IsExpanded = !item.IsExpanded;
         item.Focus();   // the keyboard carries on from the header clicked
     }

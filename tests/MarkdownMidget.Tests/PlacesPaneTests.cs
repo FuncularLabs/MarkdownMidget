@@ -171,6 +171,21 @@ public sealed class PlacesPaneTests : IDisposable
     });
 
     [Fact]
+    public void FastClicksOnAHeaderToggleItOnEveryOddCountAndWriteOnlyThen() => OnPane((pane, store) =>
+    {
+        var (drives, toggles) = (Section(pane, "Drives"), 0);
+        drives.Expanded += (_, _) => toggles++;   // each open or shut is the one write the pane makes
+        drives.Collapsed += (_, _) => toggles++;
+        // One fast series: WPF counts on (3, 4, ...) while the clicks stay within the double-click time.
+        foreach (var (clicks, open, toggled) in new[] { (1, false, 1), (2, false, 1), (3, true, 2), (4, true, 2) })
+        {
+            Assert.True(Click(drives, clicks));
+            Written(store);
+            Assert.Equal((open, toggled, open ? 0 : 1), (drives.IsExpanded, toggles, store.Load().Collapsed.Count));
+        }
+    });
+
+    [Fact]
     public void AClickOrDoubleClickOnACardsBlankSpaceDoesNothing() => OnPane((pane, store) =>
     {
         var (places, home) = (Section(pane, "Places"), Entry(Section(pane, "Places"), 0));
