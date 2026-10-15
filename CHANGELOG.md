@@ -9,6 +9,10 @@ testing before the stable release of the same number.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-14
+
+1.0.2 plus the one change below, to the built-in file picker's left pane.
+
 ### Changed
 
 - **The built-in file picker's left pane now groups its sections under larger headers you can collapse, and starts with Home**: Places, Quick access, Recent folders and Drives each sit on their own card with a thin border, with space between the cards. Each card's header, larger and bolder than the folders and in the normal text colour, sits on a shaded band across the top of the card, and the section's folders are indented under it. Click a header, or select it and press Enter or Space, to collapse or expand its section; Left collapses it and Right expands it, and a chevron on the header shows which way it is. Narrator reads each header with whether it is expanded or collapsed. The picker remembers which sections you collapsed, the next time it opens and after a restart, in `%LocalAppData%\MarkdownMidget\picker-views.json`, and a change made in one window doesn't undo one made in another; 1.0.1 and 1.0.2 read the file but forget which sections were collapsed whenever they write to it. **Home**, your user folder (such as `C:\Users\you`), is now the first entry under Places, before Desktop, Documents and Downloads, with its full path in its tooltip. The cards follow light and dark mode, and with a contrast theme on they take the theme's own colours. A section with nothing in it is still left out. Before, the section names were small grey labels that couldn't be collapsed, the folders under them weren't indented, nothing set one section apart from the next, and your user folder wasn't listed.
@@ -1544,7 +1548,8 @@ hands-on testing before dropping the prerelease flag for 0.2.0 stable.
 - **Formatting marks** toggle (¶ / ↵ / →).
 - Single-file `.exe` distribution.
 
-[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/FuncularLabs/MarkdownMidget/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.3
 [1.0.2]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.2
 [1.0.1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.1
 [1.0.1-beta1]: https://github.com/FuncularLabs/MarkdownMidget/releases/tag/v1.0.1-beta1
