@@ -11,6 +11,13 @@ not planned, and the deliberate limits, are in
 
 ---
 
+## 1.0.3 (released 2026-10-14)
+
+Made straight from master with no prerelease, as 1.0.2 was: the built-in file
+picker's left pane now puts each section on its own card under a larger header you
+can collapse, remembers which sections you collapsed, and starts with Home, your user
+folder. Nothing outside the picker's left pane changed.
+
 ## 1.0.2 (released 2026-10-14)
 
 A fix release, made straight from master with no prerelease: the built-in file

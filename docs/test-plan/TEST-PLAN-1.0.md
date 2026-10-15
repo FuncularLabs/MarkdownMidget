@@ -1,6 +1,6 @@
 # Markdown Midget 1.0 test plan
 
-This plan covers every user-facing change going into 1.0.0, 1.0.1 and 1.0.2: everything in `CHANGELOG.md` since `1.0.0-beta1`, a few commits since then with no CHANGELOG bullet (the view pair and the opening card), and block-level source preservation, which applies from the first build that includes it.
+This plan covers every user-facing change going into 1.0.0, 1.0.1, 1.0.2 and 1.0.3: everything in `CHANGELOG.md` since `1.0.0-beta1`, a few commits since then with no CHANGELOG bullet (the view pair and the opening card), and block-level source preservation, which applies from the first build that includes it.
 
 Results are tracked by build number in the [run log](#4-run-log). Claude runs and checks off every test marked **Automated (Claude)** and the automated part of every **Both** test. Developers then run the **Human** tests and the human part of **Both** tests.
 
@@ -2198,6 +2198,125 @@ The project version is now `1.0.1-beta1`. Since build 1282 the editor source has
 | DLG-06 | | Claude (2026-10-08) | auto PASS — human pending. All 26 C# tests the plan names pass: 24 in `PickerViewsTests` and 2 in `PickerRowsTests`. |
 | DLG-07 | | Claude (2026-10-08) | auto PASS — human pending. All 20 C# tests the plan names pass, all in `QuickAccessTests`. |
 | DLG-08 | | Claude (2026-10-08) | auto PASS — human pending. All 13 C# tests the plan names pass: 12 in `PickerOfferTests` and `PickerSettingTests.AnotherWindowsUnrelatedSaveKeepsThePickerSettingAsItIsOnDisk`. |
+
+### Build 1827 (1.0.2+build.1827) — 2026-10-14
+
+DLG-09 only: Paul's human result from 2026-10-14, and its automated half, run by Claude on 2026-10-14 on the same source. Build 1827 is master 1f49539, built locally as 1.0.2+build.1827 before the version became 1.0.3. It is 1.0.2 plus the one change in `CHANGELOG.md` `[1.0.3]`, to the built-in file picker's left pane (DLG-09), and v1.0.3 is the same code with the version, and the CHANGELOG it carries, moved to 1.0.3. No other result was recorded on this build. The automated half ran in `C:\code\MarkdownMidget\.claude\worktrees\agent-a62c39568ff2ddc91` with 1f49539 checked out; the local test build is numbered 1830.
+
+| ID | Result | By | Note |
+|---|---|---|---|
+| LIN-01 | | | |
+| LIN-02 | | | |
+| LIN-03 | | | |
+| LIN-04 | | | |
+| LIN-05 | | | |
+| LIN-06 | | | |
+| LIN-07 | | | |
+| VIEW-01 | | | |
+| VIEW-02 | | | |
+| VIEW-03 | | | |
+| FND-01 | | | |
+| FND-02 | | | |
+| FND-03 | | | |
+| FND-05 | | | |
+| TIP-01 | | | |
+| TIP-02 | | | |
+| THM-01 | | | |
+| THM-02 | | | |
+| THM-03 | | | |
+| THM-04 | | | |
+| THM-05 | | | |
+| THM-06 | | | |
+| THM-07 | | | |
+| PRN-01 | | | |
+| PRN-02 | | | |
+| MRK-01 | | | |
+| MRK-02 | | | |
+| ANC-01 | | | |
+| ANC-02 | | | |
+| ANC-03 | | | |
+| ANC-04 | | | |
+| LNK-01 | | | |
+| LNK-02 | | | |
+| LNK-03 | | | |
+| LNK-04 | | | |
+| LNK-05 | | | |
+| LNK-06 | | | |
+| LNK-07 | | | |
+| WEB-01 | | | |
+| WEB-02 | | | |
+| WEB-03 | | | |
+| WEB-04 | | | |
+| WEB-05 | | | |
+| WEB-06 | | | |
+| MENU-01 | | | |
+| SPL-01 | | | |
+| SPL-02 | | | |
+| PERF-01 | | | |
+| PERF-02 | | | |
+| SWT-01 | | | |
+| SWT-02 | | | |
+| SWT-03 | | | |
+| SWT-04 | | | |
+| SWT-05 | | | |
+| SWT-06 | | | |
+| SWT-07 | | | |
+| FM-01 | | | |
+| FM-02 | | | |
+| FM-03 | | | |
+| FM-04 | | | |
+| FM-05 | | | |
+| TBL-01 | | | |
+| TBL-02 | | | |
+| TBL-03 | | | |
+| TBL-04 | | | |
+| TBL-05 | | | |
+| TBL-06 | | | |
+| TBL-07 | | | |
+| BR-01 | | | |
+| BR-02 | | | |
+| BR-03 | | | |
+| LST-01 | | | |
+| LST-02 | | | |
+| LST-03 | | | |
+| OPN-01 | | | |
+| OPN-02 | | | |
+| OPN-03 | | | |
+| OPN-04 | | | |
+| OPN-05 | | | |
+| OPN-06 | | | |
+| OPN-07 | | | |
+| OPN-08 | | | |
+| OPN-09 | | | |
+| OPN-10 | | | |
+| BIG-01 | | | |
+| BIG-02 | | | |
+| BIG-03 | | | |
+| BIG-04 | | | |
+| BIG-05 | | | |
+| BIG-06 | | | |
+| BIG-07 | | | |
+| BIG-08 | | | |
+| SRC-01 | | | |
+| SRC-02 | | | |
+| SRC-03 | | | |
+| SRC-04 | | | |
+| SRC-05 | | | |
+| SRC-06 | | | |
+| SRC-07 | | | |
+| SRC-08 | | | |
+| INST-01 | | | |
+| INST-02 | | | |
+| INST-03 | | | |
+| DLG-01 | | | |
+| DLG-02 | | | |
+| DLG-03 | | | |
+| DLG-04 | | | |
+| DLG-05 | | | |
+| DLG-06 | | | |
+| DLG-07 | | | |
+| DLG-08 | | | |
+| DLG-09 | PASS | Claude (2026-10-14); Paul (2026-10-14) | human PASS: Paul reports DLG-09 passed on build 1827 (source 1f49539, 1.0.2+build.1827). auto PASS. All 20 C# tests the plan names pass on source 1f49539: 19 in `PlacesPaneTests` and `ChromePaletteTests.EveryKeyTheWindowsUseIsInBothPalettes`. |
 
 ### Build ___ (1.0.…+build.N) — date
 

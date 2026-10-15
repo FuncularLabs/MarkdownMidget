@@ -118,7 +118,7 @@ Every tagged push builds on GitHub Actions and attaches the exe automatically
 
 ## Status
 
-**Stable (1.0.x)**, in daily use and signed on every release: 1.0.2 is the latest
+**Stable (1.0.x)**, in daily use and signed on every release: 1.0.3 is the latest
 stable release, and the badge above and the entry marked **Latest** on the releases page
 point at it. Windows-only for now; the editor core is web-based, so a cross-platform
 shell (MAUI/Avalonia) is a realistic future step. 1.0 ships portable-only, with every
@@ -197,10 +197,10 @@ the one it replaced:
 
 | Where | Looks like |
 | --- | --- |
-| Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.2.57` |
-| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.2+build.57` |
-| The app, **Help ▸ About Markdown Midget** | `Version 1.0.2+build.57` |
-| The app's title bar, after the document name | `\| Markdown Midget v1.0.2+build.57` |
+| Explorer ▸ Properties ▸ Details ▸ **File version** | `1.0.3.57` |
+| Explorer ▸ Properties ▸ Details ▸ **Product version** | `1.0.3+build.57` |
+| The app, **Help ▸ About Markdown Midget** | `Version 1.0.3+build.57` |
+| The app's title bar, after the document name | `\| Markdown Midget v1.0.3+build.57` |
 
 The build prints it too (`MarkdownMidget local build #57 - ...`). Check the exe's
 Properties before copying it over an installed copy and **Help ▸ About Markdown
@@ -330,6 +330,8 @@ is deferred from this first iteration. Notable deferrals / divergences:
 The last few releases. See [CHANGELOG.md](CHANGELOG.md) for the full history and
 [ROADMAP.md](ROADMAP.md) for what's on deck.
 
+- **v1.0.3** — The built-in file picker's left pane now groups its sections under
+  larger **headers you can collapse**, and starts with **Home**, your user folder.
 - **v1.0.2** — A fix release: the built-in file picker's **Quick access** folders now
   appear on current **Windows 11**.
 - **v1.0.1** — **1.0.1-beta1 with the prerelease flag dropped.** The built-in file
