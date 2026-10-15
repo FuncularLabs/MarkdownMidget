@@ -2201,7 +2201,7 @@ The project version is now `1.0.1-beta1`. Since build 1282 the editor source has
 
 ### Build 1827 (1.0.2+build.1827) — 2026-10-14
 
-DLG-09 only: Paul's human result from 2026-10-14, and its automated half, run by Claude on 2026-10-14 on the same source. Build 1827 is master 1f49539, built locally as 1.0.2+build.1827 before the version became 1.0.3. It is 1.0.2 plus the one change in `CHANGELOG.md` `[1.0.3]`, to the built-in file picker's left pane (DLG-09), and v1.0.3 is the same code with the version, and the CHANGELOG it carries, moved to 1.0.3. No other result was recorded on this build. The automated half ran in `C:\code\MarkdownMidget\.claude\worktrees\agent-a62c39568ff2ddc91` with 1f49539 checked out; the local test build is numbered 1830.
+DLG-09 only: Paul's human result from 2026-10-14, and its automated half, run by Claude on 2026-10-14 on the same source. Build 1827 is master 1f49539, built locally as 1.0.2+build.1827 before the version became 1.0.3. It is 1.0.2 plus the one change in `CHANGELOG.md` `[1.0.3]`, to the built-in file picker's left pane (DLG-09), and v1.0.3 is the same code with the version, and the CHANGELOG it carries, moved to 1.0.3. No other result was recorded on this build. The automated half ran in `C:\code\MarkdownMidget\.claude\worktrees\agent-a62c39568ff2ddc91` with 1f49539 checked out; the local test build is numbered 1835.
 
 | ID | Result | By | Note |
 |---|---|---|---|
@@ -2316,7 +2316,7 @@ DLG-09 only: Paul's human result from 2026-10-14, and its automated half, run by
 | DLG-06 | | | |
 | DLG-07 | | | |
 | DLG-08 | | | |
-| DLG-09 | PASS | Claude (2026-10-14); Paul (2026-10-14) | human PASS: Paul reports DLG-09 passed on build 1827 (source 1f49539, 1.0.2+build.1827). auto PASS. All 20 C# tests the plan names pass on source 1f49539: 19 in `PlacesPaneTests` and `ChromePaletteTests.EveryKeyTheWindowsUseIsInBothPalettes`. |
+| DLG-09 | PASS | Claude (2026-10-14); Paul (2026-10-14) | human PASS: Paul reports DLG-09 passed on build 1827 (source 1f49539, 1.0.2+build.1827). auto PASS. All 21 C# tests the plan names pass on source 1f49539: 20 in `PlacesPaneTests` and `ChromePaletteTests.EveryKeyTheWindowsUseIsInBothPalettes`. |
 
 ### Build ___ (1.0.…+build.N) — date
 
